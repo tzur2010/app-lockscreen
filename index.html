@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#0f172a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Lockscreen">
+  <meta name="mobile-web-app-capable" content="yes">
+  <title>Lockscreen</title>
+  <link rel="manifest" href="./manifest.json">
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+
+  <!-- ========================================================================
+       1. מסך פתיח אנימטיבי קצר (Intro Splash - 1.2s)
+       ======================================================================== -->
+  <div class="splash-screen" id="splashScreen">
+    <div class="splash-content">
+      <div class="splash-lock-glow">
+        <svg class="splash-lock-svg" viewBox="0 0 64 64">
+          <path class="lock-shackle" d="M20 28V18c0-6.6 5.4-12 12-12s12 5.4 12 12v10" fill="none" stroke="currentColor" stroke-width="4.5" stroke-linecap="round"/>
+          <rect class="lock-body" x="12" y="28" width="40" height="30" rx="8" fill="currentColor"/>
+          <circle cx="32" cy="41" r="3.5" fill="#0f172a"/>
+          <path d="M32 44.5v5" stroke="#0f172a" stroke-width="3" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="splash-title">MAGIC LOCK</div>
+    </div>
+  </div>
+
+  <!-- ========================================================================
+       2. מסך בחירה 50/50 (Split Screen Hero) + הגדרות נקיות לאחר בחירה
+       ======================================================================== -->
+  <div class="setup-overlay" id="setupOverlay">
+
+    <!-- שלב א': מסך חצוי 50/50 לבחירת מכשיר בלבד -->
+    <div class="split-choice-screen" id="splitChoiceScreen">
+      <!-- חצי עליון: Samsung Galaxy (One UI) -->
+      <div class="split-half split-samsung" id="chooseSamsungBtn">
+        <div class="split-half-inner">
+          <div class="split-badge">One UI</div>
+          <div class="split-icon">
+            <svg viewBox="0 0 48 48" width="46" height="46" fill="none">
+              <rect x="11" y="4" width="26" height="40" rx="4.5" stroke="currentColor" stroke-width="2.5"/>
+              <circle cx="24" cy="8.5" r="1.6" fill="currentColor"/>
+              <circle cx="24" cy="36" r="3.2" stroke="currentColor" stroke-width="1.8" stroke-dasharray="2 2"/>
+            </svg>
+          </div>
+          <h2 class="split-title">Samsung Galaxy</h2>
+          <p class="split-subtitle">ממשק One UI מקורי</p>
+        </div>
+      </div>
+
+      <!-- קו הפרדה אמצעי -->
+      <div class="split-divider">
+        <span>בחר מכשיר</span>
+      </div>
+
+      <!-- חצי תחתון: Apple iPhone (iOS) -->
+      <div class="split-half split-ios" id="chooseIosBtn">
+        <div class="split-half-inner">
+          <div class="split-badge">iOS</div>
+          <div class="split-icon">
+            <svg viewBox="0 0 48 48" width="46" height="46" fill="none">
+              <rect x="11" y="4" width="26" height="40" rx="6.5" stroke="currentColor" stroke-width="2.5"/>
+              <rect x="19" y="7.5" width="10" height="3" rx="1.5" fill="currentColor"/>
+              <line x1="19" y1="40" x2="29" y2="40" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+          </div>
+          <h2 class="split-title">Apple iPhone</h2>
+          <p class="split-subtitle">ממשק iOS זכוכית בהיר</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- שלב ב': נפתח רק לאחר לחיצה על מכשיר -->
+    <div class="device-config-sheet" id="deviceConfigSheet">
+      <div class="config-header">
+        <button type="button" class="back-to-split-btn" id="backToSplitBtn">→ החלף מכשיר</button>
+        <div class="selected-device-pill" id="selectedDevicePill">Samsung Galaxy</div>
+      </div>
+
+      <div class="config-body">
+        <!-- בחירת סוג נעילה -->
+        <div class="config-group">
+          <label class="config-label">שיטת נעילה</label>
+          <div class="segmented-row" id="modeSelector">
+            <button type="button" class="seg-pill active" data-mode="pin">קוד PIN</button>
+            <button type="button" class="seg-pill" data-mode="pattern">דפוס (Pattern)</button>
+            <button type="button" class="seg-pill" data-mode="words">סיסמת מילים</button>
+          </div>
+        </div>
+
+        <!-- אורך קוד PIN (מוצג רק במצב PIN) -->
+        <div class="config-group" id="pinLengthGroup">
+          <label class="config-label">אורך קוד PIN</label>
+          <div class="segmented-row" id="pinLengthButtons">
+            <button type="button" class="seg-pill active" data-pinlen="4">4 ספרות</button>
+            <button type="button" class="seg-pill" data-pinlen="6">6 ספרות</button>
+          </div>
+        </div>
+
+        <!-- דפוס בלתי נראה (מוצג רק במצב Pattern) -->
+        <div class="config-group" id="stealthPatternGroup" style="display: none;">
+          <div class="clean-toggle-row">
+            <span>דפוס בלתי נראה (ללא קו מצויר)</span>
+            <label class="switch">
+              <input type="checkbox" id="toggleStealthPattern">
+              <span class="slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <!-- תמונת רקע ומסך בית -->
+        <div class="config-group">
+          <label class="config-label">רקע מסך נעילה ומסך בית</label>
+          <div class="media-actions-row">
+            <label class="media-upload-btn">
+              <span>🖼️ תמונת רקע</span>
+              <input type="file" id="wallpaperFileInput" accept="image/*" hidden>
+            </label>
+            <button type="button" class="media-clear-btn" id="clearWallpaperBtn" style="display: none;">איפוס רקע</button>
+
+            <label class="media-upload-btn">
+              <span>📱 תמונת מסך בית</span>
+              <input type="file" id="homescreenFileInput" accept="image/*" hidden>
+            </label>
+            <button type="button" class="media-clear-btn" id="clearHomescreenBtn" style="display: none;">איפוס בית</button>
+          </div>
+        </div>
+
+        <!-- פס סטטוס עליון (סוללה, קליטה ושעה) -->
+        <div class="config-group">
+          <label class="config-label">פס עליון (סוללה, קליטה ושעה)</label>
+          <div class="segmented-row" id="statusBarSelector">
+            <button type="button" class="seg-pill active" data-statusbar="show">הצג פס עליון</button>
+            <button type="button" class="seg-pill" data-statusbar="hide">ללא פס עליון</button>
+          </div>
+        </div>
+
+        <!-- התנהגות לאחר הזנה -->
+        <div class="config-group">
+          <label class="config-label">לאחר הקשת הסיסמה</label>
+          <div class="segmented-row" id="behaviorSelector">
+            <button type="button" class="seg-pill active" data-behavior="error">הצג שגיאה</button>
+            <button type="button" class="seg-pill" data-behavior="unlock">פתח מסך בית</button>
+          </div>
+        </div>
+
+        <!-- אפשרויות תצוגה והצצה סודית -->
+        <div class="config-group">
+          <label class="config-label">תצוגה והצצה סודית (Peek)</label>
+          <div class="clean-toggle-row">
+            <span>הצג פס עליון (סוללה, שעה וקליטה)</span>
+            <label class="switch">
+              <input type="checkbox" id="toggleStatusBar" checked>
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="clean-toggle-row" id="punchHoleSettingRow">
+            <span>הצג חור מצלמה שחור למעלה</span>
+            <label class="switch">
+              <input type="checkbox" id="togglePunchHole" checked>
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="clean-toggle-row">
+            <span>רטט סודי של הקוד בכיס (Haptic Peek)</span>
+            <label class="switch">
+              <input type="checkbox" id="toggleHapticPeek" checked>
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="clean-toggle-row">
+            <span>הצגה בשעון העליון בלחיצה (Clock Peek)</span>
+            <label class="switch">
+              <input type="checkbox" id="toggleChameleonClock" checked>
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="clean-toggle-row">
+            <span>הצצה בלחיצה ממושכת בשטח ריק (Hold Peek)</span>
+            <label class="switch">
+              <input type="checkbox" id="toggleHoldPeek" checked>
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="clean-toggle-row" id="fingerprintSettingRow">
+            <span>הצג טביעת אצבע שקופה (Samsung)</span>
+            <label class="switch">
+              <input type="checkbox" id="toggleFingerprint" checked>
+              <span class="slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <!-- תצוגה נקייה של הקוד האחרון שנקלט -->
+        <div class="last-captured-pill">
+          <span>קוד אחרון שנקלט:</span>
+          <strong id="settingsLastInput">---</strong>
+        </div>
+      </div>
+
+      <div class="config-footer">
+        <button type="button" class="launch-lockscreen-btn" id="launchLockscreenBtn">
+          🚀 הפעל מסך נעילה
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================
+       3. מסך הנעילה האותנטי והבהיר (Samsung One UI / Apple iOS)
+       ======================================================================== -->
+  <div class="phone-container theme-samsung" id="phoneContainer">
+    <!-- אזור לחיצה משולשת סודי בפינה השמאלית העליונה (חזרה להגדרות) -->
+    <div class="secret-trigger-zone" id="secretCornerTrigger"></div>
+
+    <!-- שורת סטטוס עליונה אותנטית -->
+    <div class="status-bar" id="statusBar">
+      <div class="status-left">
+        <span class="status-time" id="statusTime">14:22</span>
+      </div>
+
+      <div class="camera-punch-hole" id="cameraPunchHole"></div>
+
+      <div class="status-right">
+        <!-- אייקונים של Samsung -->
+        <div class="status-icons-samsung">
+          <svg class="status-svg wifi-svg" viewBox="0 0 24 24">
+            <path d="M12 4.5C7.3 4.5 3.1 6.4 0 9.5l12 12 12-12C20.9 6.4 16.7 4.5 12 4.5z"/>
+          </svg>
+          <svg class="status-svg signal-svg" viewBox="0 0 24 24">
+            <rect x="2" y="16" width="3" height="5" rx="0.8"/>
+            <rect x="7" y="12.5" width="3" height="8.5" rx="0.8"/>
+            <rect x="12" y="8.5" width="3" height="12.5" rx="0.8"/>
+            <rect x="17" y="4.5" width="3" height="16.5" rx="0.8"/>
+          </svg>
+          <span class="samsung-battery-text" id="samsungBatteryText">88%</span>
+          <div class="samsung-battery-icon">
+            <div class="samsung-battery-cap"></div>
+            <div class="samsung-battery-body">
+              <div class="samsung-battery-fill" id="samsungBatteryFill" style="height: 88%;"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- אייקונים של iPhone (iOS) -->
+        <div class="status-icons-ios">
+          <svg class="status-svg ios-signal-svg" viewBox="0 0 26 18">
+            <rect x="1" y="11" width="3.6" height="6" rx="1.2"/>
+            <rect x="7" y="8.2" width="3.6" height="8.8" rx="1.2"/>
+            <rect x="13" y="5" width="3.6" height="12" rx="1.2"/>
+            <rect x="19" y="1.5" width="3.6" height="15.5" rx="1.2"/>
+          </svg>
+          <svg class="status-svg ios-wifi-svg" viewBox="0 0 24 18">
+            <path d="M12 3.2c4.3 0 8.2 1.6 11.2 4.3l-2.1 2.2C18.7 7.4 15.5 6 12 6s-6.7 1.4-9.1 3.7L.8 7.5C3.8 4.8 7.7 3.2 12 3.2zm0 5.6c2.7 0 5.2 1 7.1 2.8l-2.1 2.2c-1.3-1.2-3.1-2-5-2s-3.7.8-5 2l-2.1-2.2c1.9-1.8 4.4-2.8 7.1-2.8zm0 5.6c1.2 0 2.3.5 3.1 1.3L12 18.8l-3.1-3.1c.8-.8 1.9-1.3 3.1-1.3z"/>
+          </svg>
+          <div class="ios-battery-wrap">
+            <div class="ios-battery-body">
+              <div class="ios-battery-fill" id="iosBatteryFill" style="width: 88%;"></div>
+              <span class="ios-battery-num" id="iosBatteryText">88</span>
+            </div>
+            <div class="ios-battery-cap"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- אייקון מנעול עליון -->
+    <div class="lock-icon" id="lockIconTrigger">
+      <svg viewBox="0 0 24 24">
+        <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/>
+      </svg>
+    </div>
+
+    <!-- כותרת והודעת שגיאה -->
+    <div class="header-area">
+      <div class="title-group" id="titleGroup">
+        <div class="title" id="mainTitle">הזן קוד PIN</div>
+        <div class="subtitle" id="subTitle">קוד ה-PIN שלך מכיל לפחות 4 ספרות</div>
+      </div>
+      <div class="error-msg" id="errorMsg">הוזן קוד PIN שגוי</div>
+    </div>
+
+    <!-- ==================== מצב 1: קוד PIN ==================== -->
+    <div class="unlock-mode-view active" id="viewPin">
+      <div class="pin-dots" id="pinDots"></div>
+
+      <div class="keypad">
+        <button class="key-btn" type="button" data-digit="1">
+          <span class="key-number">1</span>
+          <span class="key-letters">&nbsp;</span>
+        </button>
+        <button class="key-btn" type="button" data-digit="2">
+          <span class="key-number">2</span>
+          <span class="key-letters">ABC</span>
+        </button>
+        <button class="key-btn" type="button" data-digit="3">
+          <span class="key-number">3</span>
+          <span class="key-letters">DEF</span>
+        </button>
+
+        <button class="key-btn" type="button" data-digit="4">
+          <span class="key-number">4</span>
+          <span class="key-letters">GHI</span>
+        </button>
+        <button class="key-btn" type="button" data-digit="5">
+          <span class="key-number">5</span>
+          <span class="key-letters">JKL</span>
+        </button>
+        <button class="key-btn" type="button" data-digit="6">
+          <span class="key-number">6</span>
+          <span class="key-letters">MNO</span>
+        </button>
+
+        <button class="key-btn" type="button" data-digit="7">
+          <span class="key-number">7</span>
+          <span class="key-letters">PQRS</span>
+        </button>
+        <button class="key-btn" type="button" data-digit="8">
+          <span class="key-number">8</span>
+          <span class="key-letters">TUV</span>
+        </button>
+        <button class="key-btn" type="button" data-digit="9">
+          <span class="key-number">9</span>
+          <span class="key-letters">WXYZ</span>
+        </button>
+
+        <button class="key-btn samsung-only-key" type="button" id="keypadBackspaceBtn">
+          <span class="backspace-icon">
+            <svg viewBox="0 0 24 24">
+              <path d="M22 3H7c-.69 0-1.32.35-1.67.94L0 12l5.33 8.06c.35.59.98.94 1.67.94h15c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-3 12.59L17.59 17 14 13.41 10.41 17 9 15.59 12.59 12 9 8.41 10.41 7 14 10.59 17.59 7 19 8.41 15.41 12 19 15.59z"/>
+            </svg>
+          </span>
+        </button>
+
+        <button class="key-btn" type="button" data-digit="0">
+          <span class="key-number">0</span>
+          <span class="key-letters">&nbsp;</span>
+        </button>
+
+        <button class="key-btn samsung-only-key" type="button" id="keypadOkBtn">
+          <span class="key-action">OK</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- ==================== מצב 2: דפוס (Pattern 3x3) ==================== -->
+    <div class="unlock-mode-view" id="viewPattern">
+      <div class="pattern-wrapper" id="patternWrapper">
+        <svg class="pattern-svg" id="patternSvg" viewBox="0 0 276 276">
+          <polyline class="pattern-line" id="patternLine" points=""></polyline>
+        </svg>
+        <div class="pattern-grid" id="patternGrid">
+          <div class="pattern-node" data-node="1"><div class="pattern-node-dot"></div></div>
+          <div class="pattern-node" data-node="2"><div class="pattern-node-dot"></div></div>
+          <div class="pattern-node" data-node="3"><div class="pattern-node-dot"></div></div>
+          <div class="pattern-node" data-node="4"><div class="pattern-node-dot"></div></div>
+          <div class="pattern-node" data-node="5"><div class="pattern-node-dot"></div></div>
+          <div class="pattern-node" data-node="6"><div class="pattern-node-dot"></div></div>
+          <div class="pattern-node" data-node="7"><div class="pattern-node-dot"></div></div>
+          <div class="pattern-node" data-node="8"><div class="pattern-node-dot"></div></div>
+          <div class="pattern-node" data-node="9"><div class="pattern-node-dot"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== מצב 3: סיסמת מילים (מקלדת מערכת אמיתית בלבד!) ==================== -->
+    <div class="unlock-mode-view" id="viewWords">
+      <div class="words-native-container" id="wordsNativeContainer">
+        <div class="word-glass-field" id="wordGlassField">
+          <button type="button" class="word-icon-btn" id="toggleWordMaskBtn" title="הצג/הסתר">
+            <svg viewBox="0 0 24 24">
+              <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>
+            </svg>
+          </button>
+
+          <input
+            type="password"
+            class="word-real-input"
+            id="wordNativeInput"
+            autocomplete="off"
+            autocorrect="off"
+            autocapitalize="off"
+            spellcheck="false"
+            enterkeyhint="done"
+            placeholder="הקלד סיסמה..."
+          />
+
+          <button type="button" class="word-submit-btn" id="wordSubmitInlineBtn">
+            OK
+          </button>
+        </div>
+        <p class="word-tap-hint" id="wordTapHint">הקש כאן לפתיחת מקלדת הטלפון</p>
+      </div>
+    </div>
+
+    <!-- כפתור שיחת חירום ואזור תחתון של Samsung -->
+    <button class="emergency-btn" type="button" id="samsungEmergencyBtn">שיחת חירום</button>
+
+    <div class="footer-area" id="samsungFooter">
+      <!-- טביעת אצבע שקופה ונקייה -->
+      <div class="fingerprint-container" id="fingerprintContainer">
+        <img
+          class="fingerprint-img"
+          src="./p1.png"
+          onerror="this.onerror=null; this.src='./p1.jpg';"
+          alt="טביעת אצבע"
+        />
+      </div>
+
+      <div class="bottom-bar">
+        <div class="samsung-back-btn" id="samsungBackBtn">
+          <svg viewBox="0 0 24 24">
+            <polyline points="9 6 15 12 9 18"></polyline>
+          </svg>
+        </div>
+      </div>
+    </div>
+
+    <!-- אזור תחתון של iPhone (iOS) -->
+    <div class="ios-footer" id="iosFooter">
+      <div class="ios-bottom-actions">
+        <button type="button" class="ios-text-btn" id="iosEmergencyBtn">חירום</button>
+        <button type="button" class="ios-text-btn" id="iosRightActionBtn">ביטול</button>
+      </div>
+      <div class="ios-home-indicator"></div>
+    </div>
+
+    <!-- מסך בית מזויף (Fake Home Screen) -->
+    <div class="fake-homescreen" id="fakeHomescreen">
+      <div class="secret-relock-zone" id="secretRelockZone"></div>
+      <div class="default-homescreen-ui">
+        <div class="home-weather-widget">
+          <div class="home-clock" id="homeClock">14:22</div>
+          <div class="home-date" id="homeDate">יום שישי, 30 באוקטובר</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- חלון הצצה סודי (Secret Hold Peek) -->
+    <div class="secret-peek" id="secretPeek">
+      <svg class="peek-pattern-mini" id="peekPatternMini" viewBox="0 0 60 60"></svg>
+      <span class="peek-text" id="peekText">----</span>
+    </div>
+
+  </div>
+
+  <script src="./app.js"></script>
+</body>
+</html>

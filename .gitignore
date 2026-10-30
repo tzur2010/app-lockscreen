@@ -1,0 +1,22 @@
+# Ignore dependencies and build folders
+node_modules/
+android/
+ios/
+www/
+dist/
+build/
+.gradle/
+.idea/
+
+# Ignore APK / Capacitor packaging files
+*.apk
+*.keystore
+*.idsig
+package.json
+package-lock.json
+capacitor.config.json
+
+# Ignore OS / Editor files
+.DS_Store
+Thumbs.db
+desktop.ini

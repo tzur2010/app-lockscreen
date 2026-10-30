@@ -1,0 +1,21 @@
+{
+  "name": "One UI Lockscreen",
+  "short_name": "Lockscreen",
+  "description": "Native-Ready Magic Lockscreen App for Magicians & Mentalists",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0b0d13",
+  "theme_color": "#0b0d13",
+  "dir": "rtl",
+  "lang": "he",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='112' fill='%23111827'/%3E%3Cpath d='M336 224h-16v-48c0-35.3-28.7-64-64-64s-64 28.7-64 64v48h-16c-17.7 0-32 14.3-32 32v128c0 17.7 14.3 32 32 32h160c17.7 0 32-14.3 32-32V256c0-17.7-14.3-32-32-32zm-80 112c-17.7 0-32-14.3-32-32s14.3-32 32-32 32 14.3 32 32-14.3 32-32 32zm40-112h-80v-48c0-22.1 17.9-40 40-40s40 17.9 40 40v48z' fill='%23ffffff'/%3E%3C/svg%3E",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

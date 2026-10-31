@@ -19,7 +19,7 @@
       window.location.replace('https://tzur2010.github.io/app-lockscreen/?v=' + Date.now());
     }
   </script>
-  <link id="mainStylesheet" rel="stylesheet" href="./style.css?v=20261031212602">
+  <link id="mainStylesheet" rel="stylesheet" href="./style.css?v=20261101000444">
 </head>
 <body>
 
@@ -41,9 +41,9 @@
   </div>
 
   <!-- ========================================================================
-       2. מסך הגדרות מקדים (Setup / Onboarding) + בחירה 50/50
+       2. תפריט הגדרות סודי (Hidden Master Settings - נפתח בלחיצה ממושכת של 2.5 שניות בפינה הימנית העליונה)
        ======================================================================== -->
-  <div class="setup-overlay open" id="setupOverlay">
+  <div class="setup-overlay" id="setupOverlay">
 
     <!-- שלב א': מסך חצוי 50/50 בדיוק בין Samsung ל-iPhone -->
     <div class="split-choice-screen" id="splitChoiceScreen">
@@ -101,11 +101,28 @@
 
         <!-- 2. שיטת נעילה -->
         <div class="config-group">
-          <label class="config-label">מצב תצוגת נעילה</label>
+          <label class="config-label">בחירת מצב נעילה</label>
           <div class="segmented-row" id="modeSelector">
-            <button type="button" class="seg-pill active" data-mode="pin">קוד PIN</button>
-            <button type="button" class="seg-pill" data-mode="pattern">דפוס (Pattern)</button>
+            <button type="button" class="seg-pill active" data-mode="pin">PIN</button>
             <button type="button" class="seg-pill" data-mode="words">סיסמת מילים</button>
+            <button type="button" class="seg-pill" data-mode="swipe">החלקה</button>
+            <button type="button" class="seg-pill" data-mode="pattern">דפוס</button>
+          </div>
+        </div>
+
+        <!-- 2B. הגדרת מסך היעד לאחר הפתיחה + מצב כפיית פתיחה -->
+        <div class="config-group">
+          <label class="config-label">מסך היעד לאחר הפתיחה</label>
+          <div class="segmented-row" id="unlockTargetSelector">
+            <button type="button" class="seg-pill active" data-target="homescreen">מסך בית מדומה</button>
+            <button type="button" class="seg-pill" data-target="notes">אפליקציית פתקים מדומה</button>
+          </div>
+          <div class="clean-toggle-row" style="margin-top: 10px;">
+            <span>רוטינת "כפיית פתיחה" (Force Unlock - כל 4 ספרות פותחות)</span>
+            <label class="switch">
+              <input type="checkbox" id="toggleForceUnlockMode" checked>
+              <span class="slider"></span>
+            </label>
           </div>
         </div>
 
@@ -313,8 +330,11 @@
     <!-- שכבת עמעום כהה בגוון כחלחל-סגול עמוק (One UI 1:1 Backdrop) -->
     <div class="lockscreen-dim-backdrop" id="lockscreenDimBackdrop"></div>
 
-    <!-- אזור לחיצה משולשת סודי בפינה השמאלית העליונה (חזרה להגדרות) -->
+    <!-- אזור סודי בפינה השמאלית העליונה (לחיצה כפולה ל-Force Mode) -->
     <div class="secret-trigger-zone" id="secretCornerTrigger"></div>
+
+    <!-- אזור לחיצה ממושכת של 2.5 שניות בפינה הימנית העליונה לכניסה לתפריט ההגדרות הסודי -->
+    <div class="secret-topright-hold-zone" id="secretTopRightHoldZone"></div>
 
     <!-- שורת סטטוס עליונה אותנטית -->
     <div class="status-bar" id="statusBar">
@@ -342,7 +362,7 @@
         </div>
       </div>
 
-      <div class="status-right">
+      <div class="status-right" id="statusRightIcons">
         <!-- אייקונים של Samsung -->
         <div class="status-icons-samsung">
           <svg class="status-svg wifi-svg" viewBox="0 0 24 24">
@@ -523,6 +543,14 @@
       <!-- ==================== מצב 3: סיסמת מילים (מקלדת מערכת אמיתית) ==================== -->
       <div class="unlock-mode-view" id="viewWords"></div>
 
+      <!-- ==================== מצב 4: החלקה (Swipe to Unlock) ==================== -->
+      <div class="unlock-mode-view" id="viewSwipe">
+        <div class="swipe-unlock-area" id="swipeUnlockArea">
+          <div class="swipe-chevron-anim">⌃</div>
+          <div class="swipe-unlock-label">החלק למעלה לפתיחה</div>
+        </div>
+      </div>
+
       <!-- כפתור שיחת חירום בצורת קפסולה תואמת ומעוגלת מתחת לשדה הסיסמה / לוח המקשים -->
       <button class="emergency-btn" type="button" id="samsungEmergencyBtn">שיחת חירום</button>
 
@@ -563,14 +591,29 @@
       <div class="ios-home-indicator" id="iosHomeIndicator"></div>
     </div>
 
-    <!-- מסך בית מזויף (Fake Home Screen) -->
+    <!-- מסך יעד לאחר פתיחה: מסך בית מדומה או אפליקציית פתקים מדומה -->
     <div class="fake-homescreen" id="fakeHomescreen">
       <div class="secret-relock-zone" id="secretRelockZone"></div>
-      <div class="default-homescreen-ui">
+      <div class="default-homescreen-ui" id="defaultHomescreenUi">
         <div class="home-weather-widget">
           <div class="home-clock" id="homeClock">14:22</div>
           <div class="home-date" id="homeDate">יום שבת, 31 באוקטובר</div>
         </div>
+      </div>
+
+      <!-- אפליקציית פתקים מדומה (Fake Notes App) -->
+      <div class="fake-notes-app" id="fakeNotesApp" style="display: none;">
+        <div class="notes-header">
+          <span class="notes-back-link">‹ כל הפתקים</span>
+          <span class="notes-header-title">פתקים</span>
+          <span class="notes-done-btn" id="notesDoneBtn">סיום</span>
+        </div>
+        <div class="notes-date-line" id="notesDateLine">היום, 14:22</div>
+        <input type="text" class="notes-title-input" id="notesTitleInput" value="רשימה ותזכורות" />
+        <textarea class="notes-body-textarea" id="notesBodyTextarea" rows="12">דברים שצריך לזכור השבוע:
+• קניות לסוף שבוע
+• לאסוף חבילה מהדואר
+• מספר מזל / קוד: 1234</textarea>
       </div>
     </div>
 
@@ -582,6 +625,6 @@
 
   </div>
 
-  <script src="./app.js?v=20261031212602"></script>
+  <script src="./app.js?v=20261101000444"></script>
 </body>
 </html>

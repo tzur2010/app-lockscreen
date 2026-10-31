@@ -1481,45 +1481,82 @@ html, body {
   font-size: 14px;
 }
 
-/* נקודות קוד PIN (עבור מסך ה-PIN הקיים גם בסמסונג וגם באייפון) */
+/* נקודות קוד PIN דינמיות (השטח מתחיל ריק לחלוטין, וכל הקשה יוצרת נקודה חדשה באנימציית pop/fade-in) */
 .pin-dots {
   display: none;
   justify-content: center;
   align-items: center;
   gap: 14px;
-  height: 22px;
+  min-height: 24px;
+  height: 24px;
   margin: 8px 0 12px;
   direction: ltr;
 }
 
 .phone-container.theme-ios .pin-dots {
-  gap: 18px;
+  gap: 16px;
 }
 
-.dot {
+@keyframes pinDotPop {
+  0% {
+    opacity: 0;
+    transform: scale(0.25);
+  }
+  70% {
+    opacity: 1;
+    transform: scale(1.22);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.pin-dynamic-dot {
   width: 13px;
   height: 13px;
   border-radius: 50%;
-  border: 1.5px solid rgba(255, 255, 255, 0.85);
-  background: transparent;
-  transition: background 0.1s ease, transform 0.1s ease;
-}
-
-.dot.filled {
   background: #ffffff;
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.35);
 }
 
-.ios-dot {
-  width: 13px;
-  height: 13px;
-  border-radius: 50%;
-  border: 1.5px solid #ffffff;
+.pin-dynamic-dot.pin-dot-pop {
+  animation: pinDotPop 0.18s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.secret-topright-hold-zone {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 76px;
+  height: 76px;
+  z-index: 35;
   background: transparent;
-  transition: background 0.1s ease;
 }
 
-.ios-dot.filled {
-  background: #ffffff;
+.swipe-unlock-area {
+  width: 100%;
+  height: 220px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: rgba(255, 255, 255, 0.9);
+  cursor: pointer;
+  touch-action: none;
+}
+
+.swipe-chevron-anim {
+  font-size: 28px;
+  line-height: 1;
+  animation: iosSwipeFloat 1.8s ease-in-out infinite;
+}
+
+.swipe-unlock-label {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
 }
 
 /* ==========================================================================
@@ -2071,4 +2108,76 @@ html, body {
 
 .peek-pattern-mini.active {
   display: block;
+}
+
+/* אפליקציית פתקים מדומה (Fake Notes App) */
+.fake-notes-app {
+  width: 100%;
+  height: 100%;
+  background: #fffdf7;
+  color: #1e293b;
+  display: flex;
+  flex-direction: column;
+  padding: 48px 20px 28px;
+  direction: rtl;
+  z-index: 42;
+}
+
+.notes-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.notes-back-link {
+  color: #eab308;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.notes-header-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.notes-done-btn {
+  color: #eab308;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.notes-date-line {
+  text-align: center;
+  font-size: 12px;
+  color: #94a3b8;
+  margin: 10px 0 8px;
+}
+
+.notes-title-input {
+  width: 100%;
+  border: none;
+  background: transparent;
+  font-size: 22px;
+  font-weight: 800;
+  color: #0f172a;
+  margin-bottom: 10px;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.notes-body-textarea {
+  flex: 1;
+  width: 100%;
+  border: none;
+  background: transparent;
+  font-size: 16.5px;
+  line-height: 1.6;
+  color: #334155;
+  resize: none;
+  user-select: text;
+  -webkit-user-select: text;
 }

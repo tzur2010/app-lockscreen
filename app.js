@@ -8,10 +8,22 @@ const SELECTED_WALLPAPER_ID_KEY = 'magic_selected_wallpaper_id_v1';
 const HOMESCREEN_STORAGE_KEY = 'magic_custom_homescreen';
 const LAST_PIN_KEY = 'last_entered_pin';
 const HISTORY_KEY = 'pin_history';
-const FORCE_MODE_STORAGE_KEY = 'magic_lockscreen_force_mode';
+const FORCE_MODE_STORAGE_KEY = 'forceUnlockMode';
+const NOTES_TITLE_STORAGE_KEY = 'magic_notes_title_v1';
+const NOTES_BODY_STORAGE_KEY = 'magic_notes_body_v1';
 
-// מצב כפיית פתיחה למנטליזם (Any PIN Unlocks / Magician Force Mode)
-let isForceMode = (() => {
+// ביטול contextmenu לחלוטין (מניעת תפריטי דפדפן בלחיצה ארוכה)
+window.addEventListener(
+  'contextmenu',
+  (e) => {
+    e.preventDefault();
+    return false;
+  },
+  { capture: true }
+);
+
+// רוטינת "כפיית פתיחה" (Any PIN Unlocks / Force Routine) - ברירת מחדל: true
+let forceUnlockMode = (() => {
   const saved = localStorage.getItem(FORCE_MODE_STORAGE_KEY);
   if (saved === null) {
     localStorage.setItem(FORCE_MODE_STORAGE_KEY, 'true');
@@ -19,12 +31,16 @@ let isForceMode = (() => {
   }
   return saved === 'true';
 })();
+let isForceMode = forceUnlockMode;
 
 function setForceModeState(nextState) {
-  isForceMode = Boolean(nextState);
+  forceUnlockMode = Boolean(nextState);
+  isForceMode = forceUnlockMode;
   try {
-    localStorage.setItem(FORCE_MODE_STORAGE_KEY, String(isForceMode));
+    localStorage.setItem(FORCE_MODE_STORAGE_KEY, String(forceUnlockMode));
   } catch (e) {}
+  const toggleEl = document.getElementById('toggleForceUnlockMode');
+  if (toggleEl) toggleEl.checked = forceUnlockMode;
 }
 
 function triggerHaptic(msOrPattern) {
@@ -65,9 +81,9 @@ function playKeyClickSound() {
 }
 
 function toggleForceModeSecretly() {
-  setForceModeState(!isForceMode);
-  // חיווי רטט קצרצר ועדין בלבד (50ms) כאשר המצב משתנה
-  triggerHaptic(50);
+  setForceModeState(!forceUnlockMode);
+  // חיווי רטט עדין של 40ms כחיווי סודי למבצע בלבד
+  triggerHaptic(40);
 }
 
 // ----------------------------------------------------------------------------
@@ -323,7 +339,8 @@ const BUILTIN_GALLERY_WALLPAPERS = {
 const DEFAULT_CONFIG = {
   osTheme: 'samsung',           // 'samsung' | 'ios'
   deviceModel: 's26',           // 's20'..'s26' | 'iphone12'..'iphone18'
-  unlockMode: 'pin',            // 'pin' | 'pattern' | 'words'
+  unlockMode: 'pin',            // 'pin' | 'pattern' | 'words' | 'swipe'
+  unlockTargetScreen: 'homescreen', // 'homescreen' | 'notes'
   registeredPasscode: '1234',   // הסיסמה האישית שנרשמה ב-Setup (עבור PIN / מקלדת)
   registeredPattern: '12369',   // הדפוס האישי שנרשם ב-Setup (עבור Pattern בלבד)
   fingerprintEnrolled: false,   // האם טביעת אצבע כוילה ונרשמה ב-Setup
@@ -412,8 +429,10 @@ const statusBar = document.getElementById('statusBar');
 const cameraPunchHole = document.getElementById('cameraPunchHole');
 const islandLiveCam = document.getElementById('islandLiveCam');
 const statusTime = document.getElementById('statusTime');
+const statusRightIcons = document.getElementById('statusRightIcons');
 const lockIconTrigger = document.getElementById('lockIconTrigger');
 const secretCornerTrigger = document.getElementById('secretCornerTrigger');
+const secretTopRightHoldZone = document.getElementById('secretTopRightHoldZone');
 
 const clockLockScreen = document.getElementById('clockLockScreen');
 const clockLockBigTime = document.getElementById('clockLockBigTime');
@@ -433,6 +452,8 @@ const pinDotsContainer = document.getElementById('pinDots');
 const viewPin = document.getElementById('viewPin');
 const viewPattern = document.getElementById('viewPattern');
 const viewWords = document.getElementById('viewWords');
+const viewSwipe = document.getElementById('viewSwipe');
+const swipeUnlockArea = document.getElementById('swipeUnlockArea');
 
 const numericKeypad = document.getElementById('numericKeypad');
 const keypadBackspaceBtn = document.getElementById('keypadBackspaceBtn');
@@ -451,6 +472,12 @@ const iosSwipeHint = document.getElementById('iosSwipeHint');
 const iosRightActionBtn = document.getElementById('iosRightActionBtn');
 
 const fakeHomescreen = document.getElementById('fakeHomescreen');
+const defaultHomescreenUi = document.getElementById('defaultHomescreenUi');
+const fakeNotesApp = document.getElementById('fakeNotesApp');
+const notesDateLine = document.getElementById('notesDateLine');
+const notesTitleInput = document.getElementById('notesTitleInput');
+const notesBodyTextarea = document.getElementById('notesBodyTextarea');
+const notesDoneBtn = document.getElementById('notesDoneBtn');
 const secretRelockZone = document.getElementById('secretRelockZone');
 const homeClock = document.getElementById('homeClock');
 const homeDate = document.getElementById('homeDate');
@@ -461,6 +488,8 @@ const peekPatternMini = document.getElementById('peekPatternMini');
 
 // Settings Controls
 const modeSelector = document.getElementById('modeSelector');
+const unlockTargetSelector = document.getElementById('unlockTargetSelector');
+const toggleForceUnlockMode = document.getElementById('toggleForceUnlockMode');
 const statusBarSelector = document.getElementById('statusBarSelector');
 const stealthPatternGroup = document.getElementById('stealthPatternGroup');
 const toggleStealthPattern = document.getElementById('toggleStealthPattern');
@@ -1153,21 +1182,46 @@ function applyConfigToUI() {
     patternWrapper.classList.toggle('stealth-mode', config.stealthPattern);
   }
 
-  // החלפת תצוגות נעילה (PIN / Pattern / Words) והפרדה מוחלטת בין PIN לסיסמת מילים
+  // החלפת תצוגות נעילה (PIN / Pattern / Words / Swipe) והפרדה מוחלטת בין PIN לסיסמת מילים
   phoneContainer.classList.toggle('mode-words-active', config.unlockMode === 'words');
   viewPin.classList.toggle('active', config.unlockMode === 'pin');
   viewPattern.classList.toggle('active', config.unlockMode === 'pattern');
   viewWords.classList.toggle('active', config.unlockMode === 'words');
+  if (viewSwipe) {
+    viewSwipe.classList.toggle('active', config.unlockMode === 'swipe');
+  }
 
   // הפרדה מוחלטת:
-  // - במצב קוד PIN ('pin'): מוצגות נקודות ה-PIN ולוח המקשים הנומרי כרגיל (ללא שדה הקפסולה)
+  // - במצב קוד PIN ('pin'): מוצגות נקודות ה-PIN הדינמיות ולוח המקשים הנומרי כרגיל (ללא שדה הקפסולה)
   // - במצב סיסמת מילים ('words'): מוצג אך ורק שדה הקפסולה המעוגל בגוון סגלגל-בורדו כהה עם העין והמקלדת האמיתית
   // - במצב דפוס ('pattern'): מוצג אך ורק לוח הדפוס 3x3
+  // - במצב החלקה ('swipe'): מוצג אזור ההחלקה לפתיחה
   if (oneUiPasswordPillWrap) {
     oneUiPasswordPillWrap.style.display = config.unlockMode === 'words' ? 'flex' : 'none';
   }
   if (pinDotsContainer) {
     pinDotsContainer.style.display = config.unlockMode === 'pin' ? 'flex' : 'none';
+  }
+
+  // מסך היעד לאחר הפתיחה (מסך בית מדומה / אפליקציית פתקים מדומה)
+  const targetScreen = config.unlockTargetScreen || 'homescreen';
+  if (unlockTargetSelector) {
+    unlockTargetSelector.querySelectorAll('.seg-pill').forEach((btn) => {
+      btn.classList.toggle('active', btn.dataset.target === targetScreen);
+    });
+  }
+  if (fakeNotesApp && defaultHomescreenUi) {
+    if (targetScreen === 'notes') {
+      fakeNotesApp.style.display = 'flex';
+      defaultHomescreenUi.style.display = 'none';
+    } else {
+      fakeNotesApp.style.display = 'none';
+      const hasCustomHome = Boolean(localStorage.getItem(HOMESCREEN_STORAGE_KEY));
+      defaultHomescreenUi.style.display = hasCustomHome ? 'none' : 'flex';
+    }
+  }
+  if (toggleForceUnlockMode) {
+    toggleForceUnlockMode.checked = forceUnlockMode;
   }
 
   updateHeaderTitles();
@@ -1197,6 +1251,9 @@ function updateHeaderTitles() {
     subTitle.textContent = 'סיסמה חייבת להכיל לפחות 4 תווים, ביניהם אות אחת לפחות.';
   } else if (config.unlockMode === 'pattern') {
     mainTitle.textContent = config.osTheme === 'ios' ? 'צייר דפוס לשחרור' : 'צייר דפוס';
+    subTitle.textContent = '';
+  } else if (config.unlockMode === 'swipe') {
+    mainTitle.textContent = 'החלק לפתיחת המכשיר';
     subTitle.textContent = '';
   } else {
     // מסך קוד ה-PIN המקורי ללא שינוי
@@ -1470,27 +1527,34 @@ function clearCurrentInputs() {
 }
 
 // ----------------------------------------------------------------------------
-// 13. שדה הסיסמה של One UI (#passwordInput) + כפתור עין + לוח מקשים נומרי מתוקן
+// 13. נקודות PIN דינמיות מלאות כמו במקור (ללא עיגולים ריקים מראש) + לוח מקשים
 // ----------------------------------------------------------------------------
 function renderIosPinDots(currentVal) {
   if (!pinDotsContainer) return;
   const len = currentVal.length;
-  pinDotsContainer.innerHTML = '';
 
-  if (config.osTheme === 'ios') {
-    const totalFixed = 4;
-    for (let i = 0; i < totalFixed; i++) {
+  // אם הקלט ריק -> השטח מעל לוח המקשים מתנקה לחלוטין (ללא עיגולים ריקים או קווי מתאר)
+  if (len === 0) {
+    pinDotsContainer.innerHTML = '';
+    return;
+  }
+
+  const existingDots = pinDotsContainer.querySelectorAll('.pin-dynamic-dot');
+  const existingCount = existingDots.length;
+
+  if (len > existingCount) {
+    // הוספת נקודה חדשה באנימציית fade-in/pop קצרה עבור כל ספרה שנוספה
+    for (let i = existingCount; i < len; i++) {
       const dot = document.createElement('div');
-      dot.className = 'ios-dot' + (i < len ? ' filled' : '');
+      dot.className = 'pin-dynamic-dot pin-dot-pop';
       pinDotsContainer.appendChild(dot);
     }
-  } else {
-    // נקודות PIN עבור Samsung (4 נקודות בסיסיות שמתמלאות, או מתרחבות אם הוזנו יותר מ-4 ספרות)
-    const count = Math.max(4, len);
-    for (let i = 0; i < count; i++) {
-      const dot = document.createElement('div');
-      dot.className = 'dot' + (i < len ? ' filled' : '');
-      pinDotsContainer.appendChild(dot);
+  } else if (len < existingCount) {
+    // מחיקת הנקודות האחרונות בלחיצה על Backspace
+    for (let i = existingCount; i > len; i--) {
+      if (pinDotsContainer.lastElementChild) {
+        pinDotsContainer.removeChild(pinDotsContainer.lastElementChild);
+      }
     }
   }
 }
@@ -1522,16 +1586,16 @@ if (passwordInput) {
     const val = passwordInput.value;
     renderIosPinDots(val);
 
-    // במצב PIN: בהקשת הספרה הרביעית (או בהתאם לאורך הקוד המוגדר)
+    // במצב PIN: ברגע שמוקשת הספרה הרביעית (נוצרת הנקודה הרביעית)
     if (config.unlockMode === 'pin') {
       const configuredPin = String(config.registeredPasscode || '1234').trim();
-      const targetLen = Math.max(4, configuredPin.length || 4);
+      const targetLen = forceUnlockMode ? 4 : Math.max(4, configuredPin.length || 4);
       if (val.length >= targetLen) {
         clearTimeout(pinAutoSubmitTimer);
         const submitted = val;
         pinAutoSubmitTimer = setTimeout(() => {
           verifyAndSubmitPasscode(submitted, 'PIN');
-        }, 110);
+        }, 120);
       }
     }
   });
@@ -1575,16 +1639,16 @@ function initCleanNumericKeypad() {
       if (digit === null || !passwordInput) return;
 
       const configuredPin = String(config.registeredPasscode || '1234').trim();
-      const targetLen = Math.max(4, configuredPin.length || 4);
+      const targetLen = forceUnlockMode ? 4 : Math.max(4, configuredPin.length || 4);
       if (passwordInput.value.length >= targetLen) return;
 
-      // הוספת הספרה ישירות לשדה הסיסמה והפעלת אירוע input (ממלא נקודת PIN כרגיל)
+      // הוספת הספרה ישירות לשדה הסיסמה והפעלת אירוע input (יוצרת נקודה דינמית חדשה באנימציית pop)
       passwordInput.value += digit;
       passwordInput.dispatchEvent(new Event('input', { bubbles: true }));
 
-      // צליל נקישה עדין ורטט תקין של 20ms בכל הקשה על מקש
+      // צליל הקשה מקורי ורטט קצר (30ms) בכל הקשה על ספרה
       playKeyClickSound();
-      triggerHaptic(20);
+      triggerHaptic(30);
 
       if (iosRightActionBtn && config.osTheme === 'ios') {
         iosRightActionBtn.textContent = passwordInput.value.length > 0 ? 'מחק' : 'ביטול';
@@ -1848,7 +1912,7 @@ function hideHoldPeek() {
 phoneContainer.addEventListener('pointerdown', (e) => {
   if (setupOverlay.classList.contains('open')) return;
   const interactive = e.target.closest(
-    'button, input, .key-btn, .pattern-wrapper, .oneui-password-pill, .secret-trigger-zone, .status-time, .fingerprint-container, .ios-footer, .clock-lock-screen'
+    'button, input, textarea, .key-btn, .pattern-wrapper, .oneui-password-pill, .secret-trigger-zone, .secret-topright-hold-zone, .status-right, .swipe-unlock-area, .status-time, .fingerprint-container, .ios-footer, .clock-lock-screen'
   );
   if (interactive) return;
 
@@ -1864,6 +1928,12 @@ phoneContainer.addEventListener('pointerleave', hideHoldPeek);
 // 17. הדמיית ביומטריה אמיתית: טביעת אצבע (Samsung) ו-Face ID (iPhone)
 // ----------------------------------------------------------------------------
 function triggerUnlockHomescreen() {
+  if (notesDateLine) {
+    const now = new Date();
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    notesDateLine.textContent = `היום, ${hours}:${minutes}`;
+  }
   fakeHomescreen.classList.add('unlocked');
   if (passwordInput) passwordInput.blur();
   stopAllCameraStreams();
@@ -2033,15 +2103,16 @@ async function triggerIosFaceIdSequence() {
   }, 850);
 }
 
-// מחוות החלקה כלפי מעלה (Swipe Up) לפתיחת האייפון לאחר פתיחת המנעול ב-Face ID
+// מחוות החלקה כלפי מעלה (Swipe Up) לפתיחת המכשיר במצב החלקה ('swipe') או לאחר Face ID באייפון
 let swipeStartY = null;
 let swipeStartX = null;
 
 phoneContainer.addEventListener(
   'pointerdown',
   (e) => {
-    if (config.osTheme !== 'ios' || setupOverlay.classList.contains('open')) return;
+    if (setupOverlay.classList.contains('open')) return;
     if (fakeHomescreen.classList.contains('unlocked')) return;
+    if (config.osTheme !== 'ios' && config.unlockMode !== 'swipe') return;
     swipeStartY = e.clientY;
     swipeStartX = e.clientX;
   },
@@ -2051,27 +2122,35 @@ phoneContainer.addEventListener(
 phoneContainer.addEventListener(
   'pointerup',
   (e) => {
-    if (swipeStartY === null || config.osTheme !== 'ios') return;
+    if (swipeStartY === null) return;
     const dy = swipeStartY - e.clientY;
     const dx = Math.abs((swipeStartX || 0) - e.clientX);
     swipeStartY = null;
     swipeStartX = null;
 
-    if (dy > 55 && dy > dx) {
-      if (faceIdUnlocked) {
-        if (navigator.vibrate) {
-          try {
-            navigator.vibrate(35);
-          } catch (err) {}
+    if (dy > 50 && dy > dx) {
+      if (config.unlockMode === 'swipe') {
+        animateLockOpenAndUnlock();
+      } else if (config.osTheme === 'ios') {
+        if (faceIdUnlocked) {
+          triggerHaptic(35);
+          triggerUnlockHomescreen();
+        } else {
+          triggerIosFaceIdSequence();
         }
-        triggerUnlockHomescreen();
-      } else {
-        triggerIosFaceIdSequence();
       }
     }
   },
   { passive: true }
 );
+
+if (swipeUnlockArea) {
+  swipeUnlockArea.addEventListener('click', () => {
+    if (config.unlockMode === 'swipe') {
+      animateLockOpenAndUnlock();
+    }
+  });
+}
 
 // נעילה מחדש בלחיצה כפולה בפינה הימנית העליונה של מסך הבית
 let relockTapCount = 0;
@@ -2098,7 +2177,7 @@ if (secretRelockZone) {
 }
 
 // ----------------------------------------------------------------------------
-// 18. כניסה סודית להגדרות (3 לחיצות) + החלפת Force Mode בלחיצה כפולה בפינה השמאלית העליונה
+// 18. תפריט הגדרות סודי (לחיצה ממושכת 2.5 שניות בפינה הימנית העליונה) + עקיפת חירום (3 לחיצות על סוללה/Wi-Fi)
 // ----------------------------------------------------------------------------
 function bindTripleTap(element, callback) {
   if (!element) return;
@@ -2160,6 +2239,31 @@ function closeSettingsSheet() {
   }
 }
 
+// כניסה לתפריט ההגדרות הסודי: לחיצה ממושכת של 2.5 שניות בפינה הימנית העליונה של המסך
+let topRightHoldTimer = null;
+if (secretTopRightHoldZone) {
+  const startTopRightHold = (e) => {
+    if (e && e.cancelable) e.preventDefault();
+    clearTimeout(topRightHoldTimer);
+    topRightHoldTimer = setTimeout(() => {
+      triggerHaptic(50);
+      openSettingsSheet();
+    }, 2500);
+  };
+  const cancelTopRightHold = () => {
+    clearTimeout(topRightHoldTimer);
+  };
+  secretTopRightHoldZone.addEventListener('pointerdown', startTopRightHold);
+  secretTopRightHoldZone.addEventListener('pointerup', cancelTopRightHold);
+  secretTopRightHoldZone.addEventListener('pointerleave', cancelTopRightHold);
+  secretTopRightHoldZone.addEventListener('pointercancel', cancelTopRightHold);
+}
+
+// עקיפת חירום: 3 לחיצות מהירות על סמל הסוללה / Wi-Fi פותחות מיד את המכשיר
+bindTripleTap(statusRightIcons, () => {
+  animateLockOpenAndUnlock();
+});
+
 bindTripleTap(lockIconTrigger, openSettingsSheet);
 bindCornerSecretZone(secretCornerTrigger, toggleForceModeSecretly, openSettingsSheet);
 
@@ -2167,6 +2271,39 @@ function refreshSettingsLastCaptured() {
   const last = localStorage.getItem(LAST_PIN_KEY) || '---';
   if (settingsLastInput) settingsLastInput.textContent = last;
 }
+
+// שמירת תוכן אפליקציית הפתקים המדומה ב-localStorage
+function initFakeNotesApp() {
+  const savedTitle = localStorage.getItem(NOTES_TITLE_STORAGE_KEY);
+  const savedBody = localStorage.getItem(NOTES_BODY_STORAGE_KEY);
+  if (notesTitleInput && savedTitle !== null) {
+    notesTitleInput.value = savedTitle;
+  }
+  if (notesBodyTextarea && savedBody !== null) {
+    notesBodyTextarea.value = savedBody;
+  }
+  if (notesTitleInput) {
+    notesTitleInput.addEventListener('input', () => {
+      try {
+        localStorage.setItem(NOTES_TITLE_STORAGE_KEY, notesTitleInput.value);
+      } catch (e) {}
+    });
+  }
+  if (notesBodyTextarea) {
+    notesBodyTextarea.addEventListener('input', () => {
+      try {
+        localStorage.setItem(NOTES_BODY_STORAGE_KEY, notesBodyTextarea.value);
+      } catch (e) {}
+    });
+  }
+  if (notesDoneBtn) {
+    notesDoneBtn.addEventListener('click', () => {
+      if (notesTitleInput) notesTitleInput.blur();
+      if (notesBodyTextarea) notesBodyTextarea.blur();
+    });
+  }
+}
+initFakeNotesApp();
 
 // ----------------------------------------------------------------------------
 // 19. מאזינים להגדרות והעלאת תמונות מהגלריה (LocalStorage)
@@ -2178,6 +2315,22 @@ if (modeSelector) {
       saveConfig();
       applyConfigToUI();
     });
+  });
+}
+
+if (unlockTargetSelector) {
+  unlockTargetSelector.querySelectorAll('.seg-pill').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      config.unlockTargetScreen = btn.dataset.target;
+      saveConfig();
+      applyConfigToUI();
+    });
+  });
+}
+
+if (toggleForceUnlockMode) {
+  toggleForceUnlockMode.addEventListener('change', (e) => {
+    setForceModeState(e.target.checked);
   });
 }
 
@@ -2361,7 +2514,7 @@ loadCustomMedia();
 applyConfigToUI();
 
 // מנגנון בדיקת גרסה אוטומטי מול GitHub Pages
-const CURRENT_APP_VERSION = '20261031212602';
+const CURRENT_APP_VERSION = '20261101000444';
 
 async function checkRemoteVersionAndReload() {
   if (!navigator.onLine) return;

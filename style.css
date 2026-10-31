@@ -1481,19 +1481,32 @@ html, body {
   font-size: 14px;
 }
 
-/* נקודות קוד עבור iOS */
+/* נקודות קוד PIN (עבור מסך ה-PIN הקיים גם בסמסונג וגם באייפון) */
 .pin-dots {
   display: none;
   justify-content: center;
   align-items: center;
-  gap: 18px;
-  height: 20px;
-  margin: 8px 0 14px;
+  gap: 14px;
+  height: 22px;
+  margin: 8px 0 12px;
   direction: ltr;
 }
 
-.phone-container.theme-ios .pin-dots.active-ios-dots {
-  display: flex;
+.phone-container.theme-ios .pin-dots {
+  gap: 18px;
+}
+
+.dot {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.85);
+  background: transparent;
+  transition: background 0.1s ease, transform 0.1s ease;
+}
+
+.dot.filled {
+  background: #ffffff;
 }
 
 .ios-dot {
@@ -1841,19 +1854,31 @@ html, body {
   filter: contrast(1.4) brightness(1.75) drop-shadow(0 0 14px rgba(56, 189, 248, 0.98));
 }
 
-/* חץ חזרה (>) ממוקם בפינה השמאלית התחתונה ומצביע שמאלה */
+.words-mode-spacer {
+  display: none;
+}
+
+.phone-container.mode-words-active .words-mode-spacer {
+  display: block;
+  flex: 1;
+}
+
+/* חץ חזרה (<) ממוקם בפינה השמאלית התחתונה ומצביע שמאלה */
 .bottom-bar {
   width: 100%;
-  direction: ltr;
+  direction: ltr !important;
   display: flex;
+  flex-direction: row !important;
   align-items: center;
-  justify-content: flex-start;
-  padding: 0 12px 2px;
+  justify-content: flex-start !important;
+  padding: 0 8px 2px;
 }
 
 .samsung-back-btn {
   width: 44px;
   height: 44px;
+  margin-right: auto !important;
+  margin-left: 0 !important;
   background: transparent;
   border: none;
   display: flex;

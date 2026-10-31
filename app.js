@@ -1044,12 +1044,12 @@ function applyConfigToUI() {
     }
   }
 
-  // הצגת רישום טביעת אצבע רק עבור Samsung, ורישום Face ID רק עבור iPhone
+  // הצגת רישום טביעת אצבע ו-Face ID בהגדרות
   if (fpEnrollSection) {
     fpEnrollSection.style.display = config.osTheme === 'samsung' ? 'flex' : 'none';
   }
   if (faceIdEnrollSection) {
-    faceIdEnrollSection.style.display = config.osTheme === 'ios' ? 'flex' : 'none';
+    faceIdEnrollSection.style.display = 'flex';
   }
 
   // הצגת/הסתרת שורת סטטוס עליונה
@@ -1092,26 +1092,21 @@ function applyConfigToUI() {
     patternWrapper.classList.toggle('stealth-mode', config.stealthPattern);
   }
 
-  // החלפת תצוגות נעילה (PIN / Pattern / Words)
+  // החלפת תצוגות נעילה (PIN / Pattern / Words) והפרדה מוחלטת בין PIN לסיסמת מילים
+  phoneContainer.classList.toggle('mode-words-active', config.unlockMode === 'words');
   viewPin.classList.toggle('active', config.unlockMode === 'pin');
   viewPattern.classList.toggle('active', config.unlockMode === 'pattern');
   viewWords.classList.toggle('active', config.unlockMode === 'words');
 
-  // הצגת שדה הקפסולה של One UI או נקודות iOS
-  if (config.osTheme === 'samsung') {
-    if (oneUiPasswordPillWrap) {
-      oneUiPasswordPillWrap.style.display = config.unlockMode === 'pattern' ? 'none' : 'flex';
-    }
-    if (pinDotsContainer) {
-      pinDotsContainer.style.display = 'none';
-    }
-  } else {
-    if (oneUiPasswordPillWrap) {
-      oneUiPasswordPillWrap.style.display = config.unlockMode === 'words' ? 'flex' : 'none';
-    }
-    if (pinDotsContainer) {
-      pinDotsContainer.style.display = config.unlockMode === 'pin' ? 'flex' : 'none';
-    }
+  // הפרדה מוחלטת:
+  // - במצב קוד PIN ('pin'): מוצגות נקודות ה-PIN ולוח המקשים הנומרי כרגיל (ללא שדה הקפסולה)
+  // - במצב סיסמת מילים ('words'): מוצג אך ורק שדה הקפסולה המעוגל בגוון סגלגל-בורדו כהה עם העין והמקלדת האמיתית
+  // - במצב דפוס ('pattern'): מוצג אך ורק לוח הדפוס 3x3
+  if (oneUiPasswordPillWrap) {
+    oneUiPasswordPillWrap.style.display = config.unlockMode === 'words' ? 'flex' : 'none';
+  }
+  if (pinDotsContainer) {
+    pinDotsContainer.style.display = config.unlockMode === 'pin' ? 'flex' : 'none';
   }
 
   updateHeaderTitles();
@@ -1128,33 +1123,24 @@ function applyConfigToUI() {
   clearCurrentInputs();
   refreshSettingsLastCaptured();
 
-  // הפעלת Face ID באייפון כשמסך ההגדרות סגור
+  // הפעלת סריקת פנים כשמסך ההגדרות סגור (אם נרשמו פנים)
   if (!setupOverlay.classList.contains('open')) {
     triggerIosFaceIdSequence();
   }
 }
 
 function updateHeaderTitles() {
-  if (config.osTheme === 'ios') {
-    if (config.unlockMode === 'pin') {
-      mainTitle.textContent = 'הזן קוד גישה';
-      subTitle.textContent = '';
-    } else if (config.unlockMode === 'pattern') {
-      mainTitle.textContent = 'צייר דפוס לשחרור';
-      subTitle.textContent = '';
-    } else {
-      mainTitle.textContent = 'הזן סיסמה';
-      subTitle.textContent = '';
-    }
+  if (config.unlockMode === 'words') {
+    // עיצוב צילום המסך מיועד אך ורק לאפשרות של "סיסמת מילים"
+    mainTitle.textContent = 'הזן סיסמה';
+    subTitle.textContent = 'סיסמה חייבת להכיל לפחות 4 תווים, ביניהם אות אחת לפחות.';
+  } else if (config.unlockMode === 'pattern') {
+    mainTitle.textContent = config.osTheme === 'ios' ? 'צייר דפוס לשחרור' : 'צייר דפוס';
+    subTitle.textContent = '';
   } else {
-    // Samsung One UI 1:1 Exact Titles
-    if (config.unlockMode === 'pattern') {
-      mainTitle.textContent = 'צייר דפוס';
-      subTitle.textContent = 'חבר לפחות 4 נקודות לשחרור הנעילה.';
-    } else {
-      mainTitle.textContent = 'הזן סיסמה';
-      subTitle.textContent = 'סיסמה חייבת להכיל לפחות 4 תווים, ביניהם אות אחת לפחות.';
-    }
+    // מסך קוד ה-PIN המקורי ללא שינוי
+    mainTitle.textContent = config.osTheme === 'ios' ? 'הזן קוד גישה' : 'הזן קוד PIN';
+    subTitle.textContent = '';
   }
 }
 
@@ -1299,9 +1285,14 @@ function triggerErrorFeedback(customErrorMessage = 'סיסמה שגויה') {
     setTimeout(() => wordGlassField.classList.remove('text-shake'), 420);
   }
 
-  if (config.unlockMode === 'pin' && config.osTheme === 'ios') {
+  if (config.unlockMode === 'pin' && pinDotsContainer) {
     pinDotsContainer.classList.add('ios-dots-shake');
     setTimeout(() => pinDotsContainer.classList.remove('ios-dots-shake'), 420);
+  }
+
+  if (customErrorMessage === 'טביעת אצבע לא תואמת') {
+    phoneContainer.classList.add('text-shake');
+    setTimeout(() => phoneContainer.classList.remove('text-shake'), 420);
   }
 
   if (config.unlockMode === 'pattern') {
@@ -1377,6 +1368,14 @@ function renderIosPinDots(currentVal) {
     for (let i = 0; i < totalFixed; i++) {
       const dot = document.createElement('div');
       dot.className = 'ios-dot' + (i < len ? ' filled' : '');
+      pinDotsContainer.appendChild(dot);
+    }
+  } else {
+    // נקודות PIN עבור Samsung (4 נקודות בסיסיות שמתמלאות, או מתרחבות אם הוזנו יותר מ-4 ספרות)
+    const count = Math.max(4, len);
+    for (let i = 0; i < count; i++) {
+      const dot = document.createElement('div');
+      dot.className = 'dot' + (i < len ? ' filled' : '');
       pinDotsContainer.appendChild(dot);
     }
   }
@@ -1749,10 +1748,10 @@ function triggerUnlockHomescreen() {
   stopAllCameraStreams();
 }
 
-// 17A. סמסונג: אימות טביעת אצבע קפדני (בודק שהמשתמש רשם טביעת אצבע + מיקום הלחיצה + משך הלחיצה המכויל)
-let fpHoldTimer = null;
+// 17A. סמסונג: אימות טביעת אצבע קפדני (נפתח רק למי שהגדיר: בודק מיקום מדויק + לא קצר מדי + לא ארוך מדי)
+let fpOverholdTimer = null;
+let fpReadyPulseTimer = null;
 let fpPressStartTime = 0;
-let fpUnlockedDuringHold = false;
 let fpSpotMatches = false;
 
 function startFingerprintHold(e) {
@@ -1760,10 +1759,9 @@ function startFingerprintHold(e) {
   if (fakeHomescreen.classList.contains('unlocked') || isLockedOut) return;
 
   fpPressStartTime = performance.now();
-  fpUnlockedDuringHold = false;
   fingerprintContainer.classList.add('pressing', 'fp-holding');
 
-  // בדיקת מיקום האצבע על החיישן מול הכיול שנשמר ב-Setup
+  // בדיקת קואורדינטת המגע על החיישן מול הקואורדינטה שנרשמה ב-Setup
   const rect = fingerprintContainer.getBoundingClientRect();
   const normX = Math.min(Math.max((e.clientX - rect.left) / rect.width, 0), 1);
   const normY = Math.min(Math.max((e.clientY - rect.top) / rect.height, 0), 1);
@@ -1771,52 +1769,61 @@ function startFingerprintHold(e) {
   const targetY = typeof config.fingerprintZoneY === 'number' ? config.fingerprintZoneY : 0.5;
   const spotDist = Math.hypot(normX - targetX, normY - targetY);
 
-  fpSpotMatches = Boolean(config.fingerprintEnrolled) && spotDist <= 0.31;
+  fpSpotMatches = Boolean(config.fingerprintEnrolled) && spotDist <= 0.28;
 
-  const calibratedMs = Math.max(config.fingerprintHoldMs || 480, 320);
+  const calibratedMs = Math.max(config.fingerprintHoldMs || 550, 300);
 
-  clearTimeout(fpHoldTimer);
-  fpHoldTimer = setTimeout(() => {
-    // אם טביעת האצבע לא כוילה או שהונחה באזור/זווית שגויים -> כישלון זיהוי
-    if (!fpSpotMatches) {
-      fpPressStartTime = 0;
-      fingerprintContainer.classList.remove('pressing', 'fp-holding');
-      triggerErrorFeedback('טביעת אצבע לא תואמת');
-      return;
-    }
+  clearTimeout(fpReadyPulseTimer);
+  clearTimeout(fpOverholdTimer);
 
-    fpUnlockedDuringHold = true;
+  // חיווי רטט עדין ברגע שמגיעים למשך הנגיעה המוגדר (אם האצבע במיקום הנכון)
+  if (fpSpotMatches) {
+    fpReadyPulseTimer = setTimeout(() => {
+      if (navigator.vibrate) {
+        try {
+          navigator.vibrate(25);
+        } catch (err) {}
+      }
+    }, calibratedMs);
+  }
+
+  // אם המשתמש מחזיק ארוך מדי מעבר למשך הנגיעה שנרשם -> נכשל מיד ("טביעת אצבע לא תואמת")
+  fpOverholdTimer = setTimeout(() => {
+    if (!fpPressStartTime) return;
+    fpPressStartTime = 0;
     fingerprintContainer.classList.remove('pressing', 'fp-holding');
-    fingerprintContainer.classList.add('fp-success');
-
-    // רטט אישור של 50ms ופתיחה חלקה של המכשיר
-    if (navigator.vibrate) {
-      try {
-        navigator.vibrate(50);
-      } catch (err) {}
-    }
-
-    setTimeout(() => {
-      triggerUnlockHomescreen();
-      setTimeout(() => {
-        fingerprintContainer.classList.remove('fp-success');
-      }, 400);
-    }, 180);
-  }, calibratedMs);
+    triggerErrorFeedback('טביעת אצבע לא תואמת');
+  }, calibratedMs + 195);
 }
 
 function endFingerprintHold() {
-  clearTimeout(fpHoldTimer);
+  clearTimeout(fpReadyPulseTimer);
+  clearTimeout(fpOverholdTimer);
   if (!fpPressStartTime) return;
 
   const heldMs = performance.now() - fpPressStartTime;
   fpPressStartTime = 0;
   fingerprintContainer.classList.remove('pressing', 'fp-holding');
 
-  const calibratedMs = Math.max(config.fingerprintHoldMs || 480, 320);
+  const calibratedMs = Math.max(config.fingerprintHoldMs || 550, 300);
+  const timeDiff = Math.abs(heldMs - calibratedMs);
 
-  // אם המשתמש עזב לפני הזמן המכויל או שמיקום האצבע לא תאם -> הודעת שגיאה "טביעת אצבע לא תואמת"
-  if (!fpUnlockedDuringHold && heldMs < calibratedMs) {
+  // רק הנחת אותה אצבע במיקום המוגדר ובמשך הזמן המוגדר (לא קצר מדי ולא ארוך מדי) פותחת את המכשיר
+  if (fpSpotMatches && timeDiff <= 170) {
+    fingerprintContainer.classList.add('fp-success');
+    if (navigator.vibrate) {
+      try {
+        navigator.vibrate(50);
+      } catch (err) {}
+    }
+    setTimeout(() => {
+      triggerUnlockHomescreen();
+      setTimeout(() => {
+        fingerprintContainer.classList.remove('fp-success');
+      }, 400);
+    }, 140);
+  } else {
+    // נגיעה קצרה מדי, ארוכה מדי, במיקום שגוי או ללא רישום -> רטט שגיאה כפול, רעידת מסך ו-"טביעת אצבע לא תואמת"
     triggerErrorFeedback('טביעת אצבע לא תואמת');
   }
 }
@@ -1828,7 +1835,7 @@ if (fingerprintContainer) {
   fingerprintContainer.addEventListener('pointercancel', endFingerprintHold);
 }
 
-// 17B. אייפון: סריקת Face ID אמיתית שמשווה את מצלמת הסלפי לתווי הפנים שנרשמו ב-Setup
+// 17B. זיהוי פנים אמיתי (Face ID): פותח את המנעול רק כשמצלמת הסלפי מזהה מחדש את הפנים שנרשמו ב-Setup
 async function triggerIosFaceIdSequence() {
   clearTimeout(faceIdTimer);
   faceIdUnlocked = false;
@@ -1843,9 +1850,7 @@ async function triggerIosFaceIdSequence() {
     iosSwipeHint.classList.remove('visible');
   }
 
-  if (config.osTheme !== 'ios') return;
-
-  // אם המשתמש עדיין לא רשם את הפנים שלו ב-Setup -> המנעול נשאר סגור ולא נפתח מעצמו
+  // אם המשתמש עדיין לא רשם את הפנים שלו ב-Setup -> המנעול נשאר נעול!
   if (!config.faceIdEnrolled || !Array.isArray(config.faceSignature) || config.faceSignature.length === 0) {
     return;
   }
@@ -1878,8 +1883,8 @@ async function triggerIosFaceIdSequence() {
       cameraPunchHole.classList.remove('faceid-animating');
     }
 
-    // פתיחת המנעול אך ורק אם הפנים במצלמה תואמות לתווי הפנים שנרשמו ב-Setup
-    if (similarity >= 0.78) {
+    // רק כשמצלמת הסלפי מזהה מחדש את הפנים של המשתמש שהוגדר -> המנעול נפתח
+    if (similarity >= 0.80) {
       faceIdUnlocked = true;
       if (cameraPunchHole) {
         cameraPunchHole.classList.add('faceid-unlocked');
@@ -1895,9 +1900,14 @@ async function triggerIosFaceIdSequence() {
           navigator.vibrate(30);
         } catch (err) {}
       }
+      if (config.osTheme === 'samsung') {
+        setTimeout(() => {
+          triggerUnlockHomescreen();
+        }, 320);
+      }
     } else {
+      // כל ניסיון אחר משאיר את המנעול נעול
       faceIdUnlocked = false;
-      triggerErrorFeedback('זיהוי פנים לא תואם');
     }
   }, 850);
 }
@@ -2204,7 +2214,7 @@ loadCustomMedia();
 applyConfigToUI();
 
 // מנגנון בדיקת גרסה אוטומטי מול GitHub Pages
-const CURRENT_APP_VERSION = '20261031194929';
+const CURRENT_APP_VERSION = '20261031200742';
 
 async function checkRemoteVersionAndReload() {
   if (!navigator.onLine) return;

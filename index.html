@@ -13,7 +13,7 @@
   <meta http-equiv="Expires" content="0">
   <title>Lockscreen</title>
   <link rel="manifest" href="./manifest.json">
-  <link rel="stylesheet" href="./style.css?v=20261031194929">
+  <link rel="stylesheet" href="./style.css?v=20261031200742">
 </head>
 <body>
 
@@ -97,9 +97,9 @@
         <div class="config-group">
           <label class="config-label">מצב תצוגת נעילה</label>
           <div class="segmented-row" id="modeSelector">
-            <button type="button" class="seg-pill active" data-mode="pin">סיסמה + לוח מקשים</button>
+            <button type="button" class="seg-pill active" data-mode="pin">קוד PIN</button>
             <button type="button" class="seg-pill" data-mode="pattern">דפוס (Pattern)</button>
-            <button type="button" class="seg-pill" data-mode="words">מקלדת מלאה</button>
+            <button type="button" class="seg-pill" data-mode="words">סיסמת מילים</button>
           </div>
         </div>
 
@@ -430,100 +430,98 @@
       </div>
     </div>
 
-    <!-- נקודות קוד עבור iOS בלבד -->
-    <div class="pin-dots" id="pinDots"></div>
+      <!-- נקודות קוד PIN (מוצגות במצב קוד PIN גם בסמסונג וגם באייפון) -->
+      <div class="pin-dots" id="pinDots"></div>
 
-    <!-- ==================== מצב 1: לוח מקשים נומרי נקי (CSS Grid repeat(3, 1fr)) ==================== -->
-    <div class="unlock-mode-view active" id="viewPin">
-      <div class="keypad" id="numericKeypad">
-        <button class="key-btn" type="button" data-digit="1">
-          <span class="key-number">1</span>
-          <span class="key-letters">&nbsp;</span>
-        </button>
-        <button class="key-btn" type="button" data-digit="2">
-          <span class="key-number">2</span>
-          <span class="key-letters">ABC</span>
-        </button>
-        <button class="key-btn" type="button" data-digit="3">
-          <span class="key-number">3</span>
-          <span class="key-letters">DEF</span>
-        </button>
+      <!-- ==================== מצב 1: לוח מקשים נומרי (קוד PIN) ==================== -->
+      <div class="unlock-mode-view active" id="viewPin">
+        <div class="keypad" id="numericKeypad">
+          <button class="key-btn" type="button" data-digit="1">
+            <span class="key-number">1</span>
+            <span class="key-letters">&nbsp;</span>
+          </button>
+          <button class="key-btn" type="button" data-digit="2">
+            <span class="key-number">2</span>
+            <span class="key-letters">ABC</span>
+          </button>
+          <button class="key-btn" type="button" data-digit="3">
+            <span class="key-number">3</span>
+            <span class="key-letters">DEF</span>
+          </button>
 
-        <button class="key-btn" type="button" data-digit="4">
-          <span class="key-number">4</span>
-          <span class="key-letters">GHI</span>
-        </button>
-        <button class="key-btn" type="button" data-digit="5">
-          <span class="key-number">5</span>
-          <span class="key-letters">JKL</span>
-        </button>
-        <button class="key-btn" type="button" data-digit="6">
-          <span class="key-number">6</span>
-          <span class="key-letters">MNO</span>
-        </button>
+          <button class="key-btn" type="button" data-digit="4">
+            <span class="key-number">4</span>
+            <span class="key-letters">GHI</span>
+          </button>
+          <button class="key-btn" type="button" data-digit="5">
+            <span class="key-number">5</span>
+            <span class="key-letters">JKL</span>
+          </button>
+          <button class="key-btn" type="button" data-digit="6">
+            <span class="key-number">6</span>
+            <span class="key-letters">MNO</span>
+          </button>
 
-        <button class="key-btn" type="button" data-digit="7">
-          <span class="key-number">7</span>
-          <span class="key-letters">PQRS</span>
-        </button>
-        <button class="key-btn" type="button" data-digit="8">
-          <span class="key-number">8</span>
-          <span class="key-letters">TUV</span>
-        </button>
-        <button class="key-btn" type="button" data-digit="9">
-          <span class="key-number">9</span>
-          <span class="key-letters">WXYZ</span>
-        </button>
+          <button class="key-btn" type="button" data-digit="7">
+            <span class="key-number">7</span>
+            <span class="key-letters">PQRS</span>
+          </button>
+          <button class="key-btn" type="button" data-digit="8">
+            <span class="key-number">8</span>
+            <span class="key-letters">TUV</span>
+          </button>
+          <button class="key-btn" type="button" data-digit="9">
+            <span class="key-number">9</span>
+            <span class="key-letters">WXYZ</span>
+          </button>
 
-        <button class="key-btn samsung-only-key" type="button" id="keypadBackspaceBtn">
-          <span class="backspace-icon">
-            <svg viewBox="0 0 24 24">
-              <path d="M22 3H7c-.69 0-1.32.35-1.67.94L0 12l5.33 8.06c.35.59.98.94 1.67.94h15c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-3 12.59L17.59 17 14 13.41 10.41 17 9 15.59 12.59 12 9 8.41 10.41 7 14 10.59 17.59 7 19 8.41 15.41 12 19 15.59z"/>
-            </svg>
-          </span>
-        </button>
+          <button class="key-btn samsung-only-key" type="button" id="keypadBackspaceBtn">
+            <span class="backspace-icon">
+              <svg viewBox="0 0 24 24">
+                <path d="M22 3H7c-.69 0-1.32.35-1.67.94L0 12l5.33 8.06c.35.59.98.94 1.67.94h15c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-3 12.59L17.59 17 14 13.41 10.41 17 9 15.59 12.59 12 9 8.41 10.41 7 14 10.59 17.59 7 19 8.41 15.41 12 19 15.59z"/>
+              </svg>
+            </span>
+          </button>
 
-        <button class="key-btn" type="button" data-digit="0">
-          <span class="key-number">0</span>
-          <span class="key-letters">&nbsp;</span>
-        </button>
+          <button class="key-btn" type="button" data-digit="0">
+            <span class="key-number">0</span>
+            <span class="key-letters">&nbsp;</span>
+          </button>
 
-        <button class="key-btn samsung-only-key" type="button" id="keypadOkBtn">
-          <span class="key-action">OK</span>
-        </button>
-      </div>
-    </div>
-
-    <!-- ==================== מצב 2: דפוס (Pattern 3x3) ==================== -->
-    <div class="unlock-mode-view" id="viewPattern">
-      <div class="pattern-wrapper" id="patternWrapper">
-        <svg class="pattern-svg" id="patternSvg" viewBox="0 0 276 276">
-          <polyline class="pattern-line" id="patternLine" points=""></polyline>
-        </svg>
-        <div class="pattern-grid" id="patternGrid">
-          <div class="pattern-node" data-node="1"><div class="pattern-node-dot"></div></div>
-          <div class="pattern-node" data-node="2"><div class="pattern-node-dot"></div></div>
-          <div class="pattern-node" data-node="3"><div class="pattern-node-dot"></div></div>
-          <div class="pattern-node" data-node="4"><div class="pattern-node-dot"></div></div>
-          <div class="pattern-node" data-node="5"><div class="pattern-node-dot"></div></div>
-          <div class="pattern-node" data-node="6"><div class="pattern-node-dot"></div></div>
-          <div class="pattern-node" data-node="7"><div class="pattern-node-dot"></div></div>
-          <div class="pattern-node" data-node="8"><div class="pattern-node-dot"></div></div>
-          <div class="pattern-node" data-node="9"><div class="pattern-node-dot"></div></div>
+          <button class="key-btn samsung-only-key" type="button" id="keypadOkBtn">
+            <span class="key-action">OK</span>
+          </button>
         </div>
       </div>
-    </div>
 
-    <!-- ==================== מצב 3: מקלדת מערכת מלאה ==================== -->
-    <div class="unlock-mode-view" id="viewWords">
-      <div class="words-native-container" id="wordsNativeContainer">
-        <button type="button" class="word-submit-btn" id="wordSubmitInlineBtn">אישור סיסמה (OK)</button>
-        <p class="word-tap-hint" id="wordTapHint">הקש על שדה הסיסמה למעלה להקלדה במקלדת המכשיר</p>
+      <!-- ==================== מצב 2: דפוס (Pattern 3x3) ==================== -->
+      <div class="unlock-mode-view" id="viewPattern">
+        <div class="pattern-wrapper" id="patternWrapper">
+          <svg class="pattern-svg" id="patternSvg" viewBox="0 0 276 276">
+            <polyline class="pattern-line" id="patternLine" points=""></polyline>
+          </svg>
+          <div class="pattern-grid" id="patternGrid">
+            <div class="pattern-node" data-node="1"><div class="pattern-node-dot"></div></div>
+            <div class="pattern-node" data-node="2"><div class="pattern-node-dot"></div></div>
+            <div class="pattern-node" data-node="3"><div class="pattern-node-dot"></div></div>
+            <div class="pattern-node" data-node="4"><div class="pattern-node-dot"></div></div>
+            <div class="pattern-node" data-node="5"><div class="pattern-node-dot"></div></div>
+            <div class="pattern-node" data-node="6"><div class="pattern-node-dot"></div></div>
+            <div class="pattern-node" data-node="7"><div class="pattern-node-dot"></div></div>
+            <div class="pattern-node" data-node="8"><div class="pattern-node-dot"></div></div>
+            <div class="pattern-node" data-node="9"><div class="pattern-node-dot"></div></div>
+          </div>
+        </div>
       </div>
-    </div>
 
-    <!-- כפתור שיחת חירום בצורת קפסולה תואמת ומעוגלת מתחת לשדה הסיסמה -->
-    <button class="emergency-btn" type="button" id="samsungEmergencyBtn">שיחת חירום</button>
+      <!-- ==================== מצב 3: סיסמת מילים (מקלדת מערכת אמיתית) ==================== -->
+      <div class="unlock-mode-view" id="viewWords"></div>
+
+      <!-- כפתור שיחת חירום בצורת קפסולה תואמת ומעוגלת מתחת לשדה הסיסמה / לוח המקשים -->
+      <button class="emergency-btn" type="button" id="samsungEmergencyBtn">שיחת חירום</button>
+
+      <!-- מרווח גמיש במצב סיסמת מילים כדי שהכותרת, השדה וכפתור החירום יישבו למעלה בדיוק כמו בצילום המסך -->
+      <div class="words-mode-spacer" id="wordsModeSpacer"></div>
 
     <div class="footer-area" id="samsungFooter">
       <!-- אייקון טביעת אצבע מעוצב (הסמל הלבן/תכלת של סמסונג) ממורכז בתחתית -->
@@ -578,6 +576,6 @@
 
   </div>
 
-  <script src="./app.js?v=20261031194929"></script>
+  <script src="./app.js?v=20261031200742"></script>
 </body>
 </html>

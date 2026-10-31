@@ -13,7 +13,7 @@
   <meta http-equiv="Expires" content="0">
   <title>Lockscreen</title>
   <link rel="manifest" href="./manifest.json">
-  <link rel="stylesheet" href="./style.css?v=20261031180755">
+  <link rel="stylesheet" href="./style.css?v=20261031184355">
 </head>
 <body>
 
@@ -87,6 +87,12 @@
       </div>
 
       <div class="config-body">
+        <!-- בחירת דגם מדויק (Presets: S20-S26 / iPhone 12-18) -->
+        <div class="config-group">
+          <label class="config-label">דגם מכשיר (מתאים טפט מקורי אוטומטית)</label>
+          <div class="model-presets-grid" id="modelPresetsGrid"></div>
+        </div>
+
         <!-- בחירת סוג נעילה -->
         <div class="config-group">
           <label class="config-label">שיטת נעילה</label>
@@ -117,15 +123,21 @@
           </div>
         </div>
 
-        <!-- תמונת רקע ומסך בית -->
+        <!-- מערכת טפטים חכמה (גלריה מובנית + טפט אישי + מסך בית) -->
         <div class="config-group">
-          <label class="config-label">רקע מסך נעילה ומסך בית</label>
+          <div class="config-label-row">
+            <label class="config-label">טפט מסך נעילה (4 מובנים + העלאה אישית)</label>
+            <button type="button" class="cycle-wallpaper-btn" id="cycleWallpaperBtn">🎨 החלף טפט מובנה</button>
+          </div>
+
+          <div class="wallpaper-gallery-row" id="wallpaperGalleryRow"></div>
+
           <div class="media-actions-row">
             <label class="media-upload-btn">
-              <span>🖼️ תמונת רקע</span>
+              <span>🖼️ העלה טפט אישי</span>
               <input type="file" id="wallpaperFileInput" accept="image/*" hidden>
             </label>
-            <button type="button" class="media-clear-btn" id="clearWallpaperBtn" style="display: none;">איפוס רקע</button>
+            <button type="button" class="media-clear-btn" id="clearWallpaperBtn" style="display: none;">חזור לטפט הדגם</button>
 
             <label class="media-upload-btn">
               <span>📱 תמונת מסך בית</span>
@@ -453,6 +465,6 @@
 
   </div>
 
-  <script src="./app.js?v=20261031180755"></script>
+  <script src="./app.js?v=20261031184355"></script>
 </body>
 </html>

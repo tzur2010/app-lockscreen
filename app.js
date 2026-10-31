@@ -7,6 +7,8 @@
 
   const DEFAULT_CONFIG = {
     theme: 'samsung',           // 'samsung' | 'ios'
+    modelId: 's24',             // 's20'..'s26' | 'iphone12'..'iphone18'
+    wallpaperId: 'model_default', // 'model_default' | 'gallery_aurora' | 'gallery_ocean' | 'gallery_sunset' | 'custom'
     unlockMode: 'pin',          // 'pin' | 'pattern' | 'words'
     pinLength: 4,               // 4 | 6
     stealthPattern: false,
@@ -21,6 +23,448 @@
   };
 
   const STORAGE_KEY_CONFIG = 'magic_lockscreen_clean_config_v3';
+  const STORAGE_KEY_CUSTOM_WP = 'magic_lockscreen_custom_wallpaper';
+
+  // מחולל טפטי SVG וקטוריים ברזולוציה גבוהה (Data URI) בסגנון הרשמי של כל דגם
+  function createSvgWallpaperUri(svgBody) {
+    const fullSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 2340" width="1080" height="2340" preserveAspectRatio="xMidYMid slice">${svgBody}</svg>`;
+    return `data:image/svg+xml;utf8,${encodeURIComponent(fullSvg)}`;
+  }
+
+  // Presets לכל הדגמים: Galaxy S20 עד S26 ו-iPhone 12 עד 18
+  const MODEL_PRESETS = {
+    // --- Samsung Galaxy Models (S20 - S26) ---
+    s20: {
+      theme: 'samsung',
+      label: 'Galaxy S20',
+      wallpaper: createSvgWallpaperUri(`
+        <defs>
+          <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#0ea5e9"/>
+            <stop offset="50%" stop-color="#2563eb"/>
+            <stop offset="100%" stop-color="#1e1b4b"/>
+          </linearGradient>
+          <radialGradient id="bloom1" cx="30%" cy="35%" r="55%">
+            <stop offset="0%" stop-color="#f472b6" stop-opacity="0.85"/>
+            <stop offset="55%" stop-color="#38bdf8" stop-opacity="0.35"/>
+            <stop offset="100%" stop-color="#1e1b4b" stop-opacity="0"/>
+          </radialGradient>
+          <radialGradient id="bloom2" cx="75%" cy="68%" r="50%">
+            <stop offset="0%" stop-color="#60a5fa" stop-opacity="0.9"/>
+            <stop offset="100%" stop-color="#1e3a8a" stop-opacity="0"/>
+          </radialGradient>
+        </defs>
+        <rect width="1080" height="2340" fill="url(#bg)"/>
+        <circle cx="340" cy="820" r="680" fill="url(#bloom1)"/>
+        <circle cx="800" cy="1580" r="640" fill="url(#bloom2)"/>
+        <path d="M0,1250 Q540,980 1080,1320 L1080,2340 L0,2340 Z" fill="#ffffff" fill-opacity="0.08"/>
+      `)
+    },
+    s21: {
+      theme: 'samsung',
+      label: 'Galaxy S21',
+      wallpaper: createSvgWallpaperUri(`
+        <defs>
+          <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#312e81"/>
+            <stop offset="48%" stop-color="#4f46e5"/>
+            <stop offset="100%" stop-color="#0f172a"/>
+          </linearGradient>
+          <linearGradient id="silk1" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#a78bfa" stop-opacity="0.8"/>
+            <stop offset="100%" stop-color="#ec4899" stop-opacity="0.25"/>
+          </linearGradient>
+          <linearGradient id="silk2" x1="1" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.75"/>
+            <stop offset="100%" stop-color="#6366f1" stop-opacity="0.1"/>
+          </linearGradient>
+        </defs>
+        <rect width="1080" height="2340" fill="url(#bg)"/>
+        <path d="M-100,400 C350,750 720,200 1180,680 L1180,1700 C700,1250 300,1850 -100,1400 Z" fill="url(#silk1)"/>
+        <path d="M-100,900 C420,1350 680,750 1180,1220 L1180,2340 L-100,2340 Z" fill="url(#silk2)"/>
+      `)
+    },
+    s22: {
+      theme: 'samsung',
+      label: 'Galaxy S22',
+      wallpaper: createSvgWallpaperUri(`
+        <defs>
+          <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#0f766e"/>
+            <stop offset="52%" stop-color="#115e59"/>
+            <stop offset="100%" stop-color="#0f172a"/>
+          </linearGradient>
+          <radialGradient id="orb" cx="50%" cy="46%" r="48%">
+            <stop offset="0%" stop-color="#fb7185" stop-opacity="0.85"/>
+            <stop offset="55%" stop-color="#2dd4bf" stop-opacity="0.45"/>
+            <stop offset="100%" stop-color="#0f172a" stop-opacity="0"/>
+          </radialGradient>
+        </defs>
+        <rect width="1080" height="2340" fill="url(#bg)"/>
+        <circle cx="540" cy="1080" r="620" fill="url(#orb)"/>
+        <rect x="140" y="540" width="800" height="1260" rx="400" fill="#ffffff" fill-opacity="0.09" transform="rotate(-18 540 1170)"/>
+      `)
+    },
+    s23: {
+      theme: 'samsung',
+      label: 'Galaxy S23',
+      wallpaper: createSvgWallpaperUri(`
+        <defs>
+          <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#1e293b"/>
+            <stop offset="50%" stop-color="#0f5132"/>
+            <stop offset="100%" stop-color="#091e1a"/>
+          </linearGradient>
+          <radialGradient id="s1" cx="35%" cy="38%" r="36%">
+            <stop offset="0%" stop-color="#86efac" stop-opacity="0.8"/>
+            <stop offset="60%" stop-color="#10b981" stop-opacity="0.35"/>
+            <stop offset="100%" stop-color="#091e1a" stop-opacity="0"/>
+          </radialGradient>
+          <radialGradient id="s2" cx="68%" cy="62%" r="38%">
+            <stop offset="0%" stop-color="#c4b5fd" stop-opacity="0.75"/>
+            <stop offset="100%" stop-color="#091e1a" stop-opacity="0"/>
+          </radialGradient>
+        </defs>
+        <rect width="1080" height="2340" fill="url(#bg)"/>
+        <circle cx="380" cy="890" r="460" fill="url(#s1)"/>
+        <circle cx="720" cy="1450" r="480" fill="url(#s2)"/>
+      `)
+    },
+    s24: {
+      theme: 'samsung',
+      label: 'Galaxy S24',
+      wallpaper: createSvgWallpaperUri(`
+        <defs>
+          <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#1d4ed8"/>
+            <stop offset="52%" stop-color="#2563eb"/>
+            <stop offset="100%" stop-color="#1e3a8a"/>
+          </linearGradient>
+          <linearGradient id="facet1" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#93c5fd" stop-opacity="0.75"/>
+            <stop offset="100%" stop-color="#38bdf8" stop-opacity="0.15"/>
+          </linearGradient>
+          <linearGradient id="facet2" x1="1" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#fde68a" stop-opacity="0.65"/>
+            <stop offset="100%" stop-color="#60a5fa" stop-opacity="0.18"/>
+          </linearGradient>
+        </defs>
+        <rect width="1080" height="2340" fill="url(#bg)"/>
+        <polygon points="540,260 980,980 540,1460 120,920" fill="url(#facet1)"/>
+        <polygon points="540,860 1000,1420 540,2060 100,1480" fill="url(#facet2)"/>
+      `)
+    },
+    s25: {
+      theme: 'samsung',
+      label: 'Galaxy S25',
+      wallpaper: createSvgWallpaperUri(`
+        <defs>
+          <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#0284c7"/>
+            <stop offset="50%" stop-color="#1d4ed8"/>
+            <stop offset="100%" stop-color="#0f172a"/>
+          </linearGradient>
+          <radialGradient id="ring" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stop-color="#7dd3fc" stop-opacity="0.15"/>
+            <stop offset="65%" stop-color="#38bdf8" stop-opacity="0.65"/>
+            <stop offset="100%" stop-color="#1d4ed8" stop-opacity="0"/>
+          </radialGradient>
+        </defs>
+        <rect width="1080" height="2340" fill="url(#bg)"/>
+        <circle cx="540" cy="950" r="520" fill="url(#ring)"/>
+        <circle cx="540" cy="1420" r="520" fill="url(#ring)"/>
+        <circle cx="540" cy="1170" r="320" fill="#ffffff" fill-opacity="0.1"/>
+      `)
+    },
+    s26: {
+      theme: 'samsung',
+      label: 'Galaxy S26',
+      wallpaper: createSvgWallpaperUri(`
+        <defs>
+          <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#06b6d4"/>
+            <stop offset="48%" stop-color="#3b82f6"/>
+            <stop offset="100%" stop-color="#1e1b4b"/>
+          </linearGradient>
+          <radialGradient id="ai1" cx="30%" cy="30%" r="60%">
+            <stop offset="0%" stop-color="#67e8f9" stop-opacity="0.85"/>
+            <stop offset="100%" stop-color="#3b82f6" stop-opacity="0"/>
+          </radialGradient>
+          <radialGradient id="ai2" cx="72%" cy="72%" r="55%">
+            <stop offset="0%" stop-color="#c084fc" stop-opacity="0.8"/>
+            <stop offset="100%" stop-color="#1e1b4b" stop-opacity="0"/>
+          </radialGradient>
+        </defs>
+        <rect width="1080" height="2340" fill="url(#bg)"/>
+        <circle cx="320" cy="700" r="650" fill="url(#ai1)"/>
+        <circle cx="780" cy="1680" r="650" fill="url(#ai2)"/>
+        <path d="M-100,1170 Q540,620 1180,1170 Q540,1720 -100,1170 Z" fill="#ffffff" fill-opacity="0.12"/>
+      `)
+    },
+
+    // --- Apple iPhone Models (iPhone 12 - iPhone 18) ---
+    iphone12: {
+      theme: 'ios',
+      label: 'iPhone 12',
+      wallpaper: createSvgWallpaperUri(`
+        <defs>
+          <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#1e3a8a"/>
+            <stop offset="50%" stop-color="#1d4ed8"/>
+            <stop offset="100%" stop-color="#0f172a"/>
+          </linearGradient>
+          <radialGradient id="r1" cx="50%" cy="35%" r="50%">
+            <stop offset="0%" stop-color="#f43f5e" stop-opacity="0.85"/>
+            <stop offset="65%" stop-color="#3b82f6" stop-opacity="0.35"/>
+            <stop offset="100%" stop-color="#1e3a8a" stop-opacity="0"/>
+          </radialGradient>
+          <radialGradient id="r2" cx="50%" cy="72%" r="52%">
+            <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.85"/>
+            <stop offset="100%" stop-color="#0f172a" stop-opacity="0"/>
+          </radialGradient>
+        </defs>
+        <rect width="1080" height="2340" fill="url(#bg)"/>
+        <circle cx="540" cy="820" r="640" fill="url(#r1)"/>
+        <circle cx="540" cy="1650" r="660" fill="url(#r2)"/>
+      `)
+    },
+    iphone13: {
+      theme: 'ios',
+      label: 'iPhone 13',
+      wallpaper: createSvgWallpaperUri(`
+        <defs>
+          <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#0284c7"/>
+            <stop offset="55%" stop-color="#0369a1"/>
+            <stop offset="100%" stop-color="#0f172a"/>
+          </linearGradient>
+          <linearGradient id="beam" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#bae6fd" stop-opacity="0.85"/>
+            <stop offset="100%" stop-color="#38bdf8" stop-opacity="0.1"/>
+          </linearGradient>
+        </defs>
+        <rect width="1080" height="2340" fill="url(#bg)"/>
+        <circle cx="260" cy="780" r="560" fill="url(#beam)"/>
+        <circle cx="820" cy="1520" r="580" fill="url(#beam)"/>
+      `)
+    },
+    iphone14: {
+      theme: 'ios',
+      label: 'iPhone 14',
+      wallpaper: createSvgWallpaperUri(`
+        <defs>
+          <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#4338ca"/>
+            <stop offset="52%" stop-color="#2563eb"/>
+            <stop offset="100%" stop-color="#0284c7"/>
+          </linearGradient>
+          <radialGradient id="orb1" cx="50%" cy="32%" r="48%">
+            <stop offset="0%" stop-color="#c084fc" stop-opacity="0.85"/>
+            <stop offset="100%" stop-color="#4338ca" stop-opacity="0"/>
+          </radialGradient>
+          <radialGradient id="orb2" cx="50%" cy="74%" r="50%">
+            <stop offset="0%" stop-color="#7dd3fc" stop-opacity="0.85"/>
+            <stop offset="100%" stop-color="#0284c7" stop-opacity="0"/>
+          </radialGradient>
+        </defs>
+        <rect width="1080" height="2340" fill="url(#bg)"/>
+        <circle cx="540" cy="740" r="600" fill="url(#orb1)"/>
+        <circle cx="540" cy="1720" r="640" fill="url(#orb2)"/>
+      `)
+    },
+    iphone15: {
+      theme: 'ios',
+      label: 'iPhone 15',
+      wallpaper: createSvgWallpaperUri(`
+        <defs>
+          <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#0ea5e9"/>
+            <stop offset="50%" stop-color="#2563eb"/>
+            <stop offset="100%" stop-color="#1e293b"/>
+          </linearGradient>
+          <linearGradient id="w1" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#fdba74" stop-opacity="0.78"/>
+            <stop offset="50%" stop-color="#f472b6" stop-opacity="0.65"/>
+            <stop offset="100%" stop-color="#38bdf8" stop-opacity="0.75"/>
+          </linearGradient>
+        </defs>
+        <rect width="1080" height="2340" fill="url(#bg)"/>
+        <path d="M-100,820 Q540,420 1180,860 L1180,1520 Q540,1920 -100,1480 Z" fill="url(#w1)"/>
+        <path d="M-100,1150 Q540,780 1180,1180 L1180,1850 Q540,2180 -100,1820 Z" fill="#ffffff" fill-opacity="0.12"/>
+      `)
+    },
+    iphone16: {
+      theme: 'ios',
+      label: 'iPhone 16',
+      wallpaper: createSvgWallpaperUri(`
+        <defs>
+          <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#0284c7"/>
+            <stop offset="52%" stop-color="#1d4ed8"/>
+            <stop offset="100%" stop-color="#1e3a8a"/>
+          </linearGradient>
+          <radialGradient id="ios18a" cx="28%" cy="28%" r="55%">
+            <stop offset="0%" stop-color="#5eead4" stop-opacity="0.88"/>
+            <stop offset="100%" stop-color="#0284c7" stop-opacity="0"/>
+          </radialGradient>
+          <radialGradient id="ios18b" cx="74%" cy="68%" r="55%">
+            <stop offset="0%" stop-color="#818cf8" stop-opacity="0.88"/>
+            <stop offset="100%" stop-color="#1e3a8a" stop-opacity="0"/>
+          </radialGradient>
+        </defs>
+        <rect width="1080" height="2340" fill="url(#bg)"/>
+        <circle cx="300" cy="680" r="680" fill="url(#ios18a)"/>
+        <circle cx="800" cy="1600" r="680" fill="url(#ios18b)"/>
+        <ellipse cx="540" cy="1170" rx="480" ry="760" fill="#ffffff" fill-opacity="0.09" transform="rotate(24 540 1170)"/>
+      `)
+    },
+    iphone17: {
+      theme: 'ios',
+      label: 'iPhone 17',
+      wallpaper: createSvgWallpaperUri(`
+        <defs>
+          <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#0ea5e9"/>
+            <stop offset="50%" stop-color="#6366f1"/>
+            <stop offset="100%" stop-color="#0f172a"/>
+          </linearGradient>
+          <radialGradient id="lg1" cx="50%" cy="40%" r="52%">
+            <stop offset="0%" stop-color="#bae6fd" stop-opacity="0.9"/>
+            <stop offset="55%" stop-color="#38bdf8" stop-opacity="0.45"/>
+            <stop offset="100%" stop-color="#6366f1" stop-opacity="0"/>
+          </radialGradient>
+        </defs>
+        <rect width="1080" height="2340" fill="url(#bg)"/>
+        <circle cx="540" cy="960" r="640" fill="url(#lg1)"/>
+        <rect x="160" y="480" width="760" height="1380" rx="380" fill="#ffffff" fill-opacity="0.12" transform="rotate(15 540 1170)"/>
+      `)
+    },
+    iphone18: {
+      theme: 'ios',
+      label: 'iPhone 18',
+      wallpaper: createSvgWallpaperUri(`
+        <defs>
+          <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#06b6d4"/>
+            <stop offset="48%" stop-color="#2563eb"/>
+            <stop offset="100%" stop-color="#3b0764"/>
+          </linearGradient>
+          <radialGradient id="na1" cx="35%" cy="32%" r="50%">
+            <stop offset="0%" stop-color="#67e8f9" stop-opacity="0.9"/>
+            <stop offset="100%" stop-color="#2563eb" stop-opacity="0"/>
+          </radialGradient>
+          <radialGradient id="na2" cx="68%" cy="68%" r="52%">
+            <stop offset="0%" stop-color="#f472b6" stop-opacity="0.85"/>
+            <stop offset="100%" stop-color="#3b0764" stop-opacity="0"/>
+          </radialGradient>
+        </defs>
+        <rect width="1080" height="2340" fill="url(#bg)"/>
+        <circle cx="360" cy="760" r="620" fill="url(#na1)"/>
+        <circle cx="740" cy="1580" r="640" fill="url(#na2)"/>
+        <circle cx="540" cy="1170" r="390" fill="#ffffff" fill-opacity="0.1"/>
+      `)
+    }
+  };
+
+  // טפטים משלימים לגלריה המובנית (בנוסף לטפט המקורי של כל דגם)
+  const EXTRA_GALLERY_WALLPAPERS = {
+    gallery_aurora: {
+      id: 'gallery_aurora',
+      label: 'אורורה צלולה',
+      uri: createSvgWallpaperUri(`
+        <defs>
+          <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#0284c7"/>
+            <stop offset="50%" stop-color="#0d9488"/>
+            <stop offset="100%" stop-color="#1e3a8a"/>
+          </linearGradient>
+          <radialGradient id="a1" cx="25%" cy="30%" r="55%">
+            <stop offset="0%" stop-color="#5eead4" stop-opacity="0.9"/>
+            <stop offset="100%" stop-color="#0284c7" stop-opacity="0"/>
+          </radialGradient>
+          <radialGradient id="a2" cx="78%" cy="72%" r="55%">
+            <stop offset="0%" stop-color="#7dd3fc" stop-opacity="0.85"/>
+            <stop offset="100%" stop-color="#1e3a8a" stop-opacity="0"/>
+          </radialGradient>
+        </defs>
+        <rect width="1080" height="2340" fill="url(#bg)"/>
+        <circle cx="280" cy="700" r="680" fill="url(#a1)"/>
+        <circle cx="840" cy="1660" r="680" fill="url(#a2)"/>
+      `)
+    },
+    gallery_ocean: {
+      id: 'gallery_ocean',
+      label: 'כחול קריסטל',
+      uri: createSvgWallpaperUri(`
+        <defs>
+          <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#38bdf8"/>
+            <stop offset="48%" stop-color="#2563eb"/>
+            <stop offset="100%" stop-color="#1e3a8a"/>
+          </linearGradient>
+          <radialGradient id="o1" cx="50%" cy="28%" r="55%">
+            <stop offset="0%" stop-color="#bae6fd" stop-opacity="0.88"/>
+            <stop offset="100%" stop-color="#2563eb" stop-opacity="0"/>
+          </radialGradient>
+        </defs>
+        <rect width="1080" height="2340" fill="url(#bg)"/>
+        <circle cx="540" cy="650" r="660" fill="url(#o1)"/>
+        <path d="M0,1450 Q540,1150 1080,1480 L1080,2340 L0,2340 Z" fill="#ffffff" fill-opacity="0.1"/>
+      `)
+    },
+    gallery_sunset: {
+      id: 'gallery_sunset',
+      label: 'שקיעה הולוגרפית',
+      uri: createSvgWallpaperUri(`
+        <defs>
+          <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#fb7185"/>
+            <stop offset="48%" stop-color="#6366f1"/>
+            <stop offset="100%" stop-color="#1e3a8a"/>
+          </linearGradient>
+          <radialGradient id="s1" cx="35%" cy="32%" r="52%">
+            <stop offset="0%" stop-color="#fde047" stop-opacity="0.78"/>
+            <stop offset="100%" stop-color="#fb7185" stop-opacity="0"/>
+          </radialGradient>
+          <radialGradient id="s2" cx="72%" cy="70%" r="55%">
+            <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.82"/>
+            <stop offset="100%" stop-color="#1e3a8a" stop-opacity="0"/>
+          </radialGradient>
+        </defs>
+        <rect width="1080" height="2340" fill="url(#bg)"/>
+        <circle cx="380" cy="740" r="620" fill="url(#s1)"/>
+        <circle cx="780" cy="1620" r="640" fill="url(#s2)"/>
+      `)
+    }
+  };
+
+  function getModelsForTheme(theme) {
+    return Object.entries(MODEL_PRESETS)
+      .filter(([, info]) => info.theme === theme)
+      .map(([id, info]) => ({ id, ...info }));
+  }
+
+  function ensureValidModelForTheme() {
+    const preset = MODEL_PRESETS[config.modelId];
+    if (!preset || preset.theme !== config.theme) {
+      config.modelId = config.theme === 'ios' ? 'iphone16' : 's24';
+    }
+  }
+
+  function getGalleryWallpapersForCurrentModel() {
+    ensureValidModelForTheme();
+    const modelPreset = MODEL_PRESETS[config.modelId];
+    return [
+      {
+        id: 'model_default',
+        label: `מקורי (${modelPreset.label})`,
+        uri: modelPreset.wallpaper
+      },
+      EXTRA_GALLERY_WALLPAPERS.gallery_aurora,
+      EXTRA_GALLERY_WALLPAPERS.gallery_ocean,
+      EXTRA_GALLERY_WALLPAPERS.gallery_sunset
+    ];
+  }
 
   let config = loadConfig();
 
@@ -502,22 +946,37 @@
   }
 
   async function applySavedImages() {
-    const wpData = await loadImageData('wallpaper');
+    ensureValidModelForTheme();
     const clearWpBtn = document.getElementById('clearWallpaperBtn');
-    if (wpData) {
-      phoneContainer.style.backgroundImage = `url("${wpData}")`;
+    const customWpData = localStorage.getItem(STORAGE_KEY_CUSTOM_WP) || (await loadImageData('wallpaper'));
+
+    if (config.wallpaperId === 'custom' && customWpData) {
+      phoneContainer.style.backgroundImage = `url("${customWpData}")`;
+      phoneContainer.style.backgroundSize = 'cover';
+      phoneContainer.style.backgroundPosition = 'center';
       phoneContainer.classList.add('has-custom-wallpaper');
       if (clearWpBtn) clearWpBtn.style.display = 'inline-block';
     } else {
-      phoneContainer.style.backgroundImage = '';
-      phoneContainer.classList.remove('has-custom-wallpaper');
-      if (clearWpBtn) clearWpBtn.style.display = 'none';
+      if (config.wallpaperId === 'custom') {
+        config.wallpaperId = 'model_default';
+      }
+      const galleryList = getGalleryWallpapersForCurrentModel();
+      const chosen = galleryList.find((w) => w.id === config.wallpaperId) || galleryList[0];
+      phoneContainer.style.backgroundImage = `url("${chosen.uri}")`;
+      phoneContainer.style.backgroundSize = 'cover';
+      phoneContainer.style.backgroundPosition = 'center';
+      phoneContainer.classList.add('has-custom-wallpaper');
+      if (clearWpBtn) {
+        clearWpBtn.style.display = config.wallpaperId !== 'model_default' ? 'inline-block' : 'none';
+      }
     }
 
     const homeData = await loadImageData('homescreen');
     const clearHomeBtn = document.getElementById('clearHomescreenBtn');
     if (homeData) {
       fakeHomescreen.style.backgroundImage = `url("${homeData}")`;
+      fakeHomescreen.style.backgroundSize = 'cover';
+      fakeHomescreen.style.backgroundPosition = 'center';
       fakeHomescreen.classList.add('has-custom-home');
       if (clearHomeBtn) clearHomeBtn.style.display = 'inline-block';
     } else {
@@ -1088,8 +1547,10 @@
 
   function selectDeviceFromSplit(themeName) {
     config.theme = themeName;
+    ensureValidModelForTheme();
     saveConfig();
     applyConfigToUI();
+    applySavedImages();
     syncConfigControls();
     splitChoiceScreen.classList.add('hidden');
     deviceConfigSheet.classList.add('active');
@@ -1103,11 +1564,72 @@
     splitChoiceScreen.classList.remove('hidden');
   });
 
+  function renderModelPresetsGrid() {
+    const grid = document.getElementById('modelPresetsGrid');
+    if (!grid) return;
+    ensureValidModelForTheme();
+    const models = getModelsForTheme(config.theme);
+    grid.innerHTML = '';
+
+    models.forEach((m) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'model-preset-chip' + (m.id === config.modelId ? ' active' : '');
+      btn.textContent = m.label;
+      btn.addEventListener('click', () => {
+        config.modelId = m.id;
+        // כשבוחרים דגם חדש, מציגים אוטומטית את טפט ברירת המחדל של אותו דגם
+        config.wallpaperId = 'model_default';
+        saveConfig();
+        applyConfigToUI();
+        applySavedImages();
+        syncConfigControls();
+      });
+      grid.appendChild(btn);
+    });
+  }
+
+  function renderWallpaperGallery() {
+    const galleryRow = document.getElementById('wallpaperGalleryRow');
+    if (!galleryRow) return;
+    const wallpapers = getGalleryWallpapersForCurrentModel();
+    galleryRow.innerHTML = '';
+
+    wallpapers.forEach((wp) => {
+      const card = document.createElement('button');
+      card.type = 'button';
+      card.className = 'wp-thumb-card' + (config.wallpaperId === wp.id ? ' active' : '');
+      card.style.backgroundImage = `url("${wp.uri}")`;
+
+      const lbl = document.createElement('span');
+      lbl.className = 'wp-thumb-label';
+      lbl.textContent = wp.label;
+      card.appendChild(lbl);
+
+      card.addEventListener('click', () => {
+        config.wallpaperId = wp.id;
+        saveConfig();
+        applySavedImages();
+        syncConfigControls();
+      });
+
+      galleryRow.appendChild(card);
+    });
+  }
+
   function syncConfigControls() {
-    selectedDevicePill.textContent = config.theme === 'ios' ? 'Apple iPhone (iOS)' : 'Samsung Galaxy (One UI)';
+    ensureValidModelForTheme();
+    const currentModel = MODEL_PRESETS[config.modelId];
+    selectedDevicePill.textContent = currentModel
+      ? `${currentModel.label} (${config.theme === 'ios' ? 'iOS' : 'One UI'})`
+      : (config.theme === 'ios' ? 'Apple iPhone (iOS)' : 'Samsung Galaxy (One UI)');
+
     if (settingsLastInput) {
       settingsLastInput.textContent = localStorage.getItem('last_entered_pin') || '---';
     }
+
+    renderModelPresetsGrid();
+    renderWallpaperGallery();
 
     document.querySelectorAll('#modeSelector .seg-pill').forEach((btn) => {
       btn.classList.toggle('active', btn.dataset.mode === config.unlockMode);
@@ -1252,28 +1774,94 @@
     applyConfigToUI();
   });
 
-  // העלאת תמונת רקע ותמונת מסך בית
-  function handleImageUpload(fileInput, storageKey) {
-    fileInput.addEventListener('change', (e) => {
+  // כפתור החלפה מהירה בין 4 הטפטים המובנים של המכשיר
+  const cycleWallpaperBtn = document.getElementById('cycleWallpaperBtn');
+  if (cycleWallpaperBtn) {
+    cycleWallpaperBtn.addEventListener('click', () => {
+      const wallpapers = getGalleryWallpapersForCurrentModel();
+      const idx = wallpapers.findIndex((w) => w.id === config.wallpaperId);
+      const nextIdx = (idx + 1) % wallpapers.length;
+      config.wallpaperId = wallpapers[nextIdx].id;
+      saveConfig();
+      applySavedImages();
+      syncConfigControls();
+    });
+  }
+
+  // דחיסת תמונה חכמה כדי שתמונות מהגלריה יישמרו ב-localStorage במהירות וללא חריגת נפח
+  function compressImageDataUrl(rawDataUrl, maxWidth = 1080, maxHeight = 2340, quality = 0.84) {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        let w = img.width;
+        let h = img.height;
+        const ratio = Math.min(maxWidth / w, maxHeight / h, 1);
+        w = Math.round(w * ratio);
+        h = Math.round(h * ratio);
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+        try {
+          resolve(canvas.toDataURL('image/jpeg', quality));
+        } catch (e) {
+          resolve(rawDataUrl);
+        }
+      };
+      img.onerror = () => resolve(rawDataUrl);
+      img.src = rawDataUrl;
+    });
+  }
+
+  // העלאת טפט אישי ותמונת מסך בית
+  const wallpaperFileInputEl = document.getElementById('wallpaperFileInput');
+  if (wallpaperFileInputEl) {
+    wallpaperFileInputEl.addEventListener('change', (e) => {
       const file = e.target.files && e.target.files[0];
       if (!file) return;
       const reader = new FileReader();
       reader.onload = async () => {
-        await saveImageData(storageKey, reader.result);
-        await applySavedImages();
+        const compressed = await compressImageDataUrl(reader.result);
+        try {
+          localStorage.setItem(STORAGE_KEY_CUSTOM_WP, compressed);
+        } catch (err) {}
+        await saveImageData('wallpaper', compressed);
+        config.wallpaperId = 'custom';
         saveConfig();
+        await applySavedImages();
+        syncConfigControls();
       };
       reader.readAsDataURL(file);
     });
   }
 
-  handleImageUpload(document.getElementById('wallpaperFileInput'), 'wallpaper');
-  handleImageUpload(document.getElementById('homescreenFileInput'), 'homescreen');
+  const homescreenFileInputEl = document.getElementById('homescreenFileInput');
+  if (homescreenFileInputEl) {
+    homescreenFileInputEl.addEventListener('change', (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const compressed = await compressImageDataUrl(reader.result);
+        await saveImageData('homescreen', compressed);
+        saveConfig();
+        await applySavedImages();
+      };
+      reader.readAsDataURL(file);
+    });
+  }
 
   document.getElementById('clearWallpaperBtn').addEventListener('click', async () => {
+    try {
+      localStorage.removeItem(STORAGE_KEY_CUSTOM_WP);
+    } catch (e) {}
     await saveImageData('wallpaper', null);
     document.getElementById('wallpaperFileInput').value = '';
+    config.wallpaperId = 'model_default';
+    saveConfig();
     await applySavedImages();
+    syncConfigControls();
   });
 
   document.getElementById('clearHomescreenBtn').addEventListener('click', async () => {
@@ -1293,7 +1881,7 @@
   });
 
   // סנכרון אוטומטי מול GitHub Pages ורענון עצמי של הדף כשעולה גרסה חדשה
-  const APP_BUILD_VERSION = '20261031180755';
+  const APP_BUILD_VERSION = '20261031184355';
   let isReloadingForUpdate = false;
 
   async function triggerCleanReload() {

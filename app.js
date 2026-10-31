@@ -362,7 +362,8 @@ const DEFAULT_CONFIG = {
   hapticPeek: true,
   chameleonClock: true,
   holdPeek: true,
-  showFingerprint: true
+  showFingerprint: true,
+  settingsColorScheme: 'dark'   // 'dark' | 'light' עבור ערכת הנושא של מסך ההגדרות
 };
 
 let config = loadConfig();
@@ -500,6 +501,7 @@ const unlockTargetSelector = document.getElementById('unlockTargetSelector');
 const toggleForceUnlockMode = document.getElementById('toggleForceUnlockMode');
 const toggleSecretFpBypass = document.getElementById('toggleSecretFpBypass');
 const floatingCloseSettingsBtn = document.getElementById('floatingCloseSettingsBtn');
+const settingsThemeToggleBtn = document.getElementById('settingsThemeToggleBtn');
 const currentWallpaperCirclePreview = document.getElementById('currentWallpaperCirclePreview');
 const statusBarSelector = document.getElementById('statusBarSelector');
 const stealthPatternGroup = document.getElementById('stealthPatternGroup');
@@ -604,6 +606,25 @@ if (floatingCloseSettingsBtn) {
     stopAllCameraStreams();
     phoneContainer.classList.remove('clock-mode-active');
     closeSettingsSheet();
+  });
+}
+
+function applySettingsColorScheme() {
+  if (!deviceConfigSheet) return;
+  const savedScheme = localStorage.getItem('magic_lockscreen_settings_theme') || config.settingsColorScheme || 'dark';
+  config.settingsColorScheme = savedScheme === 'light' ? 'light' : 'dark';
+  deviceConfigSheet.classList.toggle('light-mode', config.settingsColorScheme === 'light');
+}
+
+if (settingsThemeToggleBtn) {
+  settingsThemeToggleBtn.addEventListener('click', () => {
+    const nextScheme = config.settingsColorScheme === 'light' ? 'dark' : 'light';
+    config.settingsColorScheme = nextScheme;
+    try {
+      localStorage.setItem('magic_lockscreen_settings_theme', nextScheme);
+    } catch (e) {}
+    saveConfig();
+    applySettingsColorScheme();
   });
 }
 
@@ -1127,6 +1148,7 @@ function stopAllCameraStreams() {
 // ----------------------------------------------------------------------------
 function applyConfigToUI() {
   const currentModel = getCurrentModelObject();
+  applySettingsColorScheme();
 
   // ערכת נושא Samsung One UI מול Apple iOS
   phoneContainer.classList.toggle('theme-samsung', config.osTheme === 'samsung');
@@ -2561,7 +2583,7 @@ loadCustomMedia();
 applyConfigToUI();
 
 // מנגנון בדיקת גרסה אוטומטי מול GitHub Pages
-const CURRENT_APP_VERSION = '20261101002803';
+const CURRENT_APP_VERSION = '20261101004123';
 
 async function checkRemoteVersionAndReload() {
   if (!navigator.onLine) return;

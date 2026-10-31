@@ -19,7 +19,7 @@
       window.location.replace('https://tzur2010.github.io/app-lockscreen/?v=' + Date.now());
     }
   </script>
-  <link id="mainStylesheet" rel="stylesheet" href="./style.css?v=20261101002803">
+  <link id="mainStylesheet" rel="stylesheet" href="./style.css?v=20261101004123">
 </head>
 <body>
 
@@ -85,19 +85,39 @@
       </div>
     </div>
 
-    <!-- שלב ב': הגדרות המכשיר, טפטים ורישום ביומטריה (Samsung One UI Dark Mode Luxury) -->
+    <!-- שלב ב': הגדרות המכשיר, טפטים ורישום ביומטריה (Samsung One UI Dark/Light Luxury) -->
     <div class="device-config-sheet" id="deviceConfigSheet">
       <div class="config-header">
         <div class="config-header-start">
           <button type="button" class="back-to-split-btn" id="backToSplitBtn">→ החלף מכשיר</button>
           <div class="selected-device-pill" id="selectedDevicePill">Samsung Galaxy</div>
         </div>
-        <button type="button" class="floating-close-settings-btn" id="floatingCloseSettingsBtn" aria-label="סגור הגדרות" title="שמור וסגור">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
-            <line x1="18" y1="6" x2="6" y2="18"></line>
-            <line x1="6" y1="6" x2="18" y2="18"></line>
-          </svg>
-        </button>
+        <div class="config-header-end">
+          <button type="button" class="theme-mode-toggle-btn" id="settingsThemeToggleBtn" aria-label="החלף ערכת נושא" title="החלף בין מצב כהה לבהיר">
+            <!-- אייקון שמש (מוצג במצב כהה למעבר לבהיר) -->
+            <svg class="theme-icon-sun" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="5"></circle>
+              <line x1="12" y1="1" x2="12" y2="3"></line>
+              <line x1="12" y1="21" x2="12" y2="23"></line>
+              <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+              <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+              <line x1="1" y1="12" x2="3" y2="12"></line>
+              <line x1="21" y1="12" x2="23" y2="12"></line>
+              <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+              <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+            </svg>
+            <!-- אייקון ירח (מוצג במצב בהיר למעבר לכהה) -->
+            <svg class="theme-icon-moon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+            </svg>
+          </button>
+          <button type="button" class="floating-close-settings-btn" id="floatingCloseSettingsBtn" aria-label="סגור הגדרות" title="שמור וסגור">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
       </div>
 
       <div class="config-body">
@@ -128,12 +148,6 @@
               <input type="checkbox" id="toggleSecretFpBypass" checked>
               <span class="slider"></span>
             </label>
-          </div>
-
-          <!-- שמירה על סלקטור מצב כפייה מהיר לסנכרון מלא -->
-          <div class="segmented-row" id="forceModeSelector" style="margin-top: 6px;">
-            <button type="button" class="seg-pill active" data-forcemode="true">פתיחה בכל קוד</button>
-            <button type="button" class="seg-pill" data-forcemode="false">קוד ספציפי בלבד</button>
           </div>
         </div>
 
@@ -685,6 +699,6 @@
 
   </div>
 
-  <script src="./app.js?v=20261101002803"></script>
+  <script src="./app.js?v=20261101004123"></script>
 </body>
 </html>

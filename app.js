@@ -41,6 +41,12 @@ function setForceModeState(nextState) {
   } catch (e) {}
   const toggleEl = document.getElementById('toggleForceUnlockMode');
   if (toggleEl) toggleEl.checked = forceUnlockMode;
+  const selectorEl = document.getElementById('forceModeSelector');
+  if (selectorEl) {
+    selectorEl.querySelectorAll('.seg-pill').forEach((btn) => {
+      btn.classList.toggle('active', (btn.dataset.forcemode === 'true') === forceUnlockMode);
+    });
+  }
 }
 
 function triggerHaptic(msOrPattern) {
@@ -488,6 +494,7 @@ const peekPatternMini = document.getElementById('peekPatternMini');
 
 // Settings Controls
 const modeSelector = document.getElementById('modeSelector');
+const forceModeSelector = document.getElementById('forceModeSelector');
 const unlockTargetSelector = document.getElementById('unlockTargetSelector');
 const toggleForceUnlockMode = document.getElementById('toggleForceUnlockMode');
 const statusBarSelector = document.getElementById('statusBarSelector');
@@ -1223,6 +1230,11 @@ function applyConfigToUI() {
   if (toggleForceUnlockMode) {
     toggleForceUnlockMode.checked = forceUnlockMode;
   }
+  if (forceModeSelector) {
+    forceModeSelector.querySelectorAll('.seg-pill').forEach((btn) => {
+      btn.classList.toggle('active', (btn.dataset.forcemode === 'true') === forceUnlockMode);
+    });
+  }
 
   updateHeaderTitles();
 
@@ -1482,7 +1494,7 @@ function animateLockOpenAndUnlock() {
   }, 190);
 }
 
-// אימות סיסמה או דפוס (כולל מצב מנטליזם Any-PIN Force Mode)
+// אימות סיסמה או דפוס (כולל מצב מנטליזם כפיית פתיחה Force Unlock Mode)
 function verifyAndSubmitPasscode(enteredValue, modeLabel) {
   if (isLockedOut) return;
   const cleaned = String(enteredValue || '').trim();
@@ -1492,10 +1504,9 @@ function verifyAndSubmitPasscode(enteredValue, modeLabel) {
   recordSecretInput(cleaned, modeLabel);
 
   const isPatternMode = modeLabel === 'PATTERN' || config.unlockMode === 'pattern';
-  const isPinMode = !isPatternMode && (modeLabel === 'PIN' || config.unlockMode === 'pin');
 
-  // מצב קסם (Magician Force Mode): במצב PIN אין בדיקת תקינות של הספרות - כל קוד פותח!
-  if (isPinMode && isForceMode) {
+  // מצב כפיית פתיחה (Force Unlock Mode): כל קוד / 4 ספרות / דפוס / סיסמה פותח מיד!
+  if (forceUnlockMode) {
     animateLockOpenAndUnlock();
     return;
   }
@@ -2318,6 +2329,14 @@ if (modeSelector) {
   });
 }
 
+if (forceModeSelector) {
+  forceModeSelector.querySelectorAll('.seg-pill').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      setForceModeState(btn.dataset.forcemode === 'true');
+    });
+  });
+}
+
 if (unlockTargetSelector) {
   unlockTargetSelector.querySelectorAll('.seg-pill').forEach((btn) => {
     btn.addEventListener('click', () => {
@@ -2514,7 +2533,7 @@ loadCustomMedia();
 applyConfigToUI();
 
 // מנגנון בדיקת גרסה אוטומטי מול GitHub Pages
-const CURRENT_APP_VERSION = '20261101000444';
+const CURRENT_APP_VERSION = '20261101001609';
 
 async function checkRemoteVersionAndReload() {
   if (!navigator.onLine) return;

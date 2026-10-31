@@ -19,7 +19,7 @@
       window.location.replace('https://tzur2010.github.io/app-lockscreen/?v=' + Date.now());
     }
   </script>
-  <link id="mainStylesheet" rel="stylesheet" href="./style.css?v=20261101000444">
+  <link id="mainStylesheet" rel="stylesheet" href="./style.css?v=20261101001609">
 </head>
 <body>
 
@@ -41,9 +41,9 @@
   </div>
 
   <!-- ========================================================================
-       2. תפריט הגדרות סודי (Hidden Master Settings - נפתח בלחיצה ממושכת של 2.5 שניות בפינה הימנית העליונה)
+       2. מסך הגדרות מקדים (Setup / Onboarding) + בחירה 50/50
        ======================================================================== -->
-  <div class="setup-overlay" id="setupOverlay">
+  <div class="setup-overlay open" id="setupOverlay">
 
     <!-- שלב א': מסך חצוי 50/50 בדיוק בין Samsung ל-iPhone -->
     <div class="split-choice-screen" id="splitChoiceScreen">
@@ -110,19 +110,27 @@
           </div>
         </div>
 
-        <!-- 2B. הגדרת מסך היעד לאחר הפתיחה + מצב כפיית פתיחה -->
+        <!-- 2B. הגדרת כפיית פתיחה מהתחלה + מסך היעד לאחר הפתיחה -->
+        <div class="config-group">
+          <label class="config-label">אופן אימות הקוד (כפיית פתיחה מהתחלה מול קוד ספציפי)</label>
+          <div class="segmented-row" id="forceModeSelector">
+            <button type="button" class="seg-pill active" data-forcemode="true">✨ כפיית פתיחה (כל קוד פותח)</button>
+            <button type="button" class="seg-pill" data-forcemode="false">🔒 קוד ספציפי בלבד</button>
+          </div>
+          <div class="clean-toggle-row" style="margin-top: 8px;">
+            <span>הפעל כפיית פתיחה אוטומטית מהתחלה (כל 4 ספרות פותחות)</span>
+            <label class="switch">
+              <input type="checkbox" id="toggleForceUnlockMode" checked>
+              <span class="slider"></span>
+            </label>
+          </div>
+        </div>
+
         <div class="config-group">
           <label class="config-label">מסך היעד לאחר הפתיחה</label>
           <div class="segmented-row" id="unlockTargetSelector">
             <button type="button" class="seg-pill active" data-target="homescreen">מסך בית מדומה</button>
             <button type="button" class="seg-pill" data-target="notes">אפליקציית פתקים מדומה</button>
-          </div>
-          <div class="clean-toggle-row" style="margin-top: 10px;">
-            <span>רוטינת "כפיית פתיחה" (Force Unlock - כל 4 ספרות פותחות)</span>
-            <label class="switch">
-              <input type="checkbox" id="toggleForceUnlockMode" checked>
-              <span class="slider"></span>
-            </label>
           </div>
         </div>
 
@@ -625,6 +633,6 @@
 
   </div>
 
-  <script src="./app.js?v=20261101000444"></script>
+  <script src="./app.js?v=20261101001609"></script>
 </body>
 </html>

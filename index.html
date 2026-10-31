@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <meta name="theme-color" content="#0f172a">
+  <meta name="theme-color" content="#0f1026">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Lockscreen">
@@ -13,12 +13,12 @@
   <meta http-equiv="Expires" content="0">
   <title>Lockscreen</title>
   <link rel="manifest" href="./manifest.json">
-  <link rel="stylesheet" href="./style.css?v=20261031185933">
+  <link rel="stylesheet" href="./style.css?v=20261031191825">
 </head>
 <body>
 
   <!-- ========================================================================
-       1. מסך פתיח אנימטיבי קצר (Intro Splash - 1.2s)
+       1. מסך פתיח אנימטיבי קצר (Intro Splash - 1.1s)
        ======================================================================== -->
   <div class="splash-screen" id="splashScreen">
     <div class="splash-content">
@@ -35,25 +35,25 @@
   </div>
 
   <!-- ========================================================================
-       2. מסך בחירה 50/50 (Split Screen Hero) + הגדרות נקיות לאחר בחירה
+       2. מסך הגדרות מקדים (Setup / Onboarding) + בחירה 50/50
        ======================================================================== -->
-  <div class="setup-overlay" id="setupOverlay">
+  <div class="setup-overlay open" id="setupOverlay">
 
-    <!-- שלב א': מסך חצוי 50/50 לבחירת מכשיר בלבד -->
+    <!-- שלב א': מסך חצוי 50/50 בדיוק בין Samsung ל-iPhone -->
     <div class="split-choice-screen" id="splitChoiceScreen">
       <!-- חצי עליון: Samsung Galaxy (One UI) -->
       <div class="split-half split-samsung" id="chooseSamsungBtn">
         <div class="split-half-inner">
-          <div class="split-badge">One UI</div>
+          <div class="split-badge">ONE UI</div>
           <div class="split-icon">
             <svg viewBox="0 0 48 48" width="46" height="46" fill="none">
-              <rect x="11" y="4" width="26" height="40" rx="4.5" stroke="currentColor" stroke-width="2.5"/>
+              <rect x="11" y="4" width="26" height="40" rx="5.5" stroke="currentColor" stroke-width="2.5"/>
               <circle cx="24" cy="8.5" r="1.6" fill="currentColor"/>
-              <circle cx="24" cy="36" r="3.2" stroke="currentColor" stroke-width="1.8" stroke-dasharray="2 2"/>
+              <circle cx="24" cy="36.5" r="3.2" stroke="currentColor" stroke-width="1.8" stroke-dasharray="2 2"/>
             </svg>
           </div>
           <h2 class="split-title">Samsung Galaxy</h2>
-          <p class="split-subtitle">ממשק One UI מקורי</p>
+          <p class="split-subtitle">ממשק One UI מדויק 1:1</p>
         </div>
       </div>
 
@@ -74,12 +74,12 @@
             </svg>
           </div>
           <h2 class="split-title">Apple iPhone</h2>
-          <p class="split-subtitle">ממשק iOS זכוכית בהיר</p>
+          <p class="split-subtitle">ממשק iOS עם Face ID</p>
         </div>
       </div>
     </div>
 
-    <!-- שלב ב': נפתח רק לאחר לחיצה על מכשיר -->
+    <!-- שלב ב': הגדרות המכשיר, טפטים ורישום ביומטריה -->
     <div class="device-config-sheet" id="deviceConfigSheet">
       <div class="config-header">
         <button type="button" class="back-to-split-btn" id="backToSplitBtn">→ החלף מכשיר</button>
@@ -87,28 +87,84 @@
       </div>
 
       <div class="config-body">
-        <!-- בחירת דגם מדויק (Presets: S20-S26 / iPhone 12-18) -->
+        <!-- 1. בחירת דגם מתוך הרשימה המלאה (S20-S26 / iPhone 12-18) -->
         <div class="config-group">
-          <label class="config-label">דגם מכשיר (מתאים טפט מקורי אוטומטית)</label>
+          <label class="config-label">דגם מכשיר (Notch / Dynamic Island / Punch-hole)</label>
           <div class="model-presets-grid" id="modelPresetsGrid"></div>
         </div>
 
-        <!-- בחירת סוג נעילה -->
+        <!-- 2. הגדרת ביומטריה וקוד אישי (Passcode, Fingerprint 3x, Face ID Camera) -->
         <div class="config-group">
-          <label class="config-label">שיטת נעילה</label>
-          <div class="segmented-row" id="modeSelector">
-            <button type="button" class="seg-pill active" data-mode="pin">קוד PIN</button>
-            <button type="button" class="seg-pill" data-mode="pattern">דפוס (Pattern)</button>
-            <button type="button" class="seg-pill" data-mode="words">סיסמת מילים</button>
+          <label class="config-label">הגדרת סיסמה אישית וביומטריה מורשית</label>
+
+          <!-- שדה רישום סיסמה / PIN אישי -->
+          <div class="setup-passcode-box">
+            <label class="setup-sub-label" for="setupPasscodeInput">סיסמה / PIN אישי לפתיחת המכשיר:</label>
+            <div class="setup-passcode-row">
+              <input
+                type="text"
+                id="setupPasscodeInput"
+                class="setup-passcode-input"
+                placeholder="למשל: 1234 או ab12"
+                autocomplete="off"
+                dir="ltr"
+              />
+              <span class="setup-passcode-saved" id="setupPasscodeSavedBadge">נשמר ✓</span>
+            </div>
+          </div>
+
+          <!-- רישום טביעת אצבע (3 לחיצות לכיול משך הלחיצה) -->
+          <div class="biometric-enroll-card" id="fpEnrollSection">
+            <div class="bio-enroll-header">
+              <div>
+                <div class="bio-enroll-title">רישום טביעת אצבע מורשית</div>
+                <div class="bio-enroll-status" id="fpEnrollStatusText">הנח והחזק את האצבע 3 פעמים לכיול (0/3)</div>
+              </div>
+              <button type="button" class="bio-enroll-toggle-btn" id="openFpEnrollBtn">כייל טביעת אצבע</button>
+            </div>
+
+            <div class="fp-enroll-pad-wrap" id="fpEnrollPadWrap" style="display: none;">
+              <div class="fp-enroll-steps" id="fpEnrollSteps">
+                <span class="fp-step-dot" data-step="1">1</span>
+                <span class="fp-step-dot" data-step="2">2</span>
+                <span class="fp-step-dot" data-step="3">3</span>
+              </div>
+              <div class="fp-enroll-sensor" id="fpEnrollSensor">
+                <div class="fp-enroll-ripple"></div>
+                <img src="./p1.png" alt="חיישן" class="fp-enroll-img" />
+              </div>
+              <p class="fp-enroll-hint" id="fpEnrollHint">החזק את האצבע על החיישן כחצי שנייה ושחרר</p>
+            </div>
+          </div>
+
+          <!-- רישום זיהוי פנים Face ID (מצלמת סלפי חיה + אנימציית סריקה) -->
+          <div class="biometric-enroll-card" id="faceIdEnrollSection">
+            <div class="bio-enroll-header">
+              <div>
+                <div class="bio-enroll-title">רישום זיהוי פנים (Face ID)</div>
+                <div class="bio-enroll-status" id="faceIdEnrollStatusText">סריקת מצלמת סלפי עם אישור פנים</div>
+              </div>
+              <button type="button" class="bio-enroll-toggle-btn" id="startFaceIdEnrollBtn">סרוק פנים כעת</button>
+            </div>
+
+            <div class="faceid-camera-box" id="faceIdCameraBox" style="display: none;">
+              <div class="faceid-video-circle">
+                <video id="setupFaceVideo" autoplay playsinline muted></video>
+                <div class="faceid-scan-laser"></div>
+                <div class="faceid-ring-overlay" id="faceIdRingOverlay"></div>
+              </div>
+              <p class="faceid-scan-caption" id="faceIdScanCaption">מקם את הפנים במסגרת לסריקה...</p>
+            </div>
           </div>
         </div>
 
-        <!-- אורך קוד PIN (מוצג רק במצב PIN) -->
-        <div class="config-group" id="pinLengthGroup">
-          <label class="config-label">אורך קוד PIN</label>
-          <div class="segmented-row" id="pinLengthButtons">
-            <button type="button" class="seg-pill active" data-pinlen="4">4 ספרות</button>
-            <button type="button" class="seg-pill" data-pinlen="6">6 ספרות</button>
+        <!-- 3. שיטת נעילה -->
+        <div class="config-group">
+          <label class="config-label">מצב תצוגת נעילה</label>
+          <div class="segmented-row" id="modeSelector">
+            <button type="button" class="seg-pill active" data-mode="pin">סיסמה + לוח מקשים</button>
+            <button type="button" class="seg-pill" data-mode="pattern">דפוס (Pattern)</button>
+            <button type="button" class="seg-pill" data-mode="words">מקלדת מלאה</button>
           </div>
         </div>
 
@@ -123,10 +179,10 @@
           </div>
         </div>
 
-        <!-- מערכת טפטים חכמה (גלריה מובנית + טפט אישי + מסך בית) -->
+        <!-- 4. מערכת טפטים חכמה (גלריה מובנית + טפט אישי + מסך בית) -->
         <div class="config-group">
           <div class="config-label-row">
-            <label class="config-label">טפט מסך נעילה (4 מובנים + העלאה אישית)</label>
+            <label class="config-label">טפט מסך נעילה (רשמי של הדגם או אישי)</label>
             <button type="button" class="cycle-wallpaper-btn" id="cycleWallpaperBtn">🎨 החלף טפט מובנה</button>
           </div>
 
@@ -147,7 +203,7 @@
           </div>
         </div>
 
-        <!-- פס סטטוס עליון (סוללה, קליטה ושעה) -->
+        <!-- 5. פס סטטוס עליון והצצה סודית -->
         <div class="config-group">
           <label class="config-label">פס עליון (סוללה, קליטה ושעה)</label>
           <div class="segmented-row" id="statusBarSelector">
@@ -156,16 +212,6 @@
           </div>
         </div>
 
-        <!-- התנהגות לאחר הזנה -->
-        <div class="config-group">
-          <label class="config-label">לאחר הקשת הסיסמה</label>
-          <div class="segmented-row" id="behaviorSelector">
-            <button type="button" class="seg-pill active" data-behavior="error">הצג שגיאה</button>
-            <button type="button" class="seg-pill" data-behavior="unlock">פתח מסך בית</button>
-          </div>
-        </div>
-
-        <!-- אפשרויות תצוגה והצצה סודית -->
         <div class="config-group">
           <label class="config-label">תצוגה והצצה סודית (Peek)</label>
           <div class="clean-toggle-row">
@@ -176,7 +222,7 @@
             </label>
           </div>
           <div class="clean-toggle-row" id="punchHoleSettingRow">
-            <span>הצג חור מצלמה שחור למעלה</span>
+            <span>הצג חור מצלמה / Dynamic Island למעלה</span>
             <label class="switch">
               <input type="checkbox" id="togglePunchHole" checked>
               <span class="slider"></span>
@@ -204,7 +250,7 @@
             </label>
           </div>
           <div class="clean-toggle-row" id="fingerprintSettingRow">
-            <span>הצג טביעת אצבע שקופה (Samsung)</span>
+            <span>הצג טביעת אצבע בתחתית (Samsung)</span>
             <label class="switch">
               <input type="checkbox" id="toggleFingerprint" checked>
               <span class="slider"></span>
@@ -228,9 +274,12 @@
   </div>
 
   <!-- ========================================================================
-       3. מסך הנעילה האותנטי והבהיר (Samsung One UI / Apple iOS)
+       3. מסך הנעילה המדויק 1:1 (Samsung One UI / Apple iOS)
        ======================================================================== -->
   <div class="phone-container theme-samsung" id="phoneContainer">
+    <!-- שכבת עמעום כהה בגוון כחלחל-סגול עמוק (One UI 1:1 Backdrop) -->
+    <div class="lockscreen-dim-backdrop" id="lockscreenDimBackdrop"></div>
+
     <!-- אזור לחיצה משולשת סודי בפינה השמאלית העליונה (חזרה להגדרות) -->
     <div class="secret-trigger-zone" id="secretCornerTrigger"></div>
 
@@ -241,7 +290,9 @@
       </div>
 
       <div class="camera-punch-hole" id="cameraPunchHole">
-        <!-- סמל מנעול וחיווי Face ID בתוך ה-Dynamic Island (עבור iPhone) -->
+        <!-- מצלמת סלפי זעירה לסריקת Face ID חיה באייפון -->
+        <video class="island-live-cam" id="islandLiveCam" autoplay playsinline muted></video>
+        <!-- סמל מנעול וחיווי Face ID בתוך ה-Dynamic Island / Notch (עבור iPhone) -->
         <div class="island-faceid-content" id="islandFaceIdContent">
           <svg class="island-lock-svg" viewBox="0 0 24 24">
             <path class="island-lock-shackle" d="M8 10V7a4 4 0 0 1 8 0v3" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
@@ -301,7 +352,7 @@
       </div>
     </div>
 
-    <!-- אייקון מנעול עליון (נפתח אוטומטית ב-Face ID באייפון) -->
+    <!-- אייקון מנעול לבן סגור וממורכז מתחת לחור המצלמה העליון -->
     <div class="lock-icon" id="lockIconTrigger">
       <svg viewBox="0 0 24 24" class="top-lock-svg">
         <path class="top-lock-shackle" d="M8.9 10V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v4" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round"/>
@@ -309,20 +360,55 @@
       </svg>
     </div>
 
-    <!-- כותרת והודעת שגיאה -->
-    <div class="header-area">
-      <div class="title-group" id="titleGroup">
-        <div class="title" id="mainTitle">הזן קוד PIN</div>
-        <div class="subtitle" id="subTitle">קוד ה-PIN שלך מכיל לפחות 4 ספרות</div>
+    <!-- מסך השעון הראשי של מסך הנעילה (מוצג כשלוחצים על חץ החזרה השמאלי התחתון) -->
+    <div class="clock-lock-screen" id="clockLockScreen">
+      <div class="clock-lock-center">
+        <div class="clock-lock-big-time" id="clockLockBigTime">14:22</div>
+        <div class="clock-lock-date" id="clockLockDate">יום שבת, 31 באוקטובר</div>
       </div>
-      <div class="error-msg" id="errorMsg">הוזן קוד PIN שגוי</div>
+      <div class="clock-lock-swipe-prompt">החלק או הקש להזנת סיסמה</div>
     </div>
 
-    <!-- ==================== מצב 1: קוד PIN ==================== -->
-    <div class="unlock-mode-view active" id="viewPin">
-      <div class="pin-dots" id="pinDots"></div>
+    <!-- כותרת עליונה, כיתוב משני והודעת שגיאה באדום -->
+    <div class="header-area" id="lockHeaderArea">
+      <div class="title-group" id="titleGroup">
+        <div class="title" id="mainTitle">הזן סיסמה</div>
+        <div class="subtitle" id="subTitle">סיסמה חייבת להכיל לפחות 4 תווים, ביניהם אות אחת לפחות.</div>
+      </div>
+      <div class="error-msg" id="errorMsg">סיסמה שגויה</div>
+    </div>
 
-      <div class="keypad">
+    <!-- שדה הסיסמה של One UI בצורת קפסולה מעוגלת (רקע סגלגל/בורדו כהה חצי-שקוף, סמן תכלת מימין, כפתור עין משמאל) -->
+    <div class="oneui-password-pill-wrap" id="oneUiPasswordPillWrap">
+      <div class="oneui-password-pill" id="wordGlassField">
+        <!-- כפתור עין משמאל לשדה לחשיפה או הסתרה של התווים -->
+        <button type="button" class="oneui-eye-btn" id="togglePasswordEyeBtn" title="הצג/הסתר תווים">
+          <svg id="eyeIconOpen" viewBox="0 0 24 24">
+            <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>
+          </svg>
+        </button>
+
+        <!-- שדה קלט RTL עם סמן הקלדה תכלת בצד ימין -->
+        <input
+          type="password"
+          class="oneui-password-input"
+          id="passwordInput"
+          dir="rtl"
+          autocomplete="off"
+          autocorrect="off"
+          autocapitalize="off"
+          spellcheck="false"
+          enterkeyhint="done"
+        />
+      </div>
+    </div>
+
+    <!-- נקודות קוד עבור iOS בלבד -->
+    <div class="pin-dots" id="pinDots"></div>
+
+    <!-- ==================== מצב 1: לוח מקשים נומרי נקי (CSS Grid repeat(3, 1fr)) ==================== -->
+    <div class="unlock-mode-view active" id="viewPin">
+      <div class="keypad" id="numericKeypad">
         <button class="key-btn" type="button" data-digit="1">
           <span class="key-number">1</span>
           <span class="key-letters">&nbsp;</span>
@@ -401,41 +487,19 @@
       </div>
     </div>
 
-    <!-- ==================== מצב 3: סיסמת מילים (מקלדת מערכת אמיתית בלבד!) ==================== -->
+    <!-- ==================== מצב 3: מקלדת מערכת מלאה ==================== -->
     <div class="unlock-mode-view" id="viewWords">
       <div class="words-native-container" id="wordsNativeContainer">
-        <div class="word-glass-field" id="wordGlassField">
-          <button type="button" class="word-icon-btn" id="toggleWordMaskBtn" title="הצג/הסתר">
-            <svg viewBox="0 0 24 24">
-              <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>
-            </svg>
-          </button>
-
-          <input
-            type="password"
-            class="word-real-input"
-            id="wordNativeInput"
-            autocomplete="off"
-            autocorrect="off"
-            autocapitalize="off"
-            spellcheck="false"
-            enterkeyhint="done"
-            placeholder="הקלד סיסמה..."
-          />
-
-          <button type="button" class="word-submit-btn" id="wordSubmitInlineBtn">
-            OK
-          </button>
-        </div>
-        <p class="word-tap-hint" id="wordTapHint">הקש כאן לפתיחת מקלדת הטלפון</p>
+        <button type="button" class="word-submit-btn" id="wordSubmitInlineBtn">אישור סיסמה (OK)</button>
+        <p class="word-tap-hint" id="wordTapHint">הקש על שדה הסיסמה למעלה להקלדה במקלדת המכשיר</p>
       </div>
     </div>
 
-    <!-- כפתור שיחת חירום ואזור תחתון של Samsung -->
+    <!-- כפתור שיחת חירום בצורת קפסולה תואמת ומעוגלת מתחת לשדה הסיסמה -->
     <button class="emergency-btn" type="button" id="samsungEmergencyBtn">שיחת חירום</button>
 
     <div class="footer-area" id="samsungFooter">
-      <!-- טביעת אצבע אותנטית עם אנימציית הילה זוהרת (Ripple) ופתיחה בלחיצה ממושכת -->
+      <!-- אייקון טביעת אצבע מעוצב (הסמל הלבן/תכלת של סמסונג) ממורכז בתחתית -->
       <div class="fingerprint-container" id="fingerprintContainer">
         <div class="fingerprint-halo"></div>
         <div class="fingerprint-ripple"></div>
@@ -448,12 +512,13 @@
         />
       </div>
 
+      <!-- חץ חזרה (>) ממוקם בפינה השמאלית התחתונה ומצביע שמאלה -->
       <div class="bottom-bar">
-        <div class="samsung-back-btn" id="samsungBackBtn">
+        <button type="button" class="samsung-back-btn" id="samsungBackBtn" title="חזרה למסך השעון הראשי">
           <svg viewBox="0 0 24 24">
-            <polyline points="9 6 15 12 9 18"></polyline>
+            <polyline points="15 6 9 12 15 18"></polyline>
           </svg>
-        </div>
+        </button>
       </div>
     </div>
 
@@ -473,7 +538,7 @@
       <div class="default-homescreen-ui">
         <div class="home-weather-widget">
           <div class="home-clock" id="homeClock">14:22</div>
-          <div class="home-date" id="homeDate">יום שישי, 30 באוקטובר</div>
+          <div class="home-date" id="homeDate">יום שבת, 31 באוקטובר</div>
         </div>
       </div>
     </div>
@@ -486,6 +551,6 @@
 
   </div>
 
-  <script src="./app.js?v=20261031185933"></script>
+  <script src="./app.js?v=20261031191825"></script>
 </body>
 </html>

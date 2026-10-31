@@ -1,2111 +1,1933 @@
-/* ==========================================================================
-   Magic Lockscreen - Splash, 50/50 Split Choice, Light Glass & Native Keyboard
-   ========================================================================== */
+// ============================================================================
+// MAGIC LOCKSCREEN SIMULATOR (ONE UI 1:1 & iOS + BIOMETRICS + FULLSCREEN)
+// ============================================================================
 
-(() => {
-  'use strict';
+const CONFIG_STORAGE_KEY = 'magic_lockscreen_config_v6';
+const WALLPAPER_STORAGE_KEY = 'magic_custom_wallpaper';
+const SELECTED_WALLPAPER_ID_KEY = 'magic_selected_wallpaper_id_v1';
+const HOMESCREEN_STORAGE_KEY = 'magic_custom_homescreen';
+const LAST_PIN_KEY = 'last_entered_pin';
+const HISTORY_KEY = 'pin_history';
 
-  const DEFAULT_CONFIG = {
-    theme: 'samsung',           // 'samsung' | 'ios'
-    modelId: 's24',             // 's20'..'s26' | 'iphone12'..'iphone18'
-    wallpaperId: 'model_default', // 'model_default' | 'gallery_aurora' | 'gallery_ocean' | 'gallery_sunset' | 'custom'
-    unlockMode: 'pin',          // 'pin' | 'pattern' | 'words'
-    pinLength: 4,               // 4 | 6
-    stealthPattern: false,
-    postBehavior: 'error',      // 'error' | 'unlock'
-    showStatusBar: true,        // הצג/הסתר פס עליון (סוללה, קליטה, שעה)
-    showPunchHole: true,        // הצג/הסתר חור מצלמה עליון
-    hapticPeekEnabled: true,
-    chameleonClockEnabled: true,
-    holdPeekEnabled: true,
-    showFingerprint: true,
-    batteryLevel: 88
-  };
+// ----------------------------------------------------------------------------
+// 1. מחולל טפטים רשמיים מובנים (SVG Data-URI מהירים, חדים וללא תלות ברשת)
+// ----------------------------------------------------------------------------
+function createSvgWallpaper(stops, shapesSvg = '', angle = 145) {
+  const rad = (angle * Math.PI) / 180;
+  const x2 = Math.round(50 + Math.sin(rad) * 50);
+  const y2 = Math.round(50 + Math.cos(rad) * 50);
+  const stopsXml = stops
+    .map(([offset, color]) => `<stop offset="${offset}%" stop-color="${color}"/>`)
+    .join('');
 
-  const STORAGE_KEY_CONFIG = 'magic_lockscreen_clean_config_v3';
-  const STORAGE_KEY_CUSTOM_WP = 'magic_lockscreen_custom_wallpaper';
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 2400" preserveAspectRatio="xMidYMid slice">
+    <defs>
+      <linearGradient id="bg" x1="0%" y1="0%" x2="${x2}%" y2="${y2}%">${stopsXml}</linearGradient>
+      <radialGradient id="glow1" cx="30%" cy="25%" r="55%">
+        <stop offset="0%" stop-color="rgba(255,255,255,0.28)"/>
+        <stop offset="100%" stop-color="rgba(255,255,255,0)"/>
+      </radialGradient>
+      <radialGradient id="glow2" cx="75%" cy="72%" r="50%">
+        <stop offset="0%" stop-color="rgba(56,189,248,0.22)"/>
+        <stop offset="100%" stop-color="rgba(0,0,0,0)"/>
+      </radialGradient>
+    </defs>
+    <rect width="1080" height="2400" fill="url(#bg)"/>
+    <rect width="1080" height="2400" fill="url(#glow1)"/>
+    <rect width="1080" height="2400" fill="url(#glow2)"/>
+    ${shapesSvg}
+  </svg>`;
 
-  // מחולל טפטי SVG וקטוריים ברזולוציה גבוהה (Data URI) בסגנון הרשמי של כל דגם
-  function createSvgWallpaperUri(svgBody) {
-    const fullSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 2340" width="1080" height="2340" preserveAspectRatio="xMidYMid slice">${svgBody}</svg>`;
-    return `data:image/svg+xml;utf8,${encodeURIComponent(fullSvg)}`;
-  }
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}
 
-  // Presets לכל הדגמים: Galaxy S20 עד S26 ו-iPhone 12 עד 18
-  const MODEL_PRESETS = {
-    // --- Samsung Galaxy Models (S20 - S26) ---
-    s20: {
-      theme: 'samsung',
-      label: 'Galaxy S20',
-      wallpaper: createSvgWallpaperUri(`
-        <defs>
-          <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stop-color="#0ea5e9"/>
-            <stop offset="50%" stop-color="#2563eb"/>
-            <stop offset="100%" stop-color="#1e1b4b"/>
-          </linearGradient>
-          <radialGradient id="bloom1" cx="30%" cy="35%" r="55%">
-            <stop offset="0%" stop-color="#f472b6" stop-opacity="0.85"/>
-            <stop offset="55%" stop-color="#38bdf8" stop-opacity="0.35"/>
-            <stop offset="100%" stop-color="#1e1b4b" stop-opacity="0"/>
-          </radialGradient>
-          <radialGradient id="bloom2" cx="75%" cy="68%" r="50%">
-            <stop offset="0%" stop-color="#60a5fa" stop-opacity="0.9"/>
-            <stop offset="100%" stop-color="#1e3a8a" stop-opacity="0"/>
-          </radialGradient>
-        </defs>
-        <rect width="1080" height="2340" fill="url(#bg)"/>
-        <circle cx="340" cy="820" r="680" fill="url(#bloom1)"/>
-        <circle cx="800" cy="1580" r="640" fill="url(#bloom2)"/>
-        <path d="M0,1250 Q540,980 1080,1320 L1080,2340 L0,2340 Z" fill="#ffffff" fill-opacity="0.08"/>
-      `)
+// ----------------------------------------------------------------------------
+// 2. מאגר דגמים מלא (Presets: Samsung S20-S26 & Apple iPhone 12-18)
+// ----------------------------------------------------------------------------
+const MODEL_PRESETS = {
+  samsung: [
+    {
+      id: 's20',
+      name: 'Galaxy S20',
+      year: '2020',
+      cutout: 'punch',
+      defaultWallpaper: createSvgWallpaper(
+        [[0, '#0f172a'], [38, '#1e3a8a'], [74, '#ec4899'], [100, '#fbcfe8']],
+        `<path d="M-100 1700 C320 1350, 760 1980, 1200 1550 L1200 2400 L-100 2400 Z" fill="rgba(255,255,255,0.14)"/>
+         <circle cx="540" cy="880" r="420" fill="rgba(244,114,182,0.18)"/>`
+      )
     },
-    s21: {
-      theme: 'samsung',
-      label: 'Galaxy S21',
-      wallpaper: createSvgWallpaperUri(`
-        <defs>
-          <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stop-color="#312e81"/>
-            <stop offset="48%" stop-color="#4f46e5"/>
-            <stop offset="100%" stop-color="#0f172a"/>
-          </linearGradient>
-          <linearGradient id="silk1" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stop-color="#a78bfa" stop-opacity="0.8"/>
-            <stop offset="100%" stop-color="#ec4899" stop-opacity="0.25"/>
-          </linearGradient>
-          <linearGradient id="silk2" x1="1" y1="0" x2="0" y2="1">
-            <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.75"/>
-            <stop offset="100%" stop-color="#6366f1" stop-opacity="0.1"/>
-          </linearGradient>
-        </defs>
-        <rect width="1080" height="2340" fill="url(#bg)"/>
-        <path d="M-100,400 C350,750 720,200 1180,680 L1180,1700 C700,1250 300,1850 -100,1400 Z" fill="url(#silk1)"/>
-        <path d="M-100,900 C420,1350 680,750 1180,1220 L1180,2340 L-100,2340 Z" fill="url(#silk2)"/>
-      `)
+    {
+      id: 's21',
+      name: 'Galaxy S21',
+      year: '2021',
+      cutout: 'punch',
+      defaultWallpaper: createSvgWallpaper(
+        [[0, '#1e1b4b'], [42, '#5b21b6'], [78, '#c084fc'], [100, '#f5d0fe']],
+        `<path d="M0 400 Q540 950 1080 350 L1080 1450 Q540 1000 0 1550 Z" fill="rgba(255,255,255,0.12)"/>`
+      )
     },
-    s22: {
-      theme: 'samsung',
-      label: 'Galaxy S22',
-      wallpaper: createSvgWallpaperUri(`
-        <defs>
-          <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stop-color="#0f766e"/>
-            <stop offset="52%" stop-color="#115e59"/>
-            <stop offset="100%" stop-color="#0f172a"/>
-          </linearGradient>
-          <radialGradient id="orb" cx="50%" cy="46%" r="48%">
-            <stop offset="0%" stop-color="#fb7185" stop-opacity="0.85"/>
-            <stop offset="55%" stop-color="#2dd4bf" stop-opacity="0.45"/>
-            <stop offset="100%" stop-color="#0f172a" stop-opacity="0"/>
-          </radialGradient>
-        </defs>
-        <rect width="1080" height="2340" fill="url(#bg)"/>
-        <circle cx="540" cy="1080" r="620" fill="url(#orb)"/>
-        <rect x="140" y="540" width="800" height="1260" rx="400" fill="#ffffff" fill-opacity="0.09" transform="rotate(-18 540 1170)"/>
-      `)
+    {
+      id: 's22',
+      name: 'Galaxy S22',
+      year: '2022',
+      cutout: 'punch',
+      defaultWallpaper: createSvgWallpaper(
+        [[0, '#042f2e'], [40, '#0f766e'], [78, '#fb7185'], [100, '#fde68a']],
+        `<circle cx="380" cy="980" r="460" fill="rgba(45,212,191,0.2)"/>
+         <circle cx="720" cy="1360" r="390" fill="rgba(251,113,133,0.22)"/>`
+      )
     },
-    s23: {
-      theme: 'samsung',
-      label: 'Galaxy S23',
-      wallpaper: createSvgWallpaperUri(`
-        <defs>
-          <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stop-color="#1e293b"/>
-            <stop offset="50%" stop-color="#0f5132"/>
-            <stop offset="100%" stop-color="#091e1a"/>
-          </linearGradient>
-          <radialGradient id="s1" cx="35%" cy="38%" r="36%">
-            <stop offset="0%" stop-color="#86efac" stop-opacity="0.8"/>
-            <stop offset="60%" stop-color="#10b981" stop-opacity="0.35"/>
-            <stop offset="100%" stop-color="#091e1a" stop-opacity="0"/>
-          </radialGradient>
-          <radialGradient id="s2" cx="68%" cy="62%" r="38%">
-            <stop offset="0%" stop-color="#c4b5fd" stop-opacity="0.75"/>
-            <stop offset="100%" stop-color="#091e1a" stop-opacity="0"/>
-          </radialGradient>
-        </defs>
-        <rect width="1080" height="2340" fill="url(#bg)"/>
-        <circle cx="380" cy="890" r="460" fill="url(#s1)"/>
-        <circle cx="720" cy="1450" r="480" fill="url(#s2)"/>
-      `)
+    {
+      id: 's23',
+      name: 'Galaxy S23',
+      year: '2023',
+      cutout: 'punch',
+      defaultWallpaper: createSvgWallpaper(
+        [[0, '#052e16'], [45, '#14532d'], [80, '#3f6212'], [100, '#bef264']],
+        `<circle cx="540" cy="1120" r="480" fill="rgba(163,230,53,0.16)"/>
+         <circle cx="540" cy="1120" r="290" fill="rgba(255,255,255,0.1)"/>`
+      )
     },
-    s24: {
-      theme: 'samsung',
-      label: 'Galaxy S24',
-      wallpaper: createSvgWallpaperUri(`
-        <defs>
-          <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stop-color="#1d4ed8"/>
-            <stop offset="52%" stop-color="#2563eb"/>
-            <stop offset="100%" stop-color="#1e3a8a"/>
-          </linearGradient>
-          <linearGradient id="facet1" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stop-color="#93c5fd" stop-opacity="0.75"/>
-            <stop offset="100%" stop-color="#38bdf8" stop-opacity="0.15"/>
-          </linearGradient>
-          <linearGradient id="facet2" x1="1" y1="0" x2="0" y2="1">
-            <stop offset="0%" stop-color="#fde68a" stop-opacity="0.65"/>
-            <stop offset="100%" stop-color="#60a5fa" stop-opacity="0.18"/>
-          </linearGradient>
-        </defs>
-        <rect width="1080" height="2340" fill="url(#bg)"/>
-        <polygon points="540,260 980,980 540,1460 120,920" fill="url(#facet1)"/>
-        <polygon points="540,860 1000,1420 540,2060 100,1480" fill="url(#facet2)"/>
-      `)
+    {
+      id: 's24',
+      name: 'Galaxy S24',
+      year: '2024',
+      cutout: 'punch',
+      defaultWallpaper: createSvgWallpaper(
+        [[0, '#1c1917'], [38, '#57534e'], [74, '#d97706'], [100, '#fef08a']],
+        `<polygon points="540,360 960,1150 540,1920 120,1150" fill="rgba(251,191,36,0.16)"/>
+         <polygon points="540,560 820,1150 540,1720 260,1150" fill="rgba(255,255,255,0.12)"/>`
+      )
     },
-    s25: {
-      theme: 'samsung',
-      label: 'Galaxy S25',
-      wallpaper: createSvgWallpaperUri(`
-        <defs>
-          <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stop-color="#0284c7"/>
-            <stop offset="50%" stop-color="#1d4ed8"/>
-            <stop offset="100%" stop-color="#0f172a"/>
-          </linearGradient>
-          <radialGradient id="ring" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stop-color="#7dd3fc" stop-opacity="0.15"/>
-            <stop offset="65%" stop-color="#38bdf8" stop-opacity="0.65"/>
-            <stop offset="100%" stop-color="#1d4ed8" stop-opacity="0"/>
-          </radialGradient>
-        </defs>
-        <rect width="1080" height="2340" fill="url(#bg)"/>
-        <circle cx="540" cy="950" r="520" fill="url(#ring)"/>
-        <circle cx="540" cy="1420" r="520" fill="url(#ring)"/>
-        <circle cx="540" cy="1170" r="320" fill="#ffffff" fill-opacity="0.1"/>
-      `)
+    {
+      id: 's25',
+      name: 'Galaxy S25',
+      year: '2025',
+      cutout: 'punch',
+      defaultWallpaper: createSvgWallpaper(
+        [[0, '#090d1e'], [38, '#1e1b4b'], [72, '#3b0764'], [100, '#581c87']],
+        `<circle cx="540" cy="960" r="500" fill="rgba(56,189,248,0.15)"/>
+         <path d="M-80 1650 Q540 1220 1160 1650 L1160 2400 L-80 2400 Z" fill="rgba(192,38,211,0.16)"/>`
+      )
     },
-    s26: {
-      theme: 'samsung',
-      label: 'Galaxy S26',
-      wallpaper: createSvgWallpaperUri(`
-        <defs>
-          <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stop-color="#06b6d4"/>
-            <stop offset="48%" stop-color="#3b82f6"/>
-            <stop offset="100%" stop-color="#1e1b4b"/>
-          </linearGradient>
-          <radialGradient id="ai1" cx="30%" cy="30%" r="60%">
-            <stop offset="0%" stop-color="#67e8f9" stop-opacity="0.85"/>
-            <stop offset="100%" stop-color="#3b82f6" stop-opacity="0"/>
-          </radialGradient>
-          <radialGradient id="ai2" cx="72%" cy="72%" r="55%">
-            <stop offset="0%" stop-color="#c084fc" stop-opacity="0.8"/>
-            <stop offset="100%" stop-color="#1e1b4b" stop-opacity="0"/>
-          </radialGradient>
-        </defs>
-        <rect width="1080" height="2340" fill="url(#bg)"/>
-        <circle cx="320" cy="700" r="650" fill="url(#ai1)"/>
-        <circle cx="780" cy="1680" r="650" fill="url(#ai2)"/>
-        <path d="M-100,1170 Q540,620 1180,1170 Q540,1720 -100,1170 Z" fill="#ffffff" fill-opacity="0.12"/>
-      `)
-    },
-
-    // --- Apple iPhone Models (iPhone 12 - iPhone 18) ---
-    iphone12: {
-      theme: 'ios',
-      label: 'iPhone 12',
-      wallpaper: createSvgWallpaperUri(`
-        <defs>
-          <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stop-color="#1e3a8a"/>
-            <stop offset="50%" stop-color="#1d4ed8"/>
-            <stop offset="100%" stop-color="#0f172a"/>
-          </linearGradient>
-          <radialGradient id="r1" cx="50%" cy="35%" r="50%">
-            <stop offset="0%" stop-color="#f43f5e" stop-opacity="0.85"/>
-            <stop offset="65%" stop-color="#3b82f6" stop-opacity="0.35"/>
-            <stop offset="100%" stop-color="#1e3a8a" stop-opacity="0"/>
-          </radialGradient>
-          <radialGradient id="r2" cx="50%" cy="72%" r="52%">
-            <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.85"/>
-            <stop offset="100%" stop-color="#0f172a" stop-opacity="0"/>
-          </radialGradient>
-        </defs>
-        <rect width="1080" height="2340" fill="url(#bg)"/>
-        <circle cx="540" cy="820" r="640" fill="url(#r1)"/>
-        <circle cx="540" cy="1650" r="660" fill="url(#r2)"/>
-      `)
-    },
-    iphone13: {
-      theme: 'ios',
-      label: 'iPhone 13',
-      wallpaper: createSvgWallpaperUri(`
-        <defs>
-          <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stop-color="#0284c7"/>
-            <stop offset="55%" stop-color="#0369a1"/>
-            <stop offset="100%" stop-color="#0f172a"/>
-          </linearGradient>
-          <linearGradient id="beam" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stop-color="#bae6fd" stop-opacity="0.85"/>
-            <stop offset="100%" stop-color="#38bdf8" stop-opacity="0.1"/>
-          </linearGradient>
-        </defs>
-        <rect width="1080" height="2340" fill="url(#bg)"/>
-        <circle cx="260" cy="780" r="560" fill="url(#beam)"/>
-        <circle cx="820" cy="1520" r="580" fill="url(#beam)"/>
-      `)
-    },
-    iphone14: {
-      theme: 'ios',
-      label: 'iPhone 14',
-      wallpaper: createSvgWallpaperUri(`
-        <defs>
-          <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stop-color="#4338ca"/>
-            <stop offset="52%" stop-color="#2563eb"/>
-            <stop offset="100%" stop-color="#0284c7"/>
-          </linearGradient>
-          <radialGradient id="orb1" cx="50%" cy="32%" r="48%">
-            <stop offset="0%" stop-color="#c084fc" stop-opacity="0.85"/>
-            <stop offset="100%" stop-color="#4338ca" stop-opacity="0"/>
-          </radialGradient>
-          <radialGradient id="orb2" cx="50%" cy="74%" r="50%">
-            <stop offset="0%" stop-color="#7dd3fc" stop-opacity="0.85"/>
-            <stop offset="100%" stop-color="#0284c7" stop-opacity="0"/>
-          </radialGradient>
-        </defs>
-        <rect width="1080" height="2340" fill="url(#bg)"/>
-        <circle cx="540" cy="740" r="600" fill="url(#orb1)"/>
-        <circle cx="540" cy="1720" r="640" fill="url(#orb2)"/>
-      `)
-    },
-    iphone15: {
-      theme: 'ios',
-      label: 'iPhone 15',
-      wallpaper: createSvgWallpaperUri(`
-        <defs>
-          <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stop-color="#0ea5e9"/>
-            <stop offset="50%" stop-color="#2563eb"/>
-            <stop offset="100%" stop-color="#1e293b"/>
-          </linearGradient>
-          <linearGradient id="w1" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%" stop-color="#fdba74" stop-opacity="0.78"/>
-            <stop offset="50%" stop-color="#f472b6" stop-opacity="0.65"/>
-            <stop offset="100%" stop-color="#38bdf8" stop-opacity="0.75"/>
-          </linearGradient>
-        </defs>
-        <rect width="1080" height="2340" fill="url(#bg)"/>
-        <path d="M-100,820 Q540,420 1180,860 L1180,1520 Q540,1920 -100,1480 Z" fill="url(#w1)"/>
-        <path d="M-100,1150 Q540,780 1180,1180 L1180,1850 Q540,2180 -100,1820 Z" fill="#ffffff" fill-opacity="0.12"/>
-      `)
-    },
-    iphone16: {
-      theme: 'ios',
-      label: 'iPhone 16',
-      wallpaper: createSvgWallpaperUri(`
-        <defs>
-          <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stop-color="#0284c7"/>
-            <stop offset="52%" stop-color="#1d4ed8"/>
-            <stop offset="100%" stop-color="#1e3a8a"/>
-          </linearGradient>
-          <radialGradient id="ios18a" cx="28%" cy="28%" r="55%">
-            <stop offset="0%" stop-color="#5eead4" stop-opacity="0.88"/>
-            <stop offset="100%" stop-color="#0284c7" stop-opacity="0"/>
-          </radialGradient>
-          <radialGradient id="ios18b" cx="74%" cy="68%" r="55%">
-            <stop offset="0%" stop-color="#818cf8" stop-opacity="0.88"/>
-            <stop offset="100%" stop-color="#1e3a8a" stop-opacity="0"/>
-          </radialGradient>
-        </defs>
-        <rect width="1080" height="2340" fill="url(#bg)"/>
-        <circle cx="300" cy="680" r="680" fill="url(#ios18a)"/>
-        <circle cx="800" cy="1600" r="680" fill="url(#ios18b)"/>
-        <ellipse cx="540" cy="1170" rx="480" ry="760" fill="#ffffff" fill-opacity="0.09" transform="rotate(24 540 1170)"/>
-      `)
-    },
-    iphone17: {
-      theme: 'ios',
-      label: 'iPhone 17',
-      wallpaper: createSvgWallpaperUri(`
-        <defs>
-          <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stop-color="#0ea5e9"/>
-            <stop offset="50%" stop-color="#6366f1"/>
-            <stop offset="100%" stop-color="#0f172a"/>
-          </linearGradient>
-          <radialGradient id="lg1" cx="50%" cy="40%" r="52%">
-            <stop offset="0%" stop-color="#bae6fd" stop-opacity="0.9"/>
-            <stop offset="55%" stop-color="#38bdf8" stop-opacity="0.45"/>
-            <stop offset="100%" stop-color="#6366f1" stop-opacity="0"/>
-          </radialGradient>
-        </defs>
-        <rect width="1080" height="2340" fill="url(#bg)"/>
-        <circle cx="540" cy="960" r="640" fill="url(#lg1)"/>
-        <rect x="160" y="480" width="760" height="1380" rx="380" fill="#ffffff" fill-opacity="0.12" transform="rotate(15 540 1170)"/>
-      `)
-    },
-    iphone18: {
-      theme: 'ios',
-      label: 'iPhone 18',
-      wallpaper: createSvgWallpaperUri(`
-        <defs>
-          <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stop-color="#06b6d4"/>
-            <stop offset="48%" stop-color="#2563eb"/>
-            <stop offset="100%" stop-color="#3b0764"/>
-          </linearGradient>
-          <radialGradient id="na1" cx="35%" cy="32%" r="50%">
-            <stop offset="0%" stop-color="#67e8f9" stop-opacity="0.9"/>
-            <stop offset="100%" stop-color="#2563eb" stop-opacity="0"/>
-          </radialGradient>
-          <radialGradient id="na2" cx="68%" cy="68%" r="52%">
-            <stop offset="0%" stop-color="#f472b6" stop-opacity="0.85"/>
-            <stop offset="100%" stop-color="#3b0764" stop-opacity="0"/>
-          </radialGradient>
-        </defs>
-        <rect width="1080" height="2340" fill="url(#bg)"/>
-        <circle cx="360" cy="760" r="620" fill="url(#na1)"/>
-        <circle cx="740" cy="1580" r="640" fill="url(#na2)"/>
-        <circle cx="540" cy="1170" r="390" fill="#ffffff" fill-opacity="0.1"/>
-      `)
+    {
+      id: 's26',
+      name: 'Galaxy S26',
+      year: '2026',
+      cutout: 'punch',
+      defaultWallpaper: createSvgWallpaper(
+        [[0, '#0c0a24'], [35, '#1e1b4b'], [72, '#4c1d95'], [100, '#701a75']],
+        `<ellipse cx="540" cy="1080" rx="460" ry="620" fill="rgba(56,189,248,0.14)"/>
+         <ellipse cx="540" cy="1080" rx="280" ry="420" fill="rgba(244,114,182,0.15)"/>`
+      )
     }
-  };
-
-  // טפטים משלימים לגלריה המובנית (בנוסף לטפט המקורי של כל דגם)
-  const EXTRA_GALLERY_WALLPAPERS = {
-    gallery_aurora: {
-      id: 'gallery_aurora',
-      label: 'אורורה צלולה',
-      uri: createSvgWallpaperUri(`
-        <defs>
-          <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stop-color="#0284c7"/>
-            <stop offset="50%" stop-color="#0d9488"/>
-            <stop offset="100%" stop-color="#1e3a8a"/>
-          </linearGradient>
-          <radialGradient id="a1" cx="25%" cy="30%" r="55%">
-            <stop offset="0%" stop-color="#5eead4" stop-opacity="0.9"/>
-            <stop offset="100%" stop-color="#0284c7" stop-opacity="0"/>
-          </radialGradient>
-          <radialGradient id="a2" cx="78%" cy="72%" r="55%">
-            <stop offset="0%" stop-color="#7dd3fc" stop-opacity="0.85"/>
-            <stop offset="100%" stop-color="#1e3a8a" stop-opacity="0"/>
-          </radialGradient>
-        </defs>
-        <rect width="1080" height="2340" fill="url(#bg)"/>
-        <circle cx="280" cy="700" r="680" fill="url(#a1)"/>
-        <circle cx="840" cy="1660" r="680" fill="url(#a2)"/>
-      `)
+  ],
+  ios: [
+    {
+      id: 'iphone12',
+      name: 'iPhone 12',
+      year: 'Notch',
+      cutout: 'notch',
+      defaultWallpaper: createSvgWallpaper(
+        [[0, '#0f172a'], [36, '#1d4ed8'], [72, '#ec4899'], [100, '#fda4af']],
+        `<circle cx="540" cy="1200" r="560" fill="rgba(59,130,246,0.22)"/>
+         <circle cx="540" cy="1200" r="360" fill="rgba(244,114,182,0.25)"/>`
+      )
     },
-    gallery_ocean: {
-      id: 'gallery_ocean',
-      label: 'כחול קריסטל',
-      uri: createSvgWallpaperUri(`
-        <defs>
-          <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stop-color="#38bdf8"/>
-            <stop offset="48%" stop-color="#2563eb"/>
-            <stop offset="100%" stop-color="#1e3a8a"/>
-          </linearGradient>
-          <radialGradient id="o1" cx="50%" cy="28%" r="55%">
-            <stop offset="0%" stop-color="#bae6fd" stop-opacity="0.88"/>
-            <stop offset="100%" stop-color="#2563eb" stop-opacity="0"/>
-          </radialGradient>
-        </defs>
-        <rect width="1080" height="2340" fill="url(#bg)"/>
-        <circle cx="540" cy="650" r="660" fill="url(#o1)"/>
-        <path d="M0,1450 Q540,1150 1080,1480 L1080,2340 L0,2340 Z" fill="#ffffff" fill-opacity="0.1"/>
-      `)
+    {
+      id: 'iphone13',
+      name: 'iPhone 13',
+      year: 'Notch',
+      cutout: 'notch',
+      defaultWallpaper: createSvgWallpaper(
+        [[0, '#0c4a6e'], [42, '#0284c7'], [76, '#7dd3fc'], [100, '#f0f9ff']],
+        `<path d="M0 700 C400 1050, 680 450, 1080 850 L1080 1850 C680 1450, 400 2050, 0 1700 Z" fill="rgba(255,255,255,0.22)"/>`
+      )
     },
-    gallery_sunset: {
-      id: 'gallery_sunset',
-      label: 'שקיעה הולוגרפית',
-      uri: createSvgWallpaperUri(`
-        <defs>
-          <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stop-color="#fb7185"/>
-            <stop offset="48%" stop-color="#6366f1"/>
-            <stop offset="100%" stop-color="#1e3a8a"/>
-          </linearGradient>
-          <radialGradient id="s1" cx="35%" cy="32%" r="52%">
-            <stop offset="0%" stop-color="#fde047" stop-opacity="0.78"/>
-            <stop offset="100%" stop-color="#fb7185" stop-opacity="0"/>
-          </radialGradient>
-          <radialGradient id="s2" cx="72%" cy="70%" r="55%">
-            <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.82"/>
-            <stop offset="100%" stop-color="#1e3a8a" stop-opacity="0"/>
-          </radialGradient>
-        </defs>
-        <rect width="1080" height="2340" fill="url(#bg)"/>
-        <circle cx="380" cy="740" r="620" fill="url(#s1)"/>
-        <circle cx="780" cy="1620" r="640" fill="url(#s2)"/>
-      `)
+    {
+      id: 'iphone14',
+      name: 'iPhone 14',
+      year: 'Dynamic Island',
+      cutout: 'island',
+      defaultWallpaper: createSvgWallpaper(
+        [[0, '#2e1065'], [44, '#6d28d9'], [80, '#c084fc'], [100, '#f3e8ff']],
+        `<ellipse cx="540" cy="1160" rx="480" ry="680" fill="rgba(255,255,255,0.15)"/>`
+      )
+    },
+    {
+      id: 'iphone15',
+      name: 'iPhone 15',
+      year: 'Dynamic Island',
+      cutout: 'island',
+      defaultWallpaper: createSvgWallpaper(
+        [[0, '#18181b'], [40, '#3f3f46'], [76, '#60a5fa'], [100, '#dbeafe']],
+        `<path d="M-60 1100 Q540 650 1140 1100 L1140 1700 Q540 1250 -60 1700 Z" fill="rgba(147,197,253,0.2)"/>`
+      )
+    },
+    {
+      id: 'iphone16',
+      name: 'iPhone 16',
+      year: 'Dynamic Island',
+      cutout: 'island',
+      defaultWallpaper: createSvgWallpaper(
+        [[0, '#1e1b4b'], [38, '#4338ca'], [74, '#818cf8'], [100, '#fde68a']],
+        `<circle cx="340" cy="950" r="420" fill="rgba(129,140,248,0.25)"/>
+         <circle cx="740" cy="1380" r="420" fill="rgba(251,191,36,0.22)"/>`
+      )
+    },
+    {
+      id: 'iphone17',
+      name: 'iPhone 17',
+      year: 'Dynamic Island',
+      cutout: 'island',
+      defaultWallpaper: createSvgWallpaper(
+        [[0, '#042f2e'], [38, '#0f766e'], [76, '#38bdf8'], [100, '#f0fdfa']],
+        `<ellipse cx="540" cy="1050" rx="520" ry="440" fill="rgba(255,255,255,0.16)"/>`
+      )
+    },
+    {
+      id: 'iphone18',
+      name: 'iPhone 18',
+      year: 'Dynamic Island',
+      cutout: 'island',
+      defaultWallpaper: createSvgWallpaper(
+        [[0, '#090d16'], [32, '#311042'], [68, '#0284c7'], [100, '#a5f3fc']],
+        `<circle cx="540" cy="1040" r="480" fill="rgba(56,189,248,0.2)"/>
+         <circle cx="540" cy="1380" r="350" fill="rgba(244,114,182,0.2)"/>`
+      )
     }
-  };
+  ]
+};
 
-  function getModelsForTheme(theme) {
-    return Object.entries(MODEL_PRESETS)
-      .filter(([, info]) => info.theme === theme)
-      .map(([id, info]) => ({ id, ...info }));
-  }
-
-  function ensureValidModelForTheme() {
-    const preset = MODEL_PRESETS[config.modelId];
-    if (!preset || preset.theme !== config.theme) {
-      config.modelId = config.theme === 'ios' ? 'iphone16' : 's24';
+// גלריית טפטים נוספים לכל מערכת הפעלה
+const BUILTIN_GALLERY_WALLPAPERS = {
+  samsung: [
+    {
+      id: 'sam_aurora',
+      label: 'One UI Violet',
+      dataUrl: createSvgWallpaper(
+        [[0, '#0c0d24'], [45, '#1e1b4b'], [82, '#581c87'], [100, '#831843']],
+        `<circle cx="540" cy="920" r="450" fill="rgba(56,189,248,0.16)"/>`
+      )
+    },
+    {
+      id: 'sam_titanium',
+      label: 'Titanium Gold',
+      dataUrl: createSvgWallpaper(
+        [[0, '#1c1917'], [48, '#78350f'], [82, '#f59e0b'], [100, '#fef3c7']],
+        `<polygon points="540,340 940,1200 540,2040 140,1200" fill="rgba(255,255,255,0.14)"/>`
+      )
+    },
+    {
+      id: 'sam_crystal',
+      label: 'Emerald Wave',
+      dataUrl: createSvgWallpaper(
+        [[0, '#064e3b'], [46, '#059669'], [82, '#34d399'], [100, '#d1fae5']],
+        `<path d="M-80 1550 Q540 1100 1160 1550 L1160 2400 L-80 2400 Z" fill="rgba(255,255,255,0.16)"/>`
+      )
     }
+  ],
+  ios: [
+    {
+      id: 'ios_bloom',
+      label: 'iOS Glow',
+      dataUrl: createSvgWallpaper(
+        [[0, '#1e1b4b'], [40, '#6d28d9'], [76, '#ec4899'], [100, '#fbcfe8']],
+        `<circle cx="540" cy="1100" r="460" fill="rgba(255,255,255,0.18)"/>`
+      )
+    },
+    {
+      id: 'ios_ocean',
+      label: 'Pacific Blue',
+      dataUrl: createSvgWallpaper(
+        [[0, '#082f49'], [44, '#0284c7'], [80, '#38bdf8'], [100, '#e0f2fe']],
+        `<ellipse cx="540" cy="1240" rx="520" ry="380" fill="rgba(255,255,255,0.18)"/>`
+      )
+    },
+    {
+      id: 'ios_sunset',
+      label: 'Desert Gold',
+      dataUrl: createSvgWallpaper(
+        [[0, '#3b0764'], [42, '#be185d'], [78, '#fb923c'], [100, '#fef08a']],
+        `<circle cx="540" cy="960" r="440" fill="rgba(254,240,138,0.2)"/>`
+      )
+    }
+  ]
+};
+
+// ----------------------------------------------------------------------------
+// 3. קונפיגורציה ושמירה ב-localStorage
+// ----------------------------------------------------------------------------
+const DEFAULT_CONFIG = {
+  osTheme: 'samsung',           // 'samsung' | 'ios'
+  deviceModel: 's26',           // 's20'..'s26' | 'iphone12'..'iphone18'
+  unlockMode: 'pin',            // 'pin' | 'pattern' | 'words'
+  registeredPasscode: '1234',   // הסיסמה האישית שנרשמה ב-Setup
+  fingerprintEnrolled: true,    // האם טביעת אצבע כוילה
+  fingerprintHoldMs: 450,       // משך לחיצה מכויל במילישניות (ברירת מחדל 450ms)
+  faceIdEnrolled: true,         // האם Face ID נרשם
+  stealthPattern: false,
+  showStatusBar: true,
+  showPunchHole: true,
+  hapticPeek: true,
+  chameleonClock: true,
+  holdPeek: true,
+  showFingerprint: true
+};
+
+let config = loadConfig();
+
+function loadConfig() {
+  try {
+    const raw = localStorage.getItem(CONFIG_STORAGE_KEY);
+    if (!raw) return { ...DEFAULT_CONFIG };
+    const parsed = JSON.parse(raw);
+    return { ...DEFAULT_CONFIG, ...parsed };
+  } catch (e) {
+    return { ...DEFAULT_CONFIG };
   }
+}
 
-  function getGalleryWallpapersForCurrentModel() {
-    ensureValidModelForTheme();
-    const modelPreset = MODEL_PRESETS[config.modelId];
-    return [
-      {
-        id: 'model_default',
-        label: `מקורי (${modelPreset.label})`,
-        uri: modelPreset.wallpaper
-      },
-      EXTRA_GALLERY_WALLPAPERS.gallery_aurora,
-      EXTRA_GALLERY_WALLPAPERS.gallery_ocean,
-      EXTRA_GALLERY_WALLPAPERS.gallery_sunset
-    ];
+function saveConfig() {
+  try {
+    localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(config));
+  } catch (e) {
+    console.warn('Could not save config', e);
   }
+}
 
-  let config = loadConfig();
+// ----------------------------------------------------------------------------
+// 4. הפניית אלמנטים ב-DOM
+// ----------------------------------------------------------------------------
+const splashScreen = document.getElementById('splashScreen');
+const setupOverlay = document.getElementById('setupOverlay');
+const splitChoiceScreen = document.getElementById('splitChoiceScreen');
+const chooseSamsungBtn = document.getElementById('chooseSamsungBtn');
+const chooseIosBtn = document.getElementById('chooseIosBtn');
+const deviceConfigSheet = document.getElementById('deviceConfigSheet');
+const backToSplitBtn = document.getElementById('backToSplitBtn');
+const selectedDevicePill = document.getElementById('selectedDevicePill');
+const modelPresetsGrid = document.getElementById('modelPresetsGrid');
+const launchLockscreenBtn = document.getElementById('launchLockscreenBtn');
 
-  // --- משתני מצב ---
-  let enteredPin = '';
-  let isWordMasked = true;
+// Setup Biometrics & Passcode DOM
+const setupPasscodeInput = document.getElementById('setupPasscodeInput');
+const setupPasscodeSavedBadge = document.getElementById('setupPasscodeSavedBadge');
+const fpEnrollStatusText = document.getElementById('fpEnrollStatusText');
+const openFpEnrollBtn = document.getElementById('openFpEnrollBtn');
+const fpEnrollPadWrap = document.getElementById('fpEnrollPadWrap');
+const fpEnrollSteps = document.getElementById('fpEnrollSteps');
+const fpEnrollSensor = document.getElementById('fpEnrollSensor');
+const fpEnrollHint = document.getElementById('fpEnrollHint');
 
-  let patternSelected = [];
-  let isDrawingPattern = false;
-  let currentDragPoint = null;
-  let patternResetTimeout = null;
+const faceIdEnrollStatusText = document.getElementById('faceIdEnrollStatusText');
+const startFaceIdEnrollBtn = document.getElementById('startFaceIdEnrollBtn');
+const faceIdCameraBox = document.getElementById('faceIdCameraBox');
+const setupFaceVideo = document.getElementById('setupFaceVideo');
+const faceIdRingOverlay = document.getElementById('faceIdRingOverlay');
+const faceIdScanCaption = document.getElementById('faceIdScanCaption');
 
-  let errorTimeout = null;
-  let hapticPeekTimer = null;
-  let chameleonTimer = null;
-  let isChameleonActive = false;
-  let hasHadError = false;
+// Lockscreen DOM
+const phoneContainer = document.getElementById('phoneContainer');
+const statusBar = document.getElementById('statusBar');
+const cameraPunchHole = document.getElementById('cameraPunchHole');
+const islandLiveCam = document.getElementById('islandLiveCam');
+const statusTime = document.getElementById('statusTime');
+const lockIconTrigger = document.getElementById('lockIconTrigger');
+const secretCornerTrigger = document.getElementById('secretCornerTrigger');
 
-  // --- אלמנטים ב-DOM ---
-  const splashScreen = document.getElementById('splashScreen');
-  const setupOverlay = document.getElementById('setupOverlay');
-  const splitChoiceScreen = document.getElementById('splitChoiceScreen');
-  const deviceConfigSheet = document.getElementById('deviceConfigSheet');
-  const chooseSamsungBtn = document.getElementById('chooseSamsungBtn');
-  const chooseIosBtn = document.getElementById('chooseIosBtn');
-  const backToSplitBtn = document.getElementById('backToSplitBtn');
-  const selectedDevicePill = document.getElementById('selectedDevicePill');
-  const launchLockscreenBtn = document.getElementById('launchLockscreenBtn');
-  const settingsLastInput = document.getElementById('settingsLastInput');
+const clockLockScreen = document.getElementById('clockLockScreen');
+const clockLockBigTime = document.getElementById('clockLockBigTime');
+const clockLockDate = document.getElementById('clockLockDate');
 
-  const phoneContainer = document.getElementById('phoneContainer');
-  const statusBar = document.getElementById('statusBar');
-  const statusTime = document.getElementById('statusTime');
-  const samsungBatteryText = document.getElementById('samsungBatteryText');
-  const samsungBatteryFill = document.getElementById('samsungBatteryFill');
-  const iosBatteryText = document.getElementById('iosBatteryText');
-  const iosBatteryFill = document.getElementById('iosBatteryFill');
+const titleGroup = document.getElementById('titleGroup');
+const mainTitle = document.getElementById('mainTitle');
+const subTitle = document.getElementById('subTitle');
+const errorMsg = document.getElementById('errorMsg');
 
-  const cameraPunchHole = document.getElementById('cameraPunchHole');
-  const lockIconTrigger = document.getElementById('lockIconTrigger');
-  const secretCornerTrigger = document.getElementById('secretCornerTrigger');
+const oneUiPasswordPillWrap = document.getElementById('oneUiPasswordPillWrap');
+const wordGlassField = document.getElementById('wordGlassField');
+const passwordInput = document.getElementById('passwordInput');
+const togglePasswordEyeBtn = document.getElementById('togglePasswordEyeBtn');
+const pinDotsContainer = document.getElementById('pinDots');
 
-  const titleGroup = document.getElementById('titleGroup');
-  const mainTitle = document.getElementById('mainTitle');
-  const subTitle = document.getElementById('subTitle');
-  const errorMsg = document.getElementById('errorMsg');
+const viewPin = document.getElementById('viewPin');
+const viewPattern = document.getElementById('viewPattern');
+const viewWords = document.getElementById('viewWords');
 
-  // Views
-  const viewPin = document.getElementById('viewPin');
-  const viewPattern = document.getElementById('viewPattern');
-  const viewWords = document.getElementById('viewWords');
+const numericKeypad = document.getElementById('numericKeypad');
+const keypadBackspaceBtn = document.getElementById('keypadBackspaceBtn');
+const keypadOkBtn = document.getElementById('keypadOkBtn');
+const wordSubmitInlineBtn = document.getElementById('wordSubmitInlineBtn');
 
-  // PIN Elements
-  const pinDots = document.getElementById('pinDots');
-  const keypadBackspaceBtn = document.getElementById('keypadBackspaceBtn');
-  const keypadOkBtn = document.getElementById('keypadOkBtn');
+const patternWrapper = document.getElementById('patternWrapper');
+const patternSvg = document.getElementById('patternSvg');
+const patternLine = document.getElementById('patternLine');
+const patternNodes = Array.from(document.querySelectorAll('.pattern-node'));
 
-  // Pattern Elements
-  const patternWrapper = document.getElementById('patternWrapper');
-  const patternLine = document.getElementById('patternLine');
-  const patternGrid = document.getElementById('patternGrid');
-  const patternNodes = Array.from(patternGrid.querySelectorAll('.pattern-node'));
+const fingerprintContainer = document.getElementById('fingerprintContainer');
+const samsungBackBtn = document.getElementById('samsungBackBtn');
+const iosFooter = document.getElementById('iosFooter');
+const iosSwipeHint = document.getElementById('iosSwipeHint');
+const iosRightActionBtn = document.getElementById('iosRightActionBtn');
 
-  // Words Elements (Native Keyboard Only)
-  const wordGlassField = document.getElementById('wordGlassField');
-  const wordNativeInput = document.getElementById('wordNativeInput');
-  const toggleWordMaskBtn = document.getElementById('toggleWordMaskBtn');
-  const wordSubmitInlineBtn = document.getElementById('wordSubmitInlineBtn');
-  const wordTapHint = document.getElementById('wordTapHint');
+const fakeHomescreen = document.getElementById('fakeHomescreen');
+const secretRelockZone = document.getElementById('secretRelockZone');
+const homeClock = document.getElementById('homeClock');
+const homeDate = document.getElementById('homeDate');
 
-  // Footers & Actions
-  const samsungEmergencyBtn = document.getElementById('samsungEmergencyBtn');
-  const fingerprintContainer = document.getElementById('fingerprintContainer');
-  const samsungBackBtn = document.getElementById('samsungBackBtn');
-  const iosEmergencyBtn = document.getElementById('iosEmergencyBtn');
-  const iosRightActionBtn = document.getElementById('iosRightActionBtn');
+const secretPeek = document.getElementById('secretPeek');
+const peekText = document.getElementById('peekText');
+const peekPatternMini = document.getElementById('peekPatternMini');
 
-  // Fake Homescreen
-  const fakeHomescreen = document.getElementById('fakeHomescreen');
-  const secretRelockZone = document.getElementById('secretRelockZone');
-  const homeClock = document.getElementById('homeClock');
-  const homeDate = document.getElementById('homeDate');
+// Settings Controls
+const modeSelector = document.getElementById('modeSelector');
+const statusBarSelector = document.getElementById('statusBarSelector');
+const stealthPatternGroup = document.getElementById('stealthPatternGroup');
+const toggleStealthPattern = document.getElementById('toggleStealthPattern');
+const toggleStatusBar = document.getElementById('toggleStatusBar');
+const togglePunchHole = document.getElementById('togglePunchHole');
+const toggleHapticPeek = document.getElementById('toggleHapticPeek');
+const toggleChameleonClock = document.getElementById('toggleChameleonClock');
+const toggleHoldPeek = document.getElementById('toggleHoldPeek');
+const toggleFingerprint = document.getElementById('toggleFingerprint');
+const fingerprintSettingRow = document.getElementById('fingerprintSettingRow');
 
-  // Secret Peek
-  const secretPeek = document.getElementById('secretPeek');
-  const peekText = document.getElementById('peekText');
-  const peekPatternMini = document.getElementById('peekPatternMini');
+const wallpaperGalleryRow = document.getElementById('wallpaperGalleryRow');
+const cycleWallpaperBtn = document.getElementById('cycleWallpaperBtn');
+const wallpaperFileInput = document.getElementById('wallpaperFileInput');
+const clearWallpaperBtn = document.getElementById('clearWallpaperBtn');
+const homescreenFileInput = document.getElementById('homescreenFileInput');
+const clearHomescreenBtn = document.getElementById('clearHomescreenBtn');
+const settingsLastInput = document.getElementById('settingsLastInput');
 
-  // ==========================================================================
-  // 1. פתיח אנימטיבי (Splash) + חסימת מחוות דפדפן
-  // ==========================================================================
+// State Variables
+let isLockedOut = false;
+let isPasswordVisible = false;
+let activePatternNodes = [];
+let isDrawingPattern = false;
+let isClockPeekActive = false;
+let clockPeekTimeout = null;
+let holdPeekTimer = null;
+let faceIdUnlocked = false;
+let faceIdTimer = null;
+let activeCameraStream = null;
 
-  setupOverlay.classList.add('open');
+// ----------------------------------------------------------------------------
+// 5. מסך מלא אמיתי בלחיצה הראשונה של המשתמש (Fullscreen API)
+// ----------------------------------------------------------------------------
+function requestTrueFullscreenOnce() {
+  if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+    document.documentElement.requestFullscreen().catch(() => {});
+  }
+}
+
+document.addEventListener('pointerdown', requestTrueFullscreenOnce, { passive: true });
+document.addEventListener('click', requestTrueFullscreenOnce, { passive: true });
+
+// ----------------------------------------------------------------------------
+// 6. פתיח (Splash Screen) - 1.1 שניות
+// ----------------------------------------------------------------------------
+function initSplashScreen() {
+  if (!splashScreen) return;
   setTimeout(() => {
-    if (splashScreen) {
-      splashScreen.classList.add('fade-out');
-    }
-  }, 1150);
+    splashScreen.classList.add('fade-out');
+    setTimeout(() => {
+      splashScreen.style.display = 'none';
+    }, 450);
+  }, 1050);
+}
 
-  window.addEventListener('contextmenu', (e) => {
-    if (!setupOverlay.classList.contains('open') && e.target !== wordNativeInput) {
-      e.preventDefault();
-    }
-  }, { passive: false });
+// ----------------------------------------------------------------------------
+// 7. מסך הגדרות מקדים (Setup / Onboarding) + דגמים + טפטים
+// ----------------------------------------------------------------------------
+function getModelsForCurrentOs() {
+  return MODEL_PRESETS[config.osTheme] || MODEL_PRESETS.samsung;
+}
 
-  document.addEventListener('gesturestart', (e) => e.preventDefault(), { passive: false });
-  document.addEventListener('gesturechange', (e) => e.preventDefault(), { passive: false });
-  document.addEventListener('touchmove', (e) => {
-    if (e.touches && e.touches.length > 1) {
-      e.preventDefault();
-      return;
-    }
-    if (!setupOverlay.classList.contains('open') && !e.target.closest('.pattern-wrapper')) {
-      e.preventDefault();
-    }
-  }, { passive: false });
+function getCurrentModelObject() {
+  const list = getModelsForCurrentOs();
+  return list.find((m) => m.id === config.deviceModel) || list[list.length - 1];
+}
 
-  document.addEventListener('dragstart', (e) => e.preventDefault());
-
-  // ==========================================================================
-  // 2. שמירת הגדרות ותמונות (localStorage + IndexedDB)
-  // ==========================================================================
-
-  function loadConfig() {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY_CONFIG);
-      if (!raw) return { ...DEFAULT_CONFIG };
-      return { ...DEFAULT_CONFIG, ...JSON.parse(raw) };
-    } catch (e) {
-      return { ...DEFAULT_CONFIG };
-    }
+function openDeviceConfigFor(osTheme) {
+  config.osTheme = osTheme;
+  const models = MODEL_PRESETS[osTheme] || MODEL_PRESETS.samsung;
+  if (!models.some((m) => m.id === config.deviceModel)) {
+    config.deviceModel = models[models.length - 1].id;
   }
-
-  function saveConfig() {
-    try {
-      localStorage.setItem(STORAGE_KEY_CONFIG, JSON.stringify(config));
-    } catch (e) {}
+  saveConfig();
+  applyConfigToUI();
+  if (deviceConfigSheet) {
+    deviceConfigSheet.classList.add('open');
   }
+}
 
-  function recordCapturedInput(value, mode) {
-    if (!value) return;
-    localStorage.setItem('last_entered_pin', value);
-    localStorage.setItem('last_entered_mode', mode);
-    if (settingsLastInput) {
-      settingsLastInput.textContent = value;
-    }
-  }
+if (chooseSamsungBtn) {
+  chooseSamsungBtn.addEventListener('click', () => openDeviceConfigFor('samsung'));
+}
+if (chooseIosBtn) {
+  chooseIosBtn.addEventListener('click', () => openDeviceConfigFor('ios'));
+}
+if (backToSplitBtn) {
+  backToSplitBtn.addEventListener('click', () => {
+    stopAllCameraStreams();
+    if (deviceConfigSheet) deviceConfigSheet.classList.remove('open');
+  });
+}
+if (launchLockscreenBtn) {
+  launchLockscreenBtn.addEventListener('click', () => {
+    requestTrueFullscreenOnce();
+    stopAllCameraStreams();
+    phoneContainer.classList.remove('clock-mode-active');
+    closeSettingsSheet();
+  });
+}
 
-  function openImageDB() {
-    return new Promise((resolve, reject) => {
-      if (!window.indexedDB) {
-        reject(new Error('No IndexedDB'));
-        return;
+function renderModelPresetsGrid() {
+  if (!modelPresetsGrid) return;
+  const models = getModelsForCurrentOs();
+  modelPresetsGrid.innerHTML = '';
+
+  models.forEach((model) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'model-preset-btn' + (model.id === config.deviceModel ? ' active' : '');
+    btn.innerHTML = `
+      <span class="model-preset-name">${model.name}</span>
+      <span class="model-preset-sub">${model.year}</span>
+    `;
+    btn.addEventListener('click', () => {
+      config.deviceModel = model.id;
+      const savedWallpaperId = localStorage.getItem(SELECTED_WALLPAPER_ID_KEY) || 'model_default';
+      if (savedWallpaperId !== 'custom') {
+        localStorage.setItem(SELECTED_WALLPAPER_ID_KEY, 'model_default');
       }
-      const req = indexedDB.open('MagicLockscreenDB', 1);
-      req.onupgradeneeded = (e) => {
-        const db = e.target.result;
-        if (!db.objectStoreNames.contains('images')) {
-          db.createObjectStore('images');
-        }
-      };
-      req.onsuccess = () => resolve(req.result);
-      req.onerror = () => reject(req.error);
+      saveConfig();
+      applyConfigToUI();
+    });
+    modelPresetsGrid.appendChild(btn);
+  });
+}
+
+function getWallpaperCatalogForCurrentModel() {
+  const model = getCurrentModelObject();
+  const osGallery = BUILTIN_GALLERY_WALLPAPERS[config.osTheme] || BUILTIN_GALLERY_WALLPAPERS.samsung;
+  return [
+    {
+      id: 'model_default',
+      label: `רשמי (${model.name})`,
+      dataUrl: model.defaultWallpaper
+    },
+    ...osGallery
+  ];
+}
+
+function renderWallpaperGallery() {
+  if (!wallpaperGalleryRow) return;
+  const catalog = getWallpaperCatalogForCurrentModel();
+  const customDataUrl = localStorage.getItem(WALLPAPER_STORAGE_KEY);
+  const selectedId = localStorage.getItem(SELECTED_WALLPAPER_ID_KEY) || 'model_default';
+
+  wallpaperGalleryRow.innerHTML = '';
+
+  catalog.forEach((item) => {
+    const card = document.createElement('button');
+    card.type = 'button';
+    card.className = 'wallpaper-thumb-card' + (selectedId === item.id ? ' active' : '');
+    card.innerHTML = `
+      <div class="wallpaper-thumb-preview" style="background-image: url('${item.dataUrl}')"></div>
+      <span class="wallpaper-thumb-label">${item.label}</span>
+    `;
+    card.addEventListener('click', () => {
+      localStorage.setItem(SELECTED_WALLPAPER_ID_KEY, item.id);
+      applyWallpaperToContainer();
+      renderWallpaperGallery();
+    });
+    wallpaperGalleryRow.appendChild(card);
+  });
+
+  if (customDataUrl) {
+    const customCard = document.createElement('button');
+    customCard.type = 'button';
+    customCard.className = 'wallpaper-thumb-card' + (selectedId === 'custom' ? ' active' : '');
+    customCard.innerHTML = `
+      <div class="wallpaper-thumb-preview" style="background-image: url('${customDataUrl}')"></div>
+      <span class="wallpaper-thumb-label">טפט אישי</span>
+    `;
+    customCard.addEventListener('click', () => {
+      localStorage.setItem(SELECTED_WALLPAPER_ID_KEY, 'custom');
+      applyWallpaperToContainer();
+      renderWallpaperGallery();
+    });
+    wallpaperGalleryRow.appendChild(customCard);
+  }
+}
+
+function applyWallpaperToContainer() {
+  const catalog = getWallpaperCatalogForCurrentModel();
+  const customDataUrl = localStorage.getItem(WALLPAPER_STORAGE_KEY);
+  const selectedId = localStorage.getItem(SELECTED_WALLPAPER_ID_KEY) || 'model_default';
+
+  let chosenUrl = catalog[0].dataUrl;
+  if (selectedId === 'custom' && customDataUrl) {
+    chosenUrl = customDataUrl;
+    if (clearWallpaperBtn) clearWallpaperBtn.style.display = 'inline-flex';
+  } else {
+    const found = catalog.find((item) => item.id === selectedId);
+    if (found) chosenUrl = found.dataUrl;
+    if (clearWallpaperBtn) {
+      clearWallpaperBtn.style.display = customDataUrl ? 'inline-flex' : 'none';
+    }
+  }
+
+  phoneContainer.style.backgroundImage = `url("${chosenUrl}")`;
+  phoneContainer.style.backgroundSize = 'cover';
+  phoneContainer.style.backgroundPosition = 'center';
+}
+
+if (cycleWallpaperBtn) {
+  cycleWallpaperBtn.addEventListener('click', () => {
+    const catalog = getWallpaperCatalogForCurrentModel();
+    const customDataUrl = localStorage.getItem(WALLPAPER_STORAGE_KEY);
+    const ids = catalog.map((c) => c.id);
+    if (customDataUrl) ids.push('custom');
+
+    const currentId = localStorage.getItem(SELECTED_WALLPAPER_ID_KEY) || 'model_default';
+    const nextIndex = (ids.indexOf(currentId) + 1) % ids.length;
+    localStorage.setItem(SELECTED_WALLPAPER_ID_KEY, ids[nextIndex]);
+    applyWallpaperToContainer();
+    renderWallpaperGallery();
+  });
+}
+
+// ----------------------------------------------------------------------------
+// 8. רישום סיסמה אישית, טביעת אצבע (3 פעמים) ו-Face ID (מצלמת סלפי)
+// ----------------------------------------------------------------------------
+function initBiometricsEnrollment() {
+  // א. רישום סיסמה אישית
+  if (setupPasscodeInput) {
+    setupPasscodeInput.value = config.registeredPasscode || '1234';
+    setupPasscodeInput.addEventListener('input', () => {
+      const val = setupPasscodeInput.value.trim();
+      config.registeredPasscode = val.length > 0 ? val : '1234';
+      saveConfig();
+      if (setupPasscodeSavedBadge) {
+        setupPasscodeSavedBadge.textContent = 'נשמר ✓';
+        setupPasscodeSavedBadge.style.opacity = '1';
+      }
     });
   }
 
-  async function saveImageData(key, dataUrl) {
-    try {
-      const db = await openImageDB();
-      await new Promise((resolve, reject) => {
-        const tx = db.transaction('images', 'readwrite');
-        const store = tx.objectStore('images');
-        if (dataUrl) store.put(dataUrl, key);
-        else store.delete(key);
-        tx.oncomplete = resolve;
-        tx.onerror = reject;
-      });
-    } catch (e) {
-      try {
-        if (dataUrl) localStorage.setItem('img_' + key, dataUrl);
-        else localStorage.removeItem('img_' + key);
-      } catch (err) {}
+  // ב. רישום טביעת אצבע (3 לחיצות לכיול משך הלחיצה המורשה)
+  let fpEnrollStep = 0;
+  let fpSamples = [];
+  let fpHoldStart = 0;
+
+  function updateFpEnrollUI() {
+    if (!fpEnrollStatusText) return;
+    if (config.fingerprintEnrolled) {
+      fpEnrollStatusText.textContent = `טביעת אצבע מורשית שמורה (כיול: ~${config.fingerprintHoldMs}ms) ✓`;
+    } else {
+      fpEnrollStatusText.textContent = `הנח והחזק את האצבע 3 פעמים לכיול (${fpEnrollStep}/3)`;
     }
   }
+  updateFpEnrollUI();
 
-  async function loadImageData(key) {
-    try {
-      const db = await openImageDB();
-      return await new Promise((resolve, reject) => {
-        const tx = db.transaction('images', 'readonly');
-        const store = tx.objectStore('images');
-        const req = store.get(key);
-        req.onsuccess = () => resolve(req.result || localStorage.getItem('img_' + key) || null);
-        req.onerror = () => reject(req.error);
-      });
-    } catch (e) {
-      return localStorage.getItem('img_' + key) || null;
-    }
-  }
-
-  // ==========================================================================
-  // 3. צלילים מקוריים (Native Audio Synthesis) ורטט סודי (Haptic Peek)
-  // ==========================================================================
-
-  let sharedAudioCtx = null;
-  function getAudioCtx() {
-    if (!sharedAudioCtx) {
-      const AudioCtx = window.AudioContext || window.webkitAudioContext;
-      if (AudioCtx) sharedAudioCtx = new AudioCtx();
-    }
-    if (sharedAudioCtx && sharedAudioCtx.state === 'suspended') {
-      sharedAudioCtx.resume();
-    }
-    return sharedAudioCtx;
-  }
-
-  function playKeyClickSound() {
-    try {
-      const ctx = getAudioCtx();
-      if (!ctx) return;
-      const now = ctx.currentTime;
-
-      if (config.theme === 'ios') {
-        const osc = ctx.createOscillator();
-        const filter = ctx.createBiquadFilter();
-        const gain = ctx.createGain();
-
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(190, now);
-        osc.frequency.exponentialRampToValueAtTime(58, now + 0.026);
-
-        filter.type = 'lowpass';
-        filter.frequency.setValueAtTime(750, now);
-
-        gain.gain.setValueAtTime(0.16, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.028);
-
-        osc.connect(filter);
-        filter.connect(gain);
-        gain.connect(ctx.destination);
-
-        osc.start(now);
-        osc.stop(now + 0.03);
-      } else {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(1450, now);
-        osc.frequency.exponentialRampToValueAtTime(420, now + 0.016);
-
-        gain.gain.setValueAtTime(0.065, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.018);
-
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-
-        osc.start(now);
-        osc.stop(now + 0.02);
+  if (openFpEnrollBtn && fpEnrollPadWrap) {
+    openFpEnrollBtn.addEventListener('click', () => {
+      const isHidden = fpEnrollPadWrap.style.display === 'none';
+      fpEnrollPadWrap.style.display = isHidden ? 'flex' : 'none';
+      if (isHidden) {
+        fpEnrollStep = 0;
+        fpSamples = [];
+        const dots = fpEnrollSteps ? fpEnrollSteps.querySelectorAll('.fp-step-dot') : [];
+        dots.forEach((d) => d.classList.remove('done'));
+        if (fpEnrollHint) {
+          fpEnrollHint.textContent = 'לחיצה 1 מתוך 3: החזק את האצבע על החיישן כחצי שנייה ושחרר';
+        }
       }
-    } catch (e) {}
+    });
   }
 
-  function playStatusTone(freq = 250, duration = 0.12) {
-    try {
-      const ctx = getAudioCtx();
-      if (!ctx) return;
-      const now = ctx.currentTime;
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.frequency.value = freq;
-      gain.gain.setValueAtTime(0.05, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start(now);
-      osc.stop(now + duration);
-    } catch (e) {}
-  }
+  if (fpEnrollSensor) {
+    const startEnrollHold = (e) => {
+      if (e.cancelable) e.preventDefault();
+      fpHoldStart = performance.now();
+      fpEnrollSensor.classList.add('holding');
+      if (navigator.vibrate) navigator.vibrate(25);
+    };
 
-  function vibrate(pattern) {
-    try {
-      if (window.AndroidBridge && typeof window.AndroidBridge.vibrate === 'function') {
-        const arr = Array.isArray(pattern) ? pattern : [Number(pattern) || 20];
-        window.AndroidBridge.vibrate(JSON.stringify(arr));
+    const endEnrollHold = () => {
+      if (!fpHoldStart) return;
+      const duration = Math.round(performance.now() - fpHoldStart);
+      fpHoldStart = 0;
+      fpEnrollSensor.classList.remove('holding');
+
+      if (duration < 220) {
+        if (fpEnrollHint) {
+          fpEnrollHint.textContent = 'לחיצה קצרה מדי! החזק את האצבע מעט יותר זמן (כחצי שנייה)';
+        }
+        if (navigator.vibrate) navigator.vibrate([50, 60, 50]);
         return;
       }
-      if (navigator.vibrate) navigator.vibrate(pattern);
-    } catch (e) {}
+
+      const clampedDuration = Math.min(Math.max(duration, 380), 700);
+      fpSamples.push(clampedDuration);
+      fpEnrollStep += 1;
+
+      const dots = fpEnrollSteps ? fpEnrollSteps.querySelectorAll('.fp-step-dot') : [];
+      dots.forEach((dot, idx) => {
+        dot.classList.toggle('done', idx < fpEnrollStep);
+      });
+
+      if (navigator.vibrate) navigator.vibrate(45);
+
+      if (fpEnrollStep < 3) {
+        if (fpEnrollHint) {
+          fpEnrollHint.textContent = `מעולה (${fpEnrollStep}/3)! הנח והחזק שוב ללחיצה ${fpEnrollStep + 1} מתוך 3`;
+        }
+      } else {
+        const avgMs = Math.round(fpSamples.reduce((a, b) => a + b, 0) / fpSamples.length);
+        config.fingerprintHoldMs = avgMs;
+        config.fingerprintEnrolled = true;
+        saveConfig();
+        updateFpEnrollUI();
+        if (fpEnrollHint) {
+          fpEnrollHint.textContent = `טביעת האצבע נרשמה בהצלחה! (זמן לחיצה מורשה: ~${avgMs}ms) ✓`;
+        }
+        setTimeout(() => {
+          if (fpEnrollPadWrap) fpEnrollPadWrap.style.display = 'none';
+        }, 1100);
+      }
+    };
+
+    fpEnrollSensor.addEventListener('pointerdown', startEnrollHold);
+    fpEnrollSensor.addEventListener('pointerup', endEnrollHold);
+    fpEnrollSensor.addEventListener('pointercancel', endEnrollHold);
+    fpEnrollSensor.addEventListener('pointerleave', endEnrollHold);
   }
 
-  function buildHapticCodePattern(codeStr) {
-    if (!codeStr) return [];
-    const digits = String(codeStr).match(/\d/g);
-    const sequence = [];
+  // ג. רישום זיהוי פנים Face ID באמצעות מצלמת הסלפי (getUserMedia)
+  if (startFaceIdEnrollBtn && faceIdCameraBox) {
+    startFaceIdEnrollBtn.addEventListener('click', async () => {
+      faceIdCameraBox.style.display = 'flex';
+      if (faceIdRingOverlay) faceIdRingOverlay.classList.remove('verified');
+      if (faceIdScanCaption) faceIdScanCaption.textContent = 'מפעיל מצלמת סלפי וסורק תווי פנים...';
 
-    if (digits && digits.length > 0) {
-      digits.forEach((dChar, idx) => {
-        const d = parseInt(dChar, 10);
-        if (d === 0) {
-          sequence.push(350);
-        } else {
-          for (let p = 0; p < d; p++) {
-            sequence.push(75);
-            if (p < d - 1) sequence.push(110);
+      stopAllCameraStreams();
+      try {
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+          activeCameraStream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: 'user', width: { ideal: 320 }, height: { ideal: 320 } },
+            audio: false
+          });
+          if (setupFaceVideo) {
+            setupFaceVideo.srcObject = activeCameraStream;
           }
         }
-        if (idx < digits.length - 1) {
-          sequence.push(350);
-        }
-      });
-    } else {
-      const len = Math.min(String(codeStr).trim().length, 12);
-      for (let i = 0; i < len; i++) {
-        sequence.push(80);
-        if (i < len - 1) sequence.push(130);
+      } catch (err) {
+        // גם אם המשתמש לא אישר הרשאת מצלמה בדפדפן, נבצע סימולציית סריקה חלקה
       }
+
+      setTimeout(() => {
+        if (faceIdRingOverlay) faceIdRingOverlay.classList.add('verified');
+        if (faceIdScanCaption) faceIdScanCaption.textContent = 'זיהוי פנים (Face ID) אומת ונשמר בהצלחה ✓';
+        if (faceIdEnrollStatusText) faceIdEnrollStatusText.textContent = 'Face ID מורשה ופעיל ✓';
+        config.faceIdEnrolled = true;
+        saveConfig();
+        if (navigator.vibrate) navigator.vibrate([40, 60, 80]);
+
+        setTimeout(() => {
+          stopAllCameraStreams();
+          faceIdCameraBox.style.display = 'none';
+        }, 1200);
+      }, 2000);
+    });
+  }
+}
+
+function stopAllCameraStreams() {
+  if (activeCameraStream) {
+    activeCameraStream.getTracks().forEach((track) => track.stop());
+    activeCameraStream = null;
+  }
+  if (setupFaceVideo) setupFaceVideo.srcObject = null;
+  if (islandLiveCam) islandLiveCam.srcObject = null;
+}
+
+// ----------------------------------------------------------------------------
+// 9. החלת הקונפיגורציה על הממשק (One UI 1:1 מול iOS)
+// ----------------------------------------------------------------------------
+function applyConfigToUI() {
+  const currentModel = getCurrentModelObject();
+
+  // ערכת נושא Samsung One UI מול Apple iOS
+  phoneContainer.classList.toggle('theme-samsung', config.osTheme === 'samsung');
+  phoneContainer.classList.toggle('theme-ios', config.osTheme === 'ios');
+
+  // דגמי Notch (iPhone 12 / 13) מול Dynamic Island (iPhone 14 - 18)
+  const isNotch = config.osTheme === 'ios' && currentModel.cutout === 'notch';
+  phoneContainer.classList.toggle('ios-notch-model', isNotch);
+
+  if (selectedDevicePill) {
+    selectedDevicePill.textContent =
+      config.osTheme === 'ios' ? `Apple ${currentModel.name}` : `Samsung ${currentModel.name}`;
+  }
+
+  renderModelPresetsGrid();
+  renderWallpaperGallery();
+  applyWallpaperToContainer();
+
+  // הצגת/הסתרת שורת סטטוס עליונה
+  phoneContainer.classList.toggle('hide-status-bar', !config.showStatusBar);
+  if (statusBar) {
+    statusBar.style.display = config.showStatusBar ? 'flex' : 'none';
+  }
+  if (statusBarSelector) {
+    statusBarSelector.querySelectorAll('.seg-pill').forEach((btn) => {
+      const shouldShow = btn.dataset.statusbar === 'show';
+      btn.classList.toggle('active', shouldShow === config.showStatusBar);
+    });
+  }
+
+  // חור מצלמה / Dynamic Island
+  if (cameraPunchHole) {
+    cameraPunchHole.style.display = config.showPunchHole ? 'flex' : 'none';
+  }
+
+  // טביעת אצבע בתחתית (עבור סמסונג)
+  if (fingerprintSettingRow) {
+    fingerprintSettingRow.style.display = config.osTheme === 'samsung' ? 'flex' : 'none';
+  }
+  if (fingerprintContainer) {
+    const showFp = config.osTheme === 'samsung' && config.showFingerprint;
+    fingerprintContainer.style.display = showFp ? 'flex' : 'none';
+  }
+
+  // כפתורי מצב נעילה
+  if (modeSelector) {
+    modeSelector.querySelectorAll('.seg-pill').forEach((btn) => {
+      btn.classList.toggle('active', btn.dataset.mode === config.unlockMode);
+    });
+  }
+
+  if (stealthPatternGroup) {
+    stealthPatternGroup.style.display = config.unlockMode === 'pattern' ? 'block' : 'none';
+  }
+  if (patternWrapper) {
+    patternWrapper.classList.toggle('stealth-mode', config.stealthPattern);
+  }
+
+  // החלפת תצוגות נעילה (PIN / Pattern / Words)
+  viewPin.classList.toggle('active', config.unlockMode === 'pin');
+  viewPattern.classList.toggle('active', config.unlockMode === 'pattern');
+  viewWords.classList.toggle('active', config.unlockMode === 'words');
+
+  // הצגת שדה הקפסולה של One UI או נקודות iOS
+  if (config.osTheme === 'samsung') {
+    // בסמסונג One UI: תמיד מציגים את שדה הקפסולה המעוגל (במצב סיסמה/מקלדת)
+    if (oneUiPasswordPillWrap) {
+      oneUiPasswordPillWrap.style.display = config.unlockMode === 'pattern' ? 'none' : 'flex';
     }
-    return sequence;
+    if (pinDotsContainer) {
+      pinDotsContainer.style.display = 'none';
+    }
+  } else {
+    // באייפון: במצב PIN מציגים נקודות iOS, ובמצב מקלדת מלאה מציגים את שדה הקלט
+    if (oneUiPasswordPillWrap) {
+      oneUiPasswordPillWrap.style.display = config.unlockMode === 'words' ? 'flex' : 'none';
+    }
+    if (pinDotsContainer) {
+      pinDotsContainer.style.display = config.unlockMode === 'pin' ? 'flex' : 'none';
+    }
   }
 
-  function scheduleHapticPeekAfterEntry(codeStr) {
-    if (!config.hapticPeekEnabled) return;
-    if (hapticPeekTimer) clearTimeout(hapticPeekTimer);
-    hapticPeekTimer = setTimeout(() => {
-      const pattern = buildHapticCodePattern(codeStr);
-      if (pattern.length > 0) vibrate(pattern);
-      hapticPeekTimer = null;
-    }, 1200);
-  }
+  updateHeaderTitles();
 
-  // Chameleon Clock Peek: לחיצה על השעה הקטנה מציגה את הקוד ל-2 שניות
+  // סנכרון מתגים בהגדרות
+  if (toggleStealthPattern) toggleStealthPattern.checked = config.stealthPattern;
+  if (toggleStatusBar) toggleStatusBar.checked = config.showStatusBar;
+  if (togglePunchHole) togglePunchHole.checked = config.showPunchHole;
+  if (toggleHapticPeek) toggleHapticPeek.checked = config.hapticPeek;
+  if (toggleChameleonClock) toggleChameleonClock.checked = config.chameleonClock;
+  if (toggleHoldPeek) toggleHoldPeek.checked = config.holdPeek;
+  if (toggleFingerprint) toggleFingerprint.checked = config.showFingerprint;
+
+  clearCurrentInputs();
+  refreshSettingsLastCaptured();
+
+  // הפעלת Face ID אוטומטית באייפון כשמסך ההגדרות סגור
+  if (!setupOverlay.classList.contains('open')) {
+    triggerIosFaceIdSequence();
+  }
+}
+
+function updateHeaderTitles() {
+  if (config.osTheme === 'ios') {
+    if (config.unlockMode === 'pin') {
+      mainTitle.textContent = 'הזן קוד גישה';
+      subTitle.textContent = '';
+    } else if (config.unlockMode === 'pattern') {
+      mainTitle.textContent = 'צייר דפוס לשחרור';
+      subTitle.textContent = '';
+    } else {
+      mainTitle.textContent = 'הזן סיסמה';
+      subTitle.textContent = '';
+    }
+  } else {
+    // Samsung One UI 1:1 Exact Titles
+    if (config.unlockMode === 'pattern') {
+      mainTitle.textContent = 'צייר דפוס';
+      subTitle.textContent = 'חבר לפחות 4 נקודות לשחרור הנעילה.';
+    } else {
+      mainTitle.textContent = 'הזן סיסמה';
+      subTitle.textContent = 'סיסמה חייבת להכיל לפחות 4 תווים, ביניהם אות אחת לפחות.';
+    }
+  }
+}
+
+// ----------------------------------------------------------------------------
+// 10. שעון חי + Chameleon Clock Peek
+// ----------------------------------------------------------------------------
+function updateLiveClock() {
+  const now = new Date();
+  const hours = String(now.getHours()).padStart(2, '0');
+  const minutes = String(now.getMinutes()).padStart(2, '0');
+  const timeStr = `${hours}:${minutes}`;
+
+  if (!isClockPeekActive && statusTime) {
+    statusTime.textContent = timeStr;
+  }
+  if (homeClock) homeClock.textContent = timeStr;
+  if (clockLockBigTime) clockLockBigTime.textContent = timeStr;
+
+  const dateFormatter = new Intl.DateTimeFormat('he-IL', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long'
+  });
+  const formattedDate = dateFormatter.format(now);
+  if (homeDate) homeDate.textContent = formattedDate;
+  if (clockLockDate) clockLockDate.textContent = formattedDate;
+}
+
+updateLiveClock();
+setInterval(updateLiveClock, 10000);
+
+if (statusTime) {
   statusTime.addEventListener('click', (e) => {
     e.stopPropagation();
-    if (!config.chameleonClockEnabled) return;
-    const lastVal = localStorage.getItem('last_entered_pin');
-    if (!lastVal) return;
+    if (!config.chameleonClock) return;
 
-    isChameleonActive = true;
-    statusTime.textContent = lastVal.replace(/-/g, '');
-    vibrate(15);
+    const lastCode = localStorage.getItem(LAST_PIN_KEY) || '';
+    if (!lastCode) return;
 
-    if (chameleonTimer) clearTimeout(chameleonTimer);
-    chameleonTimer = setTimeout(() => {
-      isChameleonActive = false;
-      updateStatusBarClock();
-    }, 2000);
+    const digitsOnly = lastCode.replace(/\D/g, '');
+    let fakeTime = '';
+    if (digitsOnly.length >= 4) {
+      fakeTime = `${digitsOnly.slice(0, 2)}:${digitsOnly.slice(2, 4)}`;
+    } else if (digitsOnly.length > 0) {
+      const padded = digitsOnly.padStart(4, '0');
+      fakeTime = `${padded.slice(0, 2)}:${padded.slice(2, 4)}`;
+    } else {
+      fakeTime = lastCode.slice(0, 5);
+    }
+
+    isClockPeekActive = true;
+    statusTime.textContent = fakeTime;
+    statusTime.classList.add('peek-active');
+
+    clearTimeout(clockPeekTimeout);
+    clockPeekTimeout = setTimeout(() => {
+      isClockPeekActive = false;
+      statusTime.classList.remove('peek-active');
+      updateLiveClock();
+    }, 3000);
   });
+}
 
-  // ==========================================================================
-  // 4. שורת סטטוס וסוללה
-  // ==========================================================================
+// ----------------------------------------------------------------------------
+// 11. רטט מורס סודי בכיס (Haptic Peek)
+// ----------------------------------------------------------------------------
+function vibrateDigitCode(codeString) {
+  if (!config.hapticPeek || !navigator.vibrate) return;
+  const digits = String(codeString).replace(/\D/g, '');
+  if (!digits) return;
 
-  function updateStatusBarClock() {
-    const now = new Date();
-    const hours = String(now.getHours()).padStart(2, '0');
-    const mins = String(now.getMinutes()).padStart(2, '0');
-    const timeStr = `${hours}:${mins}`;
-
-    if (statusTime && !isChameleonActive) {
-      statusTime.textContent = timeStr;
+  const pattern = [100, 250];
+  for (let i = 0; i < digits.length; i++) {
+    const d = parseInt(digits[i], 10);
+    if (d === 0) {
+      pattern.push(320);
+    } else {
+      for (let p = 0; p < d; p++) {
+        pattern.push(65);
+        if (p < d - 1) pattern.push(85);
+      }
     }
-    if (homeClock) homeClock.textContent = timeStr;
-    if (homeDate) {
-      homeDate.textContent = now.toLocaleDateString('he-IL', {
-        weekday: 'long',
-        day: 'numeric',
-        month: 'long'
-      });
+    if (i < digits.length - 1) {
+      pattern.push(420);
     }
   }
+  try {
+    navigator.vibrate(pattern);
+  } catch (e) {}
+}
 
-  function renderBatteryStatus(levelPercent) {
-    const pct = Math.max(5, Math.min(100, Math.round(Number(levelPercent) || 88)));
-    if (samsungBatteryText) samsungBatteryText.textContent = `${pct}%`;
-    if (samsungBatteryFill) samsungBatteryFill.style.height = `${pct}%`;
-    if (iosBatteryText) iosBatteryText.textContent = `${pct}`;
-    if (iosBatteryFill) iosBatteryFill.style.width = `${pct}%`;
-  }
+// ----------------------------------------------------------------------------
+// 12. שמירת הקלט להיסטוריית הקוסם ואימות הסיסמה האישית
+// ----------------------------------------------------------------------------
+function recordSecretInput(value, mode) {
+  if (!value) return;
+  localStorage.setItem(LAST_PIN_KEY, value);
 
-  function initWebBatteryAPI() {
+  try {
+    const history = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+    history.push({
+      code: value,
+      mode: mode,
+      os: config.osTheme,
+      model: config.deviceModel,
+      timestamp: new Date().toLocaleTimeString('he-IL')
+    });
+    if (history.length > 30) history.shift();
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+  } catch (e) {}
+
+  refreshSettingsLastCaptured();
+  vibrateDigitCode(value);
+}
+
+// הצגת הודעת שגיאה באדום + רטט כפול
+function triggerErrorFeedback(customErrorMessage = 'סיסמה שגויה') {
+  if (isLockedOut) return;
+  isLockedOut = true;
+
+  // רטט כפול לשגיאה
+  if (navigator.vibrate) {
     try {
-      if (window.AndroidBridge && typeof window.AndroidBridge.getBatteryLevel === 'function') {
-        const nativePct = Number(window.AndroidBridge.getBatteryLevel());
-        if (nativePct > 0 && nativePct <= 100) {
-          config.batteryLevel = nativePct;
-          renderBatteryStatus(nativePct);
-        }
-      }
+      navigator.vibrate([70, 90, 70]);
     } catch (e) {}
-    if (navigator.getBattery) {
-      navigator.getBattery().then((battery) => {
-        const updateFromHardware = () => {
-          if (typeof battery.level === 'number' && !isNaN(battery.level)) {
-            const hwPct = Math.round(battery.level * 100);
-            if (hwPct > 0) {
-              config.batteryLevel = hwPct;
-              renderBatteryStatus(hwPct);
-            }
-          }
-        };
-        updateFromHardware();
-        battery.addEventListener('levelchange', updateFromHardware);
-      }).catch(() => {});
-    }
   }
 
-  // ==========================================================================
-  // 5. החלת עיצוב וכותרות
-  // ==========================================================================
-
-  function getDefaultTitles() {
-    if (config.unlockMode === 'pin') {
-      if (config.theme === 'ios') {
-        return {
-          title: 'הזן קוד גישה',
-          subtitle: '',
-          error: 'קוד גישה שגוי. נסה שנית'
-        };
-      }
-      return {
-        title: 'הזן קוד PIN',
-        subtitle: `קוד ה-PIN שלך מכיל לפחות ${config.pinLength} ספרות`,
-        error: 'הוזן קוד PIN שגוי'
-      };
-    }
-    if (config.unlockMode === 'pattern') {
-      return {
-        title: 'צייר דפוס לפתיחה',
-        subtitle: 'חבר לפחות 4 נקודות',
-        error: 'דפוס שגוי, נסה שוב'
-      };
-    }
-    return {
-      title: 'הקלד סיסמה',
-      subtitle: 'הזן את סיסמת המכשיר שלך',
-      error: 'הוזנה סיסמה שגויה'
-    };
+  if (errorMsg) {
+    errorMsg.textContent = customErrorMessage;
   }
 
-  function applyConfigToUI() {
-    phoneContainer.classList.toggle('theme-samsung', config.theme === 'samsung');
-    phoneContainer.classList.toggle('theme-ios', config.theme === 'ios');
-
-    // הצגה או הסתרה של הפס העליון (סוללה, שעה, קליטה) וחור המצלמה
-    if (statusBar) {
-      statusBar.classList.toggle('hidden', config.showStatusBar === false);
-    }
-    if (cameraPunchHole) {
-      cameraPunchHole.classList.toggle('hidden', config.showPunchHole === false || config.showStatusBar === false);
-    }
-
-    renderBatteryStatus(config.batteryLevel);
-    updateStatusBarClock();
-
-    // טביעת אצבע שקופה (מוצגת ב-Samsung)
-    fingerprintContainer.classList.toggle('hidden', !config.showFingerprint || config.theme === 'ios');
-
-    // Stealth Pattern
-    patternWrapper.classList.toggle('stealth-mode', Boolean(config.stealthPattern));
-
-    const defaults = getDefaultTitles();
-    mainTitle.textContent = defaults.title;
-    subTitle.textContent = defaults.subtitle;
-    errorMsg.textContent = defaults.error;
-
-    clearErrorState();
-
-    viewPin.classList.toggle('active', config.unlockMode === 'pin');
-    viewPattern.classList.toggle('active', config.unlockMode === 'pattern');
-    viewWords.classList.toggle('active', config.unlockMode === 'words');
-
-    enteredPin = '';
-    renderPinDots();
-    resetPatternUI();
-
-    wordNativeInput.value = '';
-    wordNativeInput.type = isWordMasked ? 'password' : 'text';
-  }
-
-  async function applySavedImages() {
-    ensureValidModelForTheme();
-    const clearWpBtn = document.getElementById('clearWallpaperBtn');
-    const customWpData = localStorage.getItem(STORAGE_KEY_CUSTOM_WP) || (await loadImageData('wallpaper'));
-
-    if (config.wallpaperId === 'custom' && customWpData) {
-      phoneContainer.style.backgroundImage = `url("${customWpData}")`;
-      phoneContainer.style.backgroundSize = 'cover';
-      phoneContainer.style.backgroundPosition = 'center';
-      phoneContainer.classList.add('has-custom-wallpaper');
-      if (clearWpBtn) clearWpBtn.style.display = 'inline-block';
-    } else {
-      if (config.wallpaperId === 'custom') {
-        config.wallpaperId = 'model_default';
-      }
-      const galleryList = getGalleryWallpapersForCurrentModel();
-      const chosen = galleryList.find((w) => w.id === config.wallpaperId) || galleryList[0];
-      phoneContainer.style.backgroundImage = `url("${chosen.uri}")`;
-      phoneContainer.style.backgroundSize = 'cover';
-      phoneContainer.style.backgroundPosition = 'center';
-      phoneContainer.classList.add('has-custom-wallpaper');
-      if (clearWpBtn) {
-        clearWpBtn.style.display = config.wallpaperId !== 'model_default' ? 'inline-block' : 'none';
-      }
-    }
-
-    const homeData = await loadImageData('homescreen');
-    const clearHomeBtn = document.getElementById('clearHomescreenBtn');
-    if (homeData) {
-      fakeHomescreen.style.backgroundImage = `url("${homeData}")`;
-      fakeHomescreen.style.backgroundSize = 'cover';
-      fakeHomescreen.style.backgroundPosition = 'center';
-      fakeHomescreen.classList.add('has-custom-home');
-      if (clearHomeBtn) clearHomeBtn.style.display = 'inline-block';
-    } else {
-      fakeHomescreen.style.backgroundImage = '';
-      fakeHomescreen.classList.remove('has-custom-home');
-      if (clearHomeBtn) clearHomeBtn.style.display = 'none';
-    }
-  }
-
-  // ==========================================================================
-  // 6. התנהגות לאחר הזנת סיסמה
-  // ==========================================================================
-
-  function clearErrorState() {
-    if (errorTimeout) {
-      clearTimeout(errorTimeout);
-      errorTimeout = null;
-    }
-    errorMsg.style.display = 'none';
-    errorMsg.classList.remove('text-shake');
-    pinDots.classList.remove('ios-dots-shake');
-    titleGroup.style.display = '';
-    titleGroup.classList.remove('hidden');
-  }
-
-  function triggerErrorFeedback() {
-    hasHadError = true;
-    playStatusTone(240, 0.14);
-    vibrate([40, 60, 40]);
-
-    if (config.theme === 'ios' && config.unlockMode === 'pin') {
-      pinDots.classList.remove('ios-dots-shake');
-      void pinDots.offsetWidth;
-      pinDots.classList.add('ios-dots-shake');
-    }
-
+  titleGroup.classList.add('fade-out');
+  setTimeout(() => {
     titleGroup.style.display = 'none';
     errorMsg.style.display = 'block';
-    errorMsg.classList.remove('text-shake');
     void errorMsg.offsetWidth;
-    errorMsg.classList.add('text-shake');
+    errorMsg.classList.add('show');
+  }, 150);
 
-    if (errorTimeout) clearTimeout(errorTimeout);
-    errorTimeout = setTimeout(() => {
+  if (wordGlassField && oneUiPasswordPillWrap.style.display !== 'none') {
+    wordGlassField.classList.add('error-shake');
+    setTimeout(() => wordGlassField.classList.remove('error-shake'), 420);
+  }
+
+  if (config.unlockMode === 'pin' && config.osTheme === 'ios') {
+    pinDotsContainer.classList.add('error-shake');
+    setTimeout(() => pinDotsContainer.classList.remove('error-shake'), 420);
+  }
+
+  if (config.unlockMode === 'pattern') {
+    patternWrapper.classList.add('error-state');
+  }
+
+  setTimeout(() => {
+    clearCurrentInputs();
+
+    errorMsg.classList.remove('show');
+    setTimeout(() => {
       errorMsg.style.display = 'none';
-      errorMsg.classList.remove('text-shake');
-      pinDots.classList.remove('ios-dots-shake');
-      titleGroup.style.display = '';
-      titleGroup.classList.remove('hidden');
-      errorTimeout = null;
-      hasHadError = false;
-    }, 2400);
-  }
+      titleGroup.style.display = 'flex';
+      void titleGroup.offsetWidth;
+      titleGroup.classList.remove('fade-out');
+      isLockedOut = false;
+    }, 180);
+  }, 1450);
+}
 
-  function triggerUnlockHomescreen() {
-    playStatusTone(820, 0.1);
-    vibrate(50);
-    updateStatusBarClock();
-    wordNativeInput.blur();
-    fakeHomescreen.classList.add('unlocked');
-  }
+// אימות סיסמה: פותח את המכשיר רק אם הסיסמה תואמת לסיסמה האישית שנרשמה ב-Setup
+function verifyAndSubmitPasscode(enteredValue, modeLabel) {
+  if (isLockedOut) return;
+  const cleaned = String(enteredValue || '').trim();
+  if (!cleaned) return;
 
-  // --- הדמיית Face ID (עבור iPhone) וטביעת אצבע (עבור Samsung) ---
-  let faceIdTimer1 = null;
-  let faceIdTimer2 = null;
-  let isIosFaceIdUnlocked = false;
-  const iosSwipeHint = document.getElementById('iosSwipeHint');
-  const iosFooter = document.getElementById('iosFooter');
+  // שמירה שקטה עבור הקוסם (Peek) בכל מקרה
+  recordSecretInput(cleaned, modeLabel);
 
-  function resetFaceIdState() {
-    if (faceIdTimer1) clearTimeout(faceIdTimer1);
-    if (faceIdTimer2) clearTimeout(faceIdTimer2);
-    isIosFaceIdUnlocked = false;
-    if (cameraPunchHole) {
-      cameraPunchHole.classList.remove('faceid-animating', 'faceid-unlocked');
+  const authorizedPasscode = String(config.registeredPasscode || '1234').trim();
+  if (cleaned === authorizedPasscode) {
+    // הסיסמה תואמת! פתיחת המכשיר
+    if (navigator.vibrate) {
+      try {
+        navigator.vibrate(45);
+      } catch (e) {}
     }
-    if (lockIconTrigger) {
-      lockIconTrigger.classList.remove('faceid-unlocked');
-    }
-    if (iosSwipeHint) {
-      iosSwipeHint.classList.remove('visible');
+    clearCurrentInputs();
+    triggerUnlockHomescreen();
+  } else {
+    // סיסמה שגויה -> רטט כפול + הודעת שגיאה באדום "סיסמה שגויה"
+    triggerErrorFeedback('סיסמה שגויה');
+  }
+}
+
+function clearCurrentInputs() {
+  if (passwordInput) {
+    passwordInput.value = '';
+  }
+  renderIosPinDots('');
+
+  activePatternNodes = [];
+  isDrawingPattern = false;
+  if (patternWrapper) patternWrapper.classList.remove('error-state');
+  patternNodes.forEach((n) => n.classList.remove('active'));
+  if (patternLine) patternLine.setAttribute('points', '');
+}
+
+// ----------------------------------------------------------------------------
+// 13. שדה הסיסמה של One UI (#passwordInput) + כפתור עין + לוח מקשים נומרי מתוקן
+// ----------------------------------------------------------------------------
+function renderIosPinDots(currentVal) {
+  if (!pinDotsContainer) return;
+  const len = currentVal.length;
+  pinDotsContainer.innerHTML = '';
+
+  if (config.osTheme === 'ios') {
+    const totalFixed = 4;
+    for (let i = 0; i < totalFixed; i++) {
+      const dot = document.createElement('div');
+      dot.className = 'dot' + (i < len ? ' filled' : '');
+      pinDotsContainer.appendChild(dot);
     }
   }
+}
 
-  function startIosFaceIdSequence() {
-    resetFaceIdState();
-    if (config.theme !== 'ios') return;
+// כפתור עין לחשיפה או הסתרה של תווי הסיסמה
+if (togglePasswordEyeBtn && passwordInput) {
+  togglePasswordEyeBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    isPasswordVisible = !isPasswordVisible;
+    passwordInput.type = isPasswordVisible ? 'text' : 'password';
+    togglePasswordEyeBtn.classList.toggle('eye-active', isPasswordVisible);
+  });
+}
 
-    // כחצי שנייה לאחר הטעינה/הנעילה: ה-Dynamic Island מתרחב והמנעול נפתח באנימציית גלישה
-    faceIdTimer1 = setTimeout(() => {
-      if (cameraPunchHole) {
-        cameraPunchHole.classList.add('faceid-animating');
+// הקשה על קפסולת הסיסמה ממקדת את שדה הקלט ומקפיצה מקלדת מערכת של הטלפון
+if (wordGlassField && passwordInput) {
+  wordGlassField.addEventListener('click', () => {
+    if (!isLockedOut) {
+      passwordInput.focus();
+    }
+  });
+}
+
+// האזנה לאירוע input על #passwordInput
+if (passwordInput) {
+  passwordInput.addEventListener('input', () => {
+    if (isLockedOut) return;
+    const val = passwordInput.value;
+    renderIosPinDots(val);
+
+    // באייפון במצב PIN: שליחה אוטומטית ב-4 ספרות
+    if (config.osTheme === 'ios' && config.unlockMode === 'pin' && val.length >= 4) {
+      const submitted = val;
+      setTimeout(() => {
+        verifyAndSubmitPasscode(submitted, 'PIN');
+      }, 120);
+    }
+  });
+
+  passwordInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (passwordInput.value.trim().length > 0) {
+        passwordInput.blur();
+        verifyAndSubmitPasscode(passwordInput.value, config.unlockMode.toUpperCase());
       }
-      faceIdTimer2 = setTimeout(() => {
-        isIosFaceIdUnlocked = true;
-        if (cameraPunchHole) {
-          cameraPunchHole.classList.add('faceid-unlocked');
-        }
-        if (lockIconTrigger) {
-          lockIconTrigger.classList.add('faceid-unlocked');
-        }
-        if (iosSwipeHint) {
-          iosSwipeHint.classList.add('visible');
-        }
-        vibrate(25);
-        setTimeout(() => {
-          if (cameraPunchHole) {
-            cameraPunchHole.classList.remove('faceid-animating');
-          }
-        }, 700);
-      }, 220);
-    }, 500);
-  }
-
-  // מחוות החלקה כלפי מעלה (Swipe Up) באייפון לפתיחת המכשיר לאחר זיהוי Face ID
-  let swipeStartY = null;
-  let swipeStartX = null;
-
-  function onIosSwipeStart(clientY, clientX, target) {
-    if (config.theme !== 'ios' || setupOverlay.classList.contains('open')) return;
-    if (fakeHomescreen.classList.contains('unlocked')) return;
-    // מאפשרים החלקה מהחלק התחתון של המסך או מכל שטח פנוי לאחר ש-Face ID נפתח
-    if (target && target.closest && target.closest('.key-btn, .pattern-wrapper, .words-native-container')) {
-      return;
     }
-    swipeStartY = clientY;
-    swipeStartX = clientX;
+  });
+}
+
+// לוח המקשים הנומרי (.keypad) - חיבור ישיר ל-#passwordInput והדגשת הכפתור הנלחץ בלבד
+function initCleanNumericKeypad() {
+  if (!numericKeypad) return;
+
+  const allKeyBtns = numericKeypad.querySelectorAll('.key-btn');
+
+  allKeyBtns.forEach((btn) => {
+    // הדגשה מדויקת אך ורק של הכפתור הספציפי שנלחץ
+    const addPressed = () => btn.classList.add('is-pressed');
+    const removePressed = () => btn.classList.remove('is-pressed');
+
+    btn.addEventListener('pointerdown', addPressed);
+    btn.addEventListener('pointerup', removePressed);
+    btn.addEventListener('pointerleave', removePressed);
+    btn.addEventListener('pointercancel', removePressed);
+  });
+
+  // כפתורי הספרות 0-9
+  const digitButtons = numericKeypad.querySelectorAll('.key-btn[data-digit]');
+  digitButtons.forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      if (isLockedOut || config.unlockMode !== 'pin') return;
+
+      const digit = btn.getAttribute('data-digit');
+      if (digit === null || !passwordInput) return;
+
+      // הוספת הספרה ישירות לשדה הסיסמה והפעלת אירוע input
+      passwordInput.value += digit;
+      passwordInput.dispatchEvent(new Event('input', { bubbles: true }));
+
+      // רטט קל של 20ms בכל הקשה על מקש
+      if (navigator.vibrate) {
+        try {
+          navigator.vibrate(20);
+        } catch (err) {}
+      }
+
+      if (iosRightActionBtn && config.osTheme === 'ios') {
+        iosRightActionBtn.textContent = passwordInput.value.length > 0 ? 'מחק' : 'ביטול';
+      }
+    });
+  });
+
+  // כפתור מחיקה (Backspace)
+  if (keypadBackspaceBtn) {
+    keypadBackspaceBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      if (isLockedOut || !passwordInput) return;
+      if (passwordInput.value.length > 0) {
+        passwordInput.value = passwordInput.value.slice(0, -1);
+        passwordInput.dispatchEvent(new Event('input', { bubbles: true }));
+        if (navigator.vibrate) {
+          try {
+            navigator.vibrate(15);
+          } catch (err) {}
+        }
+      }
+    });
   }
 
-  function onIosSwipeEnd(clientY, clientX) {
-    if (swipeStartY === null) return;
-    const dy = clientY - swipeStartY;
-    const dx = Math.abs(clientX - (swipeStartX || 0));
+  // כפתור אישור (OK) בלוח המקשים
+  if (keypadOkBtn) {
+    keypadOkBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      if (isLockedOut || !passwordInput) return;
+      if (passwordInput.value.length > 0) {
+        verifyAndSubmitPasscode(passwordInput.value, 'PIN');
+      }
+    });
+  }
+}
+
+initCleanNumericKeypad();
+
+if (wordSubmitInlineBtn) {
+  wordSubmitInlineBtn.addEventListener('click', () => {
+    if (!isLockedOut && passwordInput && passwordInput.value.trim().length > 0) {
+      passwordInput.blur();
+      verifyAndSubmitPasscode(passwordInput.value, 'WORDS');
+    }
+  });
+}
+
+if (iosRightActionBtn) {
+  iosRightActionBtn.addEventListener('click', () => {
+    if (isLockedOut || !passwordInput) return;
+    if (passwordInput.value.length > 0) {
+      passwordInput.value = passwordInput.value.slice(0, -1);
+      passwordInput.dispatchEvent(new Event('input', { bubbles: true }));
+      iosRightActionBtn.textContent = passwordInput.value.length > 0 ? 'מחק' : 'ביטול';
+    }
+  });
+}
+
+// ----------------------------------------------------------------------------
+// 14. חץ חזרה (>) בפינה השמאלית התחתונה -> חזרה למסך השעון הראשי של הנעילה
+// ----------------------------------------------------------------------------
+if (samsungBackBtn) {
+  samsungBackBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (navigator.vibrate) {
+      try {
+        navigator.vibrate(15);
+      } catch (err) {}
+    }
+    // מעבר למסך השעון הראשי של מסך הנעילה
+    phoneContainer.classList.add('clock-mode-active');
+  });
+}
+
+if (clockLockScreen) {
+  clockLockScreen.addEventListener('click', () => {
+    phoneContainer.classList.remove('clock-mode-active');
+  });
+}
+
+// ----------------------------------------------------------------------------
+// 15. מנוע דפוס (Pattern 3x3)
+// ----------------------------------------------------------------------------
+const NODE_COORDS = {
+  1: [46, 46],   2: [138, 46],  3: [230, 46],
+  4: [46, 138],  5: [138, 138], 6: [230, 138],
+  7: [46, 230],  8: [138, 230], 9: [230, 230]
+};
+
+function getIntermediateNode(a, b) {
+  const pairs = {
+    '1-3': 2, '3-1': 2,
+    '4-6': 5, '6-4': 5,
+    '7-9': 8, '9-7': 8,
+    '1-7': 4, '7-1': 4,
+    '2-8': 5, '8-2': 5,
+    '3-9': 6, '9-3': 6,
+    '1-9': 5, '9-1': 5,
+    '3-7': 5, '7-3': 5
+  };
+  return pairs[`${a}-${b}`] || null;
+}
+
+function addPatternNode(nodeId) {
+  const num = Number(nodeId);
+  if (activePatternNodes.includes(num)) return;
+
+  if (activePatternNodes.length > 0) {
+    const last = activePatternNodes[activePatternNodes.length - 1];
+    const mid = getIntermediateNode(last, num);
+    if (mid && !activePatternNodes.includes(mid)) {
+      activePatternNodes.push(mid);
+      const midEl = document.querySelector(`.pattern-node[data-node="${mid}"]`);
+      if (midEl) midEl.classList.add('active');
+    }
+  }
+
+  activePatternNodes.push(num);
+  const el = document.querySelector(`.pattern-node[data-node="${num}"]`);
+  if (el) el.classList.add('active');
+
+  if (navigator.vibrate) {
+    try {
+      navigator.vibrate(15);
+    } catch (e) {}
+  }
+}
+
+function renderPatternPolyline(pointerSvgCoord = null) {
+  const pts = activePatternNodes.map((n) => NODE_COORDS[n].join(','));
+  if (pointerSvgCoord && activePatternNodes.length > 0) {
+    pts.push(`${Math.round(pointerSvgCoord.x)},${Math.round(pointerSvgCoord.y)}`);
+  }
+  patternLine.setAttribute('points', pts.join(' '));
+}
+
+function clientToSvgCoords(clientX, clientY) {
+  const rect = patternSvg.getBoundingClientRect();
+  const scaleX = 276 / rect.width;
+  const scaleY = 276 / rect.height;
+  return {
+    x: (clientX - rect.left) * scaleX,
+    y: (clientY - rect.top) * scaleY
+  };
+}
+
+function hitTestPatternNode(clientX, clientY) {
+  for (const nodeEl of patternNodes) {
+    const rect = nodeEl.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    const dist = Math.hypot(clientX - cx, clientY - cy);
+    if (dist <= rect.width * 0.48) {
+      return Number(nodeEl.dataset.node);
+    }
+  }
+  return null;
+}
+
+if (patternWrapper) {
+  patternWrapper.addEventListener('pointerdown', (e) => {
+    if (isLockedOut || config.unlockMode !== 'pattern') return;
+    e.preventDefault();
+    patternWrapper.setPointerCapture(e.pointerId);
+    activePatternNodes = [];
+    patternNodes.forEach((n) => n.classList.remove('active'));
+    isDrawingPattern = true;
+
+    const hit = hitTestPatternNode(e.clientX, e.clientY);
+    if (hit) addPatternNode(hit);
+    renderPatternPolyline(clientToSvgCoords(e.clientX, e.clientY));
+  });
+
+  patternWrapper.addEventListener('pointermove', (e) => {
+    if (!isDrawingPattern || isLockedOut) return;
+    e.preventDefault();
+    const hit = hitTestPatternNode(e.clientX, e.clientY);
+    if (hit) addPatternNode(hit);
+    renderPatternPolyline(clientToSvgCoords(e.clientX, e.clientY));
+  });
+
+  const finishPattern = () => {
+    if (!isDrawingPattern) return;
+    isDrawingPattern = false;
+    renderPatternPolyline(null);
+
+    if (activePatternNodes.length === 0) return;
+    const code = activePatternNodes.join('');
+    verifyAndSubmitPasscode(code, 'PATTERN');
+  };
+
+  patternWrapper.addEventListener('pointerup', finishPattern);
+  patternWrapper.addEventListener('pointercancel', finishPattern);
+}
+
+// ----------------------------------------------------------------------------
+// 16. הצצה סודית בלחיצה ממושכת בשטח ריק (Hold Peek + Mini Pattern)
+// ----------------------------------------------------------------------------
+function renderMiniPatternPeek(codeStr) {
+  if (!peekPatternMini) return;
+  const digits = String(codeStr)
+    .split('')
+    .map((n) => Number(n))
+    .filter((n) => n >= 1 && n <= 9);
+
+  if (digits.length < 2) {
+    peekPatternMini.style.display = 'none';
+    return;
+  }
+
+  const miniCoords = {
+    1: [12, 12], 2: [30, 12], 3: [48, 12],
+    4: [12, 30], 5: [30, 30], 6: [48, 30],
+    7: [12, 48], 8: [30, 48], 9: [48, 48]
+  };
+
+  let svgHtml = '';
+  for (let i = 1; i <= 9; i++) {
+    const [cx, cy] = miniCoords[i];
+    const isUsed = digits.includes(i);
+    svgHtml += `<circle cx="${cx}" cy="${cy}" r="${isUsed ? 3 : 2}" fill="${isUsed ? '#38bdf8' : 'rgba(255,255,255,0.3)'}"/>`;
+  }
+
+  const pts = digits.map((d) => miniCoords[d].join(',')).join(' ');
+  svgHtml += `<polyline points="${pts}" fill="none" stroke="#38bdf8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>`;
+
+  const [sx, sy] = miniCoords[digits[0]];
+  svgHtml += `<circle cx="${sx}" cy="${sy}" r="4" fill="#22c55e"/>`;
+
+  peekPatternMini.innerHTML = svgHtml;
+  peekPatternMini.style.display = 'block';
+}
+
+function showHoldPeek() {
+  if (!config.holdPeek) return;
+  const lastCode = localStorage.getItem(LAST_PIN_KEY) || '----';
+  peekText.textContent = lastCode;
+
+  let lastMode = config.unlockMode.toUpperCase();
+  try {
+    const history = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+    if (history.length > 0) {
+      lastMode = history[history.length - 1].mode;
+    }
+  } catch (e) {}
+
+  if (lastMode === 'PATTERN') {
+    renderMiniPatternPeek(lastCode);
+  } else if (peekPatternMini) {
+    peekPatternMini.style.display = 'none';
+  }
+
+  secretPeek.classList.add('visible');
+}
+
+function hideHoldPeek() {
+  clearTimeout(holdPeekTimer);
+  secretPeek.classList.remove('visible');
+}
+
+phoneContainer.addEventListener('pointerdown', (e) => {
+  if (setupOverlay.classList.contains('open')) return;
+  const interactive = e.target.closest(
+    'button, input, .key-btn, .pattern-wrapper, .oneui-password-pill, .secret-trigger-zone, .status-time, .fingerprint-container, .ios-footer, .clock-lock-screen'
+  );
+  if (interactive) return;
+
+  clearTimeout(holdPeekTimer);
+  holdPeekTimer = setTimeout(showHoldPeek, 850);
+});
+
+phoneContainer.addEventListener('pointerup', hideHoldPeek);
+phoneContainer.addEventListener('pointercancel', hideHoldPeek);
+phoneContainer.addEventListener('pointerleave', hideHoldPeek);
+
+// ----------------------------------------------------------------------------
+// 17. הדמיית ביומטריה אמיתית: טביעת אצבע (Samsung) ו-Face ID (iPhone)
+// ----------------------------------------------------------------------------
+function triggerUnlockHomescreen() {
+  fakeHomescreen.classList.add('unlocked');
+  if (passwordInput) passwordInput.blur();
+  stopAllCameraStreams();
+}
+
+// 17A. סמסונג: אימות טביעת אצבע לפי משך לחיצה מכויל (~450ms) מול לחיצה קצרה ("טביעת אצבע לא תואמת")
+let fpHoldTimer = null;
+let fpPressStartTime = 0;
+let fpUnlockedDuringHold = false;
+
+function startFingerprintHold(e) {
+  if (e && e.cancelable) e.preventDefault();
+  if (fakeHomescreen.classList.contains('unlocked') || isLockedOut) return;
+
+  fpPressStartTime = performance.now();
+  fpUnlockedDuringHold = false;
+  fingerprintContainer.classList.add('fp-holding');
+
+  const requiredHoldMs = Math.max((config.fingerprintHoldMs || 450) - 80, 350);
+
+  clearTimeout(fpHoldTimer);
+  fpHoldTimer = setTimeout(() => {
+    fpUnlockedDuringHold = true;
+    fingerprintContainer.classList.remove('fp-holding');
+    fingerprintContainer.classList.add('fp-success');
+
+    // רטט אישור של 50ms ופתיחה חלקה של המכשיר
+    if (navigator.vibrate) {
+      try {
+        navigator.vibrate(50);
+      } catch (err) {}
+    }
+
+    setTimeout(() => {
+      triggerUnlockHomescreen();
+      setTimeout(() => {
+        fingerprintContainer.classList.remove('fp-success');
+      }, 400);
+    }, 180);
+  }, requiredHoldMs);
+}
+
+function endFingerprintHold() {
+  clearTimeout(fpHoldTimer);
+  if (!fpPressStartTime) return;
+
+  const heldMs = performance.now() - fpPressStartTime;
+  fpPressStartTime = 0;
+  fingerprintContainer.classList.remove('fp-holding');
+
+  // אם המשתמש עזב מהר מדי (לחיצה קצרה) לפני שהושלם הזיהוי -> רטט כפול + הודעת שגיאה "טביעת אצבע לא תואמת"
+  if (!fpUnlockedDuringHold && heldMs < 350) {
+    triggerErrorFeedback('טביעת אצבע לא תואמת');
+  }
+}
+
+if (fingerprintContainer) {
+  fingerprintContainer.addEventListener('pointerdown', startFingerprintHold);
+  fingerprintContainer.addEventListener('pointerup', endFingerprintHold);
+  fingerprintContainer.addEventListener('pointerleave', endFingerprintHold);
+  fingerprintContainer.addEventListener('pointercancel', endFingerprintHold);
+}
+
+// 17B. אייפון: סריקת Face ID עם מצלמת סלפי ב-Dynamic Island ופתיחה ב-Swipe Up
+async function triggerIosFaceIdSequence() {
+  clearTimeout(faceIdTimer);
+  faceIdUnlocked = false;
+
+  if (cameraPunchHole) {
+    cameraPunchHole.classList.remove('faceid-scanning', 'faceid-unlocked');
+  }
+  if (lockIconTrigger) {
+    lockIconTrigger.classList.remove('unlocked-anim');
+  }
+  if (iosSwipeHint) {
+    iosSwipeHint.classList.remove('ready');
+  }
+
+  if (config.osTheme !== 'ios') return;
+
+  // ניסיון להפעיל סריקה קצרה במצלמה הקדמית בתוך ה-Dynamic Island
+  try {
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia && islandLiveCam) {
+      activeCameraStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'user', width: { ideal: 160 }, height: { ideal: 160 } },
+        audio: false
+      });
+      islandLiveCam.srcObject = activeCameraStream;
+    }
+  } catch (err) {
+    // אם אין מצלמה זמינה או הרשאה, האנימציה של ה-Dynamic Island ממשיכה כרגיל
+  }
+
+  faceIdTimer = setTimeout(() => {
+    if (cameraPunchHole) {
+      cameraPunchHole.classList.add('faceid-scanning');
+    }
+
+    faceIdTimer = setTimeout(() => {
+      faceIdUnlocked = true;
+      if (cameraPunchHole) {
+        cameraPunchHole.classList.remove('faceid-scanning');
+        cameraPunchHole.classList.add('faceid-unlocked');
+      }
+      if (lockIconTrigger) {
+        lockIconTrigger.classList.add('unlocked-anim');
+      }
+      if (iosSwipeHint) {
+        iosSwipeHint.classList.add('ready');
+      }
+      if (navigator.vibrate) {
+        try {
+          navigator.vibrate(30);
+        } catch (err) {}
+      }
+      // כיבוי מצלמת הסלפי לאחר השלמת הזיהוי
+      stopAllCameraStreams();
+    }, 650);
+  }, 450);
+}
+
+// מחוות החלקה כלפי מעלה (Swipe Up) לפתיחת האייפון לאחר פתיחת המנעול ב-Face ID
+let swipeStartY = null;
+let swipeStartX = null;
+
+phoneContainer.addEventListener(
+  'pointerdown',
+  (e) => {
+    if (config.osTheme !== 'ios' || setupOverlay.classList.contains('open')) return;
+    if (fakeHomescreen.classList.contains('unlocked')) return;
+    swipeStartY = e.clientY;
+    swipeStartX = e.clientX;
+  },
+  { passive: true }
+);
+
+phoneContainer.addEventListener(
+  'pointerup',
+  (e) => {
+    if (swipeStartY === null || config.osTheme !== 'ios') return;
+    const dy = swipeStartY - e.clientY;
+    const dx = Math.abs((swipeStartX || 0) - e.clientX);
     swipeStartY = null;
     swipeStartX = null;
 
-    // החלקה כלפי מעלה (dy שלילי של לפחות 45 פיקסלים)
-    if (dy < -45 && dy < -dx && isIosFaceIdUnlocked) {
-      triggerUnlockHomescreen();
-    }
-  }
-
-  phoneContainer.addEventListener('touchstart', (e) => {
-    if (e.touches && e.touches.length === 1) {
-      onIosSwipeStart(e.touches[0].clientY, e.touches[0].clientX, e.target);
-    }
-  }, { passive: true });
-
-  phoneContainer.addEventListener('touchend', (e) => {
-    if (e.changedTouches && e.changedTouches.length === 1) {
-      onIosSwipeEnd(e.changedTouches[0].clientY, e.changedTouches[0].clientX);
-    }
-  }, { passive: true });
-
-  phoneContainer.addEventListener('mousedown', (e) => {
-    if ('ontouchstart' in window) return;
-    onIosSwipeStart(e.clientY, e.clientX, e.target);
-  });
-
-  phoneContainer.addEventListener('mouseup', (e) => {
-    if ('ontouchstart' in window) return;
-    onIosSwipeEnd(e.clientY, e.clientX);
-  });
-
-  // הדמיית טביעת אצבע בסמסונג: לחיצה ממושכת (450ms) מדליקה את ההילה, מפעילה רטט ופותחת את המסך
-  let fpHoldTimer = null;
-
-  function startFingerprintHold(e) {
-    if (config.theme !== 'samsung' || !config.showFingerprint) return;
-    if (e && e.cancelable) e.preventDefault();
-    fingerprintContainer.classList.add('pressing');
-    vibrate(18);
-
-    if (fpHoldTimer) clearTimeout(fpHoldTimer);
-    fpHoldTimer = setTimeout(() => {
-      fpHoldTimer = null;
-      fingerprintContainer.classList.remove('pressing');
-      try {
-        if (navigator.vibrate) navigator.vibrate(50);
-      } catch (err) {}
-      vibrate(50);
-      triggerUnlockHomescreen();
-    }, 450);
-  }
-
-  function cancelFingerprintHold() {
-    if (fpHoldTimer) {
-      clearTimeout(fpHoldTimer);
-      fpHoldTimer = null;
-    }
-    if (fingerprintContainer) {
-      fingerprintContainer.classList.remove('pressing');
-    }
-  }
-
-  if (fingerprintContainer) {
-    fingerprintContainer.addEventListener('touchstart', startFingerprintHold, { passive: false });
-    fingerprintContainer.addEventListener('touchend', cancelFingerprintHold);
-    fingerprintContainer.addEventListener('touchcancel', cancelFingerprintHold);
-    fingerprintContainer.addEventListener('mousedown', (e) => {
-      if ('ontouchstart' in window) return;
-      startFingerprintHold(e);
-    });
-    fingerprintContainer.addEventListener('mouseup', cancelFingerprintHold);
-    fingerprintContainer.addEventListener('mouseleave', cancelFingerprintHold);
-  }
-
-  function lockPhoneAgain() {
-    fakeHomescreen.classList.remove('unlocked');
-    enteredPin = '';
-    wordNativeInput.value = '';
-    renderPinDots();
-    resetPatternUI();
-    clearErrorState();
-    vibrate(20);
-    if (config.theme === 'ios') {
-      startIosFaceIdSequence();
-    }
-  }
-
-  function handleSubmissionResult(enteredValue, modeKey) {
-    recordCapturedInput(enteredValue, modeKey);
-    scheduleHapticPeekAfterEntry(enteredValue);
-
-    if (config.postBehavior === 'unlock') {
-      triggerUnlockHomescreen();
-      return true;
-    } else {
-      triggerErrorFeedback();
-      return false;
-    }
-  }
-
-  // ==========================================================================
-  // 7. מצב 1: קוד PIN (Samsung & iOS)
-  // ==========================================================================
-
-  function renderPinDots() {
-    pinDots.innerHTML = '';
-
-    if (config.theme === 'ios') {
-      const totalDots = Number(config.pinLength) || 4;
-      for (let i = 0; i < totalDots; i++) {
-        const dot = document.createElement('div');
-        dot.className = 'ios-dot' + (i < enteredPin.length ? ' filled' : '');
-        pinDots.appendChild(dot);
-      }
-      if (iosRightActionBtn) {
-        iosRightActionBtn.textContent = enteredPin.length > 0 ? 'מחק' : 'ביטול';
-      }
-    } else {
-      for (let i = 0; i < enteredPin.length; i++) {
-        const dot = document.createElement('div');
-        dot.className = 'dot';
-        pinDots.appendChild(dot);
-      }
-    }
-
-    if (enteredPin.length > 0) {
-      if (errorTimeout) {
-        clearTimeout(errorTimeout);
-        errorTimeout = null;
-        errorMsg.style.display = 'none';
-        errorMsg.classList.remove('text-shake');
-        titleGroup.style.display = '';
-      }
-      if (config.theme === 'samsung') {
-        titleGroup.classList.add('hidden');
-      }
-    } else if (!hasHadError && !errorTimeout) {
-      titleGroup.style.display = '';
-      titleGroup.classList.remove('hidden');
-    }
-  }
-
-  function pressPinDigit(digit) {
-    const maxLen = config.theme === 'ios' ? (Number(config.pinLength) || 4) : 8;
-    if (enteredPin.length >= maxLen) return;
-
-    if (hapticPeekTimer) {
-      clearTimeout(hapticPeekTimer);
-      hapticPeekTimer = null;
-    }
-
-    enteredPin += digit;
-    renderPinDots();
-    playKeyClickSound();
-    vibrate(14);
-
-    const targetAutoLen = Number(config.pinLength) || 4;
-    if (config.theme === 'ios' && enteredPin.length === targetAutoLen) {
-      setTimeout(submitPin, 130);
-    }
-  }
-
-  function deletePinDigit() {
-    if (enteredPin.length > 0) {
-      enteredPin = enteredPin.slice(0, -1);
-      renderPinDots();
-      playKeyClickSound();
-      vibrate(12);
-    }
-  }
-
-  function submitPin() {
-    if (enteredPin.length === 0) return;
-    const pinToSubmit = enteredPin;
-    enteredPin = '';
-    renderPinDots();
-    handleSubmissionResult(pinToSubmit, 'pin');
-  }
-
-  document.querySelectorAll('.keypad .key-btn[data-digit]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      pressPinDigit(btn.getAttribute('data-digit'));
-    });
-  });
-
-  keypadBackspaceBtn.addEventListener('click', deletePinDigit);
-  keypadOkBtn.addEventListener('click', submitPin);
-
-  samsungBackBtn.addEventListener('click', () => {
-    if (config.unlockMode === 'pin') deletePinDigit();
-  });
-
-  iosRightActionBtn.addEventListener('click', () => {
-    if (config.unlockMode === 'pin' && enteredPin.length > 0) {
-      deletePinDigit();
-    } else if (config.unlockMode === 'words') {
-      wordNativeInput.value = '';
-    }
-  });
-
-  fingerprintContainer.addEventListener('click', triggerUnlockHomescreen);
-  samsungEmergencyBtn.addEventListener('click', playKeyClickSound);
-  iosEmergencyBtn.addEventListener('click', playKeyClickSound);
-
-  // ==========================================================================
-  // 8. מצב 2: דפוס (Pattern Lock 3x3)
-  // ==========================================================================
-
-  function getNodeCoords(nodeNum) {
-    const idx = nodeNum - 1;
-    return {
-      x: 46 + (idx % 3) * 92,
-      y: 46 + Math.floor(idx / 3) * 92
-    };
-  }
-
-  function getIntermediateNode(a, b) {
-    const r1 = Math.floor((a - 1) / 3), c1 = (a - 1) % 3;
-    const r2 = Math.floor((b - 1) / 3), c2 = (b - 1) % 3;
-    if ((r1 + r2) % 2 === 0 && (c1 + c2) % 2 === 0) {
-      return ((r1 + r2) / 2) * 3 + ((c1 + c2) / 2) + 1;
-    }
-    return null;
-  }
-
-  function updatePatternGraphics() {
-    patternNodes.forEach((el) => {
-      const n = Number(el.getAttribute('data-node'));
-      el.classList.toggle('active', patternSelected.includes(n));
-    });
-
-    const pts = patternSelected.map((n) => {
-      const c = getNodeCoords(n);
-      return `${c.x},${c.y}`;
-    });
-
-    if (isDrawingPattern && currentDragPoint && patternSelected.length > 0) {
-      pts.push(`${Math.round(currentDragPoint.x)},${Math.round(currentDragPoint.y)}`);
-    }
-
-    patternLine.setAttribute('points', pts.join(' '));
-  }
-
-  function resetPatternUI() {
-    if (patternResetTimeout) {
-      clearTimeout(patternResetTimeout);
-      patternResetTimeout = null;
-    }
-    patternSelected = [];
-    isDrawingPattern = false;
-    currentDragPoint = null;
-    patternWrapper.classList.remove('pattern-error');
-    updatePatternGraphics();
-  }
-
-  function addPatternNode(nodeNum) {
-    if (patternSelected.includes(nodeNum)) return;
-    if (patternSelected.length > 0) {
-      const last = patternSelected[patternSelected.length - 1];
-      const mid = getIntermediateNode(last, nodeNum);
-      if (mid && !patternSelected.includes(mid)) {
-        patternSelected.push(mid);
-      }
-    }
-    patternSelected.push(nodeNum);
-    if (!config.stealthPattern) {
-      playKeyClickSound();
-      vibrate(14);
-    }
-
-    if (errorTimeout) clearErrorState();
-    if (config.theme === 'samsung') {
-      titleGroup.classList.add('hidden');
-    }
-  }
-
-  function getRelativeSvgPoint(clientX, clientY) {
-    const rect = patternWrapper.getBoundingClientRect();
-    return {
-      x: (clientX - rect.left) * (276 / rect.width),
-      y: (clientY - rect.top) * (276 / rect.height)
-    };
-  }
-
-  function detectHitNode(svgPt) {
-    for (let n = 1; n <= 9; n++) {
-      const c = getNodeCoords(n);
-      if (Math.hypot(svgPt.x - c.x, svgPt.y - c.y) <= 34) {
-        return n;
-      }
-    }
-    return null;
-  }
-
-  function handlePatternStart(clientX, clientY) {
-    if (config.unlockMode !== 'pattern') return;
-    if (hapticPeekTimer) {
-      clearTimeout(hapticPeekTimer);
-      hapticPeekTimer = null;
-    }
-    resetPatternUI();
-    const pt = getRelativeSvgPoint(clientX, clientY);
-    const hit = detectHitNode(pt);
-    if (hit) {
-      isDrawingPattern = true;
-      currentDragPoint = pt;
-      addPatternNode(hit);
-      updatePatternGraphics();
-    }
-  }
-
-  function handlePatternMove(clientX, clientY) {
-    if (!isDrawingPattern) return;
-    const pt = getRelativeSvgPoint(clientX, clientY);
-    currentDragPoint = pt;
-    const hit = detectHitNode(pt);
-    if (hit) addPatternNode(hit);
-    updatePatternGraphics();
-  }
-
-  function handlePatternEnd() {
-    if (!isDrawingPattern) return;
-    isDrawingPattern = false;
-    currentDragPoint = null;
-    updatePatternGraphics();
-
-    if (patternSelected.length === 0) return;
-
-    const seq = patternSelected.join('-');
-    const unlocked = handleSubmissionResult(seq, 'pattern');
-
-    if (!unlocked) {
-      patternWrapper.classList.add('pattern-error');
-      patternResetTimeout = setTimeout(resetPatternUI, 900);
-    } else {
-      resetPatternUI();
-    }
-  }
-
-  patternWrapper.addEventListener('touchstart', (e) => {
-    if (e.touches.length > 0) {
-      e.preventDefault();
-      handlePatternStart(e.touches[0].clientX, e.touches[0].clientY);
-    }
-  }, { passive: false });
-
-  patternWrapper.addEventListener('touchmove', (e) => {
-    if (e.touches.length > 0) {
-      e.preventDefault();
-      handlePatternMove(e.touches[0].clientX, e.touches[0].clientY);
-    }
-  }, { passive: false });
-
-  patternWrapper.addEventListener('touchend', handlePatternEnd);
-  patternWrapper.addEventListener('touchcancel', handlePatternEnd);
-
-  patternWrapper.addEventListener('mousedown', (e) => handlePatternStart(e.clientX, e.clientY));
-  window.addEventListener('mousemove', (e) => {
-    if (isDrawingPattern) handlePatternMove(e.clientX, e.clientY);
-  });
-  window.addEventListener('mouseup', () => {
-    if (isDrawingPattern) handlePatternEnd();
-  });
-
-  // ==========================================================================
-  // 9. מצב 3: סיסמת מילים (מקלדת מערכת אמיתית של הטלפון בלבד!)
-  // ==========================================================================
-
-  function focusNativeWordInput() {
-    if (config.unlockMode === 'words') {
-      wordNativeInput.focus();
-    }
-  }
-
-  wordGlassField.addEventListener('click', (e) => {
-    if (e.target.closest('#toggleWordMaskBtn') || e.target.closest('#wordSubmitInlineBtn')) return;
-    focusNativeWordInput();
-  });
-
-  if (wordTapHint) {
-    wordTapHint.addEventListener('click', focusNativeWordInput);
-  }
-
-  toggleWordMaskBtn.addEventListener('click', () => {
-    isWordMasked = !isWordMasked;
-    wordNativeInput.type = isWordMasked ? 'password' : 'text';
-    focusNativeWordInput();
-  });
-
-  function submitNativeWord() {
-    const val = wordNativeInput.value.trim();
-    if (!val) return;
-    wordNativeInput.value = '';
-    handleSubmissionResult(val, 'words');
-  }
-
-  wordSubmitInlineBtn.addEventListener('click', submitNativeWord);
-
-  wordNativeInput.addEventListener('input', () => {
-    if (errorTimeout) clearErrorState();
-    // שמירה חיה של הטקסט תוך כדי הקלדה במקלדת המערכת
-    if (wordNativeInput.value.trim()) {
-      localStorage.setItem('last_entered_pin', wordNativeInput.value.trim());
-      localStorage.setItem('last_entered_mode', 'words');
-      if (settingsLastInput) {
-        settingsLastInput.textContent = wordNativeInput.value.trim();
-      }
-    }
-  });
-
-  wordNativeInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      submitNativeWord();
-    }
-  });
-
-  // ==========================================================================
-  // 10. הצצה במסך (Secret Hold Peek)
-  // ==========================================================================
-
-  let peekHoldTimer = null;
-
-  function renderMiniPatternPreview(svgEl, patternStr) {
-    svgEl.innerHTML = '';
-    const parts = (patternStr || '')
-      .split('-')
-      .map((x) => parseInt(x, 10))
-      .filter((n) => n >= 1 && n <= 9);
-
-    if (parts.length === 0) {
-      svgEl.classList.remove('active');
-      return;
-    }
-
-    svgEl.classList.add('active');
-    const getMiniCoord = (n) => {
-      const idx = n - 1;
-      return {
-        x: 10 + (idx % 3) * 20,
-        y: 10 + Math.floor(idx / 3) * 20
-      };
-    };
-
-    const poly = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
-    poly.setAttribute(
-      'points',
-      parts.map((n) => {
-        const c = getMiniCoord(n);
-        return `${c.x},${c.y}`;
-      }).join(' ')
-    );
-    poly.setAttribute('fill', 'none');
-    poly.setAttribute('stroke', '#38bdf8');
-    poly.setAttribute('stroke-width', '2.5');
-    poly.setAttribute('stroke-linecap', 'round');
-    poly.setAttribute('stroke-linejoin', 'round');
-    svgEl.appendChild(poly);
-
-    for (let n = 1; n <= 9; n++) {
-      const c = getMiniCoord(n);
-      const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-      circle.setAttribute('cx', c.x);
-      circle.setAttribute('cy', c.y);
-      const isStart = parts[0] === n;
-      const isUsed = parts.includes(n);
-      circle.setAttribute('r', isStart ? '3.5' : isUsed ? '2.6' : '1.8');
-      circle.setAttribute('fill', isStart ? '#4ade80' : isUsed ? '#ffffff' : 'rgba(255,255,255,0.35)');
-      svgEl.appendChild(circle);
-    }
-  }
-
-  function showHoldPeek() {
-    if (!config.holdPeekEnabled) return;
-    const lastVal = localStorage.getItem('last_entered_pin') || '---';
-    const lastMode = localStorage.getItem('last_entered_mode') || 'pin';
-
-    peekText.textContent = lastVal;
-
-    if (lastMode === 'pattern' && lastVal.includes('-')) {
-      renderMiniPatternPreview(peekPatternMini, lastVal);
-    } else {
-      peekPatternMini.classList.remove('active');
-    }
-
-    secretPeek.classList.add('visible');
-    vibrate(25);
-  }
-
-  function hideHoldPeek() {
-    if (peekHoldTimer) {
-      clearTimeout(peekHoldTimer);
-      peekHoldTimer = null;
-    }
-    secretPeek.classList.remove('visible');
-  }
-
-  function isInteractiveTarget(target) {
-    if (!target || !target.closest) return false;
-    return Boolean(
-      target.closest('.key-btn') ||
-      target.closest('.emergency-btn') ||
-      target.closest('.samsung-back-btn') ||
-      target.closest('.ios-text-btn') ||
-      target.closest('.fingerprint-container') ||
-      target.closest('.pattern-wrapper') ||
-      target.closest('.words-native-container') ||
-      target.closest('.setup-overlay') ||
-      target.closest('.secret-trigger-zone') ||
-      target.closest('.secret-relock-zone') ||
-      target.closest('.status-time')
-    );
-  }
-
-  function handlePeekStart(e) {
-    if (isInteractiveTarget(e.target)) return;
-    if (!config.holdPeekEnabled) return;
-    if (peekHoldTimer) clearTimeout(peekHoldTimer);
-    peekHoldTimer = setTimeout(showHoldPeek, 500);
-  }
-
-  phoneContainer.addEventListener('touchstart', handlePeekStart, { passive: true });
-  phoneContainer.addEventListener('touchend', hideHoldPeek);
-  phoneContainer.addEventListener('touchcancel', hideHoldPeek);
-
-  phoneContainer.addEventListener('mousedown', (e) => {
-    if ('ontouchstart' in window) return;
-    handlePeekStart(e);
-  });
-  phoneContainer.addEventListener('mouseup', hideHoldPeek);
-  phoneContainer.addEventListener('mouseleave', hideHoldPeek);
-
-  // ==========================================================================
-  // 11. חזרה להגדרות ממסך הנעילה (Triple-Tap)
-  // ==========================================================================
-
-  function attachTripleTap(element, callback) {
-    if (!element) return;
-    let tapCount = 0;
-    let tapTimer = null;
-
-    element.addEventListener('click', (e) => {
-      e.stopPropagation();
-      tapCount++;
-      if (tapTimer) clearTimeout(tapTimer);
-
-      if (tapCount >= 3) {
-        tapCount = 0;
-        vibrate([30, 50, 30]);
-        callback();
+    if (dy > 55 && dy > dx) {
+      if (faceIdUnlocked) {
+        if (navigator.vibrate) {
+          try {
+            navigator.vibrate(35);
+          } catch (err) {}
+        }
+        triggerUnlockHomescreen();
       } else {
-        tapTimer = setTimeout(() => {
-          tapCount = 0;
-        }, 600);
-      }
-    });
-  }
-
-  function openSetupOverlay() {
-    wordNativeInput.blur();
-    syncConfigControls();
-    splitChoiceScreen.classList.remove('hidden');
-    deviceConfigSheet.classList.remove('active');
-    setupOverlay.classList.add('open');
-  }
-
-  attachTripleTap(secretCornerTrigger, openSetupOverlay);
-  attachTripleTap(cameraPunchHole, openSetupOverlay);
-  attachTripleTap(lockIconTrigger, openSetupOverlay);
-
-  let relockTimer = null;
-  secretRelockZone.addEventListener('touchstart', () => {
-    relockTimer = setTimeout(lockPhoneAgain, 550);
-  }, { passive: true });
-  secretRelockZone.addEventListener('touchend', () => {
-    if (relockTimer) clearTimeout(relockTimer);
-  });
-  secretRelockZone.addEventListener('dblclick', lockPhoneAgain);
-
-  // ==========================================================================
-  // 12. לוגיקת מסך הבחירה 50/50 וההגדרות (Split Choice -> Device Config)
-  // ==========================================================================
-
-  function selectDeviceFromSplit(themeName) {
-    config.theme = themeName;
-    ensureValidModelForTheme();
-    saveConfig();
-    applyConfigToUI();
-    applySavedImages();
-    syncConfigControls();
-    splitChoiceScreen.classList.add('hidden');
-    deviceConfigSheet.classList.add('active');
-  }
-
-  chooseSamsungBtn.addEventListener('click', () => selectDeviceFromSplit('samsung'));
-  chooseIosBtn.addEventListener('click', () => selectDeviceFromSplit('ios'));
-
-  backToSplitBtn.addEventListener('click', () => {
-    deviceConfigSheet.classList.remove('active');
-    splitChoiceScreen.classList.remove('hidden');
-  });
-
-  function renderModelPresetsGrid() {
-    const grid = document.getElementById('modelPresetsGrid');
-    if (!grid) return;
-    ensureValidModelForTheme();
-    const models = getModelsForTheme(config.theme);
-    grid.innerHTML = '';
-
-    models.forEach((m) => {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'model-preset-chip' + (m.id === config.modelId ? ' active' : '');
-      btn.textContent = m.label;
-      btn.addEventListener('click', () => {
-        config.modelId = m.id;
-        // כשבוחרים דגם חדש, מציגים אוטומטית את טפט ברירת המחדל של אותו דגם
-        config.wallpaperId = 'model_default';
-        saveConfig();
-        applyConfigToUI();
-        applySavedImages();
-        syncConfigControls();
-      });
-      grid.appendChild(btn);
-    });
-  }
-
-  function renderWallpaperGallery() {
-    const galleryRow = document.getElementById('wallpaperGalleryRow');
-    if (!galleryRow) return;
-    const wallpapers = getGalleryWallpapersForCurrentModel();
-    galleryRow.innerHTML = '';
-
-    wallpapers.forEach((wp) => {
-      const card = document.createElement('button');
-      card.type = 'button';
-      card.className = 'wp-thumb-card' + (config.wallpaperId === wp.id ? ' active' : '');
-      card.style.backgroundImage = `url("${wp.uri}")`;
-
-      const lbl = document.createElement('span');
-      lbl.className = 'wp-thumb-label';
-      lbl.textContent = wp.label;
-      card.appendChild(lbl);
-
-      card.addEventListener('click', () => {
-        config.wallpaperId = wp.id;
-        saveConfig();
-        applySavedImages();
-        syncConfigControls();
-      });
-
-      galleryRow.appendChild(card);
-    });
-  }
-
-  function syncConfigControls() {
-    ensureValidModelForTheme();
-    const currentModel = MODEL_PRESETS[config.modelId];
-    selectedDevicePill.textContent = currentModel
-      ? `${currentModel.label} (${config.theme === 'ios' ? 'iOS' : 'One UI'})`
-      : (config.theme === 'ios' ? 'Apple iPhone (iOS)' : 'Samsung Galaxy (One UI)');
-
-    if (settingsLastInput) {
-      settingsLastInput.textContent = localStorage.getItem('last_entered_pin') || '---';
-    }
-
-    renderModelPresetsGrid();
-    renderWallpaperGallery();
-
-    document.querySelectorAll('#modeSelector .seg-pill').forEach((btn) => {
-      btn.classList.toggle('active', btn.dataset.mode === config.unlockMode);
-    });
-
-    document.querySelectorAll('#pinLengthButtons .seg-pill').forEach((btn) => {
-      btn.classList.toggle('active', Number(btn.dataset.pinlen) === Number(config.pinLength));
-    });
-
-    document.querySelectorAll('#behaviorSelector .seg-pill').forEach((btn) => {
-      btn.classList.toggle('active', btn.dataset.behavior === config.postBehavior);
-    });
-
-    document.querySelectorAll('#statusBarSelector .seg-pill').forEach((btn) => {
-      const wantShow = btn.dataset.statusbar === 'show';
-      btn.classList.toggle('active', wantShow === (config.showStatusBar !== false));
-    });
-
-    document.getElementById('pinLengthGroup').style.display = config.unlockMode === 'pin' ? 'flex' : 'none';
-    document.getElementById('stealthPatternGroup').style.display = config.unlockMode === 'pattern' ? 'flex' : 'none';
-    document.getElementById('fingerprintSettingRow').style.display = config.theme === 'samsung' ? 'flex' : 'none';
-
-    const toggleStatusBarEl = document.getElementById('toggleStatusBar');
-    if (toggleStatusBarEl) toggleStatusBarEl.checked = config.showStatusBar !== false;
-
-    const togglePunchHoleEl = document.getElementById('togglePunchHole');
-    if (togglePunchHoleEl) togglePunchHoleEl.checked = config.showPunchHole !== false;
-
-    const punchHoleRow = document.getElementById('punchHoleSettingRow');
-    if (punchHoleRow) punchHoleRow.style.display = config.showStatusBar !== false ? 'flex' : 'none';
-
-    document.getElementById('toggleStealthPattern').checked = config.stealthPattern;
-    document.getElementById('toggleHapticPeek').checked = config.hapticPeekEnabled;
-    document.getElementById('toggleChameleonClock').checked = config.chameleonClockEnabled;
-    document.getElementById('toggleHoldPeek').checked = config.holdPeekEnabled;
-    document.getElementById('toggleFingerprint').checked = config.showFingerprint;
-  }
-
-  // בקשת מסך מלא אוטומטית בלחיצה הראשונה על המסך ובכל הפעלה של מסך הנעילה
-  function requestAppFullscreen() {
-    const docEl = document.documentElement;
-    if (!document.fullscreenElement && !document.webkitFullscreenElement) {
-      if (docEl.requestFullscreen) {
-        docEl.requestFullscreen().catch(() => {});
-      } else if (docEl.webkitRequestFullscreen) {
-        docEl.webkitRequestFullscreen();
+        triggerIosFaceIdSequence();
       }
     }
-  }
+  },
+  { passive: true }
+);
 
-  document.addEventListener('click', requestAppFullscreen, { once: true });
-  document.addEventListener('touchend', requestAppFullscreen, { once: true });
+// נעילה מחדש בלחיצה כפולה בפינה הימנית העליונה של מסך הבית
+let relockTapCount = 0;
+let relockTapTimer = null;
+if (secretRelockZone) {
+  secretRelockZone.addEventListener('click', () => {
+    relockTapCount++;
+    clearTimeout(relockTapTimer);
+    relockTapTimer = setTimeout(() => {
+      relockTapCount = 0;
+    }, 500);
 
-  function launchLockscreen() {
-    saveConfig();
-    applyConfigToUI();
-    fakeHomescreen.classList.remove('unlocked');
-    setupOverlay.classList.remove('open');
-
-    requestAppFullscreen();
-
-    if (config.theme === 'ios') {
-      startIosFaceIdSequence();
-    } else {
-      resetFaceIdState();
+    if (relockTapCount >= 2) {
+      relockTapCount = 0;
+      fakeHomescreen.classList.remove('unlocked');
+      clearCurrentInputs();
+      if (config.osTheme === 'ios') {
+        triggerIosFaceIdSequence();
+      }
     }
+  });
+}
 
-    if (config.unlockMode === 'words') {
-      setTimeout(() => {
-        wordNativeInput.focus();
-      }, 250);
+// ----------------------------------------------------------------------------
+// 18. כניסה סודית להגדרות ממסך הנעילה (3 לחיצות על המנעול או בפינה השמאלית)
+// ----------------------------------------------------------------------------
+function bindTripleTap(element, callback) {
+  if (!element) return;
+  let taps = 0;
+  let timer = null;
+  element.addEventListener('click', (e) => {
+    e.stopPropagation();
+    taps++;
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      taps = 0;
+    }, 550);
+    if (taps >= 3) {
+      taps = 0;
+      callback();
     }
+  });
+}
+
+function openSettingsSheet() {
+  refreshSettingsLastCaptured();
+  if (deviceConfigSheet) {
+    deviceConfigSheet.classList.add('open');
   }
+  setupOverlay.classList.add('open');
+}
 
-  launchLockscreenBtn.addEventListener('click', launchLockscreen);
+function closeSettingsSheet() {
+  setupOverlay.classList.remove('open');
+  if (config.osTheme === 'ios') {
+    triggerIosFaceIdSequence();
+  }
+}
 
-  document.querySelectorAll('#modeSelector .seg-pill').forEach((btn) => {
+bindTripleTap(lockIconTrigger, openSettingsSheet);
+bindTripleTap(secretCornerTrigger, openSettingsSheet);
+
+function refreshSettingsLastCaptured() {
+  const last = localStorage.getItem(LAST_PIN_KEY) || '---';
+  if (settingsLastInput) settingsLastInput.textContent = last;
+}
+
+// ----------------------------------------------------------------------------
+// 19. מאזינים להגדרות והעלאת תמונות מהגלריה (LocalStorage)
+// ----------------------------------------------------------------------------
+if (modeSelector) {
+  modeSelector.querySelectorAll('.seg-pill').forEach((btn) => {
     btn.addEventListener('click', () => {
       config.unlockMode = btn.dataset.mode;
       saveConfig();
-      syncConfigControls();
       applyConfigToUI();
     });
   });
+}
 
-  document.querySelectorAll('#pinLengthButtons .seg-pill').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      config.pinLength = Number(btn.dataset.pinlen);
-      saveConfig();
-      syncConfigControls();
-      applyConfigToUI();
-    });
-  });
-
-  document.querySelectorAll('#behaviorSelector .seg-pill').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      config.postBehavior = btn.dataset.behavior;
-      saveConfig();
-      syncConfigControls();
-    });
-  });
-
-  document.querySelectorAll('#statusBarSelector .seg-pill').forEach((btn) => {
+if (statusBarSelector) {
+  statusBarSelector.querySelectorAll('.seg-pill').forEach((btn) => {
     btn.addEventListener('click', () => {
       config.showStatusBar = btn.dataset.statusbar === 'show';
       saveConfig();
-      syncConfigControls();
       applyConfigToUI();
     });
   });
+}
 
-  const toggleStatusBarInput = document.getElementById('toggleStatusBar');
-  if (toggleStatusBarInput) {
-    toggleStatusBarInput.addEventListener('change', (e) => {
-      config.showStatusBar = e.target.checked;
-      saveConfig();
-      syncConfigControls();
-      applyConfigToUI();
-    });
-  }
-
-  const togglePunchHoleInput = document.getElementById('togglePunchHole');
-  if (togglePunchHoleInput) {
-    togglePunchHoleInput.addEventListener('change', (e) => {
-      config.showPunchHole = e.target.checked;
-      saveConfig();
-      syncConfigControls();
-      applyConfigToUI();
-    });
-  }
-
-  document.getElementById('toggleStealthPattern').addEventListener('change', (e) => {
+if (toggleStealthPattern) {
+  toggleStealthPattern.addEventListener('change', (e) => {
     config.stealthPattern = e.target.checked;
     saveConfig();
     applyConfigToUI();
   });
+}
 
-  document.getElementById('toggleHapticPeek').addEventListener('change', (e) => {
-    config.hapticPeekEnabled = e.target.checked;
+if (toggleStatusBar) {
+  toggleStatusBar.addEventListener('change', (e) => {
+    config.showStatusBar = e.target.checked;
+    saveConfig();
+    applyConfigToUI();
+  });
+}
+
+if (togglePunchHole) {
+  togglePunchHole.addEventListener('change', (e) => {
+    config.showPunchHole = e.target.checked;
+    saveConfig();
+    applyConfigToUI();
+  });
+}
+
+if (toggleHapticPeek) {
+  toggleHapticPeek.addEventListener('change', (e) => {
+    config.hapticPeek = e.target.checked;
     saveConfig();
   });
+}
 
-  document.getElementById('toggleChameleonClock').addEventListener('change', (e) => {
-    config.chameleonClockEnabled = e.target.checked;
+if (toggleChameleonClock) {
+  toggleChameleonClock.addEventListener('change', (e) => {
+    config.chameleonClock = e.target.checked;
     saveConfig();
   });
+}
 
-  document.getElementById('toggleHoldPeek').addEventListener('change', (e) => {
-    config.holdPeekEnabled = e.target.checked;
+if (toggleHoldPeek) {
+  toggleHoldPeek.addEventListener('change', (e) => {
+    config.holdPeek = e.target.checked;
     saveConfig();
   });
+}
 
-  document.getElementById('toggleFingerprint').addEventListener('change', (e) => {
+if (toggleFingerprint) {
+  toggleFingerprint.addEventListener('change', (e) => {
     config.showFingerprint = e.target.checked;
     saveConfig();
     applyConfigToUI();
   });
+}
 
-  // כפתור החלפה מהירה בין 4 הטפטים המובנים של המכשיר
-  const cycleWallpaperBtn = document.getElementById('cycleWallpaperBtn');
-  if (cycleWallpaperBtn) {
-    cycleWallpaperBtn.addEventListener('click', () => {
-      const wallpapers = getGalleryWallpapersForCurrentModel();
-      const idx = wallpapers.findIndex((w) => w.id === config.wallpaperId);
-      const nextIdx = (idx + 1) % wallpapers.length;
-      config.wallpaperId = wallpapers[nextIdx].id;
-      saveConfig();
-      applySavedImages();
-      syncConfigControls();
-    });
+// דחיסת תמונה ושמירה ב-localStorage
+function compressAndStoreImage(file, storageKey, onSuccess) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (event) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const maxW = 1080;
+      const maxH = 2400;
+      let w = img.width;
+      let h = img.height;
+      const ratio = Math.min(maxW / w, maxH / h, 1);
+      w = Math.round(w * ratio);
+      h = Math.round(h * ratio);
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, w, h);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.84);
+      try {
+        localStorage.setItem(storageKey, dataUrl);
+        onSuccess(dataUrl);
+      } catch (err) {
+        alert('התמונה גדולה מדי לשמירה בזיכרון הדפדפן.');
+      }
+    };
+    img.src = event.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function loadCustomMedia() {
+  applyWallpaperToContainer();
+
+  const savedHome = localStorage.getItem(HOMESCREEN_STORAGE_KEY);
+  if (savedHome) {
+    fakeHomescreen.style.backgroundImage = `url("${savedHome}")`;
+    fakeHomescreen.classList.add('has-custom-image');
+    if (clearHomescreenBtn) clearHomescreenBtn.style.display = 'inline-flex';
+  } else {
+    fakeHomescreen.style.backgroundImage = '';
+    fakeHomescreen.classList.remove('has-custom-image');
+    if (clearHomescreenBtn) clearHomescreenBtn.style.display = 'none';
   }
+}
 
-  // דחיסת תמונה חכמה כדי שתמונות מהגלריה יישמרו ב-localStorage במהירות וללא חריגת נפח
-  function compressImageDataUrl(rawDataUrl, maxWidth = 1080, maxHeight = 2340, quality = 0.84) {
-    return new Promise((resolve) => {
-      const img = new Image();
-      img.onload = () => {
-        let w = img.width;
-        let h = img.height;
-        const ratio = Math.min(maxWidth / w, maxHeight / h, 1);
-        w = Math.round(w * ratio);
-        h = Math.round(h * ratio);
-        const canvas = document.createElement('canvas');
-        canvas.width = w;
-        canvas.height = h;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, w, h);
-        try {
-          resolve(canvas.toDataURL('image/jpeg', quality));
-        } catch (e) {
-          resolve(rawDataUrl);
-        }
-      };
-      img.onerror = () => resolve(rawDataUrl);
-      img.src = rawDataUrl;
+if (wallpaperFileInput) {
+  wallpaperFileInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    compressAndStoreImage(file, WALLPAPER_STORAGE_KEY, () => {
+      localStorage.setItem(SELECTED_WALLPAPER_ID_KEY, 'custom');
+      loadCustomMedia();
+      renderWallpaperGallery();
     });
-  }
-
-  // העלאת טפט אישי ותמונת מסך בית
-  const wallpaperFileInputEl = document.getElementById('wallpaperFileInput');
-  if (wallpaperFileInputEl) {
-    wallpaperFileInputEl.addEventListener('change', (e) => {
-      const file = e.target.files && e.target.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = async () => {
-        const compressed = await compressImageDataUrl(reader.result);
-        try {
-          localStorage.setItem(STORAGE_KEY_CUSTOM_WP, compressed);
-        } catch (err) {}
-        await saveImageData('wallpaper', compressed);
-        config.wallpaperId = 'custom';
-        saveConfig();
-        await applySavedImages();
-        syncConfigControls();
-      };
-      reader.readAsDataURL(file);
-    });
-  }
-
-  const homescreenFileInputEl = document.getElementById('homescreenFileInput');
-  if (homescreenFileInputEl) {
-    homescreenFileInputEl.addEventListener('change', (e) => {
-      const file = e.target.files && e.target.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = async () => {
-        const compressed = await compressImageDataUrl(reader.result);
-        await saveImageData('homescreen', compressed);
-        saveConfig();
-        await applySavedImages();
-      };
-      reader.readAsDataURL(file);
-    });
-  }
-
-  document.getElementById('clearWallpaperBtn').addEventListener('click', async () => {
-    try {
-      localStorage.removeItem(STORAGE_KEY_CUSTOM_WP);
-    } catch (e) {}
-    await saveImageData('wallpaper', null);
-    document.getElementById('wallpaperFileInput').value = '';
-    config.wallpaperId = 'model_default';
-    saveConfig();
-    await applySavedImages();
-    syncConfigControls();
   });
+}
 
-  document.getElementById('clearHomescreenBtn').addEventListener('click', async () => {
-    await saveImageData('homescreen', null);
-    document.getElementById('homescreenFileInput').value = '';
-    await applySavedImages();
+if (clearWallpaperBtn) {
+  clearWallpaperBtn.addEventListener('click', () => {
+    localStorage.removeItem(WALLPAPER_STORAGE_KEY);
+    localStorage.setItem(SELECTED_WALLPAPER_ID_KEY, 'model_default');
+    if (wallpaperFileInput) wallpaperFileInput.value = '';
+    loadCustomMedia();
+    renderWallpaperGallery();
   });
+}
 
-  // תמיכה במקלדת פיזית במצב PIN
-  window.addEventListener('keydown', (e) => {
-    if (setupOverlay.classList.contains('open')) return;
-    if (config.unlockMode === 'pin') {
-      if (e.key >= '0' && e.key <= '9') pressPinDigit(e.key);
-      else if (e.key === 'Backspace') deletePinDigit();
-      else if (e.key === 'Enter') submitPin();
-    }
+if (homescreenFileInput) {
+  homescreenFileInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    compressAndStoreImage(file, HOMESCREEN_STORAGE_KEY, () => {
+      loadCustomMedia();
+    });
   });
+}
 
-  // סנכרון אוטומטי מול GitHub Pages ורענון עצמי של הדף כשעולה גרסה חדשה
-  const APP_BUILD_VERSION = '20261031185933';
-  let isReloadingForUpdate = false;
+if (clearHomescreenBtn) {
+  clearHomescreenBtn.addEventListener('click', () => {
+    localStorage.removeItem(HOMESCREEN_STORAGE_KEY);
+    if (homescreenFileInput) homescreenFileInput.value = '';
+    loadCustomMedia();
+  });
+}
 
-  async function triggerCleanReload() {
-    if (isReloadingForUpdate) return;
-    isReloadingForUpdate = true;
-    try {
+// ----------------------------------------------------------------------------
+// 20. סוללה חיה + עדכון אוטומטי מ-GitHub Pages
+// ----------------------------------------------------------------------------
+if ('getBattery' in navigator) {
+  navigator
+    .getBattery()
+    .then((battery) => {
+      const updateBatteryUI = () => {
+        const level = Math.round(battery.level * 100);
+        const samText = document.getElementById('samsungBatteryText');
+        const samFill = document.getElementById('samsungBatteryFill');
+        const iosText = document.getElementById('iosBatteryText');
+        const iosFill = document.getElementById('iosBatteryFill');
+
+        if (samText) samText.textContent = `${level}%`;
+        if (samFill) samFill.style.height = `${level}%`;
+        if (iosText) iosText.textContent = `${level}`;
+        if (iosFill) iosFill.style.width = `${level}%`;
+      };
+      updateBatteryUI();
+      battery.addEventListener('levelchange', updateBatteryUI);
+    })
+    .catch(() => {});
+}
+
+// אתחול ראשוני
+initSplashScreen();
+initBiometricsEnrollment();
+loadCustomMedia();
+applyConfigToUI();
+
+// מנגנון בדיקת גרסה אוטומטי מול GitHub Pages
+const CURRENT_APP_VERSION = '20261031191000';
+
+async function checkRemoteVersionAndReload() {
+  if (!navigator.onLine) return;
+  try {
+    const res = await fetch(`./version.json?t=${Date.now()}`, { cache: 'no-store' });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data && data.version && String(data.version) !== CURRENT_APP_VERSION) {
       if ('caches' in window) {
         const keys = await caches.keys();
         await Promise.all(keys.map((k) => caches.delete(k)));
       }
-    } catch (e) {}
-    window.location.reload();
-  }
-
-  async function checkRemoteVersion() {
-    if (!setupOverlay.classList.contains('open')) return;
-    try {
-      const res = await fetch(`./version.json?t=${Date.now()}`, { cache: 'no-store' });
-      if (!res.ok) return;
-      const data = await res.json();
-      if (data && data.version && String(data.version) !== String(APP_BUILD_VERSION)) {
-        triggerCleanReload();
+      if ('serviceWorker' in navigator) {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(regs.map((r) => r.unregister()));
       }
-    } catch (e) {}
-  }
+      window.location.replace(`${window.location.pathname}?v=${data.version}`);
+    }
+  } catch (e) {}
+}
 
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.addEventListener('message', (event) => {
-      if (event.data && event.data.type === 'FORCE_RELOAD') {
-        triggerCleanReload();
-      }
-    });
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker
+      .register(`./sw.js?v=${CURRENT_APP_VERSION}`, { updateViaCache: 'none' })
+      .then((reg) => {
+        reg.update();
+      })
+      .catch(() => {});
 
-    let refreshingSw = false;
-    navigator.serviceWorker.addEventListener('controllerchange', () => {
-      if (refreshingSw) return;
-      refreshingSw = true;
-      triggerCleanReload();
-    });
+    checkRemoteVersionAndReload();
+    setInterval(checkRemoteVersionAndReload, 25000);
+  });
 
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register(`./sw.js?v=${APP_BUILD_VERSION}`, { updateViaCache: 'none' })
-        .then((reg) => {
-          reg.update().catch(() => {});
-          setInterval(() => {
-            if (setupOverlay.classList.contains('open')) {
-              reg.update().catch(() => {});
-            }
-          }, 8000);
-        })
-        .catch(() => {});
-    });
-  }
-
-  // בדיקה מחזורית של גרסה חדשה ב-GitHub Pages (מתבצעת ברקע כשנמצאים במסך הבחירה/הגדרות)
-  setTimeout(checkRemoteVersion, 1500);
-  setInterval(checkRemoteVersion, 7000);
-
-  // אתחול
-  applyConfigToUI();
-  applySavedImages();
-  syncConfigControls();
-  initWebBatteryAPI();
-  setInterval(updateStatusBarClock, 10000);
-})();
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      checkRemoteVersionAndReload();
+    }
+  });
+}

@@ -4,7 +4,7 @@
   "description": "Native-Ready Magic Lockscreen App for Magicians & Mentalists",
   "start_url": "./index.html",
   "scope": "./",
-  "display": "standalone",
+  "display": "fullscreen",
   "orientation": "portrait",
   "background_color": "#0b0d13",
   "theme_color": "#0b0d13",

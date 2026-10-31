@@ -1033,10 +1033,155 @@
 
   function triggerUnlockHomescreen() {
     playStatusTone(820, 0.1);
-    vibrate(25);
+    vibrate(50);
     updateStatusBarClock();
     wordNativeInput.blur();
     fakeHomescreen.classList.add('unlocked');
+  }
+
+  // --- הדמיית Face ID (עבור iPhone) וטביעת אצבע (עבור Samsung) ---
+  let faceIdTimer1 = null;
+  let faceIdTimer2 = null;
+  let isIosFaceIdUnlocked = false;
+  const iosSwipeHint = document.getElementById('iosSwipeHint');
+  const iosFooter = document.getElementById('iosFooter');
+
+  function resetFaceIdState() {
+    if (faceIdTimer1) clearTimeout(faceIdTimer1);
+    if (faceIdTimer2) clearTimeout(faceIdTimer2);
+    isIosFaceIdUnlocked = false;
+    if (cameraPunchHole) {
+      cameraPunchHole.classList.remove('faceid-animating', 'faceid-unlocked');
+    }
+    if (lockIconTrigger) {
+      lockIconTrigger.classList.remove('faceid-unlocked');
+    }
+    if (iosSwipeHint) {
+      iosSwipeHint.classList.remove('visible');
+    }
+  }
+
+  function startIosFaceIdSequence() {
+    resetFaceIdState();
+    if (config.theme !== 'ios') return;
+
+    // כחצי שנייה לאחר הטעינה/הנעילה: ה-Dynamic Island מתרחב והמנעול נפתח באנימציית גלישה
+    faceIdTimer1 = setTimeout(() => {
+      if (cameraPunchHole) {
+        cameraPunchHole.classList.add('faceid-animating');
+      }
+      faceIdTimer2 = setTimeout(() => {
+        isIosFaceIdUnlocked = true;
+        if (cameraPunchHole) {
+          cameraPunchHole.classList.add('faceid-unlocked');
+        }
+        if (lockIconTrigger) {
+          lockIconTrigger.classList.add('faceid-unlocked');
+        }
+        if (iosSwipeHint) {
+          iosSwipeHint.classList.add('visible');
+        }
+        vibrate(25);
+        setTimeout(() => {
+          if (cameraPunchHole) {
+            cameraPunchHole.classList.remove('faceid-animating');
+          }
+        }, 700);
+      }, 220);
+    }, 500);
+  }
+
+  // מחוות החלקה כלפי מעלה (Swipe Up) באייפון לפתיחת המכשיר לאחר זיהוי Face ID
+  let swipeStartY = null;
+  let swipeStartX = null;
+
+  function onIosSwipeStart(clientY, clientX, target) {
+    if (config.theme !== 'ios' || setupOverlay.classList.contains('open')) return;
+    if (fakeHomescreen.classList.contains('unlocked')) return;
+    // מאפשרים החלקה מהחלק התחתון של המסך או מכל שטח פנוי לאחר ש-Face ID נפתח
+    if (target && target.closest && target.closest('.key-btn, .pattern-wrapper, .words-native-container')) {
+      return;
+    }
+    swipeStartY = clientY;
+    swipeStartX = clientX;
+  }
+
+  function onIosSwipeEnd(clientY, clientX) {
+    if (swipeStartY === null) return;
+    const dy = clientY - swipeStartY;
+    const dx = Math.abs(clientX - (swipeStartX || 0));
+    swipeStartY = null;
+    swipeStartX = null;
+
+    // החלקה כלפי מעלה (dy שלילי של לפחות 45 פיקסלים)
+    if (dy < -45 && dy < -dx && isIosFaceIdUnlocked) {
+      triggerUnlockHomescreen();
+    }
+  }
+
+  phoneContainer.addEventListener('touchstart', (e) => {
+    if (e.touches && e.touches.length === 1) {
+      onIosSwipeStart(e.touches[0].clientY, e.touches[0].clientX, e.target);
+    }
+  }, { passive: true });
+
+  phoneContainer.addEventListener('touchend', (e) => {
+    if (e.changedTouches && e.changedTouches.length === 1) {
+      onIosSwipeEnd(e.changedTouches[0].clientY, e.changedTouches[0].clientX);
+    }
+  }, { passive: true });
+
+  phoneContainer.addEventListener('mousedown', (e) => {
+    if ('ontouchstart' in window) return;
+    onIosSwipeStart(e.clientY, e.clientX, e.target);
+  });
+
+  phoneContainer.addEventListener('mouseup', (e) => {
+    if ('ontouchstart' in window) return;
+    onIosSwipeEnd(e.clientY, e.clientX);
+  });
+
+  // הדמיית טביעת אצבע בסמסונג: לחיצה ממושכת (450ms) מדליקה את ההילה, מפעילה רטט ופותחת את המסך
+  let fpHoldTimer = null;
+
+  function startFingerprintHold(e) {
+    if (config.theme !== 'samsung' || !config.showFingerprint) return;
+    if (e && e.cancelable) e.preventDefault();
+    fingerprintContainer.classList.add('pressing');
+    vibrate(18);
+
+    if (fpHoldTimer) clearTimeout(fpHoldTimer);
+    fpHoldTimer = setTimeout(() => {
+      fpHoldTimer = null;
+      fingerprintContainer.classList.remove('pressing');
+      try {
+        if (navigator.vibrate) navigator.vibrate(50);
+      } catch (err) {}
+      vibrate(50);
+      triggerUnlockHomescreen();
+    }, 450);
+  }
+
+  function cancelFingerprintHold() {
+    if (fpHoldTimer) {
+      clearTimeout(fpHoldTimer);
+      fpHoldTimer = null;
+    }
+    if (fingerprintContainer) {
+      fingerprintContainer.classList.remove('pressing');
+    }
+  }
+
+  if (fingerprintContainer) {
+    fingerprintContainer.addEventListener('touchstart', startFingerprintHold, { passive: false });
+    fingerprintContainer.addEventListener('touchend', cancelFingerprintHold);
+    fingerprintContainer.addEventListener('touchcancel', cancelFingerprintHold);
+    fingerprintContainer.addEventListener('mousedown', (e) => {
+      if ('ontouchstart' in window) return;
+      startFingerprintHold(e);
+    });
+    fingerprintContainer.addEventListener('mouseup', cancelFingerprintHold);
+    fingerprintContainer.addEventListener('mouseleave', cancelFingerprintHold);
   }
 
   function lockPhoneAgain() {
@@ -1047,6 +1192,9 @@
     resetPatternUI();
     clearErrorState();
     vibrate(20);
+    if (config.theme === 'ios') {
+      startIosFaceIdSequence();
+    }
   }
 
   function handleSubmissionResult(enteredValue, modeKey) {
@@ -1668,19 +1816,33 @@
     document.getElementById('toggleFingerprint').checked = config.showFingerprint;
   }
 
+  // בקשת מסך מלא אוטומטית בלחיצה הראשונה על המסך ובכל הפעלה של מסך הנעילה
+  function requestAppFullscreen() {
+    const docEl = document.documentElement;
+    if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+      if (docEl.requestFullscreen) {
+        docEl.requestFullscreen().catch(() => {});
+      } else if (docEl.webkitRequestFullscreen) {
+        docEl.webkitRequestFullscreen();
+      }
+    }
+  }
+
+  document.addEventListener('click', requestAppFullscreen, { once: true });
+  document.addEventListener('touchend', requestAppFullscreen, { once: true });
+
   function launchLockscreen() {
     saveConfig();
     applyConfigToUI();
     fakeHomescreen.classList.remove('unlocked');
     setupOverlay.classList.remove('open');
 
-    const docEl = document.documentElement;
-    if (!document.fullscreenElement) {
-      if (docEl.requestFullscreen) {
-        docEl.requestFullscreen().catch(() => {});
-      } else if (docEl.webkitRequestFullscreen) {
-        docEl.webkitRequestFullscreen();
-      }
+    requestAppFullscreen();
+
+    if (config.theme === 'ios') {
+      startIosFaceIdSequence();
+    } else {
+      resetFaceIdState();
     }
 
     if (config.unlockMode === 'words') {
@@ -1881,7 +2043,7 @@
   });
 
   // סנכרון אוטומטי מול GitHub Pages ורענון עצמי של הדף כשעולה גרסה חדשה
-  const APP_BUILD_VERSION = '20261031184355';
+  const APP_BUILD_VERSION = '20261031185933';
   let isReloadingForUpdate = false;
 
   async function triggerCleanReload() {

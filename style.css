@@ -130,10 +130,17 @@ html, body {
   display: flex;
   flex-direction: column;
   position: relative;
+  opacity: 1;
+  transform: scale(1);
+  transition: opacity 0.32s cubic-bezier(0.22, 1, 0.36, 1), transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .split-choice-screen.hidden {
-  display: none;
+  opacity: 0;
+  transform: scale(0.96);
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
 }
 
 .split-half {
@@ -222,18 +229,29 @@ html, body {
   pointer-events: none;
 }
 
-/* Post-Choice Device Config Sheet */
+/* Post-Choice Device Config Sheet (Smooth Animated Transition) */
 .device-config-sheet {
-  display: none;
+  position: absolute;
+  inset: 0;
+  display: flex;
   flex-direction: column;
   width: 100%;
   height: 100%;
   background: #f1f5f9;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(24px);
+  transition: opacity 0.36s cubic-bezier(0.22, 1, 0.36, 1), transform 0.36s cubic-bezier(0.22, 1, 0.36, 1), visibility 0.36s ease;
+  z-index: 20;
 }
 
 .device-config-sheet.active,
 .device-config-sheet.open {
-  display: flex;
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translateY(0);
 }
 
 .config-header {
@@ -343,6 +361,91 @@ html, body {
   padding: 6px 10px;
   border-radius: 8px;
   white-space: nowrap;
+}
+
+/* לוח רישום דפוס אישי במסך ההגדרות (מוצג אך ורק באופציה של דפוס) */
+.setup-pattern-box {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.setup-pattern-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.setup-pattern-pad {
+  position: relative;
+  width: 196px;
+  height: 196px;
+  margin: 2px auto;
+  background: #0f172a;
+  border-radius: 16px;
+  touch-action: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+
+.setup-pattern-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.setup-pattern-line {
+  fill: none;
+  stroke: #38bdf8;
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.setup-pattern-grid {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  place-items: center;
+  direction: ltr;
+}
+
+.setup-pattern-node {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.setup-pattern-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.65);
+  transition: all 0.15s ease;
+}
+
+.setup-pattern-node.active .setup-pattern-dot {
+  background: #38bdf8;
+  transform: scale(1.35);
+  box-shadow: 0 0 0 8px rgba(56, 189, 248, 0.25);
 }
 
 .biometric-enroll-card {

@@ -13,7 +13,7 @@
   <meta http-equiv="Expires" content="0">
   <title>Lockscreen</title>
   <link rel="manifest" href="./manifest.json">
-  <link rel="stylesheet" href="./style.css?v=20261031193413">
+  <link rel="stylesheet" href="./style.css?v=20261031194929">
 </head>
 <body>
 
@@ -93,12 +93,33 @@
           <div class="model-presets-grid" id="modelPresetsGrid"></div>
         </div>
 
-        <!-- 2. הגדרת ביומטריה וקוד אישי (Passcode, Fingerprint 3x, Face ID Camera) -->
+        <!-- 2. שיטת נעילה -->
         <div class="config-group">
-          <label class="config-label">הגדרת סיסמה אישית וביומטריה מורשית</label>
+          <label class="config-label">מצב תצוגת נעילה</label>
+          <div class="segmented-row" id="modeSelector">
+            <button type="button" class="seg-pill active" data-mode="pin">סיסמה + לוח מקשים</button>
+            <button type="button" class="seg-pill" data-mode="pattern">דפוס (Pattern)</button>
+            <button type="button" class="seg-pill" data-mode="words">מקלדת מלאה</button>
+          </div>
+        </div>
 
-          <!-- שדה רישום סיסמה / PIN אישי -->
-          <div class="setup-passcode-box">
+        <!-- דפוס בלתי נראה (מוצג רק במצב Pattern) -->
+        <div class="config-group" id="stealthPatternGroup" style="display: none;">
+          <div class="clean-toggle-row">
+            <span>דפוס בלתי נראה (ללא קו מצויר)</span>
+            <label class="switch">
+              <input type="checkbox" id="toggleStealthPattern">
+              <span class="slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <!-- 3. הגדרת ביומטריה וקוד אישי מותאם (Passcode / Pattern / Fingerprint / Face ID) -->
+        <div class="config-group">
+          <label class="config-label">הגדרת קוד אישי וביומטריה מורשית (מותאם אישית בלבד)</label>
+
+          <!-- א. שדה רישום סיסמה / PIN אישי (מוצג רק במצב סיסמה או מקלדת מלאה) -->
+          <div class="setup-passcode-box" id="setupPasscodeBox">
             <label class="setup-sub-label" for="setupPasscodeInput">סיסמה / PIN אישי לפתיחת המכשיר:</label>
             <div class="setup-passcode-row">
               <input
@@ -113,7 +134,34 @@
             </div>
           </div>
 
-          <!-- רישום טביעת אצבע (3 לחיצות לכיול משך הלחיצה) -->
+          <!-- ב. לוח רישום דפוס אישי (מוצג אך ורק כשבוחרים באופציה של דפוס - Pattern) -->
+          <div class="setup-pattern-box" id="setupPatternBox" style="display: none;">
+            <div class="setup-pattern-header">
+              <div>
+                <div class="bio-enroll-title">רישום דפוס (Pattern) אישי</div>
+                <div class="bio-enroll-status" id="setupPatternStatusText">צייר דפוס של לפחות 4 נקודות לשמירה</div>
+              </div>
+              <span class="setup-passcode-saved" id="setupPatternSavedBadge">דפוס שמור ✓</span>
+            </div>
+            <div class="setup-pattern-pad" id="setupPatternWrapper">
+              <svg class="setup-pattern-svg" id="setupPatternSvg" viewBox="0 0 210 210">
+                <polyline class="setup-pattern-line" id="setupPatternLine" points=""></polyline>
+              </svg>
+              <div class="setup-pattern-grid" id="setupPatternGrid">
+                <div class="setup-pattern-node" data-node="1"><div class="setup-pattern-dot"></div></div>
+                <div class="setup-pattern-node" data-node="2"><div class="setup-pattern-dot"></div></div>
+                <div class="setup-pattern-node" data-node="3"><div class="setup-pattern-dot"></div></div>
+                <div class="setup-pattern-node" data-node="4"><div class="setup-pattern-dot"></div></div>
+                <div class="setup-pattern-node" data-node="5"><div class="setup-pattern-dot"></div></div>
+                <div class="setup-pattern-node" data-node="6"><div class="setup-pattern-dot"></div></div>
+                <div class="setup-pattern-node" data-node="7"><div class="setup-pattern-dot"></div></div>
+                <div class="setup-pattern-node" data-node="8"><div class="setup-pattern-dot"></div></div>
+                <div class="setup-pattern-node" data-node="9"><div class="setup-pattern-dot"></div></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ג. רישום טביעת אצבע (3 לחיצות לכיול מדויק של מיקום האצבע ומשך הלחיצה) -->
           <div class="biometric-enroll-card" id="fpEnrollSection">
             <div class="bio-enroll-header">
               <div>
@@ -133,49 +181,28 @@
                 <div class="fp-enroll-ripple"></div>
                 <img src="./p1.png" alt="חיישן" class="fp-enroll-img" />
               </div>
-              <p class="fp-enroll-hint" id="fpEnrollHint">החזק את האצבע על החיישן כחצי שנייה ושחרר</p>
+              <p class="fp-enroll-hint" id="fpEnrollHint">הנח את האצבע באותה נקודה ובאותו משך לחיצה 3 פעמים</p>
             </div>
           </div>
 
-          <!-- רישום זיהוי פנים Face ID (מצלמת סלפי חיה + אנימציית סריקה) -->
+          <!-- ד. רישום זיהוי פנים Face ID (סריקת תווי פנים אמיתית במצלמת הסלפי) -->
           <div class="biometric-enroll-card" id="faceIdEnrollSection">
             <div class="bio-enroll-header">
               <div>
                 <div class="bio-enroll-title">רישום זיהוי פנים (Face ID)</div>
-                <div class="bio-enroll-status" id="faceIdEnrollStatusText">סריקת מצלמת סלפי עם אישור פנים</div>
+                <div class="bio-enroll-status" id="faceIdEnrollStatusText">סריקת מצלמת סלפי ושמירת תווי הפנים שלך</div>
               </div>
               <button type="button" class="bio-enroll-toggle-btn" id="startFaceIdEnrollBtn">סרוק פנים כעת</button>
             </div>
 
             <div class="faceid-camera-box" id="faceIdCameraBox" style="display: none;">
-              <div class="faceid-video-circle">
+              <div class="faceid-video-circle" id="faceIdVideoCircle">
                 <video id="setupFaceVideo" autoplay playsinline muted></video>
                 <div class="faceid-scan-laser"></div>
                 <div class="faceid-ring-overlay" id="faceIdRingOverlay"></div>
               </div>
               <p class="faceid-scan-caption" id="faceIdScanCaption">מקם את הפנים במסגרת לסריקה...</p>
             </div>
-          </div>
-        </div>
-
-        <!-- 3. שיטת נעילה -->
-        <div class="config-group">
-          <label class="config-label">מצב תצוגת נעילה</label>
-          <div class="segmented-row" id="modeSelector">
-            <button type="button" class="seg-pill active" data-mode="pin">סיסמה + לוח מקשים</button>
-            <button type="button" class="seg-pill" data-mode="pattern">דפוס (Pattern)</button>
-            <button type="button" class="seg-pill" data-mode="words">מקלדת מלאה</button>
-          </div>
-        </div>
-
-        <!-- דפוס בלתי נראה (מוצג רק במצב Pattern) -->
-        <div class="config-group" id="stealthPatternGroup" style="display: none;">
-          <div class="clean-toggle-row">
-            <span>דפוס בלתי נראה (ללא קו מצויר)</span>
-            <label class="switch">
-              <input type="checkbox" id="toggleStealthPattern">
-              <span class="slider"></span>
-            </label>
           </div>
         </div>
 
@@ -551,6 +578,6 @@
 
   </div>
 
-  <script src="./app.js?v=20261031193413"></script>
+  <script src="./app.js?v=20261031194929"></script>
 </body>
 </html>

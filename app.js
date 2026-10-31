@@ -263,10 +263,14 @@ const DEFAULT_CONFIG = {
   osTheme: 'samsung',           // 'samsung' | 'ios'
   deviceModel: 's26',           // 's20'..'s26' | 'iphone12'..'iphone18'
   unlockMode: 'pin',            // 'pin' | 'pattern' | 'words'
-  registeredPasscode: '1234',   // הסיסמה האישית שנרשמה ב-Setup
-  fingerprintEnrolled: true,    // האם טביעת אצבע כוילה
-  fingerprintHoldMs: 450,       // משך לחיצה מכויל במילישניות (ברירת מחדל 450ms)
-  faceIdEnrolled: true,         // האם Face ID נרשם
+  registeredPasscode: '1234',   // הסיסמה האישית שנרשמה ב-Setup (עבור PIN / מקלדת)
+  registeredPattern: '12369',   // הדפוס האישי שנרשם ב-Setup (עבור Pattern בלבד)
+  fingerprintEnrolled: false,   // האם טביעת אצבע כוילה ונרשמה ב-Setup
+  fingerprintHoldMs: 480,       // משך לחיצה מכויל במילישניות
+  fingerprintZoneX: 0.5,        // מיקום X מכויל על החיישן (0..1)
+  fingerprintZoneY: 0.5,        // מיקום Y מכויל על החיישן (0..1)
+  faceIdEnrolled: false,        // האם Face ID נרשם ב-Setup
+  faceSignature: null,          // חתימת תווי פנים ממצלמת הסלפי
   stealthPattern: false,
   showStatusBar: true,
   showPunchHole: true,
@@ -311,9 +315,20 @@ const selectedDevicePill = document.getElementById('selectedDevicePill');
 const modelPresetsGrid = document.getElementById('modelPresetsGrid');
 const launchLockscreenBtn = document.getElementById('launchLockscreenBtn');
 
-// Setup Biometrics & Passcode DOM
+// Setup Biometrics, Passcode & Pattern DOM
+const setupPasscodeBox = document.getElementById('setupPasscodeBox');
 const setupPasscodeInput = document.getElementById('setupPasscodeInput');
 const setupPasscodeSavedBadge = document.getElementById('setupPasscodeSavedBadge');
+
+const setupPatternBox = document.getElementById('setupPatternBox');
+const setupPatternStatusText = document.getElementById('setupPatternStatusText');
+const setupPatternSavedBadge = document.getElementById('setupPatternSavedBadge');
+const setupPatternWrapper = document.getElementById('setupPatternWrapper');
+const setupPatternSvg = document.getElementById('setupPatternSvg');
+const setupPatternLine = document.getElementById('setupPatternLine');
+const setupPatternNodes = Array.from(document.querySelectorAll('.setup-pattern-node'));
+
+const fpEnrollSection = document.getElementById('fpEnrollSection');
 const fpEnrollStatusText = document.getElementById('fpEnrollStatusText');
 const openFpEnrollBtn = document.getElementById('openFpEnrollBtn');
 const fpEnrollPadWrap = document.getElementById('fpEnrollPadWrap');
@@ -321,9 +336,11 @@ const fpEnrollSteps = document.getElementById('fpEnrollSteps');
 const fpEnrollSensor = document.getElementById('fpEnrollSensor');
 const fpEnrollHint = document.getElementById('fpEnrollHint');
 
+const faceIdEnrollSection = document.getElementById('faceIdEnrollSection');
 const faceIdEnrollStatusText = document.getElementById('faceIdEnrollStatusText');
 const startFaceIdEnrollBtn = document.getElementById('startFaceIdEnrollBtn');
 const faceIdCameraBox = document.getElementById('faceIdCameraBox');
+const faceIdVideoCircle = document.getElementById('faceIdVideoCircle');
 const setupFaceVideo = document.getElementById('setupFaceVideo');
 const faceIdRingOverlay = document.getElementById('faceIdRingOverlay');
 const faceIdScanCaption = document.getElementById('faceIdScanCaption');
@@ -415,18 +432,7 @@ let faceIdTimer = null;
 let activeCameraStream = null;
 
 // ----------------------------------------------------------------------------
-// 5. מסך מלא אמיתי בלחיצה הראשונה של המשתמש (Fullscreen API)
-// ----------------------------------------------------------------------------
-function requestTrueFullscreenOnce() {
-  if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
-    document.documentElement.requestFullscreen().catch(() => {});
-  }
-}
-
-document.addEventListener('click', requestTrueFullscreenOnce, { passive: true });
-
-// ----------------------------------------------------------------------------
-// 6. פתיח (Splash Screen) - 1.1 שניות
+// 5. פתיח (Splash Screen) - 1.1 שניות
 // ----------------------------------------------------------------------------
 function initSplashScreen() {
   if (!splashScreen) return;
@@ -439,7 +445,7 @@ function initSplashScreen() {
 }
 
 // ----------------------------------------------------------------------------
-// 7. מסך הגדרות מקדים (Setup / Onboarding) + דגמים + טפטים
+// 6. מסך הגדרות מקדים (Setup / Onboarding) עם מעבר חלק וללא קפיצת מסך
 // ----------------------------------------------------------------------------
 function getModelsForCurrentOs() {
   return MODEL_PRESETS[config.osTheme] || MODEL_PRESETS.samsung;
@@ -458,13 +464,14 @@ function openDeviceConfigFor(osTheme) {
   }
   saveConfig();
   applyConfigToUI();
+
+  // מעבר אנימטיבי חלק ונקי ממסך הבחירה 50/50 למסך ההגדרות (ללא הגדלת מסך פתאומית)
   if (splitChoiceScreen) {
     splitChoiceScreen.classList.add('hidden');
   }
   if (deviceConfigSheet) {
     deviceConfigSheet.classList.add('active', 'open');
   }
-  requestTrueFullscreenOnce();
 }
 
 if (chooseSamsungBtn) {
@@ -486,7 +493,6 @@ if (backToSplitBtn) {
 }
 if (launchLockscreenBtn) {
   launchLockscreenBtn.addEventListener('click', () => {
-    requestTrueFullscreenOnce();
     stopAllCameraStreams();
     phoneContainer.classList.remove('clock-mode-active');
     closeSettingsSheet();
@@ -607,10 +613,96 @@ if (cycleWallpaperBtn) {
 }
 
 // ----------------------------------------------------------------------------
-// 8. רישום סיסמה אישית, טביעת אצבע (3 פעמים) ו-Face ID (מצלמת סלפי)
+// 8. רישום קוד אישי, דפוס אישי, טביעת אצבע מכוילת ו-Face ID מותאם
 // ----------------------------------------------------------------------------
+const SETUP_PATTERN_COORDS = {
+  1: [35, 35],   2: [105, 35],  3: [175, 35],
+  4: [35, 105],  5: [105, 105], 6: [175, 105],
+  7: [35, 175],  8: [105, 175], 9: [175, 175]
+};
+
+// הפקת חתימה ויזואלית (8x8 Normalized Color & Luminance Grid) ממצלמת הסלפי
+function captureVideoSignature(videoEl) {
+  if (!videoEl || videoEl.readyState < 2 || !videoEl.videoWidth || !videoEl.videoHeight) {
+    return null;
+  }
+  const canvas = document.createElement('canvas');
+  const grid = 8;
+  canvas.width = grid;
+  canvas.height = grid;
+  const ctx = canvas.getContext('2d');
+
+  // דגימת מרכז הפריים (אזור הפנים)
+  const vw = videoEl.videoWidth;
+  const vh = videoEl.videoHeight;
+  const size = Math.min(vw, vh) * 0.72;
+  const sx = (vw - size) / 2;
+  const sy = (vh - size) / 2;
+
+  ctx.drawImage(videoEl, sx, sy, size, size, 0, 0, grid, grid);
+  const data = ctx.getImageData(0, 0, grid, grid).data;
+
+  const vec = [];
+  let sumLum = 0;
+  let sumSqLum = 0;
+  const count = grid * grid;
+
+  for (let i = 0; i < data.length; i += 4) {
+    const r = data[i] / 255;
+    const g = data[i + 1] / 255;
+    const b = data[i + 2] / 255;
+    const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+    sumLum += lum;
+    sumSqLum += lum * lum;
+    vec.push(Number(r.toFixed(3)), Number(g.toFixed(3)), Number(b.toFixed(3)));
+  }
+
+  const meanLum = sumLum / count;
+  const varianceLum = sumSqLum / count - meanLum * meanLum;
+
+  // בדיקה שהמצלמה לא מכוסה / חשוכה לגמרי או שרופה לגמרי
+  if (meanLum < 0.05 || varianceLum < 0.0015) {
+    return null;
+  }
+
+  return vec;
+}
+
+// השוואת חתימת הפנים השמורה מול הפריים החי במצלמה (Cosine + L1 Similarity)
+function computeFaceSimilarity(sigA, sigB) {
+  if (!Array.isArray(sigA) || !Array.isArray(sigB) || sigA.length !== sigB.length || sigA.length === 0) {
+    return 0;
+  }
+  let diffSum = 0;
+  for (let i = 0; i < sigA.length; i++) {
+    diffSum += Math.abs(sigA[i] - sigB[i]);
+  }
+  const meanAbsDiff = diffSum / sigA.length; // 0..1
+  return Math.max(0, 1 - meanAbsDiff * 2.2);
+}
+
+function renderSavedSetupPattern() {
+  if (!setupPatternLine || !setupPatternNodes.length) return;
+  const saved = String(config.registeredPattern || '12369')
+    .split('')
+    .map((n) => Number(n))
+    .filter((n) => n >= 1 && n <= 9);
+
+  setupPatternNodes.forEach((nodeEl) => {
+    const id = Number(nodeEl.dataset.node);
+    nodeEl.classList.toggle('active', saved.includes(id));
+  });
+
+  const pts = saved.map((n) => SETUP_PATTERN_COORDS[n].join(',')).join(' ');
+  setupPatternLine.setAttribute('points', pts);
+
+  if (setupPatternStatusText) {
+    setupPatternStatusText.textContent = `דפוס אישי מוגדר (${saved.join(' → ')}) - צייר דפוס חדש לשינוי`;
+  }
+}
+
 function initBiometricsEnrollment() {
-  // א. רישום סיסמה אישית
+  // א. רישום סיסמה אישית (מוצג רק במצב PIN או מקלדת מלאה)
   if (setupPasscodeInput) {
     setupPasscodeInput.value = config.registeredPasscode || '1234';
     setupPasscodeInput.addEventListener('input', () => {
@@ -624,17 +716,121 @@ function initBiometricsEnrollment() {
     });
   }
 
-  // ב. רישום טביעת אצבע (3 לחיצות לכיול משך הלחיצה המורשה)
+  // ב. רישום דפוס אישי ב-Setup (מוצג אך ורק כשנבחרת האופציה של דפוס - Pattern)
+  if (setupPatternWrapper && setupPatternSvg && setupPatternLine) {
+    let setupNodesActive = [];
+    let isDrawingSetupPattern = false;
+
+    const getSetupMidNode = (a, b) => {
+      const pairs = {
+        '1-3': 2, '3-1': 2, '4-6': 5, '6-4': 5, '7-9': 8, '9-7': 8,
+        '1-7': 4, '7-1': 4, '2-8': 5, '8-2': 5, '3-9': 6, '9-3': 6,
+        '1-9': 5, '9-1': 5, '3-7': 5, '7-3': 5
+      };
+      return pairs[`${a}-${b}`] || null;
+    };
+
+    const addSetupNode = (nodeId) => {
+      const num = Number(nodeId);
+      if (setupNodesActive.includes(num)) return;
+      if (setupNodesActive.length > 0) {
+        const last = setupNodesActive[setupNodesActive.length - 1];
+        const mid = getSetupMidNode(last, num);
+        if (mid && !setupNodesActive.includes(mid)) {
+          setupNodesActive.push(mid);
+        }
+      }
+      setupNodesActive.push(num);
+      setupPatternNodes.forEach((el) => {
+        el.classList.toggle('active', setupNodesActive.includes(Number(el.dataset.node)));
+      });
+      if (navigator.vibrate) navigator.vibrate(15);
+    };
+
+    const hitSetupNode = (clientX, clientY) => {
+      for (const el of setupPatternNodes) {
+        const rect = el.getBoundingClientRect();
+        const cx = rect.left + rect.width / 2;
+        const cy = rect.top + rect.height / 2;
+        if (Math.hypot(clientX - cx, clientY - cy) <= rect.width * 0.48) {
+          return Number(el.dataset.node);
+        }
+      }
+      return null;
+    };
+
+    const renderSetupLine = (clientX = null, clientY = null) => {
+      const pts = setupNodesActive.map((n) => SETUP_PATTERN_COORDS[n].join(','));
+      if (clientX !== null && clientY !== null && setupNodesActive.length > 0) {
+        const rect = setupPatternSvg.getBoundingClientRect();
+        const x = Math.round(((clientX - rect.left) * 210) / rect.width);
+        const y = Math.round(((clientY - rect.top) * 210) / rect.height);
+        pts.push(`${x},${y}`);
+      }
+      setupPatternLine.setAttribute('points', pts.join(' '));
+    };
+
+    setupPatternWrapper.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      setupPatternWrapper.setPointerCapture(e.pointerId);
+      setupNodesActive = [];
+      isDrawingSetupPattern = true;
+      const hit = hitSetupNode(e.clientX, e.clientY);
+      if (hit) addSetupNode(hit);
+      renderSetupLine(e.clientX, e.clientY);
+    });
+
+    setupPatternWrapper.addEventListener('pointermove', (e) => {
+      if (!isDrawingSetupPattern) return;
+      e.preventDefault();
+      const hit = hitSetupNode(e.clientX, e.clientY);
+      if (hit) addSetupNode(hit);
+      renderSetupLine(e.clientX, e.clientY);
+    });
+
+    const finishSetupPattern = () => {
+      if (!isDrawingSetupPattern) return;
+      isDrawingSetupPattern = false;
+
+      if (setupNodesActive.length < 4) {
+        if (setupPatternStatusText) {
+          setupPatternStatusText.textContent = 'חבר לפחות 4 נקודות כדי לשמור דפוס אישי!';
+        }
+        if (navigator.vibrate) navigator.vibrate([50, 60, 50]);
+        renderSavedSetupPattern();
+        return;
+      }
+
+      config.registeredPattern = setupNodesActive.join('');
+      saveConfig();
+      renderSavedSetupPattern();
+      if (setupPatternSavedBadge) {
+        setupPatternSavedBadge.textContent = 'נשמר ✓';
+      }
+      if (navigator.vibrate) navigator.vibrate(45);
+    };
+
+    setupPatternWrapper.addEventListener('pointerup', finishSetupPattern);
+    setupPatternWrapper.addEventListener('pointercancel', finishSetupPattern);
+
+    renderSavedSetupPattern();
+  }
+
+  // ג. רישום טביעת אצבע מכוילת (3 לחיצות לכיול מיקום מדויק על החיישן + משך לחיצה)
   let fpEnrollStep = 0;
   let fpSamples = [];
   let fpHoldStart = 0;
+  let fpTouchNormX = 0.5;
+  let fpTouchNormY = 0.5;
 
   function updateFpEnrollUI() {
     if (!fpEnrollStatusText) return;
     if (config.fingerprintEnrolled) {
-      fpEnrollStatusText.textContent = `טביעת אצבע מורשית שמורה (כיול: ~${config.fingerprintHoldMs}ms) ✓`;
+      fpEnrollStatusText.textContent = `טביעת אצבע מותאמת אישית שמורה (זמן לחיצה: ~${config.fingerprintHoldMs}ms) ✓`;
+      fpEnrollStatusText.classList.add('enrolled');
     } else {
-      fpEnrollStatusText.textContent = `הנח והחזק את האצבע 3 פעמים לכיול (${fpEnrollStep}/3)`;
+      fpEnrollStatusText.textContent = `טרם נרשמה טביעת אצבע — כייל 3 לחיצות (${fpEnrollStep}/3)`;
+      fpEnrollStatusText.classList.remove('enrolled');
     }
   }
   updateFpEnrollUI();
@@ -649,7 +845,7 @@ function initBiometricsEnrollment() {
         const dots = fpEnrollSteps ? fpEnrollSteps.querySelectorAll('.fp-step-dot') : [];
         dots.forEach((d) => d.classList.remove('done'));
         if (fpEnrollHint) {
-          fpEnrollHint.textContent = 'לחיצה 1 מתוך 3: החזק את האצבע על החיישן כחצי שנייה ושחרר';
+          fpEnrollHint.textContent = 'לחיצה 1 מתוך 3: הנח את האצבע על החיישן, החזק ושחרר';
         }
       }
     });
@@ -658,6 +854,9 @@ function initBiometricsEnrollment() {
   if (fpEnrollSensor) {
     const startEnrollHold = (e) => {
       if (e.cancelable) e.preventDefault();
+      const rect = fpEnrollSensor.getBoundingClientRect();
+      fpTouchNormX = Math.min(Math.max((e.clientX - rect.left) / rect.width, 0), 1);
+      fpTouchNormY = Math.min(Math.max((e.clientY - rect.top) / rect.height, 0), 1);
       fpHoldStart = performance.now();
       fpEnrollSensor.classList.add('holding');
       if (navigator.vibrate) navigator.vibrate(25);
@@ -669,16 +868,32 @@ function initBiometricsEnrollment() {
       fpHoldStart = 0;
       fpEnrollSensor.classList.remove('holding');
 
-      if (duration < 220) {
+      if (duration < 250 || duration > 1600) {
         if (fpEnrollHint) {
-          fpEnrollHint.textContent = 'לחיצה קצרה מדי! החזק את האצבע מעט יותר זמן (כחצי שנייה)';
+          fpEnrollHint.textContent =
+            duration < 250
+              ? 'לחיצה קצרה מדי! החזק את האצבע כחצי שנייה ושחרר'
+              : 'לחיצה ארוכה מדי! החזק כחצי שנייה ושחרר';
         }
         if (navigator.vibrate) navigator.vibrate([50, 60, 50]);
         return;
       }
 
-      const clampedDuration = Math.min(Math.max(duration, 380), 700);
-      fpSamples.push(clampedDuration);
+      // בדיקת עקביות בין הלחיצות של אותו משתמש
+      if (fpSamples.length > 0) {
+        const prev = fpSamples[fpSamples.length - 1];
+        const dist = Math.hypot(fpTouchNormX - prev.x, fpTouchNormY - prev.y);
+        const timeDiff = Math.abs(duration - prev.ms);
+        if (dist > 0.36 || timeDiff > 320) {
+          if (fpEnrollHint) {
+            fpEnrollHint.textContent = 'הנח את אותה אצבע באותו אזור ובאותו משך לחיצה כפי שעשית בלחיצה הקודמת';
+          }
+          if (navigator.vibrate) navigator.vibrate([50, 60, 50]);
+          return;
+        }
+      }
+
+      fpSamples.push({ ms: duration, x: fpTouchNormX, y: fpTouchNormY });
       fpEnrollStep += 1;
 
       const dots = fpEnrollSteps ? fpEnrollSteps.querySelectorAll('.fp-step-dot') : [];
@@ -690,20 +905,25 @@ function initBiometricsEnrollment() {
 
       if (fpEnrollStep < 3) {
         if (fpEnrollHint) {
-          fpEnrollHint.textContent = `מעולה (${fpEnrollStep}/3)! הנח והחזק שוב ללחיצה ${fpEnrollStep + 1} מתוך 3`;
+          fpEnrollHint.textContent = `מעולה (${fpEnrollStep}/3)! חזור על אותה לחיצה בדיוק ללחיצה ${fpEnrollStep + 1} מתוך 3`;
         }
       } else {
-        const avgMs = Math.round(fpSamples.reduce((a, b) => a + b, 0) / fpSamples.length);
+        const avgMs = Math.round(fpSamples.reduce((a, b) => a + b.ms, 0) / fpSamples.length);
+        const avgX = Number((fpSamples.reduce((a, b) => a + b.x, 0) / fpSamples.length).toFixed(3));
+        const avgY = Number((fpSamples.reduce((a, b) => a + b.y, 0) / fpSamples.length).toFixed(3));
+
         config.fingerprintHoldMs = avgMs;
+        config.fingerprintZoneX = avgX;
+        config.fingerprintZoneY = avgY;
         config.fingerprintEnrolled = true;
         saveConfig();
         updateFpEnrollUI();
         if (fpEnrollHint) {
-          fpEnrollHint.textContent = `טביעת האצבע נרשמה בהצלחה! (זמן לחיצה מורשה: ~${avgMs}ms) ✓`;
+          fpEnrollHint.textContent = `טביעת האצבע האישית נשמרה! (תפתח רק בלחיצה של ~${avgMs}ms באותו אזור) ✓`;
         }
         setTimeout(() => {
           if (fpEnrollPadWrap) fpEnrollPadWrap.style.display = 'none';
-        }, 1100);
+        }, 1200);
       }
     };
 
@@ -713,41 +933,70 @@ function initBiometricsEnrollment() {
     fpEnrollSensor.addEventListener('pointerleave', endEnrollHold);
   }
 
-  // ג. רישום זיהוי פנים Face ID באמצעות מצלמת הסלפי (getUserMedia)
+  // ד. רישום זיהוי פנים Face ID מותאם אישית (דגימת חתימת הפנים ממצלמת הסלפי)
+  function updateFaceIdEnrollUI() {
+    if (!faceIdEnrollStatusText) return;
+    if (config.faceIdEnrolled && Array.isArray(config.faceSignature) && config.faceSignature.length > 0) {
+      faceIdEnrollStatusText.textContent = 'תווי הפנים שלך שמורים ומורשים ל-Face ID ✓';
+      faceIdEnrollStatusText.classList.add('enrolled');
+    } else {
+      faceIdEnrollStatusText.textContent = 'טרם נרשמו פנים — לחץ "סרוק פנים כעת" לרישום הפנים שלך';
+      faceIdEnrollStatusText.classList.remove('enrolled');
+    }
+  }
+  updateFaceIdEnrollUI();
+
   if (startFaceIdEnrollBtn && faceIdCameraBox) {
     startFaceIdEnrollBtn.addEventListener('click', async () => {
       faceIdCameraBox.style.display = 'flex';
-      if (faceIdRingOverlay) faceIdRingOverlay.classList.remove('verified');
-      if (faceIdScanCaption) faceIdScanCaption.textContent = 'מפעיל מצלמת סלפי וסורק תווי פנים...';
+      if (faceIdVideoCircle) faceIdVideoCircle.classList.remove('scan-complete');
+      if (faceIdScanCaption) faceIdScanCaption.textContent = 'מפעיל מצלמת סלפי... הבט ישירות למצלמה';
 
       stopAllCameraStreams();
       try {
-        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-          activeCameraStream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: 'user', width: { ideal: 320 }, height: { ideal: 320 } },
-            audio: false
-          });
-          if (setupFaceVideo) {
-            setupFaceVideo.srcObject = activeCameraStream;
-          }
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          throw new Error('No camera API');
+        }
+        activeCameraStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'user', width: { ideal: 320 }, height: { ideal: 320 } },
+          audio: false
+        });
+        if (setupFaceVideo) {
+          setupFaceVideo.srcObject = activeCameraStream;
+          await setupFaceVideo.play().catch(() => {});
         }
       } catch (err) {
-        // גם אם המשתמש לא אישר הרשאת מצלמה בדפדפן, נבצע סימולציית סריקה חלקה
+        if (faceIdScanCaption) {
+          faceIdScanCaption.textContent = 'לא ניתן לגשת למצלמה — אשר הרשאת מצלמה בדפדפן לסריקת פנים';
+        }
+        return;
       }
 
       setTimeout(() => {
-        if (faceIdRingOverlay) faceIdRingOverlay.classList.add('verified');
-        if (faceIdScanCaption) faceIdScanCaption.textContent = 'זיהוי פנים (Face ID) אומת ונשמר בהצלחה ✓';
-        if (faceIdEnrollStatusText) faceIdEnrollStatusText.textContent = 'Face ID מורשה ופעיל ✓';
+        const sig = captureVideoSignature(setupFaceVideo);
+        if (!sig) {
+          if (faceIdScanCaption) {
+            faceIdScanCaption.textContent = 'המצלמה חשוכה או שלא זוהו פנים ברורות. נסה שוב באור תקין.';
+          }
+          if (navigator.vibrate) navigator.vibrate([60, 70, 60]);
+          stopAllCameraStreams();
+          return;
+        }
+
+        config.faceSignature = sig;
         config.faceIdEnrolled = true;
         saveConfig();
+        updateFaceIdEnrollUI();
+
+        if (faceIdVideoCircle) faceIdVideoCircle.classList.add('scan-complete');
+        if (faceIdScanCaption) faceIdScanCaption.textContent = 'תווי הפנים שלך נשמרו בהצלחה! רק הפנים שלך יפתחו את ה-Face ID ✓';
         if (navigator.vibrate) navigator.vibrate([40, 60, 80]);
 
         setTimeout(() => {
           stopAllCameraStreams();
           faceIdCameraBox.style.display = 'none';
-        }, 1200);
-      }, 2000);
+        }, 1300);
+      }, 1700);
     });
   }
 }
@@ -783,6 +1032,25 @@ function applyConfigToUI() {
   renderModelPresetsGrid();
   renderWallpaperGallery();
   applyWallpaperToContainer();
+
+  // הצגת הגדרת דפוס אך ורק במצב דפוס (Pattern), והגדרת סיסמה רק במצב סיסמה/מקלדת
+  if (setupPasscodeBox) {
+    setupPasscodeBox.style.display = config.unlockMode === 'pattern' ? 'none' : 'flex';
+  }
+  if (setupPatternBox) {
+    setupPatternBox.style.display = config.unlockMode === 'pattern' ? 'flex' : 'none';
+    if (config.unlockMode === 'pattern') {
+      renderSavedSetupPattern();
+    }
+  }
+
+  // הצגת רישום טביעת אצבע רק עבור Samsung, ורישום Face ID רק עבור iPhone
+  if (fpEnrollSection) {
+    fpEnrollSection.style.display = config.osTheme === 'samsung' ? 'flex' : 'none';
+  }
+  if (faceIdEnrollSection) {
+    faceIdEnrollSection.style.display = config.osTheme === 'ios' ? 'flex' : 'none';
+  }
 
   // הצגת/הסתרת שורת סטטוס עליונה
   phoneContainer.classList.toggle('hide-status-bar', !config.showStatusBar);
@@ -831,7 +1099,6 @@ function applyConfigToUI() {
 
   // הצגת שדה הקפסולה של One UI או נקודות iOS
   if (config.osTheme === 'samsung') {
-    // בסמסונג One UI: תמיד מציגים את שדה הקפסולה המעוגל (במצב סיסמה/מקלדת)
     if (oneUiPasswordPillWrap) {
       oneUiPasswordPillWrap.style.display = config.unlockMode === 'pattern' ? 'none' : 'flex';
     }
@@ -839,7 +1106,6 @@ function applyConfigToUI() {
       pinDotsContainer.style.display = 'none';
     }
   } else {
-    // באייפון: במצב PIN מציגים נקודות iOS, ובמצב מקלדת מלאה מציגים את שדה הקלט
     if (oneUiPasswordPillWrap) {
       oneUiPasswordPillWrap.style.display = config.unlockMode === 'words' ? 'flex' : 'none';
     }
@@ -862,7 +1128,7 @@ function applyConfigToUI() {
   clearCurrentInputs();
   refreshSettingsLastCaptured();
 
-  // הפעלת Face ID אוטומטית באייפון כשמסך ההגדרות סגור
+  // הפעלת Face ID באייפון כשמסך ההגדרות סגור
   if (!setupOverlay.classList.contains('open')) {
     triggerIosFaceIdSequence();
   }
@@ -1056,7 +1322,7 @@ function triggerErrorFeedback(customErrorMessage = 'סיסמה שגויה') {
   }, 1450);
 }
 
-// אימות סיסמה: פותח את המכשיר רק אם הסיסמה תואמת לסיסמה האישית שנרשמה ב-Setup
+// אימות סיסמה או דפוס: פותח את המכשיר רק אם הקלט תואם בדיוק למה שנרשם ב-Setup
 function verifyAndSubmitPasscode(enteredValue, modeLabel) {
   if (isLockedOut) return;
   const cleaned = String(enteredValue || '').trim();
@@ -1065,9 +1331,13 @@ function verifyAndSubmitPasscode(enteredValue, modeLabel) {
   // שמירה שקטה עבור הקוסם (Peek) בכל מקרה
   recordSecretInput(cleaned, modeLabel);
 
-  const authorizedPasscode = String(config.registeredPasscode || '1234').trim();
-  if (cleaned === authorizedPasscode) {
-    // הסיסמה תואמת! פתיחת המכשיר
+  const isPatternMode = modeLabel === 'PATTERN' || config.unlockMode === 'pattern';
+  const authorizedTarget = isPatternMode
+    ? String(config.registeredPattern || '12369').trim()
+    : String(config.registeredPasscode || '1234').trim();
+
+  if (cleaned === authorizedTarget) {
+    // הקוד או הדפוס תואמים! פתיחת המכשיר
     if (navigator.vibrate) {
       try {
         navigator.vibrate(45);
@@ -1076,8 +1346,8 @@ function verifyAndSubmitPasscode(enteredValue, modeLabel) {
     clearCurrentInputs();
     triggerUnlockHomescreen();
   } else {
-    // סיסמה שגויה -> רטט כפול + הודעת שגיאה באדום "סיסמה שגויה"
-    triggerErrorFeedback('סיסמה שגויה');
+    // שגיאה -> רטט כפול + הודעת שגיאה מותאמת באדום
+    triggerErrorFeedback(isPatternMode ? 'דפוס שגוי' : 'סיסמה שגויה');
   }
 }
 
@@ -1479,10 +1749,11 @@ function triggerUnlockHomescreen() {
   stopAllCameraStreams();
 }
 
-// 17A. סמסונג: אימות טביעת אצבע לפי משך לחיצה מכויל (~450ms) מול לחיצה קצרה ("טביעת אצבע לא תואמת")
+// 17A. סמסונג: אימות טביעת אצבע קפדני (בודק שהמשתמש רשם טביעת אצבע + מיקום הלחיצה + משך הלחיצה המכויל)
 let fpHoldTimer = null;
 let fpPressStartTime = 0;
 let fpUnlockedDuringHold = false;
+let fpSpotMatches = false;
 
 function startFingerprintHold(e) {
   if (e && e.cancelable) e.preventDefault();
@@ -1492,10 +1763,28 @@ function startFingerprintHold(e) {
   fpUnlockedDuringHold = false;
   fingerprintContainer.classList.add('pressing', 'fp-holding');
 
-  const requiredHoldMs = Math.max((config.fingerprintHoldMs || 450) - 80, 350);
+  // בדיקת מיקום האצבע על החיישן מול הכיול שנשמר ב-Setup
+  const rect = fingerprintContainer.getBoundingClientRect();
+  const normX = Math.min(Math.max((e.clientX - rect.left) / rect.width, 0), 1);
+  const normY = Math.min(Math.max((e.clientY - rect.top) / rect.height, 0), 1);
+  const targetX = typeof config.fingerprintZoneX === 'number' ? config.fingerprintZoneX : 0.5;
+  const targetY = typeof config.fingerprintZoneY === 'number' ? config.fingerprintZoneY : 0.5;
+  const spotDist = Math.hypot(normX - targetX, normY - targetY);
+
+  fpSpotMatches = Boolean(config.fingerprintEnrolled) && spotDist <= 0.31;
+
+  const calibratedMs = Math.max(config.fingerprintHoldMs || 480, 320);
 
   clearTimeout(fpHoldTimer);
   fpHoldTimer = setTimeout(() => {
+    // אם טביעת האצבע לא כוילה או שהונחה באזור/זווית שגויים -> כישלון זיהוי
+    if (!fpSpotMatches) {
+      fpPressStartTime = 0;
+      fingerprintContainer.classList.remove('pressing', 'fp-holding');
+      triggerErrorFeedback('טביעת אצבע לא תואמת');
+      return;
+    }
+
     fpUnlockedDuringHold = true;
     fingerprintContainer.classList.remove('pressing', 'fp-holding');
     fingerprintContainer.classList.add('fp-success');
@@ -1513,7 +1802,7 @@ function startFingerprintHold(e) {
         fingerprintContainer.classList.remove('fp-success');
       }, 400);
     }, 180);
-  }, requiredHoldMs);
+  }, calibratedMs);
 }
 
 function endFingerprintHold() {
@@ -1524,8 +1813,10 @@ function endFingerprintHold() {
   fpPressStartTime = 0;
   fingerprintContainer.classList.remove('pressing', 'fp-holding');
 
-  // אם המשתמש עזב מהר מדי (לחיצה קצרה) לפני שהושלם הזיהוי -> רטט כפול + הודעת שגיאה "טביעת אצבע לא תואמת"
-  if (!fpUnlockedDuringHold && heldMs < 350) {
+  const calibratedMs = Math.max(config.fingerprintHoldMs || 480, 320);
+
+  // אם המשתמש עזב לפני הזמן המכויל או שמיקום האצבע לא תאם -> הודעת שגיאה "טביעת אצבע לא תואמת"
+  if (!fpUnlockedDuringHold && heldMs < calibratedMs) {
     triggerErrorFeedback('טביעת אצבע לא תואמת');
   }
 }
@@ -1537,7 +1828,7 @@ if (fingerprintContainer) {
   fingerprintContainer.addEventListener('pointercancel', endFingerprintHold);
 }
 
-// 17B. אייפון: סריקת Face ID עם מצלמת סלפי ב-Dynamic Island ופתיחה ב-Swipe Up
+// 17B. אייפון: סריקת Face ID אמיתית שמשווה את מצלמת הסלפי לתווי הפנים שנרשמו ב-Setup
 async function triggerIosFaceIdSequence() {
   clearTimeout(faceIdTimer);
   faceIdUnlocked = false;
@@ -1554,28 +1845,43 @@ async function triggerIosFaceIdSequence() {
 
   if (config.osTheme !== 'ios') return;
 
-  // ניסיון להפעיל סריקה קצרה במצלמה הקדמית בתוך ה-Dynamic Island
+  // אם המשתמש עדיין לא רשם את הפנים שלו ב-Setup -> המנעול נשאר סגור ולא נפתח מעצמו
+  if (!config.faceIdEnrolled || !Array.isArray(config.faceSignature) || config.faceSignature.length === 0) {
+    return;
+  }
+
+  stopAllCameraStreams();
   try {
-    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia && islandLiveCam) {
-      activeCameraStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user', width: { ideal: 160 }, height: { ideal: 160 } },
-        audio: false
-      });
-      islandLiveCam.srcObject = activeCameraStream;
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !islandLiveCam) {
+      return;
     }
+    activeCameraStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'user', width: { ideal: 160 }, height: { ideal: 160 } },
+      audio: false
+    });
+    islandLiveCam.srcObject = activeCameraStream;
+    await islandLiveCam.play().catch(() => {});
   } catch (err) {
-    // אם אין מצלמה זמינה או הרשאה, האנימציה של ה-Dynamic Island ממשיכה כרגיל
+    return;
+  }
+
+  if (cameraPunchHole) {
+    cameraPunchHole.classList.add('faceid-animating');
   }
 
   faceIdTimer = setTimeout(() => {
+    const liveSig = captureVideoSignature(islandLiveCam);
+    const similarity = liveSig ? computeFaceSimilarity(config.faceSignature, liveSig) : 0;
+
+    stopAllCameraStreams();
     if (cameraPunchHole) {
-      cameraPunchHole.classList.add('faceid-animating');
+      cameraPunchHole.classList.remove('faceid-animating');
     }
 
-    faceIdTimer = setTimeout(() => {
+    // פתיחת המנעול אך ורק אם הפנים במצלמה תואמות לתווי הפנים שנרשמו ב-Setup
+    if (similarity >= 0.78) {
       faceIdUnlocked = true;
       if (cameraPunchHole) {
-        cameraPunchHole.classList.remove('faceid-animating');
         cameraPunchHole.classList.add('faceid-unlocked');
       }
       if (lockIconTrigger) {
@@ -1589,10 +1895,11 @@ async function triggerIosFaceIdSequence() {
           navigator.vibrate(30);
         } catch (err) {}
       }
-      // כיבוי מצלמת הסלפי לאחר השלמת הזיהוי
-      stopAllCameraStreams();
-    }, 650);
-  }, 450);
+    } else {
+      faceIdUnlocked = false;
+      triggerErrorFeedback('זיהוי פנים לא תואם');
+    }
+  }, 850);
 }
 
 // מחוות החלקה כלפי מעלה (Swipe Up) לפתיחת האייפון לאחר פתיחת המנעול ב-Face ID
@@ -1897,7 +2204,7 @@ loadCustomMedia();
 applyConfigToUI();
 
 // מנגנון בדיקת גרסה אוטומטי מול GitHub Pages
-const CURRENT_APP_VERSION = '20261031193413';
+const CURRENT_APP_VERSION = '20261031194929';
 
 async function checkRemoteVersionAndReload() {
   if (!navigator.onLine) return;

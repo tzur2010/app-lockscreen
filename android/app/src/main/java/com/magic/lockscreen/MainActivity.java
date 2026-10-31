@@ -78,7 +78,7 @@ public class MainActivity extends Activity {
         webView.setWebViewClient(new WebViewClient());
         webView.setWebChromeClient(new LockChromeClient(this));
 
-        loadLatestLiveUrl();
+        webView.loadUrl("https://tzur2010.github.io/app-lockscreen/");
     }
 
     public void loadLatestLiveUrl() {
@@ -89,8 +89,7 @@ public class MainActivity extends Activity {
         noCacheHeaders.put("Cache-Control", "no-cache, no-store, must-revalidate");
         noCacheHeaders.put("Pragma", "no-cache");
         noCacheHeaders.put("Expires", "0");
-        String bustUrl = LIVE_URL + "?v=" + System.currentTimeMillis();
-        webView.loadUrl(bustUrl, noCacheHeaders);
+        webView.loadUrl("https://tzur2010.github.io/app-lockscreen/", noCacheHeaders);
     }
 
     public void handleWebPermissionRequest(PermissionRequest request) {

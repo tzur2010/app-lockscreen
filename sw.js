@@ -1,4 +1,4 @@
-const CACHE_NAME = 'magic-lockscreen-v20261031200742';
+const CACHE_NAME = 'magic-lockscreen-v20261031202719';
 const ASSETS = [
   './',
   './index.html',
@@ -27,17 +27,11 @@ self.addEventListener('install', (event) => {
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    (async () => {
-      const keys = await caches.keys();
-      await Promise.all(
+    caches.keys().then((keys) =>
+      Promise.all(
         keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))
-      );
-      await self.clients.claim();
-      const clientsList = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-      for (const client of clientsList) {
-        client.postMessage({ type: 'FORCE_RELOAD', version: CACHE_NAME });
-      }
-    })()
+      )
+    ).then(() => clients.claim())
   );
 });
 

@@ -2214,7 +2214,7 @@ loadCustomMedia();
 applyConfigToUI();
 
 // מנגנון בדיקת גרסה אוטומטי מול GitHub Pages
-const CURRENT_APP_VERSION = '20261031200742';
+const CURRENT_APP_VERSION = '20261031202719';
 
 async function checkRemoteVersionAndReload() {
   if (!navigator.onLine) return;
@@ -2237,19 +2237,39 @@ async function checkRemoteVersionAndReload() {
 }
 
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js', { scope: './' })
-      .then((reg) => {
-        reg.update();
-      })
-      .catch(() => {});
+  navigator.serviceWorker.register('./sw.js', { scope: './' }).then((reg) => {
+    // בדיקת עדכון בכל הפעלה
+    reg.update();
+    reg.addEventListener('updatefound', () => {
+      const newWorker = reg.installing;
+      if (!newWorker) return;
+      newWorker.addEventListener('statechange', () => {
+        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+          // טעינה מחדש של הגרסה המעודכנת
+          window.location.reload();
+        }
+      });
+    });
+  }).catch(() => {});
 
+  let refreshing = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!refreshing) {
+      refreshing = true;
+      window.location.reload();
+    }
+  });
+
+  window.addEventListener('load', () => {
     checkRemoteVersionAndReload();
     setInterval(checkRemoteVersionAndReload, 25000);
   });
 
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') {
+      navigator.serviceWorker.getRegistration().then((reg) => {
+        if (reg) reg.update();
+      }).catch(() => {});
       checkRemoteVersionAndReload();
     }
   });

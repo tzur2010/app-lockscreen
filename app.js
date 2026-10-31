@@ -1890,7 +1890,7 @@ loadCustomMedia();
 applyConfigToUI();
 
 // מנגנון בדיקת גרסה אוטומטי מול GitHub Pages
-const CURRENT_APP_VERSION = '20261031191000';
+const CURRENT_APP_VERSION = '20261031192428';
 
 async function checkRemoteVersionAndReload() {
   if (!navigator.onLine) return;
@@ -1914,8 +1914,7 @@ async function checkRemoteVersionAndReload() {
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker
-      .register(`./sw.js?v=${CURRENT_APP_VERSION}`, { updateViaCache: 'none' })
+    navigator.serviceWorker.register('./sw.js', { scope: './' })
       .then((reg) => {
         reg.update();
       })

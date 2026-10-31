@@ -423,7 +423,6 @@ function requestTrueFullscreenOnce() {
   }
 }
 
-document.addEventListener('pointerdown', requestTrueFullscreenOnce, { passive: true });
 document.addEventListener('click', requestTrueFullscreenOnce, { passive: true });
 
 // ----------------------------------------------------------------------------
@@ -459,9 +458,13 @@ function openDeviceConfigFor(osTheme) {
   }
   saveConfig();
   applyConfigToUI();
-  if (deviceConfigSheet) {
-    deviceConfigSheet.classList.add('open');
+  if (splitChoiceScreen) {
+    splitChoiceScreen.classList.add('hidden');
   }
+  if (deviceConfigSheet) {
+    deviceConfigSheet.classList.add('active', 'open');
+  }
+  requestTrueFullscreenOnce();
 }
 
 if (chooseSamsungBtn) {
@@ -473,7 +476,12 @@ if (chooseIosBtn) {
 if (backToSplitBtn) {
   backToSplitBtn.addEventListener('click', () => {
     stopAllCameraStreams();
-    if (deviceConfigSheet) deviceConfigSheet.classList.remove('open');
+    if (deviceConfigSheet) {
+      deviceConfigSheet.classList.remove('active', 'open');
+    }
+    if (splitChoiceScreen) {
+      splitChoiceScreen.classList.remove('hidden');
+    }
   });
 }
 if (launchLockscreenBtn) {
@@ -493,7 +501,7 @@ function renderModelPresetsGrid() {
   models.forEach((model) => {
     const btn = document.createElement('button');
     btn.type = 'button';
-    btn.className = 'model-preset-btn' + (model.id === config.deviceModel ? ' active' : '');
+    btn.className = 'model-preset-chip model-preset-btn' + (model.id === config.deviceModel ? ' active' : '');
     btn.innerHTML = `
       <span class="model-preset-name">${model.name}</span>
       <span class="model-preset-sub">${model.year}</span>
@@ -535,11 +543,9 @@ function renderWallpaperGallery() {
   catalog.forEach((item) => {
     const card = document.createElement('button');
     card.type = 'button';
-    card.className = 'wallpaper-thumb-card' + (selectedId === item.id ? ' active' : '');
-    card.innerHTML = `
-      <div class="wallpaper-thumb-preview" style="background-image: url('${item.dataUrl}')"></div>
-      <span class="wallpaper-thumb-label">${item.label}</span>
-    `;
+    card.className = 'wp-thumb-card' + (selectedId === item.id ? ' active' : '');
+    card.style.backgroundImage = `url("${item.dataUrl}")`;
+    card.innerHTML = `<span class="wp-thumb-label">${item.label}</span>`;
     card.addEventListener('click', () => {
       localStorage.setItem(SELECTED_WALLPAPER_ID_KEY, item.id);
       applyWallpaperToContainer();
@@ -551,11 +557,9 @@ function renderWallpaperGallery() {
   if (customDataUrl) {
     const customCard = document.createElement('button');
     customCard.type = 'button';
-    customCard.className = 'wallpaper-thumb-card' + (selectedId === 'custom' ? ' active' : '');
-    customCard.innerHTML = `
-      <div class="wallpaper-thumb-preview" style="background-image: url('${customDataUrl}')"></div>
-      <span class="wallpaper-thumb-label">טפט אישי</span>
-    `;
+    customCard.className = 'wp-thumb-card' + (selectedId === 'custom' ? ' active' : '');
+    customCard.style.backgroundImage = `url("${customDataUrl}")`;
+    customCard.innerHTML = `<span class="wp-thumb-label">טפט אישי</span>`;
     customCard.addEventListener('click', () => {
       localStorage.setItem(SELECTED_WALLPAPER_ID_KEY, 'custom');
       applyWallpaperToContainer();
@@ -1025,17 +1029,17 @@ function triggerErrorFeedback(customErrorMessage = 'סיסמה שגויה') {
   }, 150);
 
   if (wordGlassField && oneUiPasswordPillWrap.style.display !== 'none') {
-    wordGlassField.classList.add('error-shake');
-    setTimeout(() => wordGlassField.classList.remove('error-shake'), 420);
+    wordGlassField.classList.add('text-shake');
+    setTimeout(() => wordGlassField.classList.remove('text-shake'), 420);
   }
 
   if (config.unlockMode === 'pin' && config.osTheme === 'ios') {
-    pinDotsContainer.classList.add('error-shake');
-    setTimeout(() => pinDotsContainer.classList.remove('error-shake'), 420);
+    pinDotsContainer.classList.add('ios-dots-shake');
+    setTimeout(() => pinDotsContainer.classList.remove('ios-dots-shake'), 420);
   }
 
   if (config.unlockMode === 'pattern') {
-    patternWrapper.classList.add('error-state');
+    patternWrapper.classList.add('pattern-error');
   }
 
   setTimeout(() => {
@@ -1085,7 +1089,7 @@ function clearCurrentInputs() {
 
   activePatternNodes = [];
   isDrawingPattern = false;
-  if (patternWrapper) patternWrapper.classList.remove('error-state');
+  if (patternWrapper) patternWrapper.classList.remove('pattern-error');
   patternNodes.forEach((n) => n.classList.remove('active'));
   if (patternLine) patternLine.setAttribute('points', '');
 }
@@ -1102,7 +1106,7 @@ function renderIosPinDots(currentVal) {
     const totalFixed = 4;
     for (let i = 0; i < totalFixed; i++) {
       const dot = document.createElement('div');
-      dot.className = 'dot' + (i < len ? ' filled' : '');
+      dot.className = 'ios-dot' + (i < len ? ' filled' : '');
       pinDotsContainer.appendChild(dot);
     }
   }
@@ -1486,14 +1490,14 @@ function startFingerprintHold(e) {
 
   fpPressStartTime = performance.now();
   fpUnlockedDuringHold = false;
-  fingerprintContainer.classList.add('fp-holding');
+  fingerprintContainer.classList.add('pressing', 'fp-holding');
 
   const requiredHoldMs = Math.max((config.fingerprintHoldMs || 450) - 80, 350);
 
   clearTimeout(fpHoldTimer);
   fpHoldTimer = setTimeout(() => {
     fpUnlockedDuringHold = true;
-    fingerprintContainer.classList.remove('fp-holding');
+    fingerprintContainer.classList.remove('pressing', 'fp-holding');
     fingerprintContainer.classList.add('fp-success');
 
     // רטט אישור של 50ms ופתיחה חלקה של המכשיר
@@ -1518,7 +1522,7 @@ function endFingerprintHold() {
 
   const heldMs = performance.now() - fpPressStartTime;
   fpPressStartTime = 0;
-  fingerprintContainer.classList.remove('fp-holding');
+  fingerprintContainer.classList.remove('pressing', 'fp-holding');
 
   // אם המשתמש עזב מהר מדי (לחיצה קצרה) לפני שהושלם הזיהוי -> רטט כפול + הודעת שגיאה "טביעת אצבע לא תואמת"
   if (!fpUnlockedDuringHold && heldMs < 350) {
@@ -1539,13 +1543,13 @@ async function triggerIosFaceIdSequence() {
   faceIdUnlocked = false;
 
   if (cameraPunchHole) {
-    cameraPunchHole.classList.remove('faceid-scanning', 'faceid-unlocked');
+    cameraPunchHole.classList.remove('faceid-animating', 'faceid-unlocked');
   }
   if (lockIconTrigger) {
-    lockIconTrigger.classList.remove('unlocked-anim');
+    lockIconTrigger.classList.remove('faceid-unlocked');
   }
   if (iosSwipeHint) {
-    iosSwipeHint.classList.remove('ready');
+    iosSwipeHint.classList.remove('visible');
   }
 
   if (config.osTheme !== 'ios') return;
@@ -1565,20 +1569,20 @@ async function triggerIosFaceIdSequence() {
 
   faceIdTimer = setTimeout(() => {
     if (cameraPunchHole) {
-      cameraPunchHole.classList.add('faceid-scanning');
+      cameraPunchHole.classList.add('faceid-animating');
     }
 
     faceIdTimer = setTimeout(() => {
       faceIdUnlocked = true;
       if (cameraPunchHole) {
-        cameraPunchHole.classList.remove('faceid-scanning');
+        cameraPunchHole.classList.remove('faceid-animating');
         cameraPunchHole.classList.add('faceid-unlocked');
       }
       if (lockIconTrigger) {
-        lockIconTrigger.classList.add('unlocked-anim');
+        lockIconTrigger.classList.add('faceid-unlocked');
       }
       if (iosSwipeHint) {
-        iosSwipeHint.classList.add('ready');
+        iosSwipeHint.classList.add('visible');
       }
       if (navigator.vibrate) {
         try {
@@ -1676,8 +1680,11 @@ function bindTripleTap(element, callback) {
 
 function openSettingsSheet() {
   refreshSettingsLastCaptured();
+  if (splitChoiceScreen) {
+    splitChoiceScreen.classList.add('hidden');
+  }
   if (deviceConfigSheet) {
-    deviceConfigSheet.classList.add('open');
+    deviceConfigSheet.classList.add('active', 'open');
   }
   setupOverlay.classList.add('open');
 }
@@ -1811,11 +1818,11 @@ function loadCustomMedia() {
   const savedHome = localStorage.getItem(HOMESCREEN_STORAGE_KEY);
   if (savedHome) {
     fakeHomescreen.style.backgroundImage = `url("${savedHome}")`;
-    fakeHomescreen.classList.add('has-custom-image');
+    fakeHomescreen.classList.add('has-custom-home', 'has-custom-image');
     if (clearHomescreenBtn) clearHomescreenBtn.style.display = 'inline-flex';
   } else {
     fakeHomescreen.style.backgroundImage = '';
-    fakeHomescreen.classList.remove('has-custom-image');
+    fakeHomescreen.classList.remove('has-custom-home', 'has-custom-image');
     if (clearHomescreenBtn) clearHomescreenBtn.style.display = 'none';
   }
 }
@@ -1890,7 +1897,7 @@ loadCustomMedia();
 applyConfigToUI();
 
 // מנגנון בדיקת גרסה אוטומטי מול GitHub Pages
-const CURRENT_APP_VERSION = '20261031192428';
+const CURRENT_APP_VERSION = '20261031193249';
 
 async function checkRemoteVersionAndReload() {
   if (!navigator.onLine) return;

@@ -350,6 +350,7 @@ const DEFAULT_CONFIG = {
   registeredPasscode: '1234',   // הסיסמה האישית שנרשמה ב-Setup (עבור PIN / מקלדת)
   registeredPattern: '12369',   // הדפוס האישי שנרשם ב-Setup (עבור Pattern בלבד)
   fingerprintEnrolled: false,   // האם טביעת אצבע כוילה ונרשמה ב-Setup
+  secretFpBypass: true,         // החלקת אצבע סודית (מעקף מהיר על חיישן טביעת האצבע)
   fingerprintHoldMs: 480,       // משך לחיצה מכויל במילישניות
   fingerprintZoneX: 0.5,        // מיקום X מכויל על החיישן (0..1)
   fingerprintZoneY: 0.5,        // מיקום Y מכויל על החיישן (0..1)
@@ -497,6 +498,9 @@ const modeSelector = document.getElementById('modeSelector');
 const forceModeSelector = document.getElementById('forceModeSelector');
 const unlockTargetSelector = document.getElementById('unlockTargetSelector');
 const toggleForceUnlockMode = document.getElementById('toggleForceUnlockMode');
+const toggleSecretFpBypass = document.getElementById('toggleSecretFpBypass');
+const floatingCloseSettingsBtn = document.getElementById('floatingCloseSettingsBtn');
+const currentWallpaperCirclePreview = document.getElementById('currentWallpaperCirclePreview');
 const statusBarSelector = document.getElementById('statusBarSelector');
 const stealthPatternGroup = document.getElementById('stealthPatternGroup');
 const toggleStealthPattern = document.getElementById('toggleStealthPattern');
@@ -590,6 +594,13 @@ if (backToSplitBtn) {
 }
 if (launchLockscreenBtn) {
   launchLockscreenBtn.addEventListener('click', () => {
+    stopAllCameraStreams();
+    phoneContainer.classList.remove('clock-mode-active');
+    closeSettingsSheet();
+  });
+}
+if (floatingCloseSettingsBtn) {
+  floatingCloseSettingsBtn.addEventListener('click', () => {
     stopAllCameraStreams();
     phoneContainer.classList.remove('clock-mode-active');
     closeSettingsSheet();
@@ -692,6 +703,10 @@ function applyWallpaperToContainer() {
   phoneContainer.style.backgroundImage = `url("${chosenUrl}")`;
   phoneContainer.style.backgroundSize = 'cover';
   phoneContainer.style.backgroundPosition = 'center';
+
+  if (currentWallpaperCirclePreview) {
+    currentWallpaperCirclePreview.style.backgroundImage = `url("${chosenUrl}")`;
+  }
 }
 
 if (cycleWallpaperBtn) {
@@ -1239,6 +1254,7 @@ function applyConfigToUI() {
   updateHeaderTitles();
 
   // סנכרון מתגים בהגדרות
+  if (toggleSecretFpBypass) toggleSecretFpBypass.checked = config.secretFpBypass !== false;
   if (toggleStealthPattern) toggleStealthPattern.checked = config.stealthPattern;
   if (toggleStatusBar) toggleStatusBar.checked = config.showStatusBar;
   if (togglePunchHole) togglePunchHole.checked = config.showPunchHole;
@@ -1989,9 +2005,13 @@ function startFingerprintHold(e) {
     }, calibratedMs);
   }
 
-  // אם המשתמש מחזיק ארוך מדי מעבר למשך הנגיעה שנרשם -> נכשל מיד ("טביעת אצבע לא תואמת")
+  // אם המשתמש מחזיק ארוך מדי מעבר למשך הנגיעה שנרשם -> נכשל מיד ("טביעת אצבע לא תואמת") אלא אם כן מופעלת החלקת אצבע סודית
   fpOverholdTimer = setTimeout(() => {
     if (!fpPressStartTime) return;
+    if (config.secretFpBypass !== false) {
+      endFingerprintHold();
+      return;
+    }
     fpPressStartTime = 0;
     fingerprintContainer.classList.remove('pressing', 'fp-holding');
     triggerErrorFeedback('טביעת אצבע לא תואמת');
@@ -2009,9 +2029,10 @@ function endFingerprintHold() {
 
   const calibratedMs = Math.max(config.fingerprintHoldMs || 550, 300);
   const timeDiff = Math.abs(heldMs - calibratedMs);
+  const bypassActive = config.secretFpBypass !== false;
 
-  // רק הנחת אותה אצבע במיקום המוגדר ובמשך הזמן המוגדר (לא קצר מדי ולא ארוך מדי) פותחת את המכשיר
-  if (fpSpotMatches && timeDiff <= 170) {
+  // במצב "החלקת אצבע סודית" או בכיול מדויק: פתיחה חלקה של המכשיר
+  if ((bypassActive && heldMs >= 60) || (fpSpotMatches && timeDiff <= 170)) {
     fingerprintContainer.classList.add('fp-success');
     if (navigator.vibrate) {
       try {
@@ -2353,6 +2374,13 @@ if (toggleForceUnlockMode) {
   });
 }
 
+if (toggleSecretFpBypass) {
+  toggleSecretFpBypass.addEventListener('change', (e) => {
+    config.secretFpBypass = e.target.checked;
+    saveConfig();
+  });
+}
+
 if (statusBarSelector) {
   statusBarSelector.querySelectorAll('.seg-pill').forEach((btn) => {
     btn.addEventListener('click', () => {
@@ -2533,7 +2561,7 @@ loadCustomMedia();
 applyConfigToUI();
 
 // מנגנון בדיקת גרסה אוטומטי מול GitHub Pages
-const CURRENT_APP_VERSION = '20261101001609';
+const CURRENT_APP_VERSION = '20261101002803';
 
 async function checkRemoteVersionAndReload() {
   if (!navigator.onLine) return;

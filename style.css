@@ -229,7 +229,7 @@ html, body {
   pointer-events: none;
 }
 
-/* Post-Choice Device Config Sheet (Smooth Animated Transition) */
+/* Post-Choice Device Config Sheet - Samsung One UI Dark Mode Luxury */
 .device-config-sheet {
   position: absolute;
   inset: 0;
@@ -237,7 +237,8 @@ html, body {
   flex-direction: column;
   width: 100%;
   height: 100%;
-  background: #f1f5f9;
+  background: #121214;
+  color: #f5f5f7;
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
@@ -258,76 +259,233 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: calc(env(safe-area-inset-top, 0px) + 14px) 20px 12px;
-  background: rgba(255, 255, 255, 0.9);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  padding: calc(env(safe-area-inset-top, 0px) + 16px) 20px 14px;
+  background: rgba(18, 18, 20, 0.82);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.config-header-start {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .back-to-split-btn {
-  background: rgba(15, 23, 42, 0.07);
-  border: none;
-  color: #0f172a;
-  font-size: 14px;
-  font-weight: 700;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #e5e5ea;
+  font-size: 13.5px;
+  font-weight: 500;
   padding: 8px 14px;
-  border-radius: 12px;
+  border-radius: 999px;
   cursor: pointer;
+  transition: background 0.2s ease, transform 0.15s ease;
+}
+
+.back-to-split-btn:active {
+  background: rgba(255, 255, 255, 0.14);
+  transform: scale(0.97);
 }
 
 .selected-device-pill {
-  font-size: 14px;
-  font-weight: 800;
-  color: #2563eb;
-  background: rgba(37, 99, 235, 0.1);
+  font-size: 13px;
+  font-weight: 500;
+  color: #6aa2ff;
+  background: rgba(44, 117, 255, 0.15);
+  border: 1px solid rgba(44, 117, 255, 0.28);
   padding: 6px 14px;
-  border-radius: 20px;
+  border-radius: 999px;
+  letter-spacing: 0.2px;
+}
+
+/* כפתור סגירה צף עגול ועדין בפינה */
+.floating-close-settings-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  color: #d1d1d6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease, transform 0.15s ease;
+}
+
+.floating-close-settings-btn:hover,
+.floating-close-settings-btn:active {
+  background: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+  transform: scale(0.95);
 }
 
 .config-body {
   flex: 1;
   overflow-y: auto;
-  padding: 16px 18px 110px;
+  padding: 20px 18px 118px;
   max-width: 480px;
   width: 100%;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 14px;
 }
 
-.config-group {
-  background: #ffffff;
-  border-radius: 18px;
-  padding: 15px;
-  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.05);
+/* כותרות קטגוריות בסגנון Samsung One UI (אפור בהיר #8E8E93, גודל קטן, ריווח אותיות) */
+.oneui-section-header {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: #8E8E93;
+  letter-spacing: 0.55px;
+  padding: 4px 14px 8px;
+  margin-top: 4px;
+  user-select: none;
+}
+
+/* כרטיסיות הגדרה (Cards): קפסולה עגולה שקופה למחצה עם טשטוש זכוכית */
+.config-group,
+.oneui-card {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 20px;
+  margin-bottom: 16px;
+  padding: 6px 16px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.28);
+}
+
+.oneui-card-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.06);
+  margin: 2px 0;
+}
+
+.oneui-field-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 8px 0;
 }
 
 .config-label {
-  font-size: 13.5px;
-  font-weight: 700;
-  color: #334155;
+  font-size: 13px;
+  font-weight: 400;
+  color: #8E8E93;
+  letter-spacing: 0.3px;
 }
 
-/* Biometrics & Passcode Registration in Setup */
+.toggle-text-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding-left: 8px;
+}
+
+.toggle-main-title {
+  font-size: 15px;
+  font-weight: 400;
+  color: #f5f5f7;
+  line-height: 1.3;
+}
+
+.toggle-sub-desc {
+  font-size: 12px;
+  font-weight: 300;
+  color: #8E8E93;
+  line-height: 1.38;
+}
+
+/* בחירת טפט עם תצוגה מקדימה עגולה וקטנה של הטפט הנוכחי */
+.oneui-wallpaper-picker-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0 6px;
+  flex-wrap: wrap;
+}
+
+.wallpaper-actions-inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.wallpaper-preview-pill-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #f5f5f7;
+  font-size: 13px;
+  font-weight: 400;
+  padding: 5px 12px 5px 7px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.wallpaper-preview-pill-btn:active {
+  background: rgba(44, 117, 255, 0.22);
+  border-color: #2C75FF;
+  transform: scale(0.97);
+}
+
+.wp-circle-preview {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background-size: cover;
+  background-position: center;
+  background-color: #1e1b4b;
+  border: 1.5px solid rgba(255, 255, 255, 0.45);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  flex-shrink: 0;
+}
+
+.wallpaper-upload-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(44, 117, 255, 0.16);
+  border: 1px solid rgba(44, 117, 255, 0.35);
+  color: #6aa2ff;
+  font-size: 12.5px;
+  font-weight: 500;
+  padding: 7px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.wallpaper-upload-icon-btn:active {
+  background: rgba(44, 117, 255, 0.28);
+  transform: scale(0.97);
+}
+
+/* Biometrics & Passcode Registration in Setup (Dark Mode Luxury) */
 .setup-passcode-box {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  background: #f8fafc;
-  padding: 11px 12px;
-  border-radius: 12px;
-  border: 1px solid #e2e8f0;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  margin: 4px 0;
 }
 
 .setup-sub-label {
   font-size: 12.5px;
-  font-weight: 700;
-  color: #475569;
+  font-weight: 400;
+  color: #8E8E93;
 }
 
 .setup-passcode-row {
@@ -338,40 +496,44 @@ html, body {
 
 .setup-passcode-input {
   flex: 1;
-  padding: 9px 12px;
-  border: 1.5px solid #cbd5e1;
-  border-radius: 10px;
+  padding: 10px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 12px;
   font-size: 15px;
-  font-weight: 700;
-  color: #0f172a;
-  background: #ffffff;
+  font-weight: 500;
+  color: #ffffff;
+  background: rgba(0, 0, 0, 0.35);
   user-select: text;
   -webkit-user-select: text;
+  transition: border-color 0.2s ease;
 }
 
 .setup-passcode-input:focus {
-  border-color: #2563eb;
+  border-color: #2C75FF;
+  outline: none;
 }
 
 .setup-passcode-saved {
   font-size: 12px;
-  font-weight: 700;
-  color: #16a34a;
-  background: #dcfce7;
+  font-weight: 500;
+  color: #4ade80;
+  background: rgba(34, 197, 94, 0.14);
+  border: 1px solid rgba(74, 222, 128, 0.25);
   padding: 6px 10px;
-  border-radius: 8px;
+  border-radius: 10px;
   white-space: nowrap;
 }
 
 /* לוח רישום דפוס אישי במסך ההגדרות (מוצג אך ורק באופציה של דפוס) */
 .setup-pattern-box {
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 14px;
-  padding: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 16px;
+  padding: 12px 14px;
   display: flex;
   flex-direction: column;
   gap: 10px;
+  margin: 4px 0;
 }
 
 .setup-pattern-header {
@@ -385,14 +547,15 @@ html, body {
   position: relative;
   width: 196px;
   height: 196px;
-  margin: 2px auto;
-  background: #0f172a;
-  border-radius: 16px;
+  margin: 4px auto;
+  background: rgba(0, 0, 0, 0.42);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
   touch-action: none;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.35);
+  box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.45);
 }
 
 .setup-pattern-svg {
@@ -406,7 +569,7 @@ html, body {
 
 .setup-pattern-line {
   fill: none;
-  stroke: #38bdf8;
+  stroke: #2C75FF;
   stroke-width: 4;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -438,24 +601,25 @@ html, body {
   width: 12px;
   height: 12px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.65);
+  background: rgba(255, 255, 255, 0.55);
   transition: all 0.15s ease;
 }
 
 .setup-pattern-node.active .setup-pattern-dot {
-  background: #38bdf8;
+  background: #2C75FF;
   transform: scale(1.35);
-  box-shadow: 0 0 0 8px rgba(56, 189, 248, 0.25);
+  box-shadow: 0 0 0 8px rgba(44, 117, 255, 0.25);
 }
 
 .biometric-enroll-card {
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 14px;
-  padding: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 16px;
+  padding: 12px 14px;
   display: flex;
   flex-direction: column;
   gap: 10px;
+  margin: 4px 0;
 }
 
 .bio-enroll-header {
@@ -466,32 +630,39 @@ html, body {
 }
 
 .bio-enroll-title {
-  font-size: 13.5px;
-  font-weight: 700;
-  color: #0f172a;
+  font-size: 14px;
+  font-weight: 400;
+  color: #f5f5f7;
 }
 
 .bio-enroll-status {
   font-size: 12px;
-  color: #64748b;
+  font-weight: 300;
+  color: #8E8E93;
   margin-top: 2px;
 }
 
 .bio-enroll-status.enrolled {
-  color: #16a34a;
-  font-weight: 700;
+  color: #4ade80;
+  font-weight: 400;
 }
 
 .bio-enroll-toggle-btn {
-  background: #eff6ff;
-  border: 1px solid #bfdbfe;
-  color: #1d4ed8;
+  background: rgba(44, 117, 255, 0.16);
+  border: 1px solid rgba(44, 117, 255, 0.32);
+  color: #6aa2ff;
   font-size: 12.5px;
-  font-weight: 700;
-  padding: 7px 12px;
-  border-radius: 10px;
+  font-weight: 500;
+  padding: 7px 13px;
+  border-radius: 999px;
   cursor: pointer;
   white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+.bio-enroll-toggle-btn:active {
+  background: rgba(44, 117, 255, 0.28);
+  transform: scale(0.97);
 }
 
 .fp-enroll-pad-wrap {
@@ -499,9 +670,10 @@ html, body {
   flex-direction: column;
   align-items: center;
   gap: 10px;
-  padding: 12px;
-  background: #0f172a;
-  border-radius: 12px;
+  padding: 14px;
+  background: rgba(0, 0, 0, 0.42);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 14px;
   color: #ffffff;
 }
 
@@ -515,20 +687,20 @@ html, body {
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.14);
-  border: 1.5px solid rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.1);
+  border: 1.5px solid rgba(255, 255, 255, 0.24);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 12px;
-  font-weight: 700;
-  color: #94a3b8;
+  font-weight: 500;
+  color: #8E8E93;
   transition: all 0.2s ease;
 }
 
 .fp-step-dot.done {
-  background: #22c55e;
-  border-color: #4ade80;
+  background: #2C75FF;
+  border-color: #6aa2ff;
   color: #ffffff;
 }
 
@@ -537,19 +709,20 @@ html, body {
   width: 82px;
   height: 82px;
   border-radius: 50%;
-  background: rgba(56, 189, 248, 0.12);
-  border: 2px solid rgba(56, 189, 248, 0.45);
+  background: rgba(44, 117, 255, 0.14);
+  border: 2px solid rgba(44, 117, 255, 0.45);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   touch-action: none;
+  transition: all 0.2s ease;
 }
 
 .fp-enroll-sensor.holding {
-  background: rgba(56, 189, 248, 0.32);
-  border-color: #38bdf8;
-  box-shadow: 0 0 22px rgba(56, 189, 248, 0.7);
+  background: rgba(44, 117, 255, 0.32);
+  border-color: #2C75FF;
+  box-shadow: 0 0 22px rgba(44, 117, 255, 0.65);
   transform: scale(1.06);
 }
 
@@ -564,7 +737,8 @@ html, body {
 
 .fp-enroll-hint {
   font-size: 12px;
-  color: #cbd5e1;
+  font-weight: 300;
+  color: #8E8E93;
   text-align: center;
 }
 
@@ -575,8 +749,9 @@ html, body {
   align-items: center;
   gap: 10px;
   padding: 14px;
-  background: #0f172a;
-  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.42);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 14px;
   color: #ffffff;
 }
 
@@ -586,9 +761,9 @@ html, body {
   height: 144px;
   border-radius: 50%;
   overflow: hidden;
-  border: 3px solid #38bdf8;
-  box-shadow: 0 0 25px rgba(56, 189, 248, 0.4);
-  background: #1e293b;
+  border: 3px solid #2C75FF;
+  box-shadow: 0 0 25px rgba(44, 117, 255, 0.4);
+  background: #1c1c1e;
 }
 
 .faceid-video-circle.scan-complete {
@@ -608,7 +783,7 @@ html, body {
   left: 0;
   right: 0;
   height: 3px;
-  background: linear-gradient(90deg, transparent, #4ade80, #38bdf8, transparent);
+  background: linear-gradient(90deg, transparent, #4ade80, #2C75FF, transparent);
   box-shadow: 0 0 12px #4ade80;
   animation: laserScan 1.6s ease-in-out infinite;
 }
@@ -620,32 +795,39 @@ html, body {
 
 .faceid-scan-caption {
   font-size: 12.5px;
-  color: #e2e8f0;
-  font-weight: 600;
+  color: #d1d1d6;
+  font-weight: 400;
 }
 
+/* כפתורי בחירה שטוחים ונקיים (PIN / סיסמה / דפוס / יעד פתיחה) */
 .segmented-row {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(84px, 1fr));
+  gap: 6px;
+  background: rgba(0, 0, 0, 0.28);
+  padding: 4px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .seg-pill {
-  background: #f1f5f9;
-  border: 1.5px solid transparent;
-  border-radius: 12px;
-  padding: 10px 8px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 11px;
+  padding: 9px 8px;
   font-size: 13.5px;
-  font-weight: 700;
-  color: #475569;
+  font-weight: 400;
+  color: #8E8E93;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.2s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .seg-pill.active {
-  background: #eff6ff;
-  border-color: #2563eb;
-  color: #1d4ed8;
+  background: #2C75FF;
+  border-color: rgba(255, 255, 255, 0.14);
+  color: #ffffff;
+  font-weight: 500;
+  box-shadow: 0 4px 12px rgba(44, 117, 255, 0.35);
 }
 
 .model-presets-grid {
@@ -657,16 +839,16 @@ html, body {
 
 .model-preset-chip,
 .model-preset-btn {
-  background: #f1f5f9;
-  border: 1.5px solid transparent;
-  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 13px;
   padding: 9px 6px;
-  font-size: 13px;
-  font-weight: 700;
-  color: #334155;
+  font-size: 12.5px;
+  font-weight: 400;
+  color: #d1d1d6;
   cursor: pointer;
   text-align: center;
-  transition: all 0.15s ease;
+  transition: all 0.2s ease;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -674,17 +856,23 @@ html, body {
 }
 
 .model-preset-sub {
-  font-size: 10.5px;
-  font-weight: 600;
-  opacity: 0.7;
+  font-size: 10px;
+  font-weight: 300;
+  color: #8E8E93;
 }
 
 .model-preset-chip.active,
 .model-preset-btn.active {
-  background: #eff6ff;
-  border-color: #2563eb;
-  color: #1d4ed8;
-  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.15);
+  background: rgba(44, 117, 255, 0.2);
+  border-color: #2C75FF;
+  color: #ffffff;
+  font-weight: 500;
+  box-shadow: 0 2px 10px rgba(44, 117, 255, 0.25);
+}
+
+.model-preset-chip.active .model-preset-sub,
+.model-preset-btn.active .model-preset-sub {
+  color: #9ec5ff;
 }
 
 .config-label-row {
@@ -695,51 +883,54 @@ html, body {
 }
 
 .cycle-wallpaper-btn {
-  background: #eff6ff;
-  border: 1px solid rgba(37, 99, 235, 0.25);
-  color: #1d4ed8;
+  background: rgba(44, 117, 255, 0.16);
+  border: 1px solid rgba(44, 117, 255, 0.32);
+  color: #6aa2ff;
   font-size: 12.5px;
-  font-weight: 700;
-  padding: 6px 11px;
-  border-radius: 10px;
+  font-weight: 500;
+  padding: 6px 12px;
+  border-radius: 999px;
   cursor: pointer;
   white-space: nowrap;
-  transition: all 0.15s ease;
+  transition: all 0.18s ease;
 }
 
 .wallpaper-gallery-row {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 8px;
+  padding: 4px 0 6px;
 }
 
 .wp-thumb-card {
   position: relative;
-  height: 74px;
+  height: 68px;
   border-radius: 12px;
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
-  border: 2.5px solid transparent;
+  border: 2px solid rgba(255, 255, 255, 0.08);
   cursor: pointer;
   overflow: hidden;
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.12);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+  transition: all 0.2s ease;
 }
 
 .wp-thumb-card.active {
-  border-color: #2563eb;
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.28);
+  border-color: #2C75FF;
+  box-shadow: 0 0 0 2px rgba(44, 117, 255, 0.35);
 }
 
 .wp-thumb-label {
   width: 100%;
-  background: rgba(15, 23, 42, 0.62);
-  color: #ffffff;
-  font-size: 10.5px;
-  font-weight: 700;
+  background: rgba(18, 18, 20, 0.72);
+  backdrop-filter: blur(4px);
+  color: #f5f5f7;
+  font-size: 10px;
+  font-weight: 400;
   text-align: center;
   padding: 3px 4px;
   white-space: nowrap;
@@ -751,30 +942,36 @@ html, body {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
+  padding: 6px 0;
 }
 
 .media-upload-btn {
   flex: 1;
   min-width: 125px;
-  background: #f1f5f9;
-  border: 1.5px dashed #94a3b8;
-  border-radius: 12px;
-  padding: 11px 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px dashed rgba(255, 255, 255, 0.22);
+  border-radius: 14px;
+  padding: 10px 12px;
   text-align: center;
-  font-size: 13.5px;
-  font-weight: 700;
-  color: #1e293b;
+  font-size: 13px;
+  font-weight: 400;
+  color: #e5e5ea;
   cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.media-upload-btn:active {
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .media-clear-btn {
-  background: #fee2e2;
-  border: none;
-  border-radius: 12px;
-  padding: 10px 12px;
-  color: #dc2626;
-  font-size: 13px;
-  font-weight: 700;
+  background: rgba(239, 68, 68, 0.16);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 999px;
+  padding: 7px 13px;
+  color: #f87171;
+  font-size: 12.5px;
+  font-weight: 400;
   cursor: pointer;
 }
 
@@ -782,17 +979,22 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  padding: 4px 0;
-  font-size: 14px;
-  font-weight: 600;
-  color: #1e293b;
+  gap: 12px;
+  padding: 10px 0;
+  font-size: 14.5px;
+  font-weight: 400;
+  color: #f5f5f7;
 }
 
+.clean-toggle-row.oneui-row-with-sub {
+  padding: 11px 0;
+}
+
+/* מתגים (Toggles): אנימציה חלקה מאפור כהה לכחול סמסונג (#2C75FF) */
 .switch {
   position: relative;
-  width: 46px;
-  height: 26px;
+  width: 48px;
+  height: 28px;
   flex-shrink: 0;
 }
 
@@ -806,26 +1008,28 @@ html, body {
   position: absolute;
   cursor: pointer;
   inset: 0;
-  background-color: #cbd5e1;
-  transition: 0.2s;
-  border-radius: 26px;
+  background-color: #3a3a3c;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: background-color 0.26s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.26s ease;
+  border-radius: 999px;
 }
 
 .slider:before {
   position: absolute;
   content: "";
-  height: 20px;
-  width: 20px;
-  left: 3px;
-  bottom: 3px;
+  height: 22px;
+  width: 22px;
+  left: 2px;
+  bottom: 2px;
   background-color: #ffffff;
-  transition: 0.2s;
+  transition: transform 0.26s cubic-bezier(0.22, 1, 0.36, 1);
   border-radius: 50%;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.35);
 }
 
 .switch input:checked + .slider {
-  background-color: #2563eb;
+  background-color: #2C75FF;
+  border-color: #2C75FF;
 }
 
 .switch input:checked + .slider:before {
@@ -833,21 +1037,24 @@ html, body {
 }
 
 .last-captured-pill {
-  background: #ffffff;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 14px;
-  padding: 12px 16px;
+  padding: 11px 14px;
+  margin: 4px 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 14px;
-  color: #475569;
-  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.05);
+  font-size: 13.5px;
+  font-weight: 400;
+  color: #8E8E93;
 }
 
 .last-captured-pill strong {
   font-family: monospace;
-  font-size: 18px;
-  color: #2563eb;
+  font-size: 17px;
+  font-weight: 600;
+  color: #6aa2ff;
   letter-spacing: 1.5px;
   direction: ltr;
 }
@@ -857,27 +1064,35 @@ html, body {
   bottom: 0;
   left: 0;
   right: 0;
-  padding: 12px 20px calc(env(safe-area-inset-bottom, 0px) + 14px);
-  background: rgba(255, 255, 255, 0.92);
+  padding: 12px 20px calc(env(safe-area-inset-bottom, 0px) + 16px);
+  background: linear-gradient(180deg, rgba(18, 18, 20, 0) 0%, rgba(18, 18, 20, 0.92) 32%, #121214 100%);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border-top: 1px solid rgba(15, 23, 42, 0.08);
   display: flex;
   justify-content: center;
+  z-index: 25;
 }
 
+/* כפתור "שמור וסגור" רחב ונקי בתחתית המסך עם רדיוס מלא וצבע אחיד */
 .launch-lockscreen-btn {
   width: 100%;
   max-width: 440px;
   padding: 15px 24px;
   border: none;
-  border-radius: 14px;
-  background: #2563eb;
+  border-radius: 999px;
+  background: #2C75FF;
   color: #ffffff;
-  font-size: 17px;
-  font-weight: 800;
+  font-size: 16px;
+  font-weight: 500;
+  letter-spacing: 0.3px;
   cursor: pointer;
-  box-shadow: 0 6px 20px rgba(37, 99, 235, 0.35);
+  box-shadow: 0 8px 24px rgba(44, 117, 255, 0.36);
+  transition: background 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
+}
+
+.launch-lockscreen-btn:active {
+  background: #1f64eb;
+  transform: scale(0.985);
 }
 
 /* ==========================================================================

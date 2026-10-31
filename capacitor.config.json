@@ -1,0 +1,14 @@
+{
+  "appId": "com.magic.lockscreen",
+  "appName": "Lockscreen",
+  "webDir": "www",
+  "bundledWebRuntime": false,
+  "server": {
+    "url": "https://tzur2010.github.io/app-lockscreen/",
+    "cleartext": true
+  },
+  "android": {
+    "backgroundColor": "#0f1026",
+    "allowMixedContent": true
+  }
+}

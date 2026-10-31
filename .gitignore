@@ -1,20 +1,17 @@
-# Ignore dependencies and build folders
+# Ignore dependencies and temporary build folders
 node_modules/
-android/
 ios/
 www/
 dist/
 build/
 .gradle/
 .idea/
+android/app/build/
 
-# Ignore APK / Capacitor packaging files
-*.apk
+# Ignore signing keys
 *.keystore
 *.idsig
-package.json
 package-lock.json
-capacitor.config.json
 
 # Ignore OS / Editor files
 .DS_Store

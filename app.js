@@ -1292,11 +1292,65 @@
     }
   });
 
+  // סנכרון אוטומטי מול GitHub Pages ורענון עצמי של הדף כשעולה גרסה חדשה
+  const APP_BUILD_VERSION = '20261031180755';
+  let isReloadingForUpdate = false;
+
+  async function triggerCleanReload() {
+    if (isReloadingForUpdate) return;
+    isReloadingForUpdate = true;
+    try {
+      if ('caches' in window) {
+        const keys = await caches.keys();
+        await Promise.all(keys.map((k) => caches.delete(k)));
+      }
+    } catch (e) {}
+    window.location.reload();
+  }
+
+  async function checkRemoteVersion() {
+    if (!setupOverlay.classList.contains('open')) return;
+    try {
+      const res = await fetch(`./version.json?t=${Date.now()}`, { cache: 'no-store' });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data && data.version && String(data.version) !== String(APP_BUILD_VERSION)) {
+        triggerCleanReload();
+      }
+    } catch (e) {}
+  }
+
   if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.addEventListener('message', (event) => {
+      if (event.data && event.data.type === 'FORCE_RELOAD') {
+        triggerCleanReload();
+      }
+    });
+
+    let refreshingSw = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (refreshingSw) return;
+      refreshingSw = true;
+      triggerCleanReload();
+    });
+
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js').catch(() => {});
+      navigator.serviceWorker.register(`./sw.js?v=${APP_BUILD_VERSION}`, { updateViaCache: 'none' })
+        .then((reg) => {
+          reg.update().catch(() => {});
+          setInterval(() => {
+            if (setupOverlay.classList.contains('open')) {
+              reg.update().catch(() => {});
+            }
+          }, 8000);
+        })
+        .catch(() => {});
     });
   }
+
+  // בדיקה מחזורית של גרסה חדשה ב-GitHub Pages (מתבצעת ברקע כשנמצאים במסך הבחירה/הגדרות)
+  setTimeout(checkRemoteVersion, 1500);
+  setInterval(checkRemoteVersion, 7000);
 
   // אתחול
   applyConfigToUI();

@@ -1855,7 +1855,7 @@ html, body {
 
 .oneui-password-pill {
   width: 100%;
-  max-width: 288px;
+  max-width: 360px;
   height: 46px;
   border-radius: 25px;
   /* רקע כהה שקוף של Samsung One UI */
@@ -1864,7 +1864,7 @@ html, body {
   display: flex;
   flex-direction: row-reverse; /* כפתור עין משמאל, שדה הקלדה מימין */
   align-items: center;
-  padding: 0 16px 0 10px;
+  padding: 0 18px 0 12px;
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   transition: border-color 0.2s ease, background-color 0.2s ease;
@@ -1924,11 +1924,11 @@ html, body {
 }
 
 /* בעת לחיצה על שדה הסיסמה (פתיחת מקלדת):
-   כל הבלוק (הכיתובים + שדה הסיסמה) מחליק באנימציה חלקה כלפי מעלה,
+   כל הבלוק (הכיתובים + שדה הסיסמה) מחליק באנימציה חלקה כלפי מעלה בצורה מתונה (לא גבוה מדי),
    ואייקון טביעת האצבע וכפתור שיחת החירום מוסתרים בצורה חלקה */
 .phone-container.mode-words-active.words-keyboard-open .header-area,
 .phone-container.mode-words-active.words-keyboard-open .oneui-password-pill-wrap {
-  transform: translateY(-160px);
+  transform: translateY(-95px);
 }
 
 .phone-container.mode-words-active .emergency-btn {
@@ -2370,8 +2370,7 @@ html, body {
 }
 
 .phone-container.mode-words-active .words-mode-spacer {
-  display: block;
-  flex: 0 0 4vh;
+  display: none;
 }
 
 /* חץ חזרה ממוקם בצד ההפוך (בפינה הימנית התחתונה של המסך) ופונה לכיוון הנכון */

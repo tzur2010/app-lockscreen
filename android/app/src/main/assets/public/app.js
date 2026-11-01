@@ -2655,7 +2655,7 @@ loadCustomMedia();
 applyConfigToUI();
 
 // מנגנון בדיקת גרסה אוטומטי מול GitHub Pages
-const CURRENT_APP_VERSION = '20261101174958';
+const CURRENT_APP_VERSION = '20261101175305';
 
 async function checkRemoteVersionAndReload() {
   if (!navigator.onLine) return;

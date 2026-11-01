@@ -1676,7 +1676,7 @@ html, body {
   border-radius: 999px;
 }
 
-/* כותרת עליונה ("הזן סיסמה") וכיתוב משני באפור-בהיר */
+/* כותרת עליונה וכיתוב משני באפור-בהיר */
 .header-area {
   text-align: center;
   color: #ffffff;
@@ -1689,6 +1689,37 @@ html, body {
   justify-content: center;
   align-items: center;
   width: 100%;
+}
+
+/* במצב קוד PIN בלבד (Samsung One UI): המנעול נשאר למעלה במרכז, והטקסטים יורדים קרוב לאזור הנקודות ולוח המקשים */
+.phone-container.mode-pin-active .lock-icon {
+  margin-top: 6px;
+  margin-bottom: auto;
+}
+
+.phone-container.mode-pin-active .header-area {
+  margin-top: auto;
+  margin-bottom: 6px;
+  min-height: 54px;
+}
+
+.phone-container.mode-pin-active .title-group {
+  gap: 6px;
+}
+
+.phone-container.mode-pin-active .title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: 0.1px;
+}
+
+.phone-container.mode-pin-active .subtitle {
+  font-size: 13px;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.72);
+  max-width: 310px;
+  line-height: 1.35;
 }
 
 .title-group {
@@ -2253,22 +2284,22 @@ html, body {
   flex: 1;
 }
 
-/* חץ חזרה (<) ממוקם בפינה השמאלית התחתונה ומצביע שמאלה */
+/* חץ חזרה ממוקם בצד ההפוך (בפינה הימנית התחתונה של המסך) ופונה לכיוון הנכון */
 .bottom-bar {
   width: 100%;
   direction: ltr !important;
   display: flex;
   flex-direction: row !important;
   align-items: center;
-  justify-content: flex-start !important;
+  justify-content: flex-end !important;
   padding: 0 8px 2px;
 }
 
 .samsung-back-btn {
   width: 44px;
   height: 44px;
-  margin-right: auto !important;
-  margin-left: 0 !important;
+  margin-left: auto !important;
+  margin-right: 0 !important;
   background: transparent;
   border: none;
   display: flex;

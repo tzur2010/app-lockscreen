@@ -1227,6 +1227,7 @@ function applyConfigToUI() {
   }
 
   // החלפת תצוגות נעילה (PIN / Pattern / Words / Swipe) והפרדה מוחלטת בין PIN לסיסמת מילים
+  phoneContainer.classList.toggle('mode-pin-active', config.unlockMode === 'pin');
   phoneContainer.classList.toggle('mode-words-active', config.unlockMode === 'words');
   viewPin.classList.toggle('active', config.unlockMode === 'pin');
   viewPattern.classList.toggle('active', config.unlockMode === 'pattern');
@@ -1306,9 +1307,9 @@ function updateHeaderTitles() {
     mainTitle.textContent = 'החלק לפתיחת המכשיר';
     subTitle.textContent = '';
   } else {
-    // מסך קוד ה-PIN המקורי ללא שינוי
+    // מסך קוד ה-PIN הייעודי (סמסונג One UI מדויק): שתי שורות טקסט בדיוק מעל הנקודות ולוח המקשים
     mainTitle.textContent = config.osTheme === 'ios' ? 'הזן קוד גישה' : 'הזן קוד PIN';
-    subTitle.textContent = '';
+    subTitle.textContent = config.osTheme === 'ios' ? '' : 'קוד ה-PIN שלך מכיל לפחות 4 ספרות';
   }
 }
 
@@ -1976,6 +1977,44 @@ phoneContainer.addEventListener('pointerleave', hideHoldPeek);
 // ----------------------------------------------------------------------------
 // 17. הדמיית ביומטריה אמיתית: טביעת אצבע (Samsung) ו-Face ID (iPhone)
 // ----------------------------------------------------------------------------
+// יציאה אוטומטית למסך הבית האמיתי של הטלפון בעת כפיית פתיחה או מעקף
+function exitToRealPhoneHomeScreen() {
+  // 1) אם מותקן Capacitor / Cordova: הפעל App.exitApp()
+  try {
+    if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.App && typeof window.Capacitor.Plugins.App.exitApp === 'function') {
+      window.Capacitor.Plugins.App.exitApp();
+    } else if (window.Capacitor && typeof window.Capacitor.triggerEvent === 'function') {
+      try {
+        window.Capacitor.Plugins?.App?.exitApp?.();
+      } catch (e) {}
+    }
+    if (navigator.app && typeof navigator.app.exitApp === 'function') {
+      navigator.app.exitApp();
+    }
+    if (navigator.device && typeof navigator.device.exitApp === 'function') {
+      navigator.device.exitApp();
+    }
+  } catch (e) {}
+
+  // 2) כגיבוי מקביל: יציאה ממסך מלא (document.exitFullscreen()) ו-window.close()
+  try {
+    if (document.fullscreenElement && typeof document.exitFullscreen === 'function') {
+      document.exitFullscreen().catch(() => {});
+    } else if (document.webkitFullscreenElement && typeof document.webkitExitFullscreen === 'function') {
+      document.webkitExitFullscreen();
+    }
+  } catch (e) {}
+
+  try {
+    window.close();
+  } catch (e) {}
+
+  // 3) בדפדפן / WebView באנדרואיד: שליחת Intent ישיר למסך הבית האמיתי של המכשיר
+  try {
+    window.location.href = 'intent:#Intent;action=android.intent.action.MAIN;category=android.intent.category.HOME;end';
+  } catch (e) {}
+}
+
 function triggerUnlockHomescreen() {
   if (notesDateLine) {
     const now = new Date();
@@ -1986,6 +2025,11 @@ function triggerUnlockHomescreen() {
   fakeHomescreen.classList.add('unlocked');
   if (passwordInput) passwordInput.blur();
   stopAllCameraStreams();
+
+  // כאשר מצב Force Unlock מופעל או הופעל מעקף (והמשתמש לא בחר להציג דף פתקים מדומה), קפוץ ישירות למסך הבית האמיתי של המכשיר
+  if (forceUnlockMode && config.unlockTargetScreen !== 'notes') {
+    exitToRealPhoneHomeScreen();
+  }
 }
 
 // 17A. סמסונג: אימות טביעת אצבע קפדני (נפתח רק למי שהגדיר: בודק מיקום מדויק + לא קצר מדי + לא ארוך מדי)
@@ -2583,7 +2627,7 @@ loadCustomMedia();
 applyConfigToUI();
 
 // מנגנון בדיקת גרסה אוטומטי מול GitHub Pages
-const CURRENT_APP_VERSION = '20261101004123';
+const CURRENT_APP_VERSION = '20261101172752';
 
 async function checkRemoteVersionAndReload() {
   if (!navigator.onLine) return;

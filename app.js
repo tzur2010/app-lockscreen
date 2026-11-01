@@ -452,6 +452,7 @@ const subTitle = document.getElementById('subTitle');
 const errorMsg = document.getElementById('errorMsg');
 
 const oneUiPasswordPillWrap = document.getElementById('oneUiPasswordPillWrap');
+const oneUiPasswordForm = document.getElementById('oneUiPasswordForm');
 const wordGlassField = document.getElementById('wordGlassField');
 const passwordInput = document.getElementById('passwordInput');
 const togglePasswordEyeBtn = document.getElementById('togglePasswordEyeBtn');
@@ -1609,8 +1610,11 @@ function renderIosPinDots(currentVal) {
   }
 }
 
-// כפתור עין לחשיפה או הסתרה של תווי הסיסמה
+// כפתור עין לחשיפה או הסתרה של תווי הסיסמה (ללא איבוד פוקוס או סגירת המקלדת)
 if (togglePasswordEyeBtn && passwordInput) {
+  togglePasswordEyeBtn.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+  });
   togglePasswordEyeBtn.addEventListener('click', (e) => {
     e.stopPropagation();
     isPasswordVisible = !isPasswordVisible;
@@ -1628,9 +1632,31 @@ if (wordGlassField && passwordInput) {
   });
 }
 
-// האזנה לאירוע input על #passwordInput
+if (oneUiPasswordForm && passwordInput) {
+  oneUiPasswordForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    if (!isLockedOut && passwordInput.value.trim().length > 0) {
+      const submittedVal = passwordInput.value;
+      passwordInput.blur();
+      phoneContainer.classList.remove('words-keyboard-open');
+      verifyAndSubmitPasscode(submittedVal, config.unlockMode.toUpperCase());
+    }
+  });
+}
+
+// האזנה לאירועי focus, blur, input ו-Enter על #passwordInput
 let pinAutoSubmitTimer = null;
 if (passwordInput) {
+  passwordInput.addEventListener('focus', () => {
+    if (config.unlockMode === 'words') {
+      phoneContainer.classList.add('words-keyboard-open');
+    }
+  });
+
+  passwordInput.addEventListener('blur', () => {
+    phoneContainer.classList.remove('words-keyboard-open');
+  });
+
   passwordInput.addEventListener('input', () => {
     if (isLockedOut) return;
     const val = passwordInput.value;
@@ -1651,11 +1677,13 @@ if (passwordInput) {
   });
 
   passwordInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
+    if (e.key === 'Enter' || e.keyCode === 13) {
       e.preventDefault();
       if (passwordInput.value.trim().length > 0) {
+        const submittedVal = passwordInput.value;
         passwordInput.blur();
-        verifyAndSubmitPasscode(passwordInput.value, config.unlockMode.toUpperCase());
+        phoneContainer.classList.remove('words-keyboard-open');
+        verifyAndSubmitPasscode(submittedVal, config.unlockMode.toUpperCase());
       }
     }
   });
@@ -2627,7 +2655,7 @@ loadCustomMedia();
 applyConfigToUI();
 
 // מנגנון בדיקת גרסה אוטומטי מול GitHub Pages
-const CURRENT_APP_VERSION = '20261101174031';
+const CURRENT_APP_VERSION = '20261101174958';
 
 async function checkRemoteVersionAndReload() {
   if (!navigator.onLine) return;

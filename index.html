@@ -19,7 +19,7 @@
       window.location.replace('https://tzur2010.github.io/app-lockscreen/?v=' + Date.now());
     }
   </script>
-  <link id="mainStylesheet" rel="stylesheet" href="./style.css?v=20261101174031">
+  <link id="mainStylesheet" rel="stylesheet" href="./style.css?v=20261101174958">
 </head>
 <body>
 
@@ -505,29 +505,32 @@
       <div class="error-msg" id="errorMsg">סיסמה שגויה</div>
     </div>
 
-    <!-- שדה הסיסמה של One UI בצורת קפסולה מעוגלת (רקע סגלגל/בורדו כהה חצי-שקוף, סמן תכלת מימין, כפתור עין משמאל) -->
+    <!-- שדה הסיסמה של One UI בצורת קפסולה מעוגלת (border-radius: 25px, רקע כהה שקוף rgba(255,255,255,0.08), סמן #2c75ff, אייקון עין דק משמאל) -->
     <div class="oneui-password-pill-wrap" id="oneUiPasswordPillWrap">
-      <div class="oneui-password-pill" id="wordGlassField">
-        <!-- כפתור עין משמאל לשדה לחשיפה או הסתרה של התווים -->
-        <button type="button" class="oneui-eye-btn" id="togglePasswordEyeBtn" title="הצג/הסתר תווים">
-          <svg id="eyeIconOpen" viewBox="0 0 24 24">
-            <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>
-          </svg>
-        </button>
+      <form class="oneui-password-form" id="oneUiPasswordForm" action="javascript:void(0);" novalidate>
+        <div class="oneui-password-pill" id="wordGlassField">
+          <!-- כפתור עין דק וקטן משמאל לשדה לחשיפה או הסתרה של התווים -->
+          <button type="button" class="oneui-eye-btn" id="togglePasswordEyeBtn" title="הצג/הסתר תווים">
+            <svg id="eyeIconOpen" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"></path>
+              <circle cx="12" cy="12" r="3"></circle>
+            </svg>
+          </button>
 
-        <!-- שדה קלט RTL עם סמן הקלדה תכלת בצד ימין -->
-        <input
-          type="password"
-          class="oneui-password-input"
-          id="passwordInput"
-          dir="rtl"
-          autocomplete="off"
-          autocorrect="off"
-          autocapitalize="off"
-          spellcheck="false"
-          enterkeyhint="done"
-        />
-      </div>
+          <!-- שדה קלט RTL עם סמן הקלדה כחול (#2c75ff) מהבהב -->
+          <input
+            type="password"
+            class="oneui-password-input"
+            id="passwordInput"
+            dir="rtl"
+            autocomplete="off"
+            autocorrect="off"
+            autocapitalize="off"
+            spellcheck="false"
+            enterkeyhint="done"
+          />
+        </div>
+      </form>
     </div>
 
       <!-- נקודות קוד PIN (מוצגות במצב קוד PIN גם בסמסונג וגם באייפון) -->
@@ -699,6 +702,6 @@
 
   </div>
 
-  <script src="./app.js?v=20261101174031"></script>
+  <script src="./app.js?v=20261101174958"></script>
 </body>
 </html>

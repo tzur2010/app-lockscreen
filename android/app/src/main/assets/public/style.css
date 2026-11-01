@@ -1594,7 +1594,7 @@ html, body {
 
 .lock-icon {
   position: absolute !important;
-  top: 25px;
+  top: 30px;
   left: 50%;
   transform: translateX(-50%);
   margin: 0;
@@ -1802,14 +1802,51 @@ html, body {
 }
 
 /* ==========================================================================
-   שדה הסיסמה של One UI (קפסולה מעוגלת, רקע סגלגל/בורדו rgba(120, 20, 60, 0.45), סמן תכלת מימין, עין משמאל)
+   שדה הסיסמה של One UI (קפסולה מעוגלת border-radius: 25px, רקע כהה שקוף rgba(255,255,255,0.08), סמן כחול #2c75ff, עין דקה משמאל)
+   + אנימציית החלקה דינמית בעת פתיחת המקלדת במצב סיסמה (mode-words-active)
    ========================================================================== */
+
+/* במצב סיסמה (mode-words-active):
+   בלוק ההזנה (הכיתובים, השדה ושיחת החירום) יושב בחצי התחתון של המסך (סביב 58% מגובה המסך) */
+.phone-container.mode-words-active .lock-icon {
+  position: absolute !important;
+  top: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.phone-container.mode-words-active .header-area {
+  margin-top: auto;
+  margin-bottom: 14px;
+  transition: transform 0.25s ease-out;
+}
+
+.phone-container.mode-words-active .title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.phone-container.mode-words-active .subtitle {
+  font-size: 13px;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.72);
+  max-width: 315px;
+  line-height: 1.38;
+}
 
 .oneui-password-pill-wrap {
   width: 100%;
   display: flex;
   justify-content: center;
-  margin: 4px 0 6px;
+  margin: 4px 0 12px;
+  transition: transform 0.25s ease-out;
+}
+
+.oneui-password-form {
+  width: 100%;
+  display: flex;
+  justify-content: center;
 }
 
 .phone-container.theme-ios .oneui-password-pill-wrap.hide-on-ios-pin {
@@ -1818,25 +1855,32 @@ html, body {
 
 .oneui-password-pill {
   width: 100%;
-  max-width: 286px;
-  height: 44px;
-  border-radius: 999px;
-  /* רקע סגלגל/בורדו כהה חצי-שקוף מדויק */
-  background: rgba(120, 20, 60, 0.45);
-  border: 1px solid rgba(255, 255, 255, 0.22);
+  max-width: 288px;
+  height: 46px;
+  border-radius: 25px;
+  /* רקע כהה שקוף של Samsung One UI */
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
   display: flex;
   flex-direction: row-reverse; /* כפתור עין משמאל, שדה הקלדה מימין */
   align-items: center;
-  padding: 0 14px 0 8px;
-  box-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.25);
+  padding: 0 16px 0 10px;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.phone-container.words-keyboard-open .oneui-password-pill {
+  background: rgba(255, 255, 255, 0.11);
+  border-color: rgba(255, 255, 255, 0.26);
 }
 
 .oneui-eye-btn {
-  width: 32px;
-  height: 32px;
+  width: 30px;
+  height: 30px;
   border: none;
   background: transparent;
-  color: rgba(255, 255, 255, 0.82);
+  color: rgba(255, 255, 255, 0.78);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1850,9 +1894,10 @@ html, body {
 }
 
 .oneui-eye-btn svg {
-  width: 19px;
-  height: 19px;
-  fill: currentColor;
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
 }
 
 .oneui-password-input {
@@ -1866,8 +1911,8 @@ html, body {
   font-weight: 500;
   direction: rtl;
   text-align: right;
-  /* סמן הקלדה (caret) בצבע תכלת בצד ימין */
-  caret-color: #38bdf8;
+  /* סמן כתיבה כחול מהבהב של סמסונג */
+  caret-color: #2c75ff;
   padding: 0 6px;
   user-select: text;
   -webkit-user-select: text;
@@ -1876,6 +1921,33 @@ html, body {
 .oneui-password-input::placeholder {
   color: rgba(255, 255, 255, 0.45);
   font-size: 14px;
+}
+
+/* בעת לחיצה על שדה הסיסמה (פתיחת מקלדת):
+   כל הבלוק (הכיתובים + שדה הסיסמה) מחליק באנימציה חלקה כלפי מעלה,
+   ואייקון טביעת האצבע וכפתור שיחת החירום מוסתרים בצורה חלקה */
+.phone-container.mode-words-active.words-keyboard-open .header-area,
+.phone-container.mode-words-active.words-keyboard-open .oneui-password-pill-wrap {
+  transform: translateY(-160px);
+}
+
+.phone-container.mode-words-active .emergency-btn {
+  margin-top: 6px;
+  background: rgba(88, 36, 68, 0.48);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  transition: opacity 0.22s ease, transform 0.25s ease-out, visibility 0.22s ease;
+}
+
+.phone-container.mode-words-active .footer-area {
+  transition: opacity 0.22s ease, transform 0.25s ease-out, visibility 0.22s ease;
+}
+
+.phone-container.mode-words-active.words-keyboard-open .emergency-btn,
+.phone-container.mode-words-active.words-keyboard-open .fingerprint-container {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(20px);
 }
 
 /* נקודות קוד PIN דינמיות (השטח מתחיל ריק לחלוטין, וכל הקשה יוצרת נקודה חדשה באנימציית pop/fade-in) */
@@ -2299,7 +2371,7 @@ html, body {
 
 .phone-container.mode-words-active .words-mode-spacer {
   display: block;
-  flex: 1;
+  flex: 0 0 4vh;
 }
 
 /* חץ חזרה ממוקם בצד ההפוך (בפינה הימנית התחתונה של המסך) ופונה לכיוון הנכון */

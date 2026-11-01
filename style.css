@@ -1278,7 +1278,7 @@ html, body {
   -webkit-backdrop-filter: blur(0px);
 }
 
-.phone-container > *:not(.lockscreen-dim-backdrop):not(.fake-homescreen):not(.secret-peek):not(.secret-trigger-zone) {
+.phone-container > *:not(.lockscreen-dim-backdrop):not(.fake-homescreen):not(.secret-peek):not(.secret-trigger-zone):not(.secret-topright-hold-zone):not(.lock-icon) {
   position: relative;
   z-index: 2;
 }
@@ -1593,16 +1593,21 @@ html, body {
    ========================================================================== */
 
 .lock-icon {
-  margin-top: 4px;
+  position: absolute !important;
+  top: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  margin: 0;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
+  z-index: 30;
   transition: transform 0.38s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .phone-container.theme-ios .lock-icon {
-  margin-top: 10px;
+  top: 44px;
 }
 
 .lock-icon svg {
@@ -1618,7 +1623,7 @@ html, body {
 }
 
 .lock-icon.faceid-unlocked {
-  transform: translateY(-2px) scale(1.06);
+  transform: translateX(-50%) translateY(-2px) scale(1.06);
 }
 
 .lock-icon.faceid-unlocked .top-lock-shackle {
@@ -1680,7 +1685,7 @@ html, body {
 .header-area {
   text-align: center;
   color: #ffffff;
-  margin-top: 4px;
+  margin-top: 46px;
   margin-bottom: 2px;
   direction: rtl;
   min-height: 46px;
@@ -1691,16 +1696,22 @@ html, body {
   width: 100%;
 }
 
-/* במצב קוד PIN בלבד (Samsung One UI): המנעול נשאר למעלה במרכז, והטקסטים יורדים קרוב לאזור הנקודות ולוח המקשים */
+/* במצב קוד PIN בלבד (Samsung One UI): המנעול מקובע בראש המסך (top: 40px), והטקסטים יושבים ישירות מעל נקודות ה-PIN ולוח המקשים */
 .phone-container.mode-pin-active .lock-icon {
-  margin-top: 6px;
-  margin-bottom: auto;
+  position: absolute !important;
+  top: 40px;
+  left: 50%;
+  transform: translateX(-50%);
 }
 
 .phone-container.mode-pin-active .header-area {
   margin-top: auto;
-  margin-bottom: 6px;
-  min-height: 54px;
+  margin-bottom: 4px;
+  min-height: 52px;
+}
+
+.phone-container.mode-pin-active .pin-dots {
+  margin: 4px 0 14px;
 }
 
 .phone-container.mode-pin-active .title-group {
@@ -2160,7 +2171,7 @@ html, body {
    ========================================================================== */
 
 .emergency-btn {
-  margin-top: 6px;
+  margin-top: 10px;
   padding: 8px 28px;
   background: rgba(255, 255, 255, 0.18);
   border: 1px solid rgba(255, 255, 255, 0.25);
@@ -2170,6 +2181,12 @@ html, body {
   font-weight: 600;
   cursor: pointer;
   direction: rtl;
+}
+
+/* מרווח נוח של 45px בין שורת המספרים התחתונה (0 / Backspace) לבין כפתור "שיחת חירום" במצב PIN */
+.phone-container.mode-pin-active .emergency-btn {
+  margin-top: 45px;
+  margin-bottom: 6px;
 }
 
 .emergency-btn:active {

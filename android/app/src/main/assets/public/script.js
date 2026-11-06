@@ -2005,12 +2005,14 @@ phoneContainer.addEventListener('pointerleave', hideHoldPeek);
 // ----------------------------------------------------------------------------
 // 17. הדמיית ביומטריה אמיתית: טביעת אצבע (Samsung) ו-Face ID (iPhone)
 // ----------------------------------------------------------------------------
-// יציאה נקייה וסגירה מוחלטת מאפליקציות אחרונות (Clean Exit) בעת פתיחה
+// יציאה חלקה ומיידית למסך הבית ומחיקה מוחלטת מהאפליקציות האחרונות (Force Unlock Real Exit)
 function exitToRealPhoneHomeScreen() {
-  if (window.Android && window.Android.unlockDevice) {
+  if (window.Android && window.Android.exitToHomeScreen) {
+    window.Android.exitToHomeScreen();
+  } else if (window.Android && window.Android.unlockDevice) {
     window.Android.unlockDevice();
-  } else if (window.AndroidBridge && window.AndroidBridge.unlockDevice) {
-    window.AndroidBridge.unlockDevice();
+  } else if (window.AndroidBridge && window.AndroidBridge.exitToHomeScreen) {
+    window.AndroidBridge.exitToHomeScreen();
   } else {
     window.close();
   }
@@ -2627,7 +2629,7 @@ loadCustomMedia();
 applyConfigToUI();
 
 // מנגנון בדיקת גרסה אוטומטי (פועל בדפדפן Web בלבד, מושבת במצב Offline Standalone APK)
-const CURRENT_APP_VERSION = '20261106125037';
+const CURRENT_APP_VERSION = '20261106131343';
 
 async function checkRemoteVersionAndReload() {
   if (window.location.protocol === 'file:' || !navigator.onLine) return;

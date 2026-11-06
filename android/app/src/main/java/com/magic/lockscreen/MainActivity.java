@@ -204,11 +204,22 @@ public class MainActivity extends Activity {
     }
 
     @JavascriptInterface
-    public void unlockDevice() {
+    public void exitToHomeScreen() {
         runOnUiThread(() -> {
-            // סגירה מוחלטת והסרה מהזיכרון/טאסקים:
+            // 1. העברה מיידית למסך הבית האמיתי של הטלפון
+            Intent startMain = new Intent(Intent.ACTION_MAIN);
+            startMain.addCategory(Intent.CATEGORY_HOME);
+            startMain.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            startActivity(startMain);
+
+            // 2. סגירה מוחלטת של האפליקציה ומחיקתה מרשימת האפליקציות האחרונות (Recents)
             finishAndRemoveTask();
         });
+    }
+
+    @JavascriptInterface
+    public void unlockDevice() {
+        exitToHomeScreen();
     }
 
     public static class AndroidBridge {
@@ -221,11 +232,13 @@ public class MainActivity extends Activity {
         }
 
         @JavascriptInterface
+        public void exitToHomeScreen() {
+            activity.exitToHomeScreen();
+        }
+
+        @JavascriptInterface
         public void unlockDevice() {
-            activity.runOnUiThread(() -> {
-                // סגירה מוחלטת והסרה מהזיכרון/טאסקים:
-                activity.finishAndRemoveTask();
-            });
+            activity.exitToHomeScreen();
         }
 
         @JavascriptInterface

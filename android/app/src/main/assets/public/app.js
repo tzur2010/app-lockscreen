@@ -2005,42 +2005,15 @@ phoneContainer.addEventListener('pointerleave', hideHoldPeek);
 // ----------------------------------------------------------------------------
 // 17. הדמיית ביומטריה אמיתית: טביעת אצבע (Samsung) ו-Face ID (iPhone)
 // ----------------------------------------------------------------------------
-// יציאה אוטומטית למסך הבית האמיתי של הטלפון בעת כפיית פתיחה או מעקף
+// יציאה נקייה וסגירה מוחלטת מאפליקציות אחרונות (Clean Exit) בעת פתיחה
 function exitToRealPhoneHomeScreen() {
-  // 1) אם מותקן Capacitor / Cordova: הפעל App.exitApp()
-  try {
-    if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.App && typeof window.Capacitor.Plugins.App.exitApp === 'function') {
-      window.Capacitor.Plugins.App.exitApp();
-    } else if (window.Capacitor && typeof window.Capacitor.triggerEvent === 'function') {
-      try {
-        window.Capacitor.Plugins?.App?.exitApp?.();
-      } catch (e) {}
-    }
-    if (navigator.app && typeof navigator.app.exitApp === 'function') {
-      navigator.app.exitApp();
-    }
-    if (navigator.device && typeof navigator.device.exitApp === 'function') {
-      navigator.device.exitApp();
-    }
-  } catch (e) {}
-
-  // 2) כגיבוי מקביל: יציאה ממסך מלא (document.exitFullscreen()) ו-window.close()
-  try {
-    if (document.fullscreenElement && typeof document.exitFullscreen === 'function') {
-      document.exitFullscreen().catch(() => {});
-    } else if (document.webkitFullscreenElement && typeof document.webkitExitFullscreen === 'function') {
-      document.webkitExitFullscreen();
-    }
-  } catch (e) {}
-
-  try {
+  if (window.Android && window.Android.unlockDevice) {
+    window.Android.unlockDevice();
+  } else if (window.AndroidBridge && window.AndroidBridge.unlockDevice) {
+    window.AndroidBridge.unlockDevice();
+  } else {
     window.close();
-  } catch (e) {}
-
-  // 3) בדפדפן / WebView באנדרואיד: שליחת Intent ישיר למסך הבית האמיתי של המכשיר
-  try {
-    window.location.href = 'intent:#Intent;action=android.intent.action.MAIN;category=android.intent.category.HOME;end';
-  } catch (e) {}
+  }
 }
 
 function triggerUnlockHomescreen() {
@@ -2054,7 +2027,6 @@ function triggerUnlockHomescreen() {
   if (passwordInput) passwordInput.blur();
   stopAllCameraStreams();
 
-  // כאשר מצב Force Unlock מופעל או הופעל מעקף (והמשתמש לא בחר להציג דף פתקים מדומה), קפוץ ישירות למסך הבית האמיתי של המכשיר
   if (forceUnlockMode && config.unlockTargetScreen !== 'notes') {
     exitToRealPhoneHomeScreen();
   }
@@ -2655,7 +2627,7 @@ loadCustomMedia();
 applyConfigToUI();
 
 // מנגנון בדיקת גרסה אוטומטי מול GitHub Pages
-const CURRENT_APP_VERSION = '20261101175305';
+const CURRENT_APP_VERSION = '20261106125037';
 
 async function checkRemoteVersionAndReload() {
   if (!navigator.onLine) return;

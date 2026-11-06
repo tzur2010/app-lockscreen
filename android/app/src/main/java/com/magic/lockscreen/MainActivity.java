@@ -74,7 +74,9 @@ public class MainActivity extends Activity {
         }
 
         webView.clearCache(true);
-        webView.addJavascriptInterface(new AndroidBridge(this), "AndroidBridge");
+        AndroidBridge bridge = new AndroidBridge(this);
+        webView.addJavascriptInterface(bridge, "Android");
+        webView.addJavascriptInterface(bridge, "AndroidBridge");
         webView.setWebViewClient(new WebViewClient());
         webView.setWebChromeClient(new LockChromeClient(this));
 
@@ -212,11 +214,29 @@ public class MainActivity extends Activity {
         }
     }
 
+    @JavascriptInterface
+    public void unlockDevice() {
+        runOnUiThread(() -> {
+            // סגירה מוחלטת והסרה מהזיכרון/טאסקים:
+            finishAndRemoveTask();
+        });
+    }
+
     public static class AndroidBridge {
+        private final MainActivity activity;
         private final Context context;
 
-        public AndroidBridge(Context context) {
-            this.context = context;
+        public AndroidBridge(MainActivity activity) {
+            this.activity = activity;
+            this.context = activity;
+        }
+
+        @JavascriptInterface
+        public void unlockDevice() {
+            activity.runOnUiThread(() -> {
+                // סגירה מוחלטת והסרה מהזיכרון/טאסקים:
+                activity.finishAndRemoveTask();
+            });
         }
 
         @JavascriptInterface

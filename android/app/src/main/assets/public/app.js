@@ -2626,11 +2626,11 @@ initBiometricsEnrollment();
 loadCustomMedia();
 applyConfigToUI();
 
-// מנגנון בדיקת גרסה אוטומטי מול GitHub Pages
-const CURRENT_APP_VERSION = '20261106125037';
+// מנגנון בדיקת גרסה אוטומטי (פועל בדפדפן Web בלבד, מושבת במצב Offline Standalone APK)
+const CURRENT_APP_VERSION = '20261106131343';
 
 async function checkRemoteVersionAndReload() {
-  if (!navigator.onLine) return;
+  if (window.location.protocol === 'file:' || !navigator.onLine) return;
   try {
     const res = await fetch(`./version.json?t=${Date.now()}`, { cache: 'no-store' });
     if (!res.ok) return;
@@ -2649,7 +2649,7 @@ async function checkRemoteVersionAndReload() {
   } catch (e) {}
 }
 
-if ('serviceWorker' in navigator) {
+if (window.location.protocol !== 'file:' && 'serviceWorker' in navigator) {
   navigator.serviceWorker.register('./sw.js', { scope: './' }).then((reg) => {
     // בדיקת עדכון בכל הפעלה
     reg.update();

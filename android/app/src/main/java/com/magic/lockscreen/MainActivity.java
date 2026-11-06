@@ -30,7 +30,7 @@ import java.util.Map;
 
 public class MainActivity extends Activity {
 
-    public static final String LIVE_URL = "https://tzur2010.github.io/app-lockscreen/";
+    public static final String LOCAL_ASSET_URL = "file:///android_asset/index.html";
     private static final int FILE_CHOOSER_RESULT_CODE = 1001;
     private static final int CAMERA_PERMISSION_CODE = 1002;
 
@@ -61,37 +61,26 @@ public class MainActivity extends Activity {
 
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
-        settings.setDomStorageEnabled(true);
-        settings.setDatabaseEnabled(true);
         settings.setAllowFileAccess(true);
         settings.setAllowContentAccess(true);
+        settings.setDomStorageEnabled(true);
+        settings.setDatabaseEnabled(true);
         settings.setAllowFileAccessFromFileURLs(true);
         settings.setAllowUniversalAccessFromFileURLs(true);
         settings.setMediaPlaybackRequiresUserGesture(false);
-        settings.setCacheMode(WebSettings.LOAD_NO_CACHE);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
-        }
 
-        webView.clearCache(true);
         AndroidBridge bridge = new AndroidBridge(this);
         webView.addJavascriptInterface(bridge, "Android");
         webView.addJavascriptInterface(bridge, "AndroidBridge");
         webView.setWebViewClient(new WebViewClient());
         webView.setWebChromeClient(new LockChromeClient(this));
 
-        webView.loadUrl("https://tzur2010.github.io/app-lockscreen/");
+        webView.loadUrl("file:///android_asset/index.html");
     }
 
     public void loadLatestLiveUrl() {
         if (webView == null) return;
-        webView.getSettings().setCacheMode(WebSettings.LOAD_NO_CACHE);
-        webView.clearCache(true);
-        Map<String, String> noCacheHeaders = new HashMap<String, String>();
-        noCacheHeaders.put("Cache-Control", "no-cache, no-store, must-revalidate");
-        noCacheHeaders.put("Pragma", "no-cache");
-        noCacheHeaders.put("Expires", "0");
-        webView.loadUrl("https://tzur2010.github.io/app-lockscreen/", noCacheHeaders);
+        webView.loadUrl("file:///android_asset/index.html");
     }
 
     public void handleWebPermissionRequest(PermissionRequest request) {

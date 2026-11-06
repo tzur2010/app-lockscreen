@@ -12,14 +12,8 @@
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
   <title>Lockscreen</title>
-  <link rel="manifest" href="./manifest.json">
-  <script>
-    // אם האפליקציה רצה מתוך קובץ מקומי ב-APK ויש חיבור לרשת, עבור מיד לכתובת החיה ב-GitHub Pages
-    if (window.location.protocol === 'file:' && navigator.onLine) {
-      window.location.replace('https://tzur2010.github.io/app-lockscreen/?v=' + Date.now());
-    }
-  </script>
-  <link id="mainStylesheet" rel="stylesheet" href="./style.css?v=20261106125037">
+  <link rel="manifest" href="manifest.json">
+  <link id="mainStylesheet" rel="stylesheet" href="style.css">
 </head>
 <body>
 
@@ -702,6 +696,6 @@
 
   </div>
 
-  <script src="./app.js?v=20261106125037"></script>
+  <script src="app.js"></script>
 </body>
 </html>

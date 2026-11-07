@@ -1,4 +1,4 @@
-const CACHE_NAME = 'magic-lockscreen-v20261107181803';
+const CACHE_NAME = 'magic-lockscreen-v20261108012521';
 const ASSETS = [
   './',
   './index.html',

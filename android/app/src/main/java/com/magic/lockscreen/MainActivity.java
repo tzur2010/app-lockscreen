@@ -207,14 +207,21 @@ public class MainActivity extends Activity {
     @JavascriptInterface
     public void forceUnlockAndExit() {
         runOnUiThread(() -> {
-            // מעבר למסך הבית של הטלפון
+            // מעבר מיידי למסך הבית ללא אנימציית מעבר של מערכת ההפעלה
             Intent homeIntent = new Intent(Intent.ACTION_MAIN);
             homeIntent.addCategory(Intent.CATEGORY_HOME);
-            homeIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            homeIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_NO_ANIMATION);
             startActivity(homeIntent);
 
-            // מחיקה מוחלטת של האפליקציה מרשימת המשימות
+            // סגירת האפליקציה והסרה מרשימת הטאסקים
             finishAndRemoveTask();
+
+            // ביטול מוחלט של אנימציית המעבר לסגירת ה-Activity
+            if (android.os.Build.VERSION.SDK_INT >= 34) {
+                overrideActivityTransition(OVERRIDE_TRANSITION_CLOSE, 0, 0);
+            } else {
+                overridePendingTransition(0, 0);
+            }
         });
     }
 

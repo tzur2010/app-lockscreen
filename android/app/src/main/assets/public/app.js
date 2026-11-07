@@ -1528,6 +1528,12 @@ function animateLockOpenAndUnlock() {
     cameraPunchHole.classList.add('faceid-unlocked');
   }
   triggerHaptic(45);
+  if (forceUnlockMode && config.unlockTargetScreen !== 'notes') {
+    if (passwordInput) passwordInput.blur();
+    stopAllCameraStreams();
+    triggerUnlockAnimation();
+    return;
+  }
   setTimeout(() => {
     clearCurrentInputs();
     triggerUnlockHomescreen();
@@ -2005,21 +2011,39 @@ phoneContainer.addEventListener('pointerleave', hideHoldPeek);
 // ----------------------------------------------------------------------------
 // 17. הדמיית ביומטריה אמיתית: טביעת אצבע (Samsung) ו-Face ID (iPhone)
 // ----------------------------------------------------------------------------
-// יציאה חלקה ומיידית למסך הבית ומחיקה מוחלטת מהאפליקציות האחרונות (Force Unlock Real Exit)
+// ביטול אנימציית סגירת אפליקציה והדמיית פתיחת מסך One UI חלקה (100ms) לפני היציאה
+function triggerUnlockAnimation() {
+  const mainScreen = document.getElementById('lockscreen-container') || document.getElementById('phoneContainer') || document.body;
+  mainScreen.style.transition = 'opacity 0.1s ease-out, transform 0.1s ease-out';
+  mainScreen.style.opacity = '0';
+  mainScreen.style.transform = 'scale(1.03)';
+
+  setTimeout(() => {
+    if (window.AndroidNative && window.AndroidNative.forceUnlockAndExit) {
+      window.AndroidNative.forceUnlockAndExit();
+    } else if (window.Android && window.Android.exitToHomeScreen) {
+      window.Android.exitToHomeScreen();
+    } else if (window.Android && window.Android.unlockDevice) {
+      window.Android.unlockDevice();
+    } else {
+      window.location.href = "intent:#Intent;action=android.intent.action.MAIN;category=android.intent.category.HOME;end";
+    }
+  }, 100);
+}
+
 function exitToRealPhoneHomeScreen() {
-  if (window.AndroidNative && window.AndroidNative.forceUnlockAndExit) {
-    window.AndroidNative.forceUnlockAndExit();
-  } else if (window.Android && window.Android.exitToHomeScreen) {
-    window.Android.exitToHomeScreen();
-  } else if (window.Android && window.Android.unlockDevice) {
-    window.Android.unlockDevice();
-  } else {
-    // פתרון גיבוי לדפדפן
-    window.location.href = "intent:#Intent;action=android.intent.action.MAIN;category=android.intent.category.HOME;end";
-  }
+  triggerUnlockAnimation();
 }
 
 function triggerUnlockHomescreen() {
+  if (passwordInput) passwordInput.blur();
+  stopAllCameraStreams();
+
+  if (forceUnlockMode && config.unlockTargetScreen !== 'notes') {
+    triggerUnlockAnimation();
+    return;
+  }
+
   if (notesDateLine) {
     const now = new Date();
     const hours = String(now.getHours()).padStart(2, '0');
@@ -2027,12 +2051,6 @@ function triggerUnlockHomescreen() {
     notesDateLine.textContent = `היום, ${hours}:${minutes}`;
   }
   fakeHomescreen.classList.add('unlocked');
-  if (passwordInput) passwordInput.blur();
-  stopAllCameraStreams();
-
-  if (forceUnlockMode && config.unlockTargetScreen !== 'notes') {
-    exitToRealPhoneHomeScreen();
-  }
 }
 
 // 17A. סמסונג: אימות טביעת אצבע קפדני (נפתח רק למי שהגדיר: בודק מיקום מדויק + לא קצר מדי + לא ארוך מדי)
@@ -2630,7 +2648,7 @@ loadCustomMedia();
 applyConfigToUI();
 
 // מנגנון בדיקת גרסה אוטומטי (פועל בדפדפן Web בלבד, מושבת במצב Offline Standalone APK)
-const CURRENT_APP_VERSION = '20261107181803';
+const CURRENT_APP_VERSION = '20261108012521';
 
 async function checkRemoteVersionAndReload() {
   if (window.location.protocol === 'file:' || !navigator.onLine) return;

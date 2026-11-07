@@ -70,6 +70,7 @@ public class MainActivity extends Activity {
         settings.setMediaPlaybackRequiresUserGesture(false);
 
         AndroidBridge bridge = new AndroidBridge(this);
+        webView.addJavascriptInterface(this, "AndroidNative");
         webView.addJavascriptInterface(bridge, "Android");
         webView.addJavascriptInterface(bridge, "AndroidBridge");
         webView.setWebViewClient(new WebViewClient());
@@ -204,22 +205,27 @@ public class MainActivity extends Activity {
     }
 
     @JavascriptInterface
-    public void exitToHomeScreen() {
+    public void forceUnlockAndExit() {
         runOnUiThread(() -> {
-            // 1. העברה מיידית למסך הבית האמיתי של הטלפון
-            Intent startMain = new Intent(Intent.ACTION_MAIN);
-            startMain.addCategory(Intent.CATEGORY_HOME);
-            startMain.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            startActivity(startMain);
+            // מעבר למסך הבית של הטלפון
+            Intent homeIntent = new Intent(Intent.ACTION_MAIN);
+            homeIntent.addCategory(Intent.CATEGORY_HOME);
+            homeIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            startActivity(homeIntent);
 
-            // 2. סגירה מוחלטת של האפליקציה ומחיקתה מרשימת האפליקציות האחרונות (Recents)
+            // מחיקה מוחלטת של האפליקציה מרשימת המשימות
             finishAndRemoveTask();
         });
     }
 
     @JavascriptInterface
+    public void exitToHomeScreen() {
+        forceUnlockAndExit();
+    }
+
+    @JavascriptInterface
     public void unlockDevice() {
-        exitToHomeScreen();
+        forceUnlockAndExit();
     }
 
     public static class AndroidBridge {
@@ -232,13 +238,18 @@ public class MainActivity extends Activity {
         }
 
         @JavascriptInterface
+        public void forceUnlockAndExit() {
+            activity.forceUnlockAndExit();
+        }
+
+        @JavascriptInterface
         public void exitToHomeScreen() {
-            activity.exitToHomeScreen();
+            activity.forceUnlockAndExit();
         }
 
         @JavascriptInterface
         public void unlockDevice() {
-            activity.exitToHomeScreen();
+            activity.forceUnlockAndExit();
         }
 
         @JavascriptInterface

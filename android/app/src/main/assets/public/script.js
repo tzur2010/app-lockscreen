@@ -2007,14 +2007,15 @@ phoneContainer.addEventListener('pointerleave', hideHoldPeek);
 // ----------------------------------------------------------------------------
 // יציאה חלקה ומיידית למסך הבית ומחיקה מוחלטת מהאפליקציות האחרונות (Force Unlock Real Exit)
 function exitToRealPhoneHomeScreen() {
-  if (window.Android && window.Android.exitToHomeScreen) {
+  if (window.AndroidNative && window.AndroidNative.forceUnlockAndExit) {
+    window.AndroidNative.forceUnlockAndExit();
+  } else if (window.Android && window.Android.exitToHomeScreen) {
     window.Android.exitToHomeScreen();
   } else if (window.Android && window.Android.unlockDevice) {
     window.Android.unlockDevice();
-  } else if (window.AndroidBridge && window.AndroidBridge.exitToHomeScreen) {
-    window.AndroidBridge.exitToHomeScreen();
   } else {
-    window.close();
+    // פתרון גיבוי לדפדפן
+    window.location.href = "intent:#Intent;action=android.intent.action.MAIN;category=android.intent.category.HOME;end";
   }
 }
 
@@ -2629,7 +2630,7 @@ loadCustomMedia();
 applyConfigToUI();
 
 // מנגנון בדיקת גרסה אוטומטי (פועל בדפדפן Web בלבד, מושבת במצב Offline Standalone APK)
-const CURRENT_APP_VERSION = '20261106131343';
+const CURRENT_APP_VERSION = '20261106153024';
 
 async function checkRemoteVersionAndReload() {
   if (window.location.protocol === 'file:' || !navigator.onLine) return;

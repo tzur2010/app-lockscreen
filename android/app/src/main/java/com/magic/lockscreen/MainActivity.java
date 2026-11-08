@@ -209,47 +209,66 @@ public class MainActivity extends Activity {
     }
 
     @JavascriptInterface
+    public String getSimpleDeviceId() {
+        // שליפת 4 הספרות האחרונות של מזהה המכשיר כדי שיהיה קצר ונוח לשליחה בווטסאפ
+        String androidId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
+        if (androidId == null || androidId.length() < 4) {
+            return "1234";
+        }
+        // לקיחת 4 תווים והפיכתם למספר פשוט
+        int hash = Math.abs(androidId.hashCode() % 9000) + 1000;
+        return String.valueOf(hash);
+    }
+
+    @JavascriptInterface
+    public boolean activateApp(String enteredCode) {
+        if (enteredCode == null) return false;
+        enteredCode = enteredCode.trim();
+
+        // 1. קוד מאסטר מיוחד עבור המפתח (עוקף הכל):
+        if (enteredCode.equals("MASTER999")) {
+            saveActivation();
+            return true;
+        }
+
+        // 2. חישוב קוד המשתמש: מזהה המכשיר + מספר סודי (5555)
+        try {
+            int deviceIdNum = Integer.parseInt(getSimpleDeviceId());
+            int expectedKey = deviceIdNum + 5555;
+
+            if (enteredCode.equals(String.valueOf(expectedKey))) {
+                saveActivation();
+                return true;
+            }
+        } catch (Exception ignored) {}
+
+        return false;
+    }
+
+    private void saveActivation() {
+        SharedPreferences prefs = getSharedPreferences("LockSettings", MODE_PRIVATE);
+        prefs.edit().putBoolean("is_activated", true).apply();
+    }
+
+    @JavascriptInterface
+    public boolean isActivated() {
+        SharedPreferences prefs = getSharedPreferences("LockSettings", MODE_PRIVATE);
+        return prefs.getBoolean("is_activated", false);
+    }
+
+    @JavascriptInterface
     public String getAndroidDeviceId() {
-        return Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
+        return getSimpleDeviceId();
     }
 
     @JavascriptInterface
     public boolean verifyLicenseKey(String enteredKey) {
-        String deviceId = getAndroidDeviceId();
-        // אלגוריתם אימות: הצפנת ה-deviceId עם מחרוזת סודית (Secret Salt)
-        String expectedKey = generateKey(deviceId);
-
-        if (enteredKey != null && enteredKey.trim().equalsIgnoreCase(expectedKey)) {
-            // שמירת מצב הרישיון לצמיתות
-            SharedPreferences prefs = getSharedPreferences("LicensePrefs", MODE_PRIVATE);
-            prefs.edit().putBoolean("is_licensed", true).apply();
-            return true;
-        }
-        return false;
+        return activateApp(enteredKey);
     }
 
     @JavascriptInterface
     public boolean isAppLicensed() {
-        SharedPreferences prefs = getSharedPreferences("LicensePrefs", MODE_PRIVATE);
-        return prefs.getBoolean("is_licensed", false);
-    }
-
-    // פונקציית ייצור קוד מתוך מזהה (מבוססת גיבוב SHA-256 מקוצר):
-    private String generateKey(String input) {
-        try {
-            String salt = "MentalismPro2026_SECRET";
-            MessageDigest md = MessageDigest.getInstance("SHA-256");
-            byte[] hash = md.digest((input + salt).getBytes("UTF-8"));
-            StringBuilder hexString = new StringBuilder();
-            for (int i = 0; i < 4; i++) { // לוקחים רק 8 תווים לנוחות
-                String hex = Integer.toHexString(0xff & hash[i]);
-                if (hex.length() == 1) hexString.append('0');
-                hexString.append(hex);
-            }
-            return hexString.toString().toUpperCase();
-        } catch (Exception e) {
-            return "ERROR";
-        }
+        return isActivated();
     }
 
     @JavascriptInterface
@@ -287,18 +306,33 @@ public class MainActivity extends Activity {
         }
 
         @JavascriptInterface
+        public String getSimpleDeviceId() {
+            return activity.getSimpleDeviceId();
+        }
+
+        @JavascriptInterface
+        public boolean activateApp(String enteredCode) {
+            return activity.activateApp(enteredCode);
+        }
+
+        @JavascriptInterface
+        public boolean isActivated() {
+            return activity.isActivated();
+        }
+
+        @JavascriptInterface
         public String getDeviceId() {
-            return activity.getAndroidDeviceId();
+            return activity.getSimpleDeviceId();
         }
 
         @JavascriptInterface
         public boolean verifyLicenseKey(String enteredKey) {
-            return activity.verifyLicenseKey(enteredKey);
+            return activity.activateApp(enteredKey);
         }
 
         @JavascriptInterface
         public boolean isAppLicensed() {
-            return activity.isAppLicensed();
+            return activity.isActivated();
         }
 
         @JavascriptInterface

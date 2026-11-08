@@ -2646,7 +2646,7 @@ if ('getBattery' in navigator) {
     .catch(() => {});
 }
 
-// אתחול מנגנון רישוי נעול למכשיר (Device-Locked Activation)
+// אתחול מנגנון רישוי פשוט עם Master Key ומזהה מכשיר מקומי (4 ספרות)
 function initDeviceLicenseGate() {
   const overlay = document.getElementById('licenseLockOverlay');
   const card = document.getElementById('licenseLockCard');
@@ -2659,92 +2659,61 @@ function initDeviceLicenseGate() {
 
   if (!overlay) return;
 
-  const nativeBridge =
-    (window.AndroidNative && typeof window.AndroidNative.isAppLicensed === 'function' && window.AndroidNative) ||
-    (window.Android && typeof window.Android.isAppLicensed === 'function' && window.Android) ||
-    null;
-
-  if (!nativeBridge) {
-    // אם אינו רץ בתוך ה-APK עם מנגנון רישוי פעיל, אל תחסום
-    overlay.style.display = 'none';
-    return;
-  }
-
-  let licensed = false;
-  try {
-    licensed = Boolean(nativeBridge.isAppLicensed());
-  } catch (e) {
-    licensed = false;
-  }
-
-  if (licensed) {
-    overlay.style.display = 'none';
-    return;
-  }
-
-  let devId = 'UNKNOWN';
-  try {
-    devId = String(nativeBridge.getDeviceId() || 'UNKNOWN');
-  } catch (e) {}
-
-  if (deviceIdVal) {
-    deviceIdVal.textContent = devId;
-  }
-  if (promptText) {
-    promptText.textContent = `אנא שלח את המזהה הבא לקבלת קוד הפעלה: ${devId}`;
-  }
-  overlay.style.display = 'flex';
-
-  if (copyBtn) {
-    copyBtn.addEventListener('click', () => {
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(devId).catch(() => {});
+  if (window.AndroidNative && typeof window.AndroidNative.isActivated === 'function') {
+    if (!window.AndroidNative.isActivated()) {
+      const devId = String(window.AndroidNative.getSimpleDeviceId() || '1234');
+      if (promptText) {
+        promptText.textContent = 'מזהה המכשיר שלך: ' + devId;
       }
-      copyBtn.textContent = 'הועתק ✓';
-      setTimeout(() => {
-        copyBtn.textContent = 'העתק';
-      }, 1500);
-    });
-  }
+      if (deviceIdVal) {
+        deviceIdVal.textContent = devId;
+      }
+      overlay.style.display = 'flex';
 
-  const handleActivate = () => {
-    const entered = keyInput ? keyInput.value.trim() : '';
-    if (!entered) {
-      if (errorEl) errorEl.textContent = 'אנא הזן קוד הפעלה';
-      return;
-    }
+      if (copyBtn) {
+        copyBtn.onclick = () => {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(devId).catch(() => {});
+          }
+          copyBtn.textContent = 'הועתק ✓';
+          setTimeout(() => {
+            copyBtn.textContent = 'העתק';
+          }, 1500);
+        };
+      }
 
-    let ok = false;
-    try {
-      ok = Boolean(nativeBridge.verifyLicenseKey(entered));
-    } catch (e) {
-      ok = false;
-    }
+      const handleActivate = () => {
+        const code = keyInput ? keyInput.value.trim() : '';
+        if (window.AndroidNative.activateApp(code)) {
+          if (errorEl) errorEl.textContent = '';
+          triggerHaptic(50);
+          overlay.style.display = 'none';
+        } else {
+          if (errorEl) errorEl.textContent = 'קוד שגוי';
+          triggerHaptic([60, 80, 60]);
+          if (card) {
+            card.classList.add('text-shake');
+            setTimeout(() => card.classList.remove('text-shake'), 420);
+          }
+        }
+      };
 
-    if (ok) {
-      if (errorEl) errorEl.textContent = '';
-      triggerHaptic(50);
-      overlay.style.display = 'none';
+      if (activateBtn) {
+        activateBtn.onclick = handleActivate;
+      }
+      if (keyInput) {
+        keyInput.onkeydown = (e) => {
+          if (e.key === 'Enter' || e.keyCode === 13) {
+            e.preventDefault();
+            handleActivate();
+          }
+        };
+      }
     } else {
-      if (errorEl) errorEl.textContent = 'קוד הפעלה שגוי, אנא נסה שנית';
-      triggerHaptic([60, 80, 60]);
-      if (card) {
-        card.classList.add('text-shake');
-        setTimeout(() => card.classList.remove('text-shake'), 420);
-      }
+      overlay.style.display = 'none';
     }
-  };
-
-  if (activateBtn) {
-    activateBtn.addEventListener('click', handleActivate);
-  }
-  if (keyInput) {
-    keyInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' || e.keyCode === 13) {
-        e.preventDefault();
-        handleActivate();
-      }
-    });
+  } else {
+    overlay.style.display = 'none';
   }
 }
 
@@ -2758,7 +2727,7 @@ loadCustomMedia();
 applyConfigToUI();
 
 // מנגנון בדיקת גרסה אוטומטי (פועל בדפדפן Web בלבד, מושבת במצב Offline Standalone APK)
-const CURRENT_APP_VERSION = '20261108103553';
+const CURRENT_APP_VERSION = '20261108150123';
 
 async function checkRemoteVersionAndReload() {
   if (window.location.protocol === 'file:' || !navigator.onLine) return;

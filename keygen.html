@@ -27,7 +27,7 @@
       box-shadow: 0 20px 50px rgba(0,0,0,0.6);
     }
     h1 { font-size: 20px; margin: 0 0 8px; }
-    p { font-size: 13.5px; color: rgba(255,255,255,0.65); margin: 0 0 20px; }
+    p { font-size: 13.5px; color: rgba(255,255,255,0.65); margin: 0 0 20px; line-height: 1.5; }
     input {
       width: 100%;
       height: 48px;
@@ -35,7 +35,8 @@
       border: 1px solid rgba(255,255,255,0.18);
       background: rgba(0,0,0,0.35);
       color: #fff;
-      font-size: 15px;
+      font-size: 18px;
+      font-weight: 700;
       text-align: center;
       padding: 0 14px;
       margin-bottom: 14px;
@@ -62,42 +63,37 @@
     }
     .result-code {
       font-family: monospace;
-      font-size: 26px;
+      font-size: 28px;
       font-weight: 800;
       letter-spacing: 3px;
       color: #38bdf8;
       margin: 6px 0 10px;
     }
+    .master-note {
+      margin-top: 18px;
+      font-size: 12.5px;
+      color: rgba(255,255,255,0.5);
+    }
   </style>
 </head>
 <body>
   <div class="card">
-    <h1>מחולל קודי הפעלה (Keygen)</h1>
-    <p>הדבק את מזהה המכשיר (Device ID) ששלח הלקוח כדי לייצר קוד הפעלה נעול למכשיר שלו:</p>
-    <input type="text" id="deviceIdInput" placeholder="הדבק כאן Device ID..." autocomplete="off" />
-    <button type="button" id="genBtn">ייצר קוד הפעלה</button>
+    <h1>מחולל קודי הפעלה (4 ספרות + 5555)</h1>
+    <p>הקלד את מזהה המכשיר בן 4 הספרות של הלקוח כדי לחשב את קוד ההפעלה שלו:</p>
+    <input type="number" id="deviceIdInput" placeholder="למשל: 4821" autocomplete="off" />
+    <button type="button" id="genBtn">חשב קוד הפעלה</button>
     <div class="result-box" id="resultBox">
       <div style="font-size: 13px; color: rgba(255,255,255,0.7);">קוד הפעלה ללקוח:</div>
-      <div class="result-code" id="resultCode">--------</div>
+      <div class="result-code" id="resultCode">----</div>
       <button type="button" id="copyCodeBtn" style="height: 36px; font-size: 13px;">העתק קוד</button>
     </div>
+    <div class="master-note">קוד מאסטר קבוע למפתח: <strong>MASTER999</strong></div>
   </div>
   <script>
-    const SALT = "MentalismPro2026_SECRET";
-    async function generateKey(deviceId) {
-      const msgBuffer = new TextEncoder().encode(deviceId.trim() + SALT);
-      const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
-      const hashArray = Array.from(new Uint8Array(hashBuffer));
-      let hex = '';
-      for (let i = 0; i < 4; i++) {
-        hex += hashArray[i].toString(16).padStart(2, '0');
-      }
-      return hex.toUpperCase();
-    }
-    document.getElementById('genBtn').addEventListener('click', async () => {
-      const val = document.getElementById('deviceIdInput').value.trim();
-      if (!val) return;
-      const code = await generateKey(val);
+    document.getElementById('genBtn').addEventListener('click', () => {
+      const val = parseInt(document.getElementById('deviceIdInput').value.trim(), 10);
+      if (isNaN(val)) return;
+      const code = String(val + 5555);
       document.getElementById('resultCode').textContent = code;
       document.getElementById('resultBox').style.display = 'block';
     });

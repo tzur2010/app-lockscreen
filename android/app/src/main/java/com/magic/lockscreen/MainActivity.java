@@ -45,6 +45,7 @@ public class MainActivity extends Activity {
         requestWindowFeature(Window.FEATURE_NO_TITLE);
         Window window = getWindow();
         if (window != null) {
+            window.setBackgroundDrawableResource(android.R.color.transparent);
             window.addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
             window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
@@ -56,7 +57,7 @@ public class MainActivity extends Activity {
         enableImmersiveFullscreen();
 
         webView = new WebView(this);
-        webView.setBackgroundColor(Color.parseColor("#0f1026"));
+        webView.setBackgroundColor(Color.TRANSPARENT);
         setContentView(webView);
 
         WebSettings settings = webView.getSettings();
@@ -207,21 +208,15 @@ public class MainActivity extends Activity {
     @JavascriptInterface
     public void forceUnlockAndExit() {
         runOnUiThread(() -> {
-            // מעבר מיידי למסך הבית ללא אנימציית מעבר של מערכת ההפעלה
-            Intent homeIntent = new Intent(Intent.ACTION_MAIN);
-            homeIntent.addCategory(Intent.CATEGORY_HOME);
-            homeIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_NO_ANIMATION);
-            startActivity(homeIntent);
+            // העברת האפליקציה לרקע ללא אנימציית סגירת חלון
+            moveTaskToBack(true);
 
-            // סגירת האפליקציה והסרה מרשימת הטאסקים
+            // סגירה מלאה והסרה מהזיכרון
             finishAndRemoveTask();
-
-            // ביטול מוחלט של אנימציית המעבר לסגירת ה-Activity
             if (android.os.Build.VERSION.SDK_INT >= 34) {
                 overrideActivityTransition(OVERRIDE_TRANSITION_CLOSE, 0, 0);
-            } else {
-                overridePendingTransition(0, 0);
             }
+            overridePendingTransition(0, 0);
         });
     }
 

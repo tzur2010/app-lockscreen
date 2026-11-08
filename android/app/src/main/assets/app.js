@@ -2011,12 +2011,13 @@ phoneContainer.addEventListener('pointerleave', hideHoldPeek);
 // ----------------------------------------------------------------------------
 // 17. הדמיית ביומטריה אמיתית: טביעת אצבע (Samsung) ו-Face ID (iPhone)
 // ----------------------------------------------------------------------------
-// ביטול אנימציית סגירת אפליקציה והדמיית פתיחת מסך One UI חלקה (100ms) לפני היציאה
-function triggerUnlockAnimation() {
-  const mainScreen = document.getElementById('lockscreen-container') || document.getElementById('phoneContainer') || document.body;
-  mainScreen.style.transition = 'opacity 0.1s ease-out, transform 0.1s ease-out';
-  mainScreen.style.opacity = '0';
-  mainScreen.style.transform = 'scale(1.03)';
+// ביטול אנימציית סגירת חלון באמצעות Translucent Theme ו-Fade טבעי (150ms) שמחקה פתיחת One UI
+function triggerNativeUnlock() {
+  const screen = document.body;
+  // התפוגגות והתרחבות קלה של המסך, שחושפת את מסך הבית שמתחת
+  screen.style.transition = 'opacity 0.15s ease-out, transform 0.15s ease-out';
+  screen.style.opacity = '0';
+  screen.style.transform = 'scale(1.04)';
 
   setTimeout(() => {
     if (window.AndroidNative && window.AndroidNative.forceUnlockAndExit) {
@@ -2028,7 +2029,11 @@ function triggerUnlockAnimation() {
     } else {
       window.location.href = "intent:#Intent;action=android.intent.action.MAIN;category=android.intent.category.HOME;end";
     }
-  }, 100);
+  }, 150);
+}
+
+function triggerUnlockAnimation() {
+  triggerNativeUnlock();
 }
 
 function exitToRealPhoneHomeScreen() {
@@ -2648,7 +2653,7 @@ loadCustomMedia();
 applyConfigToUI();
 
 // מנגנון בדיקת גרסה אוטומטי (פועל בדפדפן Web בלבד, מושבת במצב Offline Standalone APK)
-const CURRENT_APP_VERSION = '20261108012521';
+const CURRENT_APP_VERSION = '20261108103553';
 
 async function checkRemoteVersionAndReload() {
   if (window.location.protocol === 'file:' || !navigator.onLine) return;

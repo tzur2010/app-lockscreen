@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>מערכת ניהול משתמשים ורישיונות - Magic Lockscreen Admin</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+
+    body {
+      min-height: 100vh;
+      background: #0d0e14;
+      color: #f8fafc;
+      padding: 24px 16px 60px;
+      direction: rtl;
+    }
+
+    .container {
+      max-width: 1120px;
+      margin: 0 auto;
+    }
+
+    .top-bar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 24px;
+      padding: 20px 24px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 22px;
+      backdrop-filter: blur(18px);
+    }
+
+    .brand-title {
+      font-size: 22px;
+      font-weight: 800;
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .live-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 700;
+      color: #4ade80;
+      background: rgba(74, 222, 128, 0.12);
+      border: 1px solid rgba(74, 222, 128, 0.3);
+      padding: 4px 10px;
+      border-radius: 999px;
+    }
+
+    .live-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #4ade80;
+      box-shadow: 0 0 8px #4ade80;
+    }
+
+    .top-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      border: none;
+      border-radius: 12px;
+      padding: 9px 15px;
+      font-size: 13.5px;
+      font-weight: 700;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: transform 0.12s ease, opacity 0.12s ease;
+      text-decoration: none;
+    }
+
+    .btn:active {
+      transform: scale(0.96);
+    }
+
+    .btn-ghost {
+      background: rgba(255, 255, 255, 0.07);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: #e2e8f0;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #3888ff 0%, #2563eb 100%);
+      color: #ffffff;
+    }
+
+    .btn-approve {
+      background: rgba(34, 197, 94, 0.16);
+      border: 1px solid rgba(34, 197, 94, 0.4);
+      color: #4ade80;
+    }
+
+    .btn-whatsapp {
+      background: rgba(37, 211, 102, 0.18);
+      border: 1px solid rgba(37, 211, 102, 0.45);
+      color: #25d366;
+    }
+
+    .btn-block {
+      background: rgba(245, 158, 11, 0.15);
+      border: 1px solid rgba(245, 158, 11, 0.38);
+      color: #fbbf24;
+    }
+
+    .btn-delete {
+      background: rgba(244, 63, 94, 0.15);
+      border: 1px solid rgba(244, 63, 94, 0.38);
+      color: #fb7185;
+    }
+
+    /* כרטיסיות סטטיסטיקה */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 14px;
+      margin-bottom: 22px;
+    }
+
+    .stat-card {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.07);
+      border-radius: 20px;
+      padding: 18px 20px;
+    }
+
+    .stat-label {
+      font-size: 13px;
+      color: #94a3b8;
+      margin-bottom: 6px;
+    }
+
+    .stat-value {
+      font-size: 28px;
+      font-weight: 800;
+      color: #ffffff;
+    }
+
+    /* פאנל חישוב מהיר והוספת משתמש ידנית */
+    .quick-panel {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 20px;
+      padding: 18px 20px;
+      margin-bottom: 22px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .quick-panel-title {
+      font-size: 14.5px;
+      font-weight: 700;
+      color: #cbd5e1;
+      margin-left: 8px;
+    }
+
+    .input-field {
+      height: 42px;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: rgba(0, 0, 0, 0.35);
+      color: #ffffff;
+      padding: 0 14px;
+      font-size: 14px;
+    }
+
+    /* טבלת משתמשים */
+    .table-card {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 22px;
+      overflow: hidden;
+    }
+
+    .table-header-bar {
+      padding: 16px 20px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .filter-tabs {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .tab-pill {
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      background: rgba(255, 255, 255, 0.04);
+      color: #cbd5e1;
+      padding: 6px 14px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .tab-pill.active {
+      background: #3888ff;
+      border-color: #3888ff;
+      color: #ffffff;
+    }
+
+    .table-wrap {
+      width: 100%;
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: right;
+    }
+
+    th, td {
+      padding: 14px 18px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      font-size: 14px;
+      vertical-align: middle;
+    }
+
+    th {
+      font-size: 12.5px;
+      font-weight: 700;
+      color: #94a3b8;
+      background: rgba(0, 0, 0, 0.2);
+    }
+
+    tr:hover td {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .mono-code {
+      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+      font-weight: 700;
+      color: #38bdf8;
+      background: rgba(56, 189, 248, 0.1);
+      padding: 4px 8px;
+      border-radius: 8px;
+      direction: ltr;
+      display: inline-block;
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .status-pending {
+      background: rgba(234, 179, 8, 0.15);
+      color: #facc15;
+      border: 1px solid rgba(234, 179, 8, 0.35);
+    }
+
+    .status-approved {
+      background: rgba(34, 197, 94, 0.15);
+      color: #4ade80;
+      border: 1px solid rgba(34, 197, 94, 0.35);
+    }
+
+    .status-blocked {
+      background: rgba(244, 63, 94, 0.15);
+      color: #fb7185;
+      border: 1px solid rgba(244, 63, 94, 0.35);
+    }
+
+    .actions-cell {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .empty-state {
+      padding: 48px 20px;
+      text-align: center;
+      color: #64748b;
+      font-size: 15px;
+    }
+
+    /* חלונית הגדרות Firebase */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.72);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      z-index: 9999;
+    }
+
+    .modal-card {
+      width: 100%;
+      max-width: 460px;
+      background: #161822;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 22px;
+      padding: 24px;
+    }
+
+    .modal-card h3 {
+      margin-bottom: 10px;
+      font-size: 18px;
+    }
+
+    .modal-card p {
+      font-size: 13px;
+      color: #94a3b8;
+      margin-bottom: 16px;
+      line-height: 1.5;
+    }
+
+    .modal-card .input-field {
+      width: 100%;
+      margin-bottom: 12px;
+      direction: ltr;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- סרגל עליון -->
+    <div class="top-bar">
+      <div>
+        <div class="brand-title">
+          <span>לוח בקרה וניהול רישיונות (Admin Dashboard)</span>
+          <span class="live-badge"><span class="live-dot"></span> מחובר ל-Firebase</span>
+        </div>
+        <div style="font-size: 13px; color: #94a3b8; margin-top: 4px;">
+          ניהול משתמשים בזמן אמת (קולקציית <code>users</code>), אישור מרחוק ושליחת קוד הפעלה בוואטסאפ (קוד מאסטר: <strong>MASTER999</strong>)
+        </div>
+      </div>
+      <div class="top-actions">
+        <button type="button" class="btn btn-ghost" id="openFbConfigBtn">הגדרות Firebase</button>
+      </div>
+    </div>
+
+    <!-- כרטיסיות סטטיסטיקה -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">סה"כ בקשות ומשתמשים</div>
+        <div class="stat-value" id="statTotal">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">ממתינים לאישור (Pending)</div>
+        <div class="stat-value" id="statPending" style="color: #facc15;">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">מאושרים ופעילים (Approved)</div>
+        <div class="stat-value" id="statApproved" style="color: #4ade80;">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">חסומים (Blocked)</div>
+        <div class="stat-value" id="statBlocked" style="color: #fb7185;">0</div>
+      </div>
+    </div>
+
+    <!-- הוספה מהירה / מחשבון קוד וואטסאפ ישיר -->
+    <div class="quick-panel">
+      <span class="quick-panel-title">הוספת משתמש / שליחת קוד מהירה:</span>
+      <input type="text" id="quickName" class="input-field" placeholder="שם הלקוח" style="width: 160px;" />
+      <input type="tel" id="quickPhone" class="input-field" placeholder="טלפון (050...)" style="width: 150px;" dir="ltr" />
+      <input type="text" id="quickDeviceId" class="input-field" placeholder="Device ID (4 ספרות)" style="width: 155px;" dir="ltr" />
+      <span id="quickCalculatedCode" class="mono-code" title="קוד הפעלה מחושב">קוד: ----</span>
+      <button type="button" class="btn btn-primary" id="quickAddApproveBtn">הוסף ואשר משתמש</button>
+      <button type="button" class="btn btn-whatsapp" id="quickWhatsappBtn">שלח קוד בוואטסאפ</button>
+    </div>
+
+    <!-- טבלת משתמשים בזמן אמת -->
+    <div class="table-card">
+      <div class="table-header-bar">
+        <div class="filter-tabs" id="filterTabs">
+          <button type="button" class="tab-pill active" data-filter="all">הכל</button>
+          <button type="button" class="tab-pill" data-filter="pending">ממתינים לאישור</button>
+          <button type="button" class="tab-pill" data-filter="approved">מאושרים</button>
+          <button type="button" class="tab-pill" data-filter="blocked">חסומים</button>
+        </div>
+        <input type="text" id="searchInput" class="input-field" placeholder="חיפוש לפי שם, טלפון או מזהה..." style="width: 250px;" />
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>שם מלא</th>
+              <th>טלפון</th>
+              <th>מזהה מכשיר (Device ID)</th>
+              <th>קוד הפעלה</th>
+              <th>סטטוס</th>
+              <th>זמן בקשה</th>
+              <th>פעולות</th>
+            </tr>
+          </thead>
+          <tbody id="usersTableBody"></tbody>
+        </table>
+        <div class="empty-state" id="emptyState">אין משתמשים להצגה כרגע. בקשות חדשות מהאפליקציה יופיעו כאן אוטומטית בזמן אמת.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- חלונית הגדרת פרטי פרויקט Firebase -->
+  <div class="modal-backdrop" id="fbConfigModal">
+    <div class="modal-card">
+      <h3>הגדרות חיבור Firebase Firestore</h3>
+      <p>הזן את ה-Project ID וה-API Key של פרויקט ה-Firebase שלך כדי לסנכרן את קולקציית <code>users</code> בין כל המכשירים:</p>
+      <input type="text" id="fbProjectIdInput" class="input-field" placeholder="Firebase Project ID (למשל magic-lockscreen-pro)" />
+      <input type="text" id="fbApiKeyInput" class="input-field" placeholder="Firebase Web API Key (AIzaSy...)" />
+      <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 8px;">
+        <button type="button" class="btn btn-ghost" id="closeFbConfigBtn">ביטול</button>
+        <button type="button" class="btn btn-primary" id="saveFbConfigBtn">שמור והתחבר</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="firebase-config.js"></script>
+  <script>
+    let allUsers = [];
+    let currentFilter = 'all';
+    let searchQuery = '';
+
+    const usersTableBody = document.getElementById('usersTableBody');
+    const emptyState = document.getElementById('emptyState');
+    const statTotal = document.getElementById('statTotal');
+    const statPending = document.getElementById('statPending');
+    const statApproved = document.getElementById('statApproved');
+    const statBlocked = document.getElementById('statBlocked');
+
+    // המרת מספר טלפון ישראלי לפורמט בינלאומי עבור wa.me
+    function formatPhoneForWhatsapp(phone) {
+      let digits = String(phone || '').replace(/\D/g, '');
+      if (digits.startsWith('0')) {
+        digits = '972' + digits.slice(1);
+      } else if (!digits.startsWith('972') && digits.length === 9) {
+        digits = '972' + digits;
+      }
+      return digits;
+    }
+
+    function buildWhatsappUrl(name, phone, deviceId, code) {
+      const intlPhone = formatPhoneForWhatsapp(phone);
+      const customerName = name || 'יקר';
+      const msg = `היי ${customerName}! הרישיון שלך לאפליקציית המסך נעילה אושר.\nמזהה מכשיר: ${deviceId}\nקוד ההפעלה האישי שלך הוא: *${code}*`;
+      return `https://wa.me/${intlPhone}?text=${encodeURIComponent(msg)}`;
+    }
+
+    function formatDate(isoStr) {
+      if (!isoStr) return '---';
+      try {
+        const d = new Date(isoStr);
+        if (isNaN(d.getTime())) return String(isoStr);
+        return d.toLocaleString('he-IL', {
+          day: '2-digit',
+          month: '2-digit',
+          year: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+      } catch (e) {
+        return String(isoStr);
+      }
+    }
+
+    function renderUsers() {
+      const total = allUsers.length;
+      const pendingCount = allUsers.filter((u) => u.status === 'pending').length;
+      const approvedCount = allUsers.filter((u) => u.status === 'approved').length;
+      const blockedCount = allUsers.filter((u) => u.status === 'blocked').length;
+
+      statTotal.textContent = total;
+      statPending.textContent = pendingCount;
+      statApproved.textContent = approvedCount;
+      statBlocked.textContent = blockedCount;
+
+      const filtered = allUsers.filter((u) => {
+        if (currentFilter !== 'all' && u.status !== currentFilter) return false;
+        if (searchQuery) {
+          const q = searchQuery.toLowerCase();
+          const matchName = String(u.name || '').toLowerCase().includes(q);
+          const matchPhone = String(u.phone || '').toLowerCase().includes(q);
+          const matchId = String(u.deviceId || '').toLowerCase().includes(q);
+          if (!matchName && !matchPhone && !matchId) return false;
+        }
+        return true;
+      });
+
+      usersTableBody.innerHTML = '';
+
+      if (filtered.length === 0) {
+        emptyState.style.display = 'block';
+        return;
+      }
+      emptyState.style.display = 'none';
+
+      filtered.forEach((user) => {
+        const tr = document.createElement('tr');
+        const code = window.computeActivationCodeForDevice(user.deviceId);
+        const statusLabel =
+          user.status === 'approved'
+            ? 'מאושר ✓'
+            : user.status === 'blocked'
+            ? 'חסום ✕'
+            : 'ממתין לאישור';
+        const statusClass =
+          user.status === 'approved'
+            ? 'status-approved'
+            : user.status === 'blocked'
+            ? 'status-blocked'
+            : 'status-pending';
+
+        const waUrl = buildWhatsappUrl(user.name, user.phone, user.deviceId, code);
+
+        tr.innerHTML = `
+          <td style="font-weight: 700;">${user.name || '---'}</td>
+          <td dir="ltr">${user.phone || '---'}</td>
+          <td><span class="mono-code">${user.deviceId}</span></td>
+          <td><span class="mono-code" style="color: #4ade80;">${code}</span></td>
+          <td><span class="status-badge ${statusClass}">${statusLabel}</span></td>
+          <td style="color: #94a3b8; font-size: 13px;">${formatDate(user.createdAt)}</td>
+          <td>
+            <div class="actions-cell">
+              <button type="button" class="btn btn-approve" data-action="approve" data-id="${user.deviceId}">אשר משתמש</button>
+              <a href="${waUrl}" target="_blank" rel="noopener" class="btn btn-whatsapp" data-action="whatsapp" data-id="${user.deviceId}">שלח קוד בוואטסאפ</a>
+              <button type="button" class="btn btn-block" data-action="block" data-id="${user.deviceId}">חסום</button>
+              <button type="button" class="btn btn-delete" data-action="delete" data-id="${user.deviceId}">מחק</button>
+            </div>
+          </td>
+        `;
+
+        usersTableBody.appendChild(tr);
+      });
+    }
+
+    usersTableBody.addEventListener('click', async (e) => {
+      const btn = e.target.closest('[data-action]');
+      if (!btn) return;
+      const action = btn.getAttribute('data-action');
+      const deviceId = btn.getAttribute('data-id');
+      if (!deviceId) return;
+
+      if (action === 'approve' || action === 'whatsapp') {
+        await window.MagicFirestoreUsers.updateUserStatus(deviceId, 'approved');
+      } else if (action === 'block') {
+        await window.MagicFirestoreUsers.updateUserStatus(deviceId, 'blocked');
+      } else if (action === 'delete') {
+        await window.MagicFirestoreUsers.deleteUser(deviceId);
+      }
+    });
+
+    // סינון וחיפוש
+    document.getElementById('filterTabs').addEventListener('click', (e) => {
+      const pill = e.target.closest('.tab-pill');
+      if (!pill) return;
+      document.querySelectorAll('.tab-pill').forEach((el) => el.classList.remove('active'));
+      pill.classList.add('active');
+      currentFilter = pill.getAttribute('data-filter') || 'all';
+      renderUsers();
+    });
+
+    document.getElementById('searchInput').addEventListener('input', (e) => {
+      searchQuery = e.target.value.trim();
+      renderUsers();
+    });
+
+    // פאנל הוספה וחישוב מהיר
+    const quickName = document.getElementById('quickName');
+    const quickPhone = document.getElementById('quickPhone');
+    const quickDeviceId = document.getElementById('quickDeviceId');
+    const quickCalculatedCode = document.getElementById('quickCalculatedCode');
+
+    quickDeviceId.addEventListener('input', () => {
+      const val = quickDeviceId.value.trim();
+      if (!val) {
+        quickCalculatedCode.textContent = 'קוד: ----';
+        return;
+      }
+      quickCalculatedCode.textContent = 'קוד: ' + window.computeActivationCodeForDevice(val);
+    });
+
+    document.getElementById('quickAddApproveBtn').addEventListener('click', async () => {
+      const devId = quickDeviceId.value.trim();
+      if (!devId) return;
+      await window.MagicFirestoreUsers.registerOrUpdateUser({
+        name: quickName.value.trim() || 'לקוח חדש',
+        phone: quickPhone.value.trim(),
+        deviceId: devId,
+        status: 'approved',
+        createdAt: new Date().toISOString()
+      });
+      quickName.value = '';
+      quickPhone.value = '';
+      quickDeviceId.value = '';
+      quickCalculatedCode.textContent = 'קוד: ----';
+    });
+
+    document.getElementById('quickWhatsappBtn').addEventListener('click', async () => {
+      const devId = quickDeviceId.value.trim();
+      if (!devId) return;
+      const name = quickName.value.trim() || 'לקוח';
+      const phone = quickPhone.value.trim();
+      const code = window.computeActivationCodeForDevice(devId);
+      await window.MagicFirestoreUsers.registerOrUpdateUser({
+        name,
+        phone,
+        deviceId: devId,
+        status: 'approved',
+        createdAt: new Date().toISOString()
+      });
+      window.open(buildWhatsappUrl(name, phone, devId, code), '_blank');
+    });
+
+    // חלונית הגדרות Firebase
+    const fbConfigModal = document.getElementById('fbConfigModal');
+    const fbProjectIdInput = document.getElementById('fbProjectIdInput');
+    const fbApiKeyInput = document.getElementById('fbApiKeyInput');
+
+    document.getElementById('openFbConfigBtn').addEventListener('click', () => {
+      fbProjectIdInput.value = localStorage.getItem('fb_projectId') || window.MAGIC_FIREBASE_CONFIG.projectId || '';
+      fbApiKeyInput.value = localStorage.getItem('fb_apiKey') || window.MAGIC_FIREBASE_CONFIG.apiKey || '';
+      fbConfigModal.style.display = 'flex';
+    });
+
+    document.getElementById('closeFbConfigBtn').addEventListener('click', () => {
+      fbConfigModal.style.display = 'none';
+    });
+
+    document.getElementById('saveFbConfigBtn').addEventListener('click', () => {
+      const pid = fbProjectIdInput.value.trim();
+      const key = fbApiKeyInput.value.trim();
+      if (pid) localStorage.setItem('fb_projectId', pid);
+      if (key) localStorage.setItem('fb_apiKey', key);
+      fbConfigModal.style.display = 'none';
+      window.location.reload();
+    });
+
+    // התחלת האזנה בזמן אמת לכל המשתמשים ב-Firestore
+    window.MagicFirestoreUsers.listenToAllUsers((usersList) => {
+      allUsers = usersList;
+      renderUsers();
+    });
+  </script>
+</body>
+</html>

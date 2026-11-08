@@ -18,7 +18,7 @@
 <body>
 
   <!-- ========================================================================
-       0. מסך רישוי נעול למכשיר (Device-Locked Activation Overlay)
+       0. מסך הרשמה ורישוי נעול למכשיר (Firebase Registration + Master Key)
        ======================================================================== -->
   <div class="license-lock-overlay" id="licenseLockOverlay" style="display: none;">
     <div class="license-lock-card" id="licenseLockCard">
@@ -28,7 +28,7 @@
           <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
         </svg>
       </div>
-      <h2 class="license-lock-title">הפעלת אפליקציה</h2>
+      <h2 class="license-lock-title">הרשמה והפעלת רישיון</h2>
       <p class="license-lock-desc" id="licensePromptText">
         מזהה המכשיר שלך: ----
       </p>
@@ -36,6 +36,37 @@
         <span class="license-device-id-val" id="licenseDeviceIdVal">----</span>
         <button type="button" class="license-copy-btn" id="copyDeviceIdBtn">העתק</button>
       </div>
+
+      <!-- טופס הרשמה ל-Firebase Firestore -->
+      <div class="reg-form-section" id="regFormSection">
+        <input
+          type="text"
+          id="regNameInput"
+          class="license-reg-input"
+          placeholder="שם מלא"
+          autocomplete="name"
+          dir="rtl"
+        />
+        <input
+          type="tel"
+          id="regPhoneInput"
+          class="license-reg-input"
+          placeholder="מספר טלפון (למשל 050-0000000)"
+          autocomplete="tel"
+          dir="ltr"
+        />
+        <button type="button" class="license-reg-submit-btn" id="submitRegBtn">שלח בקשה לאישור</button>
+      </div>
+
+      <!-- מצב המתנה לאישור מרחוק (SnapshotListener) -->
+      <div class="reg-waiting-box" id="regWaitingBox" style="display: none;">
+        <div class="reg-spinner"></div>
+        <div class="reg-waiting-title">הבקשה נשלחה וממתינה לאישור</div>
+        <div class="reg-waiting-sub">ברגע שהמנהל יאשר את הבקשה, האפליקציה תיפתח אוטומטית</div>
+      </div>
+
+      <div class="reg-divider"><span>או הזן קוד הפעלה / מאסטר</span></div>
+
       <input
         type="text"
         id="licenseKeyInput"
@@ -731,6 +762,7 @@
 
   </div>
 
+  <script src="firebase-config.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

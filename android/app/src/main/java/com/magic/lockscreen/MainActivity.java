@@ -247,7 +247,20 @@ public class MainActivity extends Activity {
 
     private void saveActivation() {
         SharedPreferences prefs = getSharedPreferences("LockSettings", MODE_PRIVATE);
-        prefs.edit().putBoolean("is_activated", true).apply();
+        prefs.edit().putBoolean("is_activated", true).putBoolean("is_licensed", true).apply();
+        SharedPreferences licensePrefs = getSharedPreferences("LicensePrefs", MODE_PRIVATE);
+        licensePrefs.edit().putBoolean("is_licensed", true).apply();
+    }
+
+    @JavascriptInterface
+    public void approveLicenseLocally() {
+        saveActivation();
+    }
+
+    @JavascriptInterface
+    public String getRawAndroidId() {
+        String androidId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
+        return (androidId != null && !androidId.isEmpty()) ? androidId : getSimpleDeviceId();
     }
 
     @JavascriptInterface
@@ -333,6 +346,16 @@ public class MainActivity extends Activity {
         @JavascriptInterface
         public boolean isAppLicensed() {
             return activity.isActivated();
+        }
+
+        @JavascriptInterface
+        public void approveLicenseLocally() {
+            activity.approveLicenseLocally();
+        }
+
+        @JavascriptInterface
+        public String getRawAndroidId() {
+            return activity.getRawAndroidId();
         }
 
         @JavascriptInterface

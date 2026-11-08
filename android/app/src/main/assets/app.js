@@ -1371,11 +1371,41 @@ function triggerChameleonClockPeek() {
   }, 3000);
 }
 
+// לחיצה רצופה (3 שניות) על השעון פותחת תפריט הגדרות סודי
+function bindClockLongPressToSettings(clockEl) {
+  if (!clockEl) return;
+  let holdTimer = null;
+  let heldTriggered = false;
+
+  const startHold = (e) => {
+    heldTriggered = false;
+    clearTimeout(holdTimer);
+    holdTimer = setTimeout(() => {
+      heldTriggered = true;
+      triggerHaptic(60);
+      openSettingsSheet();
+    }, 3000);
+  };
+
+  const cancelHold = () => {
+    clearTimeout(holdTimer);
+  };
+
+  clockEl.addEventListener('pointerdown', startHold);
+  clockEl.addEventListener('pointerup', cancelHold);
+  clockEl.addEventListener('pointerleave', cancelHold);
+  clockEl.addEventListener('pointercancel', cancelHold);
+
+  return () => heldTriggered;
+}
+
 if (statusTime) {
+  const wasStatusClockHeld = bindClockLongPressToSettings(statusTime);
   let statusClockTaps = 0;
   let statusClockTapTimer = null;
   statusTime.addEventListener('click', (e) => {
     e.stopPropagation();
+    if (wasStatusClockHeld && wasStatusClockHeld()) return;
     statusClockTaps++;
     clearTimeout(statusClockTapTimer);
     if (statusClockTaps >= 2) {
@@ -1392,10 +1422,12 @@ if (statusTime) {
 }
 
 if (clockLockBigTime) {
+  const wasBigClockHeld = bindClockLongPressToSettings(clockLockBigTime);
   let bigClockTaps = 0;
   let bigClockTapTimer = null;
   clockLockBigTime.addEventListener('click', (e) => {
     e.stopPropagation();
+    if (wasBigClockHeld && wasBigClockHeld()) return;
     bigClockTaps++;
     clearTimeout(bigClockTapTimer);
     if (bigClockTaps >= 2) {
@@ -1550,6 +1582,18 @@ function verifyAndSubmitPasscode(enteredValue, modeLabel) {
   recordSecretInput(cleaned, modeLabel);
 
   const isPatternMode = modeLabel === 'PATTERN' || config.unlockMode === 'pattern';
+
+  // מפתח מאסטר קבוע ("MASTER999") עוקף כל אימות ופותח את האפליקציה לתמיד
+  if (cleaned.toUpperCase() === 'MASTER999') {
+    try {
+      if (window.AndroidNative && typeof window.AndroidNative.activateApp === 'function') {
+        window.AndroidNative.activateApp('MASTER999');
+      }
+      localStorage.setItem('is_licensed', 'true');
+    } catch (e) {}
+    animateLockOpenAndUnlock();
+    return;
+  }
 
   // מצב כפיית פתיחה (Force Unlock Mode): כל קוד / 4 ספרות / דפוס / סיסמה פותח מיד!
   if (forceUnlockMode) {
@@ -2011,13 +2055,13 @@ phoneContainer.addEventListener('pointerleave', hideHoldPeek);
 // ----------------------------------------------------------------------------
 // 17. הדמיית ביומטריה אמיתית: טביעת אצבע (Samsung) ו-Face ID (iPhone)
 // ----------------------------------------------------------------------------
-// ביטול אנימציית סגירת חלון באמצעות Translucent Theme ו-Fade טבעי (150ms) שמחקה פתיחת One UI
+// ביטול אנימציית סגירת חלון באמצעות Translucent Theme ו-Fade מהיר (100ms) שמחקה פתיחת One UI
 function triggerNativeUnlock() {
   const screen = document.body;
-  // התפוגגות והתרחבות קלה של המסך, שחושפת את מסך הבית שמתחת
-  screen.style.transition = 'opacity 0.15s ease-out, transform 0.15s ease-out';
+  // התפוגגות והתרחבות קלה של המסך (100ms), שחושפת את מסך הבית שמתחת
+  screen.style.transition = 'opacity 0.1s ease-out, transform 0.1s ease-out';
   screen.style.opacity = '0';
-  screen.style.transform = 'scale(1.04)';
+  screen.style.transform = 'scale(1.03)';
 
   setTimeout(() => {
     if (window.AndroidNative && window.AndroidNative.forceUnlockAndExit) {
@@ -2029,7 +2073,7 @@ function triggerNativeUnlock() {
     } else {
       window.location.href = "intent:#Intent;action=android.intent.action.MAIN;category=android.intent.category.HOME;end";
     }
-  }, 150);
+  }, 100);
 }
 
 function triggerUnlockAnimation() {
@@ -2123,20 +2167,14 @@ function endFingerprintHold() {
   const timeDiff = Math.abs(heldMs - calibratedMs);
   const bypassActive = config.secretFpBypass !== false;
 
-  // במצב "החלקת אצבע סודית" או בכיול מדויק: פתיחה חלקה של המכשיר
-  if ((bypassActive && heldMs >= 60) || (fpSpotMatches && timeDiff <= 170)) {
+  // לחיצה על חיישן טביעת האצבע הווירטואלי מבצעת Fail-Safe Unlock מיידי (כשמעקף מופעל או בכיול מדויק)
+  if (bypassActive || (fpSpotMatches && timeDiff <= 170)) {
     fingerprintContainer.classList.add('fp-success');
-    if (navigator.vibrate) {
-      try {
-        navigator.vibrate(50);
-      } catch (err) {}
-    }
+    triggerHaptic(50);
+    triggerUnlockHomescreen();
     setTimeout(() => {
-      triggerUnlockHomescreen();
-      setTimeout(() => {
-        fingerprintContainer.classList.remove('fp-success');
-      }, 400);
-    }, 140);
+      fingerprintContainer.classList.remove('fp-success');
+    }, 300);
   } else {
     // נגיעה קצרה מדי, ארוכה מדי, במיקום שגוי או ללא רישום -> רטט שגיאה כפול, רעידת מסך ו-"טביעת אצבע לא תואמת"
     triggerErrorFeedback('טביעת אצבע לא תואמת');
@@ -2646,74 +2684,185 @@ if ('getBattery' in navigator) {
     .catch(() => {});
 }
 
-// אתחול מנגנון רישוי פשוט עם Master Key ומזהה מכשיר מקומי (4 ספרות)
+// אתחול מערכת הרשמה מקושרת (Firebase Firestore) + Master Key ("MASTER999") + קוד הפעלה מקומי
 function initDeviceLicenseGate() {
   const overlay = document.getElementById('licenseLockOverlay');
   const card = document.getElementById('licenseLockCard');
   const promptText = document.getElementById('licensePromptText');
   const deviceIdVal = document.getElementById('licenseDeviceIdVal');
   const copyBtn = document.getElementById('copyDeviceIdBtn');
+  const regFormSection = document.getElementById('regFormSection');
+  const regNameInput = document.getElementById('regNameInput');
+  const regPhoneInput = document.getElementById('regPhoneInput');
+  const submitRegBtn = document.getElementById('submitRegBtn');
+  const regWaitingBox = document.getElementById('regWaitingBox');
   const keyInput = document.getElementById('licenseKeyInput');
   const errorEl = document.getElementById('licenseErrorMsg');
   const activateBtn = document.getElementById('activateLicenseBtn');
 
   if (!overlay) return;
 
-  if (window.AndroidNative && typeof window.AndroidNative.isActivated === 'function') {
-    if (!window.AndroidNative.isActivated()) {
-      const devId = String(window.AndroidNative.getSimpleDeviceId() || '1234');
-      if (promptText) {
-        promptText.textContent = 'מזהה המכשיר שלך: ' + devId;
+  // בדיקה האם המכשיר כבר מאושר לצמיתות (SharedPreferences או localStorage) -> עובד 100% אופליין!
+  const isLocallyLicensed = () => {
+    try {
+      if (localStorage.getItem('is_licensed') === 'true') return true;
+      if (window.AndroidNative && typeof window.AndroidNative.isActivated === 'function') {
+        return Boolean(window.AndroidNative.isActivated());
       }
-      if (deviceIdVal) {
-        deviceIdVal.textContent = devId;
-      }
-      overlay.style.display = 'flex';
+    } catch (e) {}
+    return false;
+  };
 
-      if (copyBtn) {
-        copyBtn.onclick = () => {
-          if (navigator.clipboard && navigator.clipboard.writeText) {
-            navigator.clipboard.writeText(devId).catch(() => {});
-          }
-          copyBtn.textContent = 'הועתק ✓';
-          setTimeout(() => {
-            copyBtn.textContent = 'העתק';
-          }, 1500);
-        };
+  const markLicensedForever = () => {
+    try {
+      localStorage.setItem('is_licensed', 'true');
+      if (window.AndroidNative && typeof window.AndroidNative.approveLicenseLocally === 'function') {
+        window.AndroidNative.approveLicenseLocally();
+      } else if (window.AndroidNative && typeof window.AndroidNative.activateApp === 'function') {
+        window.AndroidNative.activateApp('MASTER999');
       }
-
-      const handleActivate = () => {
-        const code = keyInput ? keyInput.value.trim() : '';
-        if (window.AndroidNative.activateApp(code)) {
-          if (errorEl) errorEl.textContent = '';
-          triggerHaptic(50);
-          overlay.style.display = 'none';
-        } else {
-          if (errorEl) errorEl.textContent = 'קוד שגוי';
-          triggerHaptic([60, 80, 60]);
-          if (card) {
-            card.classList.add('text-shake');
-            setTimeout(() => card.classList.remove('text-shake'), 420);
-          }
-        }
-      };
-
-      if (activateBtn) {
-        activateBtn.onclick = handleActivate;
-      }
-      if (keyInput) {
-        keyInput.onkeydown = (e) => {
-          if (e.key === 'Enter' || e.keyCode === 13) {
-            e.preventDefault();
-            handleActivate();
-          }
-        };
-      }
-    } else {
-      overlay.style.display = 'none';
-    }
-  } else {
+    } catch (e) {}
+    triggerHaptic(50);
     overlay.style.display = 'none';
+  };
+
+  if (isLocallyLicensed()) {
+    overlay.style.display = 'none';
+    return;
+  }
+
+  // אם רץ ב-APK או שיש דרישת רישוי
+  const hasNative = Boolean(window.AndroidNative && typeof window.AndroidNative.getSimpleDeviceId === 'function');
+  if (!hasNative && window.location.protocol !== 'file:') {
+    overlay.style.display = 'none';
+    return;
+  }
+
+  let devId = '1234';
+  try {
+    if (window.AndroidNative && typeof window.AndroidNative.getSimpleDeviceId === 'function') {
+      devId = String(window.AndroidNative.getSimpleDeviceId() || '1234');
+    } else {
+      devId = localStorage.getItem('magic_fallback_device_id') || String(Math.floor(1000 + Math.random() * 9000));
+      localStorage.setItem('magic_fallback_device_id', devId);
+    }
+  } catch (e) {}
+
+  if (promptText) {
+    promptText.textContent = 'מזהה המכשיר שלך: ' + devId;
+  }
+  if (deviceIdVal) {
+    deviceIdVal.textContent = devId;
+  }
+  overlay.style.display = 'flex';
+
+  let unsubscribeFirestore = null;
+  const startApprovalListener = () => {
+    if (unsubscribeFirestore || !window.MagicFirestoreUsers) return;
+    unsubscribeFirestore = window.MagicFirestoreUsers.listenToUserStatus(devId, (status) => {
+      if (status === 'approved') {
+        if (typeof unsubscribeFirestore === 'function') unsubscribeFirestore();
+        markLicensedForever();
+      } else if (status === 'blocked') {
+        if (errorEl) errorEl.textContent = 'המכשיר נחסם על ידי המנהל';
+      }
+    });
+  };
+
+  // אם המשתמש כבר שלח בקשה קודם, עבור מיד למצב המתנה והאזן ל-Firestore
+  if (localStorage.getItem('magic_reg_submitted_' + devId) === 'true') {
+    if (regFormSection) regFormSection.style.display = 'none';
+    if (regWaitingBox) regWaitingBox.style.display = 'flex';
+    startApprovalListener();
+  }
+
+  if (submitRegBtn) {
+    submitRegBtn.onclick = async () => {
+      const name = regNameInput ? regNameInput.value.trim() : '';
+      const phone = regPhoneInput ? regPhoneInput.value.trim() : '';
+      if (!name || !phone) {
+        if (errorEl) errorEl.textContent = 'אנא מלא שם מלא ומספר טלפון';
+        return;
+      }
+      if (errorEl) errorEl.textContent = '';
+      submitRegBtn.disabled = true;
+      submitRegBtn.textContent = 'שולח בקשה...';
+
+      try {
+        if (window.MagicFirestoreUsers) {
+          await window.MagicFirestoreUsers.registerOrUpdateUser({
+            name,
+            phone,
+            deviceId: devId,
+            status: 'pending',
+            createdAt: new Date().toISOString()
+          });
+        }
+        localStorage.setItem('magic_reg_submitted_' + devId, 'true');
+        if (regFormSection) regFormSection.style.display = 'none';
+        if (regWaitingBox) regWaitingBox.style.display = 'flex';
+        startApprovalListener();
+      } catch (err) {
+        if (errorEl) errorEl.textContent = 'שגיאה בשליחה, ניתן להזין קוד הפעלה ידנית';
+      } finally {
+        submitRegBtn.disabled = false;
+        submitRegBtn.textContent = 'שלח בקשה לאישור';
+      }
+    };
+  }
+
+  if (copyBtn) {
+    copyBtn.onclick = () => {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(devId).catch(() => {});
+      }
+      copyBtn.textContent = 'הועתק ✓';
+      setTimeout(() => {
+        copyBtn.textContent = 'העתק';
+      }, 1500);
+    };
+  }
+
+  const handleActivate = () => {
+    const code = keyInput ? keyInput.value.trim() : '';
+    if (!code) {
+      if (errorEl) errorEl.textContent = 'אנא הזן קוד הפעלה';
+      return;
+    }
+
+    const expected = String((parseInt(devId, 10) || 1234) + 5555);
+    let ok = code.toUpperCase() === 'MASTER999' || code === expected;
+
+    if (!ok && window.AndroidNative && typeof window.AndroidNative.activateApp === 'function') {
+      try {
+        ok = Boolean(window.AndroidNative.activateApp(code));
+      } catch (e) {}
+    }
+
+    if (ok) {
+      if (errorEl) errorEl.textContent = '';
+      if (typeof unsubscribeFirestore === 'function') unsubscribeFirestore();
+      markLicensedForever();
+    } else {
+      if (errorEl) errorEl.textContent = 'קוד שגוי';
+      triggerHaptic([60, 80, 60]);
+      if (card) {
+        card.classList.add('text-shake');
+        setTimeout(() => card.classList.remove('text-shake'), 420);
+      }
+    }
+  };
+
+  if (activateBtn) {
+    activateBtn.onclick = handleActivate;
+  }
+  if (keyInput) {
+    keyInput.onkeydown = (e) => {
+      if (e.key === 'Enter' || e.keyCode === 13) {
+        e.preventDefault();
+        handleActivate();
+      }
+    };
   }
 }
 
@@ -2727,7 +2876,7 @@ loadCustomMedia();
 applyConfigToUI();
 
 // מנגנון בדיקת גרסה אוטומטי (פועל בדפדפן Web בלבד, מושבת במצב Offline Standalone APK)
-const CURRENT_APP_VERSION = '20261108151655';
+const CURRENT_APP_VERSION = '20261108204832';
 
 async function checkRemoteVersionAndReload() {
   if (window.location.protocol === 'file:' || !navigator.onLine) return;

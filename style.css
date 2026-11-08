@@ -2654,3 +2654,147 @@ html, body {
   user-select: text;
   -webkit-user-select: text;
 }
+
+/* ==========================================================================
+   מסך רישוי נעול למכשיר (Device-Locked Activation Overlay)
+   ========================================================================== */
+.license-lock-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  background: radial-gradient(circle at top, #1b1c29 0%, #0e0e12 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  direction: rtl;
+}
+
+.license-lock-card {
+  width: 100%;
+  max-width: 360px;
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 26px;
+  padding: 28px 22px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.65);
+}
+
+.license-lock-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: rgba(56, 136, 255, 0.14);
+  border: 1px solid rgba(56, 136, 255, 0.35);
+  color: #3888ff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+
+.license-lock-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #ffffff;
+  margin-bottom: 10px;
+}
+
+.license-lock-desc {
+  font-size: 14px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.72);
+  margin-bottom: 14px;
+}
+
+.license-device-id-box {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: rgba(0, 0, 0, 0.38);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  direction: ltr;
+}
+
+.license-device-id-val {
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 14.5px;
+  font-weight: 700;
+  color: #38bdf8;
+  letter-spacing: 0.6px;
+  user-select: all;
+  -webkit-user-select: all;
+  word-break: break-all;
+}
+
+.license-copy-btn {
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 11px;
+  border-radius: 9px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.license-key-input {
+  width: 100%;
+  height: 48px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.07);
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 700;
+  text-align: center;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  padding: 0 16px;
+  margin-bottom: 10px;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.license-key-input:focus {
+  border-color: #3888ff;
+  box-shadow: 0 0 0 3px rgba(56, 136, 255, 0.22);
+}
+
+.license-error-msg {
+  min-height: 20px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #fb7185;
+  margin-bottom: 8px;
+}
+
+.license-activate-btn {
+  width: 100%;
+  height: 48px;
+  border: none;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #3888ff 0%, #2563eb 100%);
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 8px 22px rgba(37, 99, 235, 0.38);
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
+.license-activate-btn:active {
+  transform: scale(0.97);
+}

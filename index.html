@@ -18,6 +18,41 @@
 <body>
 
   <!-- ========================================================================
+       0. מסך רישוי נעול למכשיר (Device-Locked Activation Overlay)
+       ======================================================================== -->
+  <div class="license-lock-overlay" id="licenseLockOverlay" style="display: none;">
+    <div class="license-lock-card" id="licenseLockCard">
+      <div class="license-lock-icon">
+        <svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+          <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+        </svg>
+      </div>
+      <h2 class="license-lock-title">אימות והפעלת רישיון</h2>
+      <p class="license-lock-desc" id="licensePromptText">
+        אנא שלח את המזהה הבא לקבלת קוד הפעלה:
+      </p>
+      <div class="license-device-id-box">
+        <span class="license-device-id-val" id="licenseDeviceIdVal">---</span>
+        <button type="button" class="license-copy-btn" id="copyDeviceIdBtn">העתק</button>
+      </div>
+      <input
+        type="text"
+        id="licenseKeyInput"
+        class="license-key-input"
+        placeholder="הזן קוד הפעלה (8 תווים)"
+        autocomplete="off"
+        autocorrect="off"
+        autocapitalize="characters"
+        spellcheck="false"
+        dir="ltr"
+      />
+      <div class="license-error-msg" id="licenseErrorMsg"></div>
+      <button type="button" class="license-activate-btn" id="activateLicenseBtn">הפעל</button>
+    </div>
+  </div>
+
+  <!-- ========================================================================
        1. מסך פתיח אנימטיבי קצר (Intro Splash - 1.1s)
        ======================================================================== -->
   <div class="splash-screen" id="splashScreen">

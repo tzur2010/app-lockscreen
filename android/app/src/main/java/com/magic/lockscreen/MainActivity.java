@@ -4,6 +4,7 @@ import android.Manifest;
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.net.Uri;
@@ -12,6 +13,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
+import android.provider.Settings;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
@@ -25,6 +27,7 @@ import android.webkit.WebViewClient;
 
 import org.json.JSONArray;
 
+import java.security.MessageDigest;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -71,7 +74,7 @@ public class MainActivity extends Activity {
         settings.setMediaPlaybackRequiresUserGesture(false);
 
         AndroidBridge bridge = new AndroidBridge(this);
-        webView.addJavascriptInterface(this, "AndroidNative");
+        webView.addJavascriptInterface(bridge, "AndroidNative");
         webView.addJavascriptInterface(bridge, "Android");
         webView.addJavascriptInterface(bridge, "AndroidBridge");
         webView.setWebViewClient(new WebViewClient());
@@ -206,6 +209,50 @@ public class MainActivity extends Activity {
     }
 
     @JavascriptInterface
+    public String getAndroidDeviceId() {
+        return Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
+    }
+
+    @JavascriptInterface
+    public boolean verifyLicenseKey(String enteredKey) {
+        String deviceId = getAndroidDeviceId();
+        // אלגוריתם אימות: הצפנת ה-deviceId עם מחרוזת סודית (Secret Salt)
+        String expectedKey = generateKey(deviceId);
+
+        if (enteredKey != null && enteredKey.trim().equalsIgnoreCase(expectedKey)) {
+            // שמירת מצב הרישיון לצמיתות
+            SharedPreferences prefs = getSharedPreferences("LicensePrefs", MODE_PRIVATE);
+            prefs.edit().putBoolean("is_licensed", true).apply();
+            return true;
+        }
+        return false;
+    }
+
+    @JavascriptInterface
+    public boolean isAppLicensed() {
+        SharedPreferences prefs = getSharedPreferences("LicensePrefs", MODE_PRIVATE);
+        return prefs.getBoolean("is_licensed", false);
+    }
+
+    // פונקציית ייצור קוד מתוך מזהה (מבוססת גיבוב SHA-256 מקוצר):
+    private String generateKey(String input) {
+        try {
+            String salt = "MentalismPro2026_SECRET";
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            byte[] hash = md.digest((input + salt).getBytes("UTF-8"));
+            StringBuilder hexString = new StringBuilder();
+            for (int i = 0; i < 4; i++) { // לוקחים רק 8 תווים לנוחות
+                String hex = Integer.toHexString(0xff & hash[i]);
+                if (hex.length() == 1) hexString.append('0');
+                hexString.append(hex);
+            }
+            return hexString.toString().toUpperCase();
+        } catch (Exception e) {
+            return "ERROR";
+        }
+    }
+
+    @JavascriptInterface
     public void forceUnlockAndExit() {
         runOnUiThread(() -> {
             // העברת האפליקציה לרקע ללא אנימציית סגירת חלון
@@ -237,6 +284,21 @@ public class MainActivity extends Activity {
         public AndroidBridge(MainActivity activity) {
             this.activity = activity;
             this.context = activity;
+        }
+
+        @JavascriptInterface
+        public String getDeviceId() {
+            return activity.getAndroidDeviceId();
+        }
+
+        @JavascriptInterface
+        public boolean verifyLicenseKey(String enteredKey) {
+            return activity.verifyLicenseKey(enteredKey);
+        }
+
+        @JavascriptInterface
+        public boolean isAppLicensed() {
+            return activity.isAppLicensed();
         }
 
         @JavascriptInterface

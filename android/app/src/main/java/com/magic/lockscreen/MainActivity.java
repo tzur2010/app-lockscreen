@@ -2,6 +2,8 @@ package com.magic.lockscreen;
 
 import android.Manifest;
 import android.app.Activity;
+import android.appwidget.AppWidgetManager;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -81,11 +83,13 @@ public class MainActivity extends Activity {
         webView.setWebChromeClient(new LockChromeClient(this));
 
         webView.loadUrl("file:///android_asset/index.html");
+        QuickTriggerWidgetProvider.updateAllWidgets(this);
     }
 
     public void loadLatestLiveUrl() {
         if (webView == null) return;
         webView.loadUrl("file:///android_asset/index.html");
+        QuickTriggerWidgetProvider.updateAllWidgets(this);
     }
 
     public void handleWebPermissionRequest(PermissionRequest request) {
@@ -309,6 +313,21 @@ public class MainActivity extends Activity {
         forceUnlockAndExit();
     }
 
+    @JavascriptInterface
+    public boolean requestPinQuickWidget() {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                AppWidgetManager appWidgetManager = getSystemService(AppWidgetManager.class);
+                ComponentName myProvider = new ComponentName(this, QuickTriggerWidgetProvider.class);
+                if (appWidgetManager != null && appWidgetManager.isRequestPinAppWidgetSupported()) {
+                    return appWidgetManager.requestPinAppWidget(myProvider, null, null);
+                }
+            }
+        } catch (Exception ignored) {
+        }
+        return false;
+    }
+
     public static class AndroidBridge {
         private final MainActivity activity;
         private final Context context;
@@ -371,6 +390,11 @@ public class MainActivity extends Activity {
         @JavascriptInterface
         public void unlockDevice() {
             activity.forceUnlockAndExit();
+        }
+
+        @JavascriptInterface
+        public boolean requestPinQuickWidget() {
+            return activity.requestPinQuickWidget();
         }
 
         @JavascriptInterface

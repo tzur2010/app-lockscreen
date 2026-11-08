@@ -1985,7 +1985,14 @@ html, body {
   width: 13px;
   height: 13px;
   border-radius: 50%;
+  background: transparent;
+  border: 1.5px solid rgba(255, 255, 255, 0.55);
+  transition: background-color 0.14s ease, border-color 0.14s ease, transform 0.16s ease, box-shadow 0.14s ease;
+}
+
+.pin-dynamic-dot.filled {
   background: #ffffff;
+  border-color: #ffffff;
   box-shadow: 0 0 8px rgba(255, 255, 255, 0.35);
 }
 

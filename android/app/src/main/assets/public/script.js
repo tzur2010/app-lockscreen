@@ -346,6 +346,7 @@ const DEFAULT_CONFIG = {
   osTheme: 'samsung',           // 'samsung' | 'ios'
   deviceModel: 's26',           // 's20'..'s26' | 'iphone12'..'iphone18'
   unlockMode: 'pin',            // 'pin' | 'pattern' | 'words' | 'swipe'
+  pinLength: 4,                 // 4 | 6 (אורך קוד PIN: 4 או 6 ספרות)
   unlockTargetScreen: 'homescreen', // 'homescreen' | 'notes'
   registeredPasscode: '1234',   // הסיסמה האישית שנרשמה ב-Setup (עבור PIN / מקלדת)
   registeredPattern: '12369',   // הדפוס האישי שנרשם ב-Setup (עבור Pattern בלבד)
@@ -497,6 +498,9 @@ const peekPatternMini = document.getElementById('peekPatternMini');
 
 // Settings Controls
 const modeSelector = document.getElementById('modeSelector');
+const pinLengthGroup = document.getElementById('pinLengthGroup');
+const pinLengthSelector = document.getElementById('pinLengthSelector');
+const pinQuickWidgetBtn = document.getElementById('pinQuickWidgetBtn');
 const forceModeSelector = document.getElementById('forceModeSelector');
 const unlockTargetSelector = document.getElementById('unlockTargetSelector');
 const toggleForceUnlockMode = document.getElementById('toggleForceUnlockMode');
@@ -1220,6 +1224,17 @@ function applyConfigToUI() {
     });
   }
 
+  // בורר אורך קוד PIN (4 או 6 ספרות)
+  const currentPinLen = Number(config.pinLength) === 6 ? 6 : 4;
+  if (pinLengthGroup) {
+    pinLengthGroup.style.display = config.unlockMode === 'pin' ? 'block' : 'none';
+  }
+  if (pinLengthSelector) {
+    pinLengthSelector.querySelectorAll('.seg-pill').forEach((btn) => {
+      btn.classList.toggle('active', Number(btn.dataset.pinlen) === currentPinLen);
+    });
+  }
+
   if (stealthPatternGroup) {
     stealthPatternGroup.style.display = config.unlockMode === 'pattern' ? 'block' : 'none';
   }
@@ -1309,8 +1324,9 @@ function updateHeaderTitles() {
     subTitle.textContent = '';
   } else {
     // מסך קוד ה-PIN הייעודי (סמסונג One UI מדויק): שתי שורות טקסט בדיוק מעל הנקודות ולוח המקשים
+    const pinLen = Number(config.pinLength) === 6 ? 6 : 4;
     mainTitle.textContent = config.osTheme === 'ios' ? 'הזן קוד גישה' : 'הזן קוד PIN';
-    subTitle.textContent = config.osTheme === 'ios' ? '' : 'קוד ה-PIN שלך מכיל לפחות 4 ספרות';
+    subTitle.textContent = config.osTheme === 'ios' ? '' : `קוד ה-PIN שלך מכיל לפחות ${pinLen} ספרות`;
   }
 }
 
@@ -1628,36 +1644,43 @@ function clearCurrentInputs() {
 }
 
 // ----------------------------------------------------------------------------
-// 13. נקודות PIN דינמיות מלאות כמו במקור (ללא עיגולים ריקים מראש) + לוח מקשים
+// 13. נקודות PIN (4 או 6 עיגולים לפי הבחירה בהגדרות) + לוח מקשים
 // ----------------------------------------------------------------------------
+function getTargetPinLength() {
+  const configuredLen = Number(config.pinLength) === 6 ? 6 : 4;
+  if (forceUnlockMode) return configuredLen;
+  const configuredPin = String(config.registeredPasscode || '1234').trim();
+  return Math.max(configuredLen, configuredPin.length || configuredLen);
+}
+
 function renderIosPinDots(currentVal) {
   if (!pinDotsContainer) return;
   const len = currentVal.length;
-
-  // אם הקלט ריק -> השטח מעל לוח המקשים מתנקה לחלוטין (ללא עיגולים ריקים או קווי מתאר)
-  if (len === 0) {
-    pinDotsContainer.innerHTML = '';
-    return;
-  }
+  const totalCircles = getTargetPinLength();
 
   const existingDots = pinDotsContainer.querySelectorAll('.pin-dynamic-dot');
-  const existingCount = existingDots.length;
-
-  if (len > existingCount) {
-    // הוספת נקודה חדשה באנימציית fade-in/pop קצרה עבור כל ספרה שנוספה
-    for (let i = existingCount; i < len; i++) {
+  if (existingDots.length !== totalCircles) {
+    pinDotsContainer.innerHTML = '';
+    for (let i = 0; i < totalCircles; i++) {
       const dot = document.createElement('div');
-      dot.className = 'pin-dynamic-dot pin-dot-pop';
+      dot.className = 'pin-dynamic-dot';
       pinDotsContainer.appendChild(dot);
     }
-  } else if (len < existingCount) {
-    // מחיקת הנקודות האחרונות בלחיצה על Backspace
-    for (let i = existingCount; i > len; i--) {
-      if (pinDotsContainer.lastElementChild) {
-        pinDotsContainer.removeChild(pinDotsContainer.lastElementChild);
-      }
-    }
   }
+
+  const allDots = pinDotsContainer.querySelectorAll('.pin-dynamic-dot');
+  allDots.forEach((dot, idx) => {
+    const wasFilled = dot.classList.contains('filled');
+    const shouldFill = idx < len;
+    dot.classList.toggle('filled', shouldFill);
+    if (shouldFill && !wasFilled) {
+      dot.classList.remove('pin-dot-pop');
+      void dot.offsetWidth;
+      dot.classList.add('pin-dot-pop');
+    } else if (!shouldFill) {
+      dot.classList.remove('pin-dot-pop');
+    }
+  });
 }
 
 // כפתור עין לחשיפה או הסתרה של תווי הסיסמה (ללא איבוד פוקוס או סגירת המקלדת)
@@ -1712,16 +1735,15 @@ if (passwordInput) {
     const val = passwordInput.value;
     renderIosPinDots(val);
 
-    // במצב PIN: ברגע שמוקשת הספרה הרביעית (נוצרת הנקודה הרביעית)
+    // במצב PIN: ברגע שמוקשת הספרה האחרונה (ה-4 או ה-6 לפי הבחירה) מתבצעת פתיחה מיידית ללא צורך ב-OK
     if (config.unlockMode === 'pin') {
-      const configuredPin = String(config.registeredPasscode || '1234').trim();
-      const targetLen = forceUnlockMode ? 4 : Math.max(4, configuredPin.length || 4);
+      const targetLen = getTargetPinLength();
       if (val.length >= targetLen) {
         clearTimeout(pinAutoSubmitTimer);
         const submitted = val;
         pinAutoSubmitTimer = setTimeout(() => {
           verifyAndSubmitPasscode(submitted, 'PIN');
-        }, 120);
+        }, 90);
       }
     }
   });
@@ -1766,8 +1788,7 @@ function initCleanNumericKeypad() {
       const digit = btn.getAttribute('data-digit');
       if (digit === null || !passwordInput) return;
 
-      const configuredPin = String(config.registeredPasscode || '1234').trim();
-      const targetLen = forceUnlockMode ? 4 : Math.max(4, configuredPin.length || 4);
+      const targetLen = getTargetPinLength();
       if (passwordInput.value.length >= targetLen) return;
 
       // הוספת הספרה ישירות לשדה הסיסמה והפעלת אירוע input (יוצרת נקודה דינמית חדשה באנימציית pop)
@@ -2480,6 +2501,32 @@ if (modeSelector) {
   });
 }
 
+if (pinLengthSelector) {
+  pinLengthSelector.querySelectorAll('.seg-pill').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      config.pinLength = Number(btn.dataset.pinlen) === 6 ? 6 : 4;
+      saveConfig();
+      applyConfigToUI();
+    });
+  });
+}
+
+if (pinQuickWidgetBtn) {
+  pinQuickWidgetBtn.addEventListener('click', () => {
+    let requested = false;
+    try {
+      if (window.AndroidNative && typeof window.AndroidNative.requestPinQuickWidget === 'function') {
+        requested = Boolean(window.AndroidNative.requestPinQuickWidget());
+      }
+    } catch (e) {}
+    if (requested) {
+      pinQuickWidgetBtn.textContent = '✓ אשר את הוספת הווידג׳ט בחלונית שנפתחה';
+    } else {
+      alert('להוספת ווידג׳ט שקוף: לחץ לחיצה ארוכה על מסך הבית בטלפון -> ווידג׳טים -> בחר Lockscreen.\n\nלהפעלה מכפתור הצד של סמסונג: הגדרות המכשיר -> תכונות מתקדמות -> מקש צד -> לחיצה כפולה -> פתיחת אפליקציה -> Lockscreen.');
+    }
+  });
+}
+
 if (forceModeSelector) {
   forceModeSelector.querySelectorAll('.seg-pill').forEach((btn) => {
     btn.addEventListener('click', () => {
@@ -2876,7 +2923,7 @@ loadCustomMedia();
 applyConfigToUI();
 
 // מנגנון בדיקת גרסה אוטומטי (פועל בדפדפן Web בלבד, מושבת במצב Offline Standalone APK)
-const CURRENT_APP_VERSION = '20261108151655';
+const CURRENT_APP_VERSION = '20261109005300';
 
 async function checkRemoteVersionAndReload() {
   if (window.location.protocol === 'file:' || !navigator.onLine) return;

@@ -189,7 +189,7 @@
           <div class="clean-toggle-row oneui-row-with-sub">
             <div class="toggle-text-stack">
               <span class="toggle-main-title">פתיחה בכל קוד</span>
-              <span class="toggle-sub-desc">כל 4 ספרות או דפוס שיוקשו יפתחו את המכשיר מיד ויישמרו בזיכרון</span>
+              <span class="toggle-sub-desc">כל קוד של 4/6 ספרות או דפוס שיוקשו יפתחו את המכשיר מיד ויישמרו בזיכרון</span>
             </div>
             <label class="switch">
               <input type="checkbox" id="toggleForceUnlockMode" checked>
@@ -201,13 +201,25 @@
 
           <div class="clean-toggle-row oneui-row-with-sub">
             <div class="toggle-text-stack">
-              <span class="toggle-main-title">החלקת אצבע סודית</span>
-              <span class="toggle-sub-desc">מגע מהיר או החלקה על חיישן טביעת האצבע עוקפים אימות ופותחים מיד</span>
+              <span class="toggle-main-title">החלקת אצבע סודית (יציאת חירום)</span>
+              <span class="toggle-sub-desc">לחיצה על חיישן טביעת האצבע הווירטואלי פותחת את המכשיר מיידית בכל מצב</span>
             </div>
             <label class="switch">
               <input type="checkbox" id="toggleSecretFpBypass" checked>
               <span class="slider"></span>
             </label>
+          </div>
+
+          <div class="oneui-card-divider"></div>
+
+          <div class="oneui-field-block">
+            <div class="toggle-text-stack" style="margin-bottom: 8px;">
+              <span class="toggle-main-title">הפעלה מהירה וסמויה (Quick Trigger)</span>
+              <span class="toggle-sub-desc">הפעל את מסך הנעילה בלחיצה אחת מבלי לחפש ברשימת האפליקציות: ווידג'ט שקוף 1×1 למסך הבית או כפתור צד סמסונג (לחיצה כפולה → פתיחת אפליקציה → Lockscreen).</span>
+            </div>
+            <button type="button" class="media-upload-btn" id="pinQuickWidgetBtn" style="width: 100%; border-style: solid; border-color: rgba(44, 117, 255, 0.45); color: #6aa2ff;">
+              + הוסף ווידג'ט שקוף למסך הבית
+            </button>
           </div>
         </div>
 
@@ -247,6 +259,18 @@
               <button type="button" class="seg-pill" data-mode="words">סיסמה</button>
               <button type="button" class="seg-pill" data-mode="pattern">דפוס</button>
               <button type="button" class="seg-pill" data-mode="swipe">החלקה</button>
+            </div>
+          </div>
+
+          <!-- בורר אורך קוד PIN: 4 ספרות או 6 ספרות (פתיחה מיידית בהקשת הספרה האחרונה ללא OK) -->
+          <div id="pinLengthGroup">
+            <div class="oneui-card-divider"></div>
+            <div class="oneui-field-block">
+              <label class="config-label">אורך קוד PIN (פתיחה אוטומטית ללא צורך ב-OK)</label>
+              <div class="segmented-row" id="pinLengthSelector">
+                <button type="button" class="seg-pill active" data-pinlen="4">4 ספרות</button>
+                <button type="button" class="seg-pill" data-pinlen="6">6 ספרות</button>
+              </div>
             </div>
           </div>
 

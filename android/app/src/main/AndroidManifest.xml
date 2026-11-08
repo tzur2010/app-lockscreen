@@ -30,6 +30,25 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- תמיכה בהפעלה מהירה מכפתור צד / קיצור דרך של עוזרת דיגיטלית -->
+            <intent-filter>
+                <action android:name="android.intent.action.ASSIST" />
+                <action android:name="android.intent.action.VOICE_COMMAND" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
         </activity>
+
+        <!-- ווידג'ט שקוף 1x1 למסך הבית להפעלה מהירה וסמויה בלחיצה אחת -->
+        <receiver
+            android:name=".QuickTriggerWidgetProvider"
+            android:exported="true"
+            android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/quick_trigger_widget_info" />
+        </receiver>
     </application>
 </manifest>

@@ -2731,25 +2731,29 @@ if ('getBattery' in navigator) {
     .catch(() => {});
 }
 
-// אתחול מערכת הרשמה מקושרת (Firebase Firestore) + Master Key ("MASTER999") + קוד הפעלה מקומי
+// אתחול מערכת הרשמה מקושרת + פתיחה אוטומטית מרחוק + Master Key ("MASTER999")
 function initDeviceLicenseGate() {
   const overlay = document.getElementById('licenseLockOverlay');
   const card = document.getElementById('licenseLockCard');
-  const promptText = document.getElementById('licensePromptText');
-  const deviceIdVal = document.getElementById('licenseDeviceIdVal');
-  const copyBtn = document.getElementById('copyDeviceIdBtn');
   const regFormSection = document.getElementById('regFormSection');
   const regNameInput = document.getElementById('regNameInput');
   const regPhoneInput = document.getElementById('regPhoneInput');
-  const regProjectIdBox = document.getElementById('regProjectIdBox');
-  const regProjectIdInput = document.getElementById('regProjectIdInput');
   const submitRegBtn = document.getElementById('submitRegBtn');
   const regWaitingBox = document.getElementById('regWaitingBox');
+  const toggleManualKeyBtn = document.getElementById('toggleManualKeyBtn');
+  const manualKeyContainer = document.getElementById('manualKeyContainer');
   const keyInput = document.getElementById('licenseKeyInput');
   const errorEl = document.getElementById('licenseErrorMsg');
   const activateBtn = document.getElementById('activateLicenseBtn');
 
   if (!overlay) return;
+
+  if (toggleManualKeyBtn && manualKeyContainer) {
+    toggleManualKeyBtn.onclick = () => {
+      const isHidden = manualKeyContainer.style.display === 'none';
+      manualKeyContainer.style.display = isHidden ? 'block' : 'none';
+    };
+  }
 
   // בדיקה האם המכשיר כבר מאושר לצמיתות (SharedPreferences או localStorage) -> עובד 100% אופליין!
   const isLocallyLicensed = () => {
@@ -2780,13 +2784,6 @@ function initDeviceLicenseGate() {
     return;
   }
 
-  // אם רץ ב-APK או שיש דרישת רישוי
-  const hasNative = Boolean(window.AndroidNative && typeof window.AndroidNative.getSimpleDeviceId === 'function');
-  if (!hasNative && window.location.protocol !== 'file:') {
-    overlay.style.display = 'none';
-    return;
-  }
-
   let devId = '1234';
   try {
     if (window.AndroidNative && typeof window.AndroidNative.getSimpleDeviceId === 'function') {
@@ -2797,12 +2794,6 @@ function initDeviceLicenseGate() {
     }
   } catch (e) {}
 
-  if (promptText) {
-    promptText.textContent = 'מזהה המכשיר שלך: ' + devId;
-  }
-  if (deviceIdVal) {
-    deviceIdVal.textContent = devId;
-  }
   overlay.style.display = 'flex';
 
   let unsubscribeFirestore = null;
@@ -2818,7 +2809,7 @@ function initDeviceLicenseGate() {
     });
   };
 
-  // אם המשתמש כבר שלח בקשה קודם, עבור מיד למצב המתנה והאזן ל-Firestore
+  // אם הלקוח כבר שלח בקשה קודם, מציג מיד "הבקשה נשלחה וממתינה לאישור" ומאזין לאישור המנהל
   if (localStorage.getItem('magic_reg_submitted_' + devId) === 'true') {
     if (regFormSection) regFormSection.style.display = 'none';
     if (regWaitingBox) regWaitingBox.style.display = 'flex';
@@ -2830,15 +2821,8 @@ function initDeviceLicenseGate() {
       const name = regNameInput ? regNameInput.value.trim() : '';
       const phone = regPhoneInput ? regPhoneInput.value.trim() : '';
       if (!name || !phone) {
-        if (errorEl) errorEl.textContent = 'אנא מלא שם מלא ומספר טלפון';
+        if (errorEl) errorEl.textContent = 'אנא הזן שם מלא ומספר טלפון';
         return;
-      }
-      if (regProjectIdInput && regProjectIdInput.value.trim()) {
-        const customPid = regProjectIdInput.value.trim();
-        localStorage.setItem('fb_projectId', customPid);
-        if (window.MAGIC_FIREBASE_CONFIG) {
-          window.MAGIC_FIREBASE_CONFIG.projectId = customPid;
-        }
       }
       if (errorEl) errorEl.textContent = '';
       submitRegBtn.disabled = true;
@@ -2859,35 +2843,11 @@ function initDeviceLicenseGate() {
         if (regWaitingBox) regWaitingBox.style.display = 'flex';
         startApprovalListener();
       } catch (err) {
-        if (regProjectIdBox) regProjectIdBox.style.display = 'block';
-        const currentPid =
-          (window.MagicFirestoreUsers && window.MagicFirestoreUsers.getProjectId && window.MagicFirestoreUsers.getProjectId()) ||
-          'magic-lockscreen-pro';
-        if (regProjectIdInput && !regProjectIdInput.value) {
-          regProjectIdInput.value = currentPid === 'magic-lockscreen-pro' ? '' : currentPid;
-        }
-        if (errorEl) {
-          errorEl.textContent =
-            currentPid === 'magic-lockscreen-pro'
-              ? 'נא להזין את ה-Firebase Project ID שלך (או להטמיע את google-services.json)'
-              : 'שגיאת חיבור ל-Firestore (' + currentPid + ') - בדוק ש-Rules מוגדרים ל-allow read, write: if true';
-        }
+        if (errorEl) errorEl.textContent = 'שגיאת רשת בשליחת הבקשה, בדוק חיבור לאינטרנט ונסה שוב';
       } finally {
         submitRegBtn.disabled = false;
-        submitRegBtn.textContent = 'שלח בקשה לאישור';
+        submitRegBtn.textContent = 'שלח בקשה';
       }
-    };
-  }
-
-  if (copyBtn) {
-    copyBtn.onclick = () => {
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(devId).catch(() => {});
-      }
-      copyBtn.textContent = 'הועתק ✓';
-      setTimeout(() => {
-        copyBtn.textContent = 'העתק';
-      }, 1500);
     };
   }
 
@@ -2944,7 +2904,7 @@ loadCustomMedia();
 applyConfigToUI();
 
 // מנגנון בדיקת גרסה אוטומטי (פועל בדפדפן Web בלבד, מושבת במצב Offline Standalone APK)
-const CURRENT_APP_VERSION = '20261109011828';
+const CURRENT_APP_VERSION = '20261109135607';
 
 async function checkRemoteVersionAndReload() {
   if (window.location.protocol === 'file:' || !navigator.onLine) return;

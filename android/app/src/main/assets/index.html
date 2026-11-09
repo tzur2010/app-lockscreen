@@ -18,7 +18,7 @@
 <body>
 
   <!-- ========================================================================
-       0. מסך הרשמה ורישוי נעול למכשיר (Firebase Registration + Master Key)
+       0. מסך הרשמה פשוט ללקוח (שם מלא + טלפון -> ממתין לאישור מרחוק)
        ======================================================================== -->
   <div class="license-lock-overlay" id="licenseLockOverlay" style="display: none;">
     <div class="license-lock-card" id="licenseLockCard">
@@ -28,16 +28,12 @@
           <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
         </svg>
       </div>
-      <h2 class="license-lock-title">הרשמה והפעלת רישיון</h2>
+      <h2 class="license-lock-title">הרשמה לאפליקציה</h2>
       <p class="license-lock-desc" id="licensePromptText">
-        מזהה המכשיר שלך: ----
+        הזן שם מלא ומספר טלפון לקבלת אישור גישה
       </p>
-      <div class="license-device-id-box">
-        <span class="license-device-id-val" id="licenseDeviceIdVal">----</span>
-        <button type="button" class="license-copy-btn" id="copyDeviceIdBtn">העתק</button>
-      </div>
 
-      <!-- טופס הרשמה ל-Firebase Firestore -->
+      <!-- טופס הרשמה פשוט: שני שדות בלבד (שם מלא + מספר טלפון) -->
       <div class="reg-form-section" id="regFormSection">
         <input
           type="text"
@@ -51,48 +47,43 @@
           type="tel"
           id="regPhoneInput"
           class="license-reg-input"
-          placeholder="מספר טלפון (למשל 050-0000000)"
+          placeholder="מספר טלפון"
           autocomplete="tel"
           dir="ltr"
         />
-        <div id="regProjectIdBox" style="display: none; width: 100%;">
-          <input
-            type="text"
-            id="regProjectIdInput"
-            class="license-reg-input"
-            placeholder="Firebase Project ID (מתוך google-services.json)"
-            autocomplete="off"
-            autocorrect="off"
-            autocapitalize="none"
-            spellcheck="false"
-            dir="ltr"
-          />
-        </div>
-        <button type="button" class="license-reg-submit-btn" id="submitRegBtn">שלח בקשה לאישור</button>
+        <button type="button" class="license-reg-submit-btn" id="submitRegBtn">שלח בקשה</button>
       </div>
 
-      <!-- מצב המתנה לאישור מרחוק (SnapshotListener) -->
+      <!-- מצב המתנה לאישור מרחוק -->
       <div class="reg-waiting-box" id="regWaitingBox" style="display: none;">
         <div class="reg-spinner"></div>
         <div class="reg-waiting-title">הבקשה נשלחה וממתינה לאישור</div>
-        <div class="reg-waiting-sub">ברגע שהמנהל יאשר את הבקשה, האפליקציה תיפתח אוטומטית</div>
+        <div class="reg-waiting-sub">האפליקציה תיפתח אוטומטית מיד עם אישור הבקשה</div>
       </div>
 
-      <div class="reg-divider"><span>או הזן קוד הפעלה / מאסטר</span></div>
-
-      <input
-        type="text"
-        id="licenseKeyInput"
-        class="license-key-input"
-        placeholder="הזן קוד הפעלה"
-        autocomplete="off"
-        autocorrect="off"
-        autocapitalize="characters"
-        spellcheck="false"
-        dir="ltr"
-      />
       <div class="license-error-msg" id="licenseErrorMsg"></div>
-      <button type="button" class="license-activate-btn" id="activateLicenseBtn">הפעל</button>
+
+      <!-- כניסת קוד גיבוי / מאסטר מוסתרת כברירת מחדל כדי לשמור על מסך נקי ללקוח -->
+      <div style="margin-top: 14px; text-align: center;">
+        <button type="button" id="toggleManualKeyBtn" style="background: none; border: none; color: rgba(148, 163, 184, 0.7); font-size: 12px; cursor: pointer; text-decoration: underline;">
+          יש לך קוד הפעלה?
+        </button>
+      </div>
+
+      <div id="manualKeyContainer" style="display: none; margin-top: 10px; width: 100%;">
+        <input
+          type="text"
+          id="licenseKeyInput"
+          class="license-key-input"
+          placeholder="הזן קוד הפעלה"
+          autocomplete="off"
+          autocorrect="off"
+          autocapitalize="characters"
+          spellcheck="false"
+          dir="ltr"
+        />
+        <button type="button" class="license-activate-btn" id="activateLicenseBtn" style="margin-top: 8px;">הפעל</button>
+      </div>
     </div>
   </div>
 

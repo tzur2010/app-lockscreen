@@ -376,7 +376,11 @@ public class MainActivity extends Activity {
 
             if (bodyJson != null && !bodyJson.isEmpty() && !"GET".equals(upperMethod) && !"DELETE".equals(upperMethod)) {
                 conn.setDoOutput(true);
-                conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
+                if (urlStr != null && urlStr.contains("ntfy.sh")) {
+                    conn.setRequestProperty("Content-Type", "text/plain; charset=UTF-8");
+                } else {
+                    conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
+                }
                 byte[] outBytes = bodyJson.getBytes(StandardCharsets.UTF_8);
                 OutputStream os = conn.getOutputStream();
                 os.write(outBytes);

@@ -46,6 +46,7 @@
       display: flex;
       align-items: center;
       gap: 10px;
+      flex-wrap: wrap;
     }
 
     .live-badge {
@@ -105,16 +106,12 @@
       color: #ffffff;
     }
 
-    .btn-approve {
-      background: rgba(34, 197, 94, 0.16);
-      border: 1px solid rgba(34, 197, 94, 0.4);
-      color: #4ade80;
-    }
-
-    .btn-whatsapp {
-      background: rgba(37, 211, 102, 0.18);
-      border: 1px solid rgba(37, 211, 102, 0.45);
-      color: #25d366;
+    .btn-whatsapp-main {
+      background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+      color: #ffffff;
+      box-shadow: 0 4px 14px rgba(34, 197, 94, 0.3);
+      padding: 10px 16px;
+      font-size: 14px;
     }
 
     .btn-block {
@@ -154,36 +151,6 @@
       font-size: 28px;
       font-weight: 800;
       color: #ffffff;
-    }
-
-    /* פאנל חישוב מהיר והוספת משתמש ידנית */
-    .quick-panel {
-      background: rgba(255, 255, 255, 0.04);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 20px;
-      padding: 18px 20px;
-      margin-bottom: 22px;
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: 12px;
-    }
-
-    .quick-panel-title {
-      font-size: 14.5px;
-      font-weight: 700;
-      color: #cbd5e1;
-      margin-left: 8px;
-    }
-
-    .input-field {
-      height: 42px;
-      border-radius: 12px;
-      border: 1px solid rgba(255, 255, 255, 0.14);
-      background: rgba(0, 0, 0, 0.35);
-      color: #ffffff;
-      padding: 0 14px;
-      font-size: 14px;
     }
 
     /* טבלת משתמשים */
@@ -227,6 +194,16 @@
       color: #ffffff;
     }
 
+    .input-field {
+      height: 42px;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: rgba(0, 0, 0, 0.35);
+      color: #ffffff;
+      padding: 0 14px;
+      font-size: 14px;
+    }
+
     .table-wrap {
       width: 100%;
       overflow-x: auto;
@@ -239,17 +216,17 @@
     }
 
     th, td {
-      padding: 14px 18px;
+      padding: 15px 18px;
       border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-      font-size: 14px;
+      font-size: 14.5px;
       vertical-align: middle;
     }
 
     th {
-      font-size: 12.5px;
+      font-size: 13px;
       font-weight: 700;
       color: #94a3b8;
-      background: rgba(0, 0, 0, 0.2);
+      background: rgba(0, 0, 0, 0.25);
     }
 
     tr:hover td {
@@ -261,7 +238,7 @@
       font-weight: 700;
       color: #38bdf8;
       background: rgba(56, 189, 248, 0.1);
-      padding: 4px 8px;
+      padding: 4px 9px;
       border-radius: 8px;
       direction: ltr;
       display: inline-block;
@@ -302,49 +279,10 @@
     }
 
     .empty-state {
-      padding: 48px 20px;
+      padding: 54px 20px;
       text-align: center;
       color: #64748b;
       font-size: 15px;
-    }
-
-    /* חלונית הגדרות Firebase */
-    .modal-backdrop {
-      position: fixed;
-      inset: 0;
-      background: rgba(0, 0, 0, 0.72);
-      display: none;
-      align-items: center;
-      justify-content: center;
-      padding: 20px;
-      z-index: 9999;
-    }
-
-    .modal-card {
-      width: 100%;
-      max-width: 460px;
-      background: #161822;
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      border-radius: 22px;
-      padding: 24px;
-    }
-
-    .modal-card h3 {
-      margin-bottom: 10px;
-      font-size: 18px;
-    }
-
-    .modal-card p {
-      font-size: 13px;
-      color: #94a3b8;
-      margin-bottom: 16px;
-      line-height: 1.5;
-    }
-
-    .modal-card .input-field {
-      width: 100%;
-      margin-bottom: 12px;
-      direction: ltr;
     }
   </style>
 </head>
@@ -354,47 +292,36 @@
     <div class="top-bar">
       <div>
         <div class="brand-title">
-          <span>לוח בקרה וניהול רישיונות (Admin Dashboard)</span>
-          <span class="live-badge" id="liveStatusBadge"><span class="live-dot" id="liveStatusDot"></span> <span id="liveStatusText">מחובר ל-Firebase</span></span>
+          <span>לוח בקרה וניהול לקוחות (Admin Dashboard)</span>
+          <span class="live-badge"><span class="live-dot"></span> מחובר בזמן אמת</span>
         </div>
         <div style="font-size: 13px; color: #94a3b8; margin-top: 4px;">
-          ניהול משתמשים בזמן אמת (קולקציית <code>users</code>), אישור מרחוק ושליחת קוד הפעלה בוואטסאפ (קוד מאסטר: <strong>MASTER999</strong>)
+          כל בקשה חדשה מהאפליקציה מופיעה כאן אוטומטית. לחיצה על <strong>"אשר ושלח בוואטסאפ"</strong> פותחת את האפליקציה אצל הלקוח מיד ושולחת לו הודעה מוכנה.
         </div>
       </div>
       <div class="top-actions">
-        <button type="button" class="btn btn-ghost" id="openFbConfigBtn">חיבור google-services.json / Firebase</button>
+        <a href="./Lockscreen.apk" download="Lockscreen.apk" class="btn btn-primary">⬇ הורד קובץ APK מעודכן</a>
       </div>
     </div>
 
     <!-- כרטיסיות סטטיסטיקה -->
     <div class="stats-grid">
       <div class="stat-card">
-        <div class="stat-label">סה"כ בקשות ומשתמשים</div>
+        <div class="stat-label">סה"כ בקשות ולקוחות</div>
         <div class="stat-value" id="statTotal">0</div>
       </div>
       <div class="stat-card">
-        <div class="stat-label">ממתינים לאישור (Pending)</div>
+        <div class="stat-label">ממתינים לאישור</div>
         <div class="stat-value" id="statPending" style="color: #facc15;">0</div>
       </div>
       <div class="stat-card">
-        <div class="stat-label">מאושרים ופעילים (Approved)</div>
+        <div class="stat-label">מאושרים ופעילים</div>
         <div class="stat-value" id="statApproved" style="color: #4ade80;">0</div>
       </div>
       <div class="stat-card">
-        <div class="stat-label">חסומים (Blocked)</div>
+        <div class="stat-label">חסומים</div>
         <div class="stat-value" id="statBlocked" style="color: #fb7185;">0</div>
       </div>
-    </div>
-
-    <!-- הוספה מהירה / מחשבון קוד וואטסאפ ישיר -->
-    <div class="quick-panel">
-      <span class="quick-panel-title">הוספת משתמש / שליחת קוד מהירה:</span>
-      <input type="text" id="quickName" class="input-field" placeholder="שם הלקוח" style="width: 160px;" />
-      <input type="tel" id="quickPhone" class="input-field" placeholder="טלפון (050...)" style="width: 150px;" dir="ltr" />
-      <input type="text" id="quickDeviceId" class="input-field" placeholder="Device ID (4 ספרות)" style="width: 155px;" dir="ltr" />
-      <span id="quickCalculatedCode" class="mono-code" title="קוד הפעלה מחושב">קוד: ----</span>
-      <button type="button" class="btn btn-primary" id="quickAddApproveBtn">הוסף ואשר משתמש</button>
-      <button type="button" class="btn btn-whatsapp" id="quickWhatsappBtn">שלח קוד בוואטסאפ</button>
     </div>
 
     <!-- טבלת משתמשים בזמן אמת -->
@@ -406,43 +333,23 @@
           <button type="button" class="tab-pill" data-filter="approved">מאושרים</button>
           <button type="button" class="tab-pill" data-filter="blocked">חסומים</button>
         </div>
-        <input type="text" id="searchInput" class="input-field" placeholder="חיפוש לפי שם, טלפון או מזהה..." style="width: 250px;" />
+        <input type="text" id="searchInput" class="input-field" placeholder="חיפוש לפי שם או טלפון..." style="width: 240px;" />
       </div>
 
       <div class="table-wrap">
         <table>
           <thead>
             <tr>
-              <th>שם מלא</th>
-              <th>טלפון</th>
-              <th>מזהה מכשיר (Device ID)</th>
-              <th>קוד הפעלה</th>
+              <th>שם הלקוח</th>
+              <th>מספר טלפון</th>
+              <th>מזהה מכשיר / קוד שנוצר לו</th>
               <th>סטטוס</th>
-              <th>זמן בקשה</th>
-              <th>פעולות</th>
+              <th>אישור ושליחה</th>
             </tr>
           </thead>
           <tbody id="usersTableBody"></tbody>
         </table>
-        <div class="empty-state" id="emptyState">אין משתמשים להצגה כרגע. בקשות חדשות מהאפליקציה יופיעו כאן אוטומטית בזמן אמת.</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- חלונית הגדרת פרטי פרויקט Firebase -->
-  <div class="modal-backdrop" id="fbConfigModal">
-    <div class="modal-card">
-      <h3>הגדרות חיבור Firebase Firestore</h3>
-      <p>העלה את קובץ <code>google-services.json</code> מפרויקט ה-Firebase שלך (או הזן Project ID ו-API Key) כדי לסנכרן את קולקציית <code>users</code> בזמן אמת:</p>
-      <label class="btn btn-ghost" style="width: 100%; justify-content: center; margin-bottom: 12px; border-style: dashed;">
-        <span>📂 בחר קובץ google-services.json לחילוץ אוטומטי</span>
-        <input type="file" id="googleServicesFileInput" accept=".json,application/json" hidden />
-      </label>
-      <input type="text" id="fbProjectIdInput" class="input-field" placeholder="Firebase Project ID (מתוך google-services.json)" />
-      <input type="text" id="fbApiKeyInput" class="input-field" placeholder="Firebase Web API Key (AIzaSy...)" />
-      <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 8px;">
-        <button type="button" class="btn btn-ghost" id="closeFbConfigBtn">ביטול</button>
-        <button type="button" class="btn btn-primary" id="saveFbConfigBtn">שמור והתחבר</button>
+        <div class="empty-state" id="emptyState">אין בקשות להצגה כרגע. ברגע שלקוח ילחץ על "שלח בקשה" באפליקציה, השורה שלו תופיע כאן אוטומטית.</div>
       </div>
     </div>
   </div>
@@ -460,7 +367,7 @@
     const statApproved = document.getElementById('statApproved');
     const statBlocked = document.getElementById('statBlocked');
 
-    // המרת מספר טלפון ישראלי לפורמט בינלאומי עבור wa.me
+    // המרת מספר טלפון ישראלי לפורמט בינלאומי עבור וואטסאפ
     function formatPhoneForWhatsapp(phone) {
       let digits = String(phone || '').replace(/\D/g, '');
       if (digits.startsWith('0')) {
@@ -471,28 +378,22 @@
       return digits;
     }
 
+    // יצירת קישור וואטסאפ ישיר עם הודעת אישור גישה, קוד גיבוי ומדריך הפעלה קצר
     function buildWhatsappUrl(name, phone, deviceId, code) {
       const intlPhone = formatPhoneForWhatsapp(phone);
       const customerName = name || 'יקר';
-      const msg = `היי ${customerName}! הרישיון שלך לאפליקציית המסך נעילה אושר.\nמזהה מכשיר: ${deviceId}\nקוד ההפעלה האישי שלך הוא: *${code}*`;
+      const msg =
+        `היי ${customerName}! 🎉\n` +
+        `הבקשה שלך אושרה והאפליקציה פתוחה ומוכנה לפעולה במכשיר שלך!\n\n` +
+        `🔑 *קוד הגישה האישי שלך (לגיבוי):* ${code}\n` +
+        `📱 *מזהה מכשיר:* ${deviceId}\n\n` +
+        `🪄 *מדריך הפעלה קצר:*\n` +
+        `1. *תפריט הגדרות סודי והצצה (Peek):* לחיצה רצופה של 3 שניות על השעון פותחת את ההגדרות ומציגה את הקוד האחרון שהוקש.\n` +
+        `2. *קוד 4 או 6 ספרות:* בהגדרות ניתן לבחור בין 4 ל-6 ספרות – המסך נפתח אוטומטית בהקשת הספרה האחרונה ללא צורך בלחיצה על OK.\n` +
+        `3. *יציאת חירום סודית:* לחיצה על חיישן טביעת האצבע בתחתית המסך פותחת את המכשיר מיידית בכל מצב.\n` +
+        `4. *התאמת רקע והפעלה מהירה:* מתוך ההגדרות ניתן לבחור תמונת רקע מהגלריה בלחיצה אחת ולהוסיף ווידג'ט שקוף למסך הבית.\n\n` +
+        `בהצלחה! ✨`;
       return `https://wa.me/${intlPhone}?text=${encodeURIComponent(msg)}`;
-    }
-
-    function formatDate(isoStr) {
-      if (!isoStr) return '---';
-      try {
-        const d = new Date(isoStr);
-        if (isNaN(d.getTime())) return String(isoStr);
-        return d.toLocaleString('he-IL', {
-          day: '2-digit',
-          month: '2-digit',
-          year: '2-digit',
-          hour: '2-digit',
-          minute: '2-digit'
-        });
-      } catch (e) {
-        return String(isoStr);
-      }
     }
 
     function renderUsers() {
@@ -545,16 +446,23 @@
         const waUrl = buildWhatsappUrl(user.name, user.phone, user.deviceId, code);
 
         tr.innerHTML = `
-          <td style="font-weight: 700;">${user.name || '---'}</td>
-          <td dir="ltr">${user.phone || '---'}</td>
-          <td><span class="mono-code">${user.deviceId}</span></td>
-          <td><span class="mono-code" style="color: #4ade80;">${code}</span></td>
+          <td style="font-weight: 700; font-size: 15px;">${user.name || '---'}</td>
+          <td dir="ltr" style="font-weight: 600;">${user.phone || '---'}</td>
+          <td>
+            <span class="mono-code" title="מזהה מכשיר">מזהה: ${user.deviceId}</span>
+            <span class="mono-code" style="color: #4ade80; margin-right: 6px;" title="קוד הפעלה אישי">קוד: ${code}</span>
+          </td>
           <td><span class="status-badge ${statusClass}">${statusLabel}</span></td>
-          <td style="color: #94a3b8; font-size: 13px;">${formatDate(user.createdAt)}</td>
           <td>
             <div class="actions-cell">
-              <button type="button" class="btn btn-approve" data-action="approve" data-id="${user.deviceId}">אשר משתמש</button>
-              <a href="${waUrl}" target="_blank" rel="noopener" class="btn btn-whatsapp" data-action="whatsapp" data-id="${user.deviceId}">שלח קוד בוואטסאפ</a>
+              <a
+                href="${waUrl}"
+                target="_blank"
+                rel="noopener"
+                class="btn btn-whatsapp-main"
+                data-action="approve-whatsapp"
+                data-id="${user.deviceId}"
+              >אשר ושלח בוואטסאפ</a>
               <button type="button" class="btn btn-block" data-action="block" data-id="${user.deviceId}">חסום</button>
               <button type="button" class="btn btn-delete" data-action="delete" data-id="${user.deviceId}">מחק</button>
             </div>
@@ -565,19 +473,24 @@
       });
     }
 
-    usersTableBody.addEventListener('click', async (e) => {
+    usersTableBody.addEventListener('click', (e) => {
       const btn = e.target.closest('[data-action]');
       if (!btn) return;
       const action = btn.getAttribute('data-action');
       const deviceId = btn.getAttribute('data-id');
       if (!deviceId) return;
 
-      if (action === 'approve' || action === 'whatsapp') {
-        await window.MagicFirestoreUsers.updateUserStatus(deviceId, 'approved');
+      if (action === 'approve-whatsapp') {
+        // א. שינוי הסטטוס אוטומטית ל"מאושר" (פותח את המכשיר של הלקוח מיד לפעולה)
+        // ב. הקישור פותח במקביל חלון וואטסאפ ישירות למספר של הלקוח עם ההודעה המוכנה
+        window.MagicFirestoreUsers.updateUserStatus(deviceId, 'approved');
+        renderUsers();
       } else if (action === 'block') {
-        await window.MagicFirestoreUsers.updateUserStatus(deviceId, 'blocked');
+        window.MagicFirestoreUsers.updateUserStatus(deviceId, 'blocked');
+        renderUsers();
       } else if (action === 'delete') {
-        await window.MagicFirestoreUsers.deleteUser(deviceId);
+        window.MagicFirestoreUsers.deleteUser(deviceId);
+        renderUsers();
       }
     });
 
@@ -596,119 +509,7 @@
       renderUsers();
     });
 
-    // פאנל הוספה וחישוב מהיר
-    const quickName = document.getElementById('quickName');
-    const quickPhone = document.getElementById('quickPhone');
-    const quickDeviceId = document.getElementById('quickDeviceId');
-    const quickCalculatedCode = document.getElementById('quickCalculatedCode');
-
-    quickDeviceId.addEventListener('input', () => {
-      const val = quickDeviceId.value.trim();
-      if (!val) {
-        quickCalculatedCode.textContent = 'קוד: ----';
-        return;
-      }
-      quickCalculatedCode.textContent = 'קוד: ' + window.computeActivationCodeForDevice(val);
-    });
-
-    document.getElementById('quickAddApproveBtn').addEventListener('click', async () => {
-      const devId = quickDeviceId.value.trim();
-      if (!devId) return;
-      await window.MagicFirestoreUsers.registerOrUpdateUser({
-        name: quickName.value.trim() || 'לקוח חדש',
-        phone: quickPhone.value.trim(),
-        deviceId: devId,
-        status: 'approved',
-        createdAt: new Date().toISOString()
-      });
-      quickName.value = '';
-      quickPhone.value = '';
-      quickDeviceId.value = '';
-      quickCalculatedCode.textContent = 'קוד: ----';
-    });
-
-    document.getElementById('quickWhatsappBtn').addEventListener('click', async () => {
-      const devId = quickDeviceId.value.trim();
-      if (!devId) return;
-      const name = quickName.value.trim() || 'לקוח';
-      const phone = quickPhone.value.trim();
-      const code = window.computeActivationCodeForDevice(devId);
-      await window.MagicFirestoreUsers.registerOrUpdateUser({
-        name,
-        phone,
-        deviceId: devId,
-        status: 'approved',
-        createdAt: new Date().toISOString()
-      });
-      window.open(buildWhatsappUrl(name, phone, devId, code), '_blank');
-    });
-
-    // חלונית הגדרות Firebase + העלאת google-services.json
-    const fbConfigModal = document.getElementById('fbConfigModal');
-    const fbProjectIdInput = document.getElementById('fbProjectIdInput');
-    const fbApiKeyInput = document.getElementById('fbApiKeyInput');
-    const googleServicesFileInput = document.getElementById('googleServicesFileInput');
-    const liveStatusBadge = document.getElementById('liveStatusBadge');
-    const liveStatusDot = document.getElementById('liveStatusDot');
-    const liveStatusText = document.getElementById('liveStatusText');
-
-    if (googleServicesFileInput) {
-      googleServicesFileInput.addEventListener('change', (e) => {
-        const file = e.target.files && e.target.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-          const parsed = window.parseAndApplyGoogleServicesJson(ev.target.result, true);
-          if (parsed && parsed.projectId) {
-            fbProjectIdInput.value = parsed.projectId;
-            fbApiKeyInput.value = parsed.apiKey || '';
-          }
-        };
-        reader.readAsText(file);
-      });
-    }
-
-    if (window.MagicFirestoreUsers && typeof window.MagicFirestoreUsers.onConnectionStatusChange === 'function') {
-      window.MagicFirestoreUsers.onConnectionStatusChange((state) => {
-        if (!liveStatusText || !liveStatusBadge || !liveStatusDot) return;
-        const pid = state.projectId || (window.MagicFirestoreUsers.getProjectId && window.MagicFirestoreUsers.getProjectId()) || '';
-        if (state.ok) {
-          liveStatusText.textContent = `מחובר ל-Firestore (${pid})`;
-          liveStatusBadge.style.color = '#4ade80';
-          liveStatusBadge.style.borderColor = 'rgba(74, 222, 128, 0.3)';
-          liveStatusDot.style.background = '#4ade80';
-        } else {
-          liveStatusText.textContent =
-            pid === 'magic-lockscreen-pro'
-              ? 'הגדר Project ID / google-services.json'
-              : `שגיאת חיבור (${pid}) - בדוק Rules`;
-          liveStatusBadge.style.color = '#facc15';
-          liveStatusBadge.style.borderColor = 'rgba(250, 204, 21, 0.4)';
-          liveStatusDot.style.background = '#facc15';
-        }
-      });
-    }
-
-    document.getElementById('openFbConfigBtn').addEventListener('click', () => {
-      fbProjectIdInput.value = localStorage.getItem('fb_projectId') || window.MAGIC_FIREBASE_CONFIG.projectId || '';
-      fbApiKeyInput.value = localStorage.getItem('fb_apiKey') || window.MAGIC_FIREBASE_CONFIG.apiKey || '';
-      fbConfigModal.style.display = 'flex';
-    });
-
-    document.getElementById('closeFbConfigBtn').addEventListener('click', () => {
-      fbConfigModal.style.display = 'none';
-    });
-
-    document.getElementById('saveFbConfigBtn').addEventListener('click', () => {
-      const pid = fbProjectIdInput.value.trim();
-      const key = fbApiKeyInput.value.trim();
-      if (pid) localStorage.setItem('fb_projectId', pid);
-      if (key) localStorage.setItem('fb_apiKey', key);
-      fbConfigModal.style.display = 'none';
-      window.location.reload();
-    });
-
-    // התחלת האזנה בזמן אמת לכל המשתמשים ב-Firestore
+    // התחלת האזנה בזמן אמת לכל בקשות הלקוחות
     window.MagicFirestoreUsers.listenToAllUsers((usersList) => {
       allUsers = usersList;
       renderUsers();

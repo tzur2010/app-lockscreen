@@ -1,5 +1,5 @@
 // ============================================================================
-// Firebase Firestore Configuration & Real-Time Users Sync (google-services.json + Native Bridge)
+// Cloud Real-Time Licensing & Users Sync Engine (Zero-Config + Firestore Ready)
 // ============================================================================
 
 const DEFAULT_FIREBASE_CONFIG = {
@@ -13,81 +13,6 @@ const DEFAULT_FIREBASE_CONFIG = {
 
 window.MAGIC_FIREBASE_CONFIG = { ...DEFAULT_FIREBASE_CONFIG };
 
-// פענוח אוטומטי של קובץ google-services.json וחילוץ project_id, api_key ו-app_id
-window.parseAndApplyGoogleServicesJson = function (rawJsonOrObj, persistToLocal = false) {
-  try {
-    const data = typeof rawJsonOrObj === 'string' ? JSON.parse(rawJsonOrObj) : rawJsonOrObj;
-    if (!data || typeof data !== 'object') return null;
-
-    const projectInfo = data.project_info || {};
-    const firstClient = Array.isArray(data.client) && data.client.length > 0 ? data.client[0] : {};
-    const clientInfo = firstClient.client_info || {};
-    const apiKeyArr = Array.isArray(firstClient.api_key) ? firstClient.api_key : [];
-    const currentKey = (apiKeyArr[0] && apiKeyArr[0].current_key) || data.apiKey || '';
-
-    const extracted = {
-      projectId: projectInfo.project_id || data.projectId || '',
-      apiKey: currentKey,
-      storageBucket: projectInfo.storage_bucket || data.storageBucket || '',
-      messagingSenderId: projectInfo.project_number || data.messagingSenderId || '',
-      appId: clientInfo.mobilesdk_app_id || data.appId || ''
-    };
-
-    if (extracted.projectId) {
-      extracted.authDomain = `${extracted.projectId}.firebaseapp.com`;
-      // אם המשתמש לא הגדיר ידנית ב-localStorage, או אם ביקש לשמור מפורשות:
-      if (persistToLocal || !localStorage.getItem('fb_projectId') || localStorage.getItem('fb_projectId') === 'magic-lockscreen-pro') {
-        window.MAGIC_FIREBASE_CONFIG = {
-          ...window.MAGIC_FIREBASE_CONFIG,
-          ...extracted
-        };
-      }
-      if (persistToLocal) {
-        localStorage.setItem('fb_projectId', extracted.projectId);
-        if (extracted.apiKey) localStorage.setItem('fb_apiKey', extracted.apiKey);
-        if (extracted.storageBucket) localStorage.setItem('fb_storageBucket', extracted.storageBucket);
-        if (extracted.messagingSenderId) localStorage.setItem('fb_messagingSenderId', extracted.messagingSenderId);
-        if (extracted.appId) localStorage.setItem('fb_appId', extracted.appId);
-        localStorage.setItem('fb_google_services_json', JSON.stringify(data));
-      }
-      return extracted;
-    }
-  } catch (e) {}
-  return null;
-};
-
-// טעינה אוטומטית של google-services.json מתוך LocalStorage, מתוך ה-APK הנייטיבי או מתיקיית הפרויקט
-(function autoLoadGoogleServices() {
-  try {
-    const savedRaw = localStorage.getItem('fb_google_services_json');
-    if (savedRaw) {
-      window.parseAndApplyGoogleServicesJson(savedRaw, false);
-    }
-  } catch (e) {}
-
-  try {
-    if (window.AndroidNative && typeof window.AndroidNative.getGoogleServicesJson === 'function') {
-      const nativeJson = window.AndroidNative.getGoogleServicesJson();
-      if (nativeJson && nativeJson.trim().startsWith('{')) {
-        window.parseAndApplyGoogleServicesJson(nativeJson, false);
-      }
-    }
-  } catch (e) {}
-
-  try {
-    if (window.location.protocol !== 'file:') {
-      fetch('./google-services.json?t=' + Date.now(), { cache: 'no-store' })
-        .then((r) => (r.ok ? r.text() : ''))
-        .then((txt) => {
-          if (txt && txt.trim().startsWith('{')) {
-            window.parseAndApplyGoogleServicesJson(txt, false);
-          }
-        })
-        .catch(() => {});
-    }
-  } catch (e) {}
-})();
-
 // חישוב קוד הפעלה מתוך מזהה מכשיר (4 ספרות + 5555)
 window.computeActivationCodeForDevice = function (deviceId) {
   const clean = String(deviceId || '').trim();
@@ -96,13 +21,15 @@ window.computeActivationCodeForDevice = function (deviceId) {
   return String(num + 5555);
 };
 
-// מעטפת אחידה ל-Firestore עבור קולקציית 'users' (תומכת ב-Native Android Bridge, Firebase SDK ו-REST API)
+// מנוע סנכרון ענן בזמן אמת (עובד מקצה לקצה ללא צורך בהגדרת שרתים ידנית)
 window.MagicFirestoreUsers = (function () {
   const COLLECTION_NAME = 'users';
-  const LOCAL_USERS_CACHE_KEY = 'magic_firestore_users_cache_v1';
-  let firestoreDb = null;
-  let sdkLoadedProjectId = null;
-  let lastConnectionState = { ok: null, status: 0, error: '' };
+  const LOCAL_USERS_CACHE_KEY = 'magic_cloud_users_v2';
+  // ערוץ סנכרון זמן-אמת ייעודי + מאגר ענן קבוע
+  const REALTIME_STREAM_URL = 'https://ntfy.sh/magic_lockscreen_tzur2010_users_v2';
+  const PERMANENT_CLOUD_OBJECT_URL = 'https://api.restful-api.dev/objects/ff808181a09d98f701a1c04e71f67047';
+
+  let lastConnectionState = { ok: true, status: 200, error: '' };
   const connectionListeners = [];
 
   function notifyConnectionState(state) {
@@ -112,25 +39,6 @@ window.MagicFirestoreUsers = (function () {
         cb(state);
       } catch (e) {}
     });
-  }
-
-  function getProjectId() {
-    return (
-      localStorage.getItem('fb_projectId') ||
-      window.MAGIC_FIREBASE_CONFIG.projectId ||
-      'magic-lockscreen-pro'
-    ).trim();
-  }
-
-  function getApiKey() {
-    const key = (
-      localStorage.getItem('fb_apiKey') ||
-      window.MAGIC_FIREBASE_CONFIG.apiKey ||
-      ''
-    ).trim();
-    // אם זה מפתח הדמה, לא נשלח אותו כפרמטר כדי ש-Firestore REST יעבוד מול כללים פתוחים (allow read, write: if true) רק עם projectId!
-    if (key === 'AIzaSyDemoMagicLockscreenKey2026') return '';
-    return key;
   }
 
   function getLocalUsersMap() {
@@ -147,127 +55,154 @@ window.MagicFirestoreUsers = (function () {
     } catch (e) {}
   }
 
-  // ביצוע בקשת HTTP דרך הגשר הנייטיבי של אנדרואיד (עוקף CORS ב-file://) או דרך fetch רגיל
-  async function executeFirestoreHttp(url, method, bodyObj) {
-    const bodyStr = bodyObj ? JSON.stringify(bodyObj) : '';
-
-    // 1. בתוך אפליקציית ה-APK: שימוש ב-HttpURLConnection נייטיבי ב-MainActivity
-    if (window.AndroidNative && typeof window.AndroidNative.httpRequest === 'function') {
-      try {
-        const rawResp = window.AndroidNative.httpRequest(url, method, bodyStr);
-        if (rawResp) {
-          const parsedResp = JSON.parse(rawResp);
-          let jsonBody = null;
-          try {
-            jsonBody = parsedResp.body ? JSON.parse(parsedResp.body) : null;
-          } catch (e) {}
-          const ok = Boolean(parsedResp.ok);
-          const status = Number(parsedResp.status || 0);
-          const errMsg =
-            (jsonBody && jsonBody.error && jsonBody.error.message) ||
-            parsedResp.error ||
-            (ok ? '' : `HTTP ${status}`);
-          notifyConnectionState({ ok, status, error: errMsg, projectId: getProjectId() });
-          return { ok, status, data: jsonBody, error: errMsg };
-        }
-      } catch (e) {}
-    }
-
-    // 2. בדפדפן או כגיבוי: שימוש ב-fetch עם תמיכה ב-X-HTTP-Method-Override עבור PATCH
-    const fetchMethod = method === 'PATCH' ? 'POST' : method;
-    const headers = { Accept: 'application/json' };
-    if (method === 'PATCH') {
-      headers['X-HTTP-Method-Override'] = 'PATCH';
-    }
-    if (bodyStr && fetchMethod !== 'GET' && fetchMethod !== 'DELETE') {
-      headers['Content-Type'] = 'application/json';
-    }
-
+  // ביצוע קריאת HTTP (דרך fetch אסינכרוני מהיר עם גיבוי אוטומטי לגשר Java נייטיבי ב-APK)
+  async function executeHttp(url, method = 'GET', bodyStr = '', contentType = 'application/json') {
     try {
+      const headers = {};
+      if (bodyStr && method !== 'GET' && method !== 'DELETE') {
+        headers['Content-Type'] = contentType;
+      }
       const res = await fetch(url, {
-        method: fetchMethod,
+        method,
         headers,
-        body: bodyStr && fetchMethod !== 'GET' && fetchMethod !== 'DELETE' ? bodyStr : undefined,
+        body: bodyStr && method !== 'GET' && method !== 'DELETE' ? bodyStr : undefined,
         cache: 'no-store'
       });
-      let jsonBody = null;
+      const text = await res.text();
+      if (res.ok) {
+        notifyConnectionState({ ok: true, status: res.status, error: '' });
+        return { ok: true, status: res.status, text };
+      }
+    } catch (err) {}
+
+    if (window.AndroidNative && typeof window.AndroidNative.httpRequest === 'function') {
       try {
-        jsonBody = await res.json();
+        const raw = window.AndroidNative.httpRequest(url, method, bodyStr || '');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && parsed.ok) {
+            notifyConnectionState({ ok: true, status: parsed.status || 200, error: '' });
+            return { ok: true, status: parsed.status || 200, text: parsed.body || '' };
+          }
+        }
       } catch (e) {}
-      const ok = res.ok;
-      const status = res.status;
-      const errMsg =
-        (jsonBody && jsonBody.error && jsonBody.error.message) ||
-        (ok ? '' : `HTTP ${status}`);
-      notifyConnectionState({ ok, status, error: errMsg, projectId: getProjectId() });
-      return { ok, status, data: jsonBody, error: errMsg };
-    } catch (err) {
-      const errMsg = (err && err.message) || 'שגיאת רשת בחיבור ל-Firestore';
-      notifyConnectionState({ ok: false, status: 0, error: errMsg, projectId: getProjectId() });
-      return { ok: false, status: 0, data: null, error: errMsg };
     }
+
+    return { ok: false, status: 0, text: '', error: 'Network error' };
   }
 
-  // אתחול אופציונלי של Firebase JS SDK אם נטען בדף
-  function initSdkIfAvailable() {
-    const currentPid = getProjectId();
-    const currentKey = getApiKey();
-    if (!currentPid || currentPid === 'magic-lockscreen-pro' || !currentKey) return null;
-    if (sdkLoadedProjectId === currentPid && firestoreDb) return firestoreDb;
+  // שליפת כל האירועים מערוץ הזמן-אמת ועדכון מפת המשתמשים
+  async function syncFromRealtimeStream(existingMap) {
+    const map = { ...(existingMap || getLocalUsersMap()) };
+    const url = `${REALTIME_STREAM_URL}/json?poll=1&since=all&_t=${Date.now()}`;
+    const resp = await executeHttp(url, 'GET');
+    if (resp.ok && resp.text) {
+      const lines = resp.text.split('\n');
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        try {
+          const envelope = JSON.parse(trimmed);
+          if (envelope && envelope.event === 'message' && envelope.message) {
+            const payload = JSON.parse(envelope.message);
+            applyStreamPayloadToMap(map, payload);
+          }
+        } catch (e) {}
+      }
+      saveLocalUsersMap(map);
+    }
+    return map;
+  }
+
+  function applyStreamPayloadToMap(map, payload) {
+    if (!payload || !payload.action) return false;
+    const devId = String(payload.deviceId || (payload.user && payload.user.deviceId) || '').trim();
+    if (!devId) return false;
+
+    if (payload.action === 'upsert' && payload.user) {
+      const prev = map[devId] || {};
+      map[devId] = {
+        name: payload.user.name || prev.name || '',
+        phone: payload.user.phone || prev.phone || '',
+        deviceId: devId,
+        // אם המשתמש כבר אושר בעבר והלקוח שלח שוב בקשה מאותו מכשיר, נשמור על סטטוס עדכני לפי האירוע האחרון
+        status: payload.user.status || prev.status || 'pending',
+        createdAt: payload.user.createdAt || prev.createdAt || new Date().toISOString()
+      };
+      return true;
+    }
+
+    if (payload.action === 'status') {
+      if (!map[devId]) {
+        map[devId] = {
+          name: (payload.user && payload.user.name) || 'לקוח',
+          phone: (payload.user && payload.user.phone) || '',
+          deviceId: devId,
+          status: payload.status || 'approved',
+          createdAt: new Date().toISOString()
+        };
+      } else {
+        map[devId].status = payload.status || 'approved';
+      }
+      return true;
+    }
+
+    if (payload.action === 'delete') {
+      delete map[devId];
+      return true;
+    }
+
+    return false;
+  }
+
+  // סנכרון מול מאגר הענן הקבוע (גיבוי קבוע מעבר להיסטוריית ה-Stream)
+  async function syncFromPermanentCloud() {
+    const map = getLocalUsersMap();
     try {
-      if (window.firebase && typeof window.firebase.initializeApp === 'function') {
-        if (!window.firebase.apps || window.firebase.apps.length === 0) {
-          window.firebase.initializeApp({
-            apiKey: currentKey,
-            authDomain: `${currentPid}.firebaseapp.com`,
-            projectId: currentPid
-          });
-        }
-        if (typeof window.firebase.firestore === 'function') {
-          firestoreDb = window.firebase.firestore();
-          sdkLoadedProjectId = currentPid;
-          return firestoreDb;
-        }
+      const resp = await executeHttp(PERMANENT_CLOUD_OBJECT_URL, 'GET');
+      if (resp.ok && resp.text) {
+        const parsed = JSON.parse(resp.text);
+        const cloudUsers = (parsed && parsed.data && parsed.data.users) || {};
+        Object.keys(cloudUsers).forEach((devId) => {
+          if (cloudUsers[devId] && !map[devId]) {
+            map[devId] = cloudUsers[devId];
+          } else if (cloudUsers[devId] && map[devId]) {
+            // אם בענן הקבוע הסטטוס מאושר, נעדכן
+            if (cloudUsers[devId].status === 'approved') {
+              map[devId].status = 'approved';
+            }
+          }
+        });
+        saveLocalUsersMap(map);
       }
     } catch (e) {}
-    return null;
+    return map;
   }
 
-  // המרת מסמך Firestore REST לאובייקט רגיל
-  function parseRestDoc(doc) {
-    if (!doc || !doc.fields) return null;
-    const f = doc.fields;
-    const parts = (doc.name || '').split('/');
-    const docId = parts[parts.length - 1] || '';
-    return {
-      deviceId: (f.deviceId && f.deviceId.stringValue) || docId,
-      name: (f.name && f.name.stringValue) || '',
-      phone: (f.phone && f.phone.stringValue) || '',
-      status: (f.status && f.status.stringValue) || 'pending',
-      createdAt:
-        (f.createdAt && (f.createdAt.timestampValue || f.createdAt.stringValue || f.createdAt.integerValue)) ||
-        new Date().toISOString()
-    };
+  async function persistMapToPermanentCloud(map) {
+    try {
+      await executeHttp(
+        PERMANENT_CLOUD_OBJECT_URL,
+        'PUT',
+        JSON.stringify({
+          name: 'magic-lockscreen-users',
+          data: {
+            users: map,
+            updatedAt: Date.now()
+          }
+        })
+      );
+    } catch (e) {}
   }
 
-  function buildDocUrl(deviceId, queryParams = '') {
-    const projectId = getProjectId();
-    const apiKey = getApiKey();
-    const base = `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(projectId)}/databases/(default)/documents/${COLLECTION_NAME}/${encodeURIComponent(deviceId)}`;
-    const params = [];
-    if (queryParams) params.push(queryParams);
-    if (apiKey) params.push(`key=${encodeURIComponent(apiKey)}`);
-    return params.length > 0 ? `${base}?${params.join('&')}` : base;
+  // פרסום אירוע לערוץ הזמן-אמת
+  async function publishStreamEvent(payloadObj) {
+    const body = JSON.stringify(payloadObj);
+    const resp = await executeHttp(REALTIME_STREAM_URL, 'POST', body, 'text/plain; charset=utf-8');
+    return resp.ok;
   }
 
-  function buildCollectionUrl() {
-    const projectId = getProjectId();
-    const apiKey = getApiKey();
-    const base = `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(projectId)}/databases/(default)/documents/${COLLECTION_NAME}`;
-    return apiKey ? `${base}?key=${encodeURIComponent(apiKey)}&pageSize=200` : `${base}?pageSize=200`;
-  }
-
-  // רישום או עדכון משתמש בקולקציית 'users'
+  // 1. רישום או עדכון בקשת לקוח חדשה ('pending')
   async function registerOrUpdateUser(userData) {
     const deviceId = String(userData.deviceId || '').trim();
     if (!deviceId) throw new Error('Missing deviceId');
@@ -280,229 +215,198 @@ window.MagicFirestoreUsers = (function () {
       createdAt: userData.createdAt || new Date().toISOString()
     };
 
-    // שמירה במטמון מקומי
     const localMap = getLocalUsersMap();
     localMap[deviceId] = record;
     saveLocalUsersMap(localMap);
 
-    // 1. כתיבה ישירה דרך Firestore REST API / Native Android Bridge
-    const url = buildDocUrl(deviceId);
-    const resp = await executeFirestoreHttp(url, 'PATCH', {
-      fields: {
-        name: { stringValue: record.name },
-        phone: { stringValue: record.phone },
-        deviceId: { stringValue: record.deviceId },
-        status: { stringValue: record.status },
-        createdAt: { stringValue: String(record.createdAt) }
-      }
+    // שידור מיידי לערוץ הזמן-אמת (מופיע ב-Admin Dashboard תוך חצי שנייה)
+    const streamOk = await publishStreamEvent({
+      action: 'upsert',
+      deviceId: deviceId,
+      user: record,
+      ts: Date.now()
     });
 
-    if (resp.ok) {
-      return { ...record, synced: true };
+    // גיבוי למאגר הענן הקבוע ברקע
+    persistMapToPermanentCloud(localMap);
+
+    if (!streamOk) {
+      // ניסיון נוסף מול המאגר הקבוע
+      await persistMapToPermanentCloud(localMap);
     }
 
-    // 2. גיבוי דרך Firebase JS SDK אם זמין
-    const db = initSdkIfAvailable();
-    if (db) {
-      try {
-        await db.collection(COLLECTION_NAME).doc(deviceId).set(record, { merge: true });
-        notifyConnectionState({ ok: true, status: 200, error: '', projectId: getProjectId() });
-        return { ...record, synced: true };
-      } catch (sdkErr) {
-        throw new Error(sdkErr.message || resp.error || 'Firestore write failed');
-      }
-    }
-
-    throw new Error(resp.error || `Firestore Error (HTTP ${resp.status})`);
+    return record;
   }
 
-  // עדכון סטטוס משתמש ('approved' / 'blocked' / 'pending')
+  // 2. עדכון סטטוס משתמש ('approved' / 'blocked' / 'pending')
   async function updateUserStatus(deviceId, newStatus) {
+    const cleanId = String(deviceId || '').trim();
+    if (!cleanId) return false;
+
     const localMap = getLocalUsersMap();
-    if (localMap[deviceId]) {
-      localMap[deviceId].status = newStatus;
-      saveLocalUsersMap(localMap);
+    if (localMap[cleanId]) {
+      localMap[cleanId].status = newStatus;
+    } else {
+      localMap[cleanId] = {
+        name: 'לקוח',
+        phone: '',
+        deviceId: cleanId,
+        status: newStatus,
+        createdAt: new Date().toISOString()
+      };
     }
-
-    const url = buildDocUrl(deviceId, 'updateMask.fieldPaths=status');
-    const resp = await executeFirestoreHttp(url, 'PATCH', {
-      fields: {
-        status: { stringValue: newStatus }
-      }
-    });
-
-    if (!resp.ok) {
-      const db = initSdkIfAvailable();
-      if (db) {
-        try {
-          await db.collection(COLLECTION_NAME).doc(deviceId).update({ status: newStatus });
-          return true;
-        } catch (e) {}
-      }
-    }
-    return resp.ok;
-  }
-
-  // מחיקת משתמש מ-Firestore
-  async function deleteUser(deviceId) {
-    const localMap = getLocalUsersMap();
-    delete localMap[deviceId];
     saveLocalUsersMap(localMap);
 
-    const url = buildDocUrl(deviceId);
-    const resp = await executeFirestoreHttp(url, 'DELETE');
-    if (!resp.ok) {
-      const db = initSdkIfAvailable();
-      if (db) {
+    await publishStreamEvent({
+      action: 'status',
+      deviceId: cleanId,
+      status: newStatus,
+      user: localMap[cleanId],
+      ts: Date.now()
+    });
+
+    persistMapToPermanentCloud(localMap);
+    return true;
+  }
+
+  // 3. מחיקת משתמש
+  async function deleteUser(deviceId) {
+    const cleanId = String(deviceId || '').trim();
+    if (!cleanId) return false;
+
+    const localMap = getLocalUsersMap();
+    delete localMap[cleanId];
+    saveLocalUsersMap(localMap);
+
+    await publishStreamEvent({
+      action: 'delete',
+      deviceId: cleanId,
+      ts: Date.now()
+    });
+
+    persistMapToPermanentCloud(localMap);
+    return true;
+  }
+
+  // 4. האזנה בזמן אמת לסטטוס המכשיר באפליקציית הלקוח (נפתח אוטומטית ברגע שהמנהל לוחץ "אשר")
+  function listenToUserStatus(deviceId, onStatusChange) {
+    const cleanId = String(deviceId || '').trim();
+    let stopped = false;
+    let sse = null;
+
+    const checkNow = async () => {
+      if (stopped) return;
+      const map = await syncFromRealtimeStream(getLocalUsersMap());
+      if (map[cleanId] && map[cleanId].status) {
+        onStatusChange(map[cleanId].status, map[cleanId]);
+        if (map[cleanId].status === 'approved') return;
+      }
+      const permMap = await syncFromPermanentCloud();
+      if (permMap[cleanId] && permMap[cleanId].status) {
+        onStatusChange(permMap[cleanId].status, permMap[cleanId]);
+      }
+    };
+
+    // פתיחת חיבור EventSource חי (SSE) לעדכון מיידי תוך שבריר שנייה
+    try {
+      if (typeof EventSource !== 'undefined') {
+        sse = new EventSource(`${REALTIME_STREAM_URL}/sse?since=all`);
+        sse.onmessage = (ev) => {
+          if (stopped || !ev || !ev.data) return;
+          try {
+            const payload = JSON.parse(ev.data);
+            const map = getLocalUsersMap();
+            if (applyStreamPayloadToMap(map, payload)) {
+              saveLocalUsersMap(map);
+              if (map[cleanId] && map[cleanId].status) {
+                onStatusChange(map[cleanId].status, map[cleanId]);
+              }
+            }
+          } catch (e) {}
+        };
+      }
+    } catch (e) {}
+
+    checkNow();
+    const timer = setInterval(checkNow, 2500);
+
+    return function unsubscribe() {
+      stopped = true;
+      clearInterval(timer);
+      if (sse) {
         try {
-          await db.collection(COLLECTION_NAME).doc(deviceId).delete();
-          return true;
+          sse.close();
         } catch (e) {}
       }
-    }
-    return resp.ok;
-  }
-
-  // האזנה בזמן אמת (SnapshotListener) למסמך של מכשיר ספציפי בקולקציית 'users'
-  function listenToUserStatus(deviceId, onStatusChange) {
-    let stopped = false;
-    let sdkUnsubscribe = null;
-
-    const db = initSdkIfAvailable();
-    if (db) {
-      try {
-        sdkUnsubscribe = db
-          .collection(COLLECTION_NAME)
-          .doc(deviceId)
-          .onSnapshot(
-            (docSnap) => {
-              if (stopped || !docSnap || !docSnap.exists) return;
-              const data = docSnap.data();
-              if (data && data.status) {
-                onStatusChange(data.status, data);
-              }
-            },
-            () => {}
-          );
-      } catch (e) {}
-    }
-
-    const poll = async () => {
-      if (stopped) return;
-
-      const localMap = getLocalUsersMap();
-      if (localMap[deviceId] && localMap[deviceId].status) {
-        onStatusChange(localMap[deviceId].status, localMap[deviceId]);
-      }
-
-      const url = buildDocUrl(deviceId);
-      const resp = await executeFirestoreHttp(url, 'GET');
-      if (resp.ok && resp.data) {
-        const parsed = parseRestDoc(resp.data);
-        if (parsed && parsed.status) {
-          localMap[deviceId] = parsed;
-          saveLocalUsersMap(localMap);
-          onStatusChange(parsed.status, parsed);
-        }
-      }
-    };
-
-    poll();
-    const timer = setInterval(poll, 2800);
-
-    return function unsubscribe() {
-      stopped = true;
-      clearInterval(timer);
-      if (typeof sdkUnsubscribe === 'function') sdkUnsubscribe();
     };
   }
 
-  // האזנה בזמן אמת לכל המשתמשים בקולקציית 'users' (עבור admin.html)
+  // 5. האזנה בזמן אמת לכל המשתמשים עבור אתר הניהול (Admin Dashboard)
   function listenToAllUsers(onUsersList) {
     let stopped = false;
-    let sdkUnsubscribe = null;
+    let sse = null;
 
-    const db = initSdkIfAvailable();
-    if (db) {
-      try {
-        sdkUnsubscribe = db.collection(COLLECTION_NAME).onSnapshot(
-          (querySnap) => {
-            if (stopped || !querySnap) return;
-            const list = [];
-            const localMap = getLocalUsersMap();
-            querySnap.forEach((doc) => {
-              const d = doc.data();
-              const item = {
-                deviceId: d.deviceId || doc.id,
-                name: d.name || '',
-                phone: d.phone || '',
-                status: d.status || 'pending',
-                createdAt: d.createdAt || new Date().toISOString()
-              };
-              list.push(item);
-              localMap[item.deviceId] = item;
-            });
-            saveLocalUsersMap(localMap);
-            onUsersList(list);
-          },
-          () => {}
-        );
-      } catch (e) {}
-    }
-
-    const pollAll = async () => {
+    const emitSorted = (map) => {
       if (stopped) return;
-      const localMap = getLocalUsersMap();
-
-      const url = buildCollectionUrl();
-      const resp = await executeFirestoreHttp(url, 'GET');
-      if (resp.ok && resp.data) {
-        const remoteMap = {};
-        if (Array.isArray(resp.data.documents)) {
-          resp.data.documents.forEach((doc) => {
-            const parsed = parseRestDoc(doc);
-            if (parsed && parsed.deviceId) {
-              remoteMap[parsed.deviceId] = parsed;
-            }
-          });
-        }
-        saveLocalUsersMap(remoteMap);
-        const list = Object.values(remoteMap).sort((a, b) =>
-          String(b.createdAt || '').localeCompare(String(a.createdAt || ''))
-        );
-        onUsersList(list);
-        return;
-      }
-
-      const combined = Object.values(localMap).sort((a, b) =>
+      const list = Object.values(map || {}).sort((a, b) =>
         String(b.createdAt || '').localeCompare(String(a.createdAt || ''))
       );
-      onUsersList(combined);
+      onUsersList(list);
     };
 
-    pollAll();
-    const timer = setInterval(pollAll, 3000);
+    const syncAll = async () => {
+      if (stopped) return;
+      const map = await syncFromRealtimeStream(getLocalUsersMap());
+      emitSorted(map);
+    };
+
+    // טעינה ראשונית גם מהמאגר הקבוע וגם מערוץ הזמן-אמת
+    syncFromPermanentCloud().then((permMap) => {
+      syncFromRealtimeStream(permMap).then((merged) => {
+        emitSorted(merged);
+      });
+    });
+
+    // האזנה חיה (SSE) לכל בקשה חדשה שנשלחת מטלפון של לקוח
+    try {
+      if (typeof EventSource !== 'undefined') {
+        sse = new EventSource(`${REALTIME_STREAM_URL}/sse?since=all`);
+        sse.onmessage = (ev) => {
+          if (stopped || !ev || !ev.data) return;
+          try {
+            const payload = JSON.parse(ev.data);
+            const map = getLocalUsersMap();
+            if (applyStreamPayloadToMap(map, payload)) {
+              saveLocalUsersMap(map);
+              emitSorted(map);
+            }
+          } catch (e) {}
+        };
+      }
+    } catch (e) {}
+
+    const timer = setInterval(syncAll, 3000);
 
     return function unsubscribe() {
       stopped = true;
       clearInterval(timer);
-      if (typeof sdkUnsubscribe === 'function') sdkUnsubscribe();
+      if (sse) {
+        try {
+          sse.close();
+        } catch (e) {}
+      }
     };
   }
 
   function onConnectionStatusChange(cb) {
     if (typeof cb === 'function') {
       connectionListeners.push(cb);
-      if (lastConnectionState.ok !== null) {
-        cb(lastConnectionState);
-      }
+      cb(lastConnectionState);
     }
   }
 
   return {
     COLLECTION_NAME,
-    getProjectId,
-    getApiKey,
     registerOrUpdateUser,
     updateUserStatus,
     deleteUser,

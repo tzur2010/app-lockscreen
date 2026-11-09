@@ -3007,7 +3007,7 @@ function initDeviceLicenseGate() {
 // ============================================================================
 // 21. מנגנון עדכון גרסה עצמי בתוך האפליקציה (In-App Self-Updater מול app_config)
 // ============================================================================
-const FALLBACK_INSTALLED_VERSION = '4.1';
+const FALLBACK_INSTALLED_VERSION = '4.2';
 const DEFAULT_APK_URL = 'https://github.com/tzur2010/app-lockscreen/raw/main/Lockscreen.apk';
 
 function getInstalledAppVersion() {
@@ -3156,7 +3156,7 @@ applyConfigToUI();
 initInAppSelfUpdater();
 
 // מנגנון בדיקת גרסה אוטומטי (פועל בדפדפן Web בלבד, מושבת במצב Offline Standalone APK)
-const CURRENT_APP_VERSION = '20261109173554';
+const CURRENT_APP_VERSION = '20261109190141';
 
 async function checkRemoteVersionAndReload() {
   if (window.location.protocol === 'file:' || !navigator.onLine) return;

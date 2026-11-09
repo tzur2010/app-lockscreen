@@ -3,12 +3,7 @@
 // ============================================================================
 
 const DEFAULT_FIREBASE_CONFIG = {
-  apiKey: localStorage.getItem('fb_apiKey') || "AIzaSyDemoMagicLockscreenKey2026",
-  authDomain: localStorage.getItem('fb_authDomain') || "magic-lockscreen-pro.firebaseapp.com",
-  projectId: localStorage.getItem('fb_projectId') || "magic-lockscreen-pro",
-  storageBucket: localStorage.getItem('fb_storageBucket') || "magic-lockscreen-pro.appspot.com",
-  messagingSenderId: localStorage.getItem('fb_messagingSenderId') || "1029384756",
-  appId: localStorage.getItem('fb_appId') || "1:1029384756:android:abcdef1234567890"
+  projectId: localStorage.getItem('fb_projectId') || "magic-lockscreen-cloud"
 };
 
 window.MAGIC_FIREBASE_CONFIG = { ...DEFAULT_FIREBASE_CONFIG };

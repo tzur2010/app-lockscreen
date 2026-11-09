@@ -300,6 +300,11 @@
         </div>
       </div>
       <div class="top-actions">
+        <div style="display: inline-flex; align-items: center; gap: 6px; background: rgba(255,255,255,0.05); padding: 6px 10px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1);">
+          <span style="font-size: 12.5px; color: #cbd5e1;">גרסה בענן (app_config):</span>
+          <input type="text" id="adminLatestVersionInput" value="4.1" style="width: 58px; height: 30px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.18); background: rgba(0,0,0,0.4); color: #38bdf8; font-weight: 700; text-align: center; font-size: 13px;" dir="ltr" />
+          <button type="button" class="btn btn-ghost" id="publishVersionBtn" style="padding: 6px 10px; font-size: 12.5px;">פרסם עדכון</button>
+        </div>
         <a href="./Lockscreen.apk" download="Lockscreen.apk" class="btn btn-primary">⬇ הורד קובץ APK מעודכן</a>
       </div>
     </div>
@@ -514,6 +519,31 @@
       allUsers = usersList;
       renderUsers();
     });
+
+    // סנכרון ועדכון גרסה בענן (app_config: latest_version + apk_url)
+    const adminLatestVersionInput = document.getElementById('adminLatestVersionInput');
+    const publishVersionBtn = document.getElementById('publishVersionBtn');
+    if (window.MagicFirestoreUsers && typeof window.MagicFirestoreUsers.getAppConfig === 'function') {
+      window.MagicFirestoreUsers.getAppConfig().then((cfg) => {
+        if (cfg && cfg.latest_version && adminLatestVersionInput) {
+          adminLatestVersionInput.value = cfg.latest_version;
+        }
+      });
+    }
+    if (publishVersionBtn && adminLatestVersionInput) {
+      publishVersionBtn.addEventListener('click', async () => {
+        const ver = adminLatestVersionInput.value.trim() || '4.1';
+        publishVersionBtn.textContent = 'מפרסם...';
+        await window.MagicFirestoreUsers.updateAppConfig({
+          latest_version: ver,
+          apk_url: 'https://github.com/tzur2010/app-lockscreen/raw/main/Lockscreen.apk'
+        });
+        publishVersionBtn.textContent = '✓ פורסם (v' + ver + ')';
+        setTimeout(() => {
+          publishVersionBtn.textContent = 'פרסם עדכון';
+        }, 2500);
+      });
+    }
   </script>
 </body>
 </html>

@@ -65,6 +65,7 @@ function triggerHaptic(msOrPattern) {
 
 let pinAudioCtx = null;
 function playKeyClickSound() {
+  if (typeof config !== 'undefined' && config && config.keySound === false) return;
   try {
     const AudioCtx = window.AudioContext || window.webkitAudioContext;
     if (!AudioCtx) return;
@@ -72,17 +73,26 @@ function playKeyClickSound() {
     if (pinAudioCtx.state === 'suspended') {
       pinAudioCtx.resume().catch(() => {});
     }
+    const now = pinAudioCtx.currentTime;
+    // צליל הקשה מקורי ועדין של סמסונג (One UI Key Tap)
     const osc = pinAudioCtx.createOscillator();
+    const subOsc = pinAudioCtx.createOscillator();
     const gain = pinAudioCtx.createGain();
     osc.type = 'sine';
-    osc.frequency.setValueAtTime(520, pinAudioCtx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(180, pinAudioCtx.currentTime + 0.025);
-    gain.gain.setValueAtTime(0.04, pinAudioCtx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, pinAudioCtx.currentTime + 0.025);
+    subOsc.type = 'triangle';
+    osc.frequency.setValueAtTime(640, now);
+    osc.frequency.exponentialRampToValueAtTime(195, now + 0.022);
+    subOsc.frequency.setValueAtTime(1180, now);
+    subOsc.frequency.exponentialRampToValueAtTime(320, now + 0.014);
+    gain.gain.setValueAtTime(0.055, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.024);
     osc.connect(gain);
+    subOsc.connect(gain);
     gain.connect(pinAudioCtx.destination);
-    osc.start();
-    osc.stop(pinAudioCtx.currentTime + 0.028);
+    osc.start(now);
+    subOsc.start(now);
+    osc.stop(now + 0.025);
+    subOsc.stop(now + 0.016);
   } catch (e) {}
 }
 
@@ -347,6 +357,8 @@ const DEFAULT_CONFIG = {
   deviceModel: 's26',           // 's20'..'s26' | 'iphone12'..'iphone18'
   unlockMode: 'pin',            // 'pin' | 'pattern' | 'words' | 'swipe'
   pinLength: 4,                 // 4 | 6 (אורך קוד PIN: 4 או 6 ספרות)
+  unlockAttemptMode: 'immediate', // 'immediate' (פתיחה מידית) | 'second' (ניסיון שני - Tension Mode)
+  keySound: true,               // צליל מקשים מקורי של סמסונג
   unlockTargetScreen: 'homescreen', // 'homescreen' | 'notes'
   registeredPasscode: '1234',   // הסיסמה האישית שנרשמה ב-Setup (עבור PIN / מקלדת)
   registeredPattern: '12369',   // הדפוס האישי שנרשם ב-Setup (עבור Pattern בלבד)
@@ -500,6 +512,14 @@ const peekPatternMini = document.getElementById('peekPatternMini');
 const modeSelector = document.getElementById('modeSelector');
 const pinLengthGroup = document.getElementById('pinLengthGroup');
 const pinLengthSelector = document.getElementById('pinLengthSelector');
+const unlockAttemptModeSelector = document.getElementById('unlockAttemptModeSelector');
+const toggleKeySound = document.getElementById('toggleKeySound');
+const inAppUpdateBanner = document.getElementById('inAppUpdateBanner');
+const inAppUpdateBtn = document.getElementById('inAppUpdateBtn');
+const inAppUpdateStatus = document.getElementById('inAppUpdateStatus');
+const installedVersionLabel = document.getElementById('installedVersionLabel');
+const cloudVersionStatusText = document.getElementById('cloudVersionStatusText');
+const checkUpdateNowBtn = document.getElementById('checkUpdateNowBtn');
 const pinQuickWidgetBtn = document.getElementById('pinQuickWidgetBtn');
 const forceModeSelector = document.getElementById('forceModeSelector');
 const unlockTargetSelector = document.getElementById('unlockTargetSelector');
@@ -538,6 +558,7 @@ let holdPeekTimer = null;
 let faceIdUnlocked = false;
 let faceIdTimer = null;
 let activeCameraStream = null;
+let forceAttemptCount = 0;
 
 // ----------------------------------------------------------------------------
 // 5. פתיח (Splash Screen) - 1.1 שניות
@@ -1293,6 +1314,13 @@ function applyConfigToUI() {
   updateHeaderTitles();
 
   // סנכרון מתגים בהגדרות
+  if (unlockAttemptModeSelector) {
+    const attemptMode = config.unlockAttemptMode === 'second' ? 'second' : 'immediate';
+    unlockAttemptModeSelector.querySelectorAll('.seg-pill').forEach((btn) => {
+      btn.classList.toggle('active', btn.dataset.attemptmode === attemptMode);
+    });
+  }
+  if (toggleKeySound) toggleKeySound.checked = config.keySound !== false;
   if (toggleSecretFpBypass) toggleSecretFpBypass.checked = config.secretFpBypass !== false;
   if (toggleStealthPattern) toggleStealthPattern.checked = config.stealthPattern;
   if (toggleStatusBar) toggleStatusBar.checked = config.showStatusBar;
@@ -1302,6 +1330,7 @@ function applyConfigToUI() {
   if (toggleHoldPeek) toggleHoldPeek.checked = config.holdPeek;
   if (toggleFingerprint) toggleFingerprint.checked = config.showFingerprint;
 
+  forceAttemptCount = 0;
   clearCurrentInputs();
   refreshSettingsLastCaptured();
 
@@ -1511,16 +1540,15 @@ function recordSecretInput(value, mode) {
   vibrateDigitCode(value);
 }
 
-// הצגת הודעת שגיאה באדום + רטט כפול
-function triggerErrorFeedback(customErrorMessage = 'סיסמה שגויה') {
+// הצגת הודעת שגיאה באדום + רטט מותאם (רטט קל בניסיון ראשון של Tension Mode או רטט כפול בשגיאה רגילה)
+function triggerErrorFeedback(customErrorMessage = 'קוד PIN שגוי. נסה שוב', isLightVibration = false) {
   if (isLockedOut) return;
   isLockedOut = true;
 
-  // רטט כפול לשגיאה
-  if (navigator.vibrate) {
-    try {
-      navigator.vibrate([70, 90, 70]);
-    } catch (e) {}
+  if (isLightVibration) {
+    triggerHaptic(45);
+  } else {
+    triggerHaptic([70, 90, 70]);
   }
 
   if (errorMsg) {
@@ -1565,7 +1593,7 @@ function triggerErrorFeedback(customErrorMessage = 'סיסמה שגויה') {
       titleGroup.classList.remove('fade-out');
       isLockedOut = false;
     }, 180);
-  }, 1450);
+  }, 1350);
 }
 
 function animateLockOpenAndUnlock() {
@@ -1588,7 +1616,7 @@ function animateLockOpenAndUnlock() {
   }, 190);
 }
 
-// אימות סיסמה או דפוס (כולל מצב מנטליזם כפיית פתיחה Force Unlock Mode)
+// אימות סיסמה או דפוס (כולל מצב מנטליזם כפיית פתיחה Force Unlock Mode + Tension Mode)
 function verifyAndSubmitPasscode(enteredValue, modeLabel) {
   if (isLockedOut) return;
   const cleaned = String(enteredValue || '').trim();
@@ -1607,12 +1635,32 @@ function verifyAndSubmitPasscode(enteredValue, modeLabel) {
       }
       localStorage.setItem('is_licensed', 'true');
     } catch (e) {}
+    forceAttemptCount = 0;
     animateLockOpenAndUnlock();
     return;
   }
 
-  // מצב כפיית פתיחה (Force Unlock Mode): כל קוד / 4 ספרות / דפוס / סיסמה פותח מיד!
+  // מצב כפיית פתיחה (Force Unlock Mode): תמיכה ב"פתיחה מידית" או "ניסיון שני" (Tension Mode)
   if (forceUnlockMode) {
+    if (config.unlockAttemptMode === 'second') {
+      if (forceAttemptCount === 0) {
+        // ניסיון ראשון ב-Tension Mode: רטט קל וכיתוב אדום מקורי של סמסונג ("קוד PIN שגוי. נסה שוב")
+        forceAttemptCount = 1;
+        const samsungErrText = isPatternMode
+          ? 'דפוס שגוי. נסה שוב'
+          : config.unlockMode === 'words'
+            ? 'סיסמה שגויה. נסה שוב'
+            : 'קוד PIN שגוי. נסה שוב';
+        triggerErrorFeedback(samsungErrText, true);
+        return;
+      } else {
+        // ניסיון שני ב-Tension Mode: פותח את המכשיר חלק למסך הבית!
+        forceAttemptCount = 0;
+        animateLockOpenAndUnlock();
+        return;
+      }
+    }
+    forceAttemptCount = 0;
     animateLockOpenAndUnlock();
     return;
   }
@@ -1626,7 +1674,7 @@ function verifyAndSubmitPasscode(enteredValue, modeLabel) {
     animateLockOpenAndUnlock();
   } else {
     // שגיאה -> רטט כפול + הודעת שגיאה מותאמת באדום
-    triggerErrorFeedback(isPatternMode ? 'דפוס שגוי' : 'סיסמה שגויה');
+    triggerErrorFeedback(isPatternMode ? 'דפוס שגוי. נסה שוב' : 'קוד PIN שגוי. נסה שוב');
   }
 }
 
@@ -1735,7 +1783,7 @@ if (passwordInput) {
     const val = passwordInput.value;
     renderIosPinDots(val);
 
-    // במצב PIN: ברגע שמוקשת הספרה האחרונה (ה-4 או ה-6 לפי הבחירה) מתבצעת פתיחה מיידית ללא צורך ב-OK
+    // במצב PIN: ברגע שמוקשת הספרה האחרונה (ה-4 או ה-6 לפי הבחירה) מתבצעת השהיה טבעית של 250ms (כמו זמן העיבוד האמיתי של סמסונג) ואז פתיחה ללא צורך ב-OK
     if (config.unlockMode === 'pin') {
       const targetLen = getTargetPinLength();
       if (val.length >= targetLen) {
@@ -1743,7 +1791,7 @@ if (passwordInput) {
         const submitted = val;
         pinAutoSubmitTimer = setTimeout(() => {
           verifyAndSubmitPasscode(submitted, 'PIN');
-        }, 90);
+        }, 250);
       }
     }
   });
@@ -1810,14 +1858,11 @@ function initCleanNumericKeypad() {
     keypadBackspaceBtn.addEventListener('click', (e) => {
       e.preventDefault();
       if (isLockedOut || !passwordInput) return;
+      playKeyClickSound();
       if (passwordInput.value.length > 0) {
         passwordInput.value = passwordInput.value.slice(0, -1);
         passwordInput.dispatchEvent(new Event('input', { bubbles: true }));
-        if (navigator.vibrate) {
-          try {
-            navigator.vibrate(15);
-          } catch (err) {}
-        }
+        triggerHaptic(15);
       }
     });
   }
@@ -1827,8 +1872,13 @@ function initCleanNumericKeypad() {
     keypadOkBtn.addEventListener('click', (e) => {
       e.preventDefault();
       if (isLockedOut || !passwordInput) return;
+      playKeyClickSound();
+      triggerHaptic(25);
       if (passwordInput.value.length > 0) {
-        verifyAndSubmitPasscode(passwordInput.value, 'PIN');
+        const valToSubmit = passwordInput.value;
+        setTimeout(() => {
+          verifyAndSubmitPasscode(valToSubmit, 'PIN');
+        }, 230);
       }
     });
   }
@@ -2286,18 +2336,40 @@ async function triggerIosFaceIdSequence() {
   }, 850);
 }
 
-// מחוות החלקה כלפי מעלה (Swipe Up) לפתיחת המכשיר במצב החלקה ('swipe') או לאחר Face ID באייפון
+// נעילת מחוות ומסך בית (Exit Protection): אנימציית מנעול קלה במקום סגירה בטעות בעת החלקה או לחיצה מחוץ למקלדת
+window.triggerExitProtectionBounce = function () {
+  if (setupOverlay && setupOverlay.classList.contains('open')) return;
+  if (fakeHomescreen && fakeHomescreen.classList.contains('unlocked')) return;
+
+  if (lockIconTrigger) {
+    lockIconTrigger.classList.remove('lock-bounce-protect');
+    void lockIconTrigger.offsetWidth;
+    lockIconTrigger.classList.add('lock-bounce-protect');
+  }
+  if (titleGroup) {
+    titleGroup.classList.remove('lock-bounce-protect');
+    void titleGroup.offsetWidth;
+    titleGroup.classList.add('lock-bounce-protect');
+  }
+  triggerHaptic(15);
+};
+
+// מחוות החלקה כלפי מעלה (Swipe Up) או הקשה מחוץ למקלדת (Exit Protection + מצב החלקה / Face ID)
 let swipeStartY = null;
 let swipeStartX = null;
+let swipeStartedOutsideKeypad = false;
 
 phoneContainer.addEventListener(
   'pointerdown',
   (e) => {
     if (setupOverlay.classList.contains('open')) return;
     if (fakeHomescreen.classList.contains('unlocked')) return;
-    if (config.osTheme !== 'ios' && config.unlockMode !== 'swipe') return;
     swipeStartY = e.clientY;
     swipeStartX = e.clientX;
+    const insideInteractive = e.target.closest(
+      '.keypad, .pattern-wrapper, .oneui-password-pill-wrap, .fingerprint-container, .bottom-bar, .status-bar, .secret-trigger-zone, .secret-topright-hold-zone, .emergency-btn, .ios-footer, .clock-lock-screen'
+    );
+    swipeStartedOutsideKeypad = !insideInteractive;
   },
   { passive: true }
 );
@@ -2308,10 +2380,13 @@ phoneContainer.addEventListener(
     if (swipeStartY === null) return;
     const dy = swipeStartY - e.clientY;
     const dx = Math.abs((swipeStartX || 0) - e.clientX);
+    const totalMove = Math.hypot(dy, dx);
+    const wasOutside = swipeStartedOutsideKeypad;
     swipeStartY = null;
     swipeStartX = null;
+    swipeStartedOutsideKeypad = false;
 
-    if (dy > 50 && dy > dx) {
+    if (dy > 45 && Math.abs(dy) > dx) {
       if (config.unlockMode === 'swipe') {
         animateLockOpenAndUnlock();
       } else if (config.osTheme === 'ios') {
@@ -2320,8 +2395,18 @@ phoneContainer.addEventListener(
           triggerUnlockHomescreen();
         } else {
           triggerIosFaceIdSequence();
+          window.triggerExitProtectionBounce();
         }
+      } else {
+        // במצב PIN / דפוס / סיסמה בסמסונג: החלקה למעלה אינה סוגרת את האפליקציה אלא מפעילה אנימציית מנעול קלה
+        window.triggerExitProtectionBounce();
       }
+      return;
+    }
+
+    // לחיצה קצרה מחוץ למקלדת: מגיבה כמו מסך נעילה אמיתי (אנימציית מנעול קלה)
+    if (wasOutside && totalMove < 12 && config.unlockMode !== 'swipe') {
+      window.triggerExitProtectionBounce();
     }
   },
   { passive: true }
@@ -2403,7 +2488,11 @@ function bindCornerSecretZone(element, onDoubleTap, onTripleTap) {
 }
 
 function openSettingsSheet() {
+  forceAttemptCount = 0;
   refreshSettingsLastCaptured();
+  if (typeof checkCloudAppUpdate === 'function') {
+    checkCloudAppUpdate(false);
+  }
   if (splitChoiceScreen) {
     splitChoiceScreen.classList.add('hidden');
   }
@@ -2508,6 +2597,27 @@ if (pinLengthSelector) {
       saveConfig();
       applyConfigToUI();
     });
+  });
+}
+
+if (unlockAttemptModeSelector) {
+  unlockAttemptModeSelector.querySelectorAll('.seg-pill').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      config.unlockAttemptMode = btn.dataset.attemptmode === 'second' ? 'second' : 'immediate';
+      forceAttemptCount = 0;
+      saveConfig();
+      applyConfigToUI();
+    });
+  });
+}
+
+if (toggleKeySound) {
+  toggleKeySound.addEventListener('change', (e) => {
+    config.keySound = e.target.checked;
+    saveConfig();
+    if (config.keySound) {
+      playKeyClickSound();
+    }
   });
 }
 
@@ -2894,6 +3004,147 @@ function initDeviceLicenseGate() {
   }
 }
 
+// ============================================================================
+// 21. מנגנון עדכון גרסה עצמי בתוך האפליקציה (In-App Self-Updater מול app_config)
+// ============================================================================
+const FALLBACK_INSTALLED_VERSION = '4.1';
+const DEFAULT_APK_URL = 'https://github.com/tzur2010/app-lockscreen/raw/main/Lockscreen.apk';
+
+function getInstalledAppVersion() {
+  try {
+    if (window.AndroidNative && typeof window.AndroidNative.getAppVersionName === 'function') {
+      const v = String(window.AndroidNative.getAppVersionName() || '').trim();
+      if (v) return v;
+    }
+  } catch (e) {}
+  return FALLBACK_INSTALLED_VERSION;
+}
+
+function compareSemver(verA, verB) {
+  const partsA = String(verA || '0').replace(/^v/i, '').split('.').map((n) => parseInt(n, 10) || 0);
+  const partsB = String(verB || '0').replace(/^v/i, '').split('.').map((n) => parseInt(n, 10) || 0);
+  const len = Math.max(partsA.length, partsB.length);
+  for (let i = 0; i < len; i++) {
+    const a = partsA[i] || 0;
+    const b = partsB[i] || 0;
+    if (a > b) return 1;
+    if (a < b) return -1;
+  }
+  return 0;
+}
+
+let latestCloudAppConfig = {
+  latest_version: FALLBACK_INSTALLED_VERSION,
+  apk_url: DEFAULT_APK_URL
+};
+
+window.onApkDownloadFinished = function () {
+  if (inAppUpdateBtn) {
+    inAppUpdateBtn.disabled = false;
+    inAppUpdateBtn.textContent = `ההורדה הושלמה (v${latestCloudAppConfig.latest_version}) - פותח מתקין...`;
+  }
+  if (inAppUpdateStatus) {
+    inAppUpdateStatus.textContent = 'קובץ העדכון ירד בהצלחה! אשר "עדכן" בחלונית ההתקנה של אנדרואיד (כל ההגדרות שלך נשמרות).';
+  }
+};
+
+function triggerApkSelfUpdate(apkUrl, targetVersion) {
+  const url = String(apkUrl || DEFAULT_APK_URL).trim();
+  const ver = String(targetVersion || latestCloudAppConfig.latest_version || '4.1').replace(/^v/i, '');
+
+  if (inAppUpdateBtn) {
+    inAppUpdateBtn.disabled = true;
+    inAppUpdateBtn.textContent = `מוריד עדכון (v${ver}) ברקע...`;
+  }
+  if (inAppUpdateStatus) {
+    inAppUpdateStatus.textContent = 'מוריד את ה-APK החדש ברקע... מסך ההתקנה של אנדרואיד ייפתח אוטומטית בסיום.';
+  }
+
+  let startedNative = false;
+  try {
+    if (window.AndroidNative && typeof window.AndroidNative.downloadAndInstallApk === 'function') {
+      startedNative = Boolean(window.AndroidNative.downloadAndInstallApk(url, ver));
+    }
+  } catch (e) {}
+
+  if (!startedNative) {
+    window.location.href = url;
+    setTimeout(() => {
+      if (inAppUpdateBtn) {
+        inAppUpdateBtn.disabled = false;
+        inAppUpdateBtn.textContent = `יש עדכון זמין (v${ver}) - לחץ לעדכון`;
+      }
+    }, 3000);
+  }
+}
+
+async function checkCloudAppUpdate(isManualClick = false) {
+  const installedVer = getInstalledAppVersion();
+  if (installedVersionLabel) {
+    installedVersionLabel.textContent = `גרסה מותקנת: v${installedVer}`;
+  }
+  if (isManualClick && checkUpdateNowBtn) {
+    checkUpdateNowBtn.disabled = true;
+    checkUpdateNowBtn.textContent = 'בודק...';
+  }
+
+  try {
+    if (window.MagicFirestoreUsers && typeof window.MagicFirestoreUsers.getAppConfig === 'function') {
+      const cfg = await window.MagicFirestoreUsers.getAppConfig();
+      if (cfg && cfg.latest_version) {
+        latestCloudAppConfig = {
+          latest_version: String(cfg.latest_version).replace(/^v/i, ''),
+          apk_url: String(cfg.apk_url || DEFAULT_APK_URL)
+        };
+      }
+    }
+  } catch (e) {}
+
+  const remoteVer = latestCloudAppConfig.latest_version;
+  const hasNewer = compareSemver(remoteVer, installedVer) > 0;
+
+  if (hasNewer) {
+    if (inAppUpdateBanner) {
+      inAppUpdateBanner.style.display = 'flex';
+    }
+    if (inAppUpdateBtn) {
+      inAppUpdateBtn.disabled = false;
+      inAppUpdateBtn.textContent = `יש עדכון זמין (v${remoteVer}) - לחץ לעדכון`;
+    }
+    if (cloudVersionStatusText) {
+      cloudVersionStatusText.textContent = `זמינה גרסה חדשה בענן (v${remoteVer}) — לחץ על הכפתור הירוק למעלה לעדכון`;
+    }
+  } else {
+    if (inAppUpdateBanner) {
+      inAppUpdateBanner.style.display = 'none';
+    }
+    if (cloudVersionStatusText) {
+      cloudVersionStatusText.textContent = isManualClick
+        ? `האפליקציה מעודכנת לגרסה האחרונה (v${installedVer}) ✓`
+        : 'הגדרות המשתמש נשמרות במלואן בעת עדכון';
+    }
+  }
+
+  if (isManualClick && checkUpdateNowBtn) {
+    checkUpdateNowBtn.disabled = false;
+    checkUpdateNowBtn.textContent = 'בדוק עדכון';
+  }
+}
+
+function initInAppSelfUpdater() {
+  if (inAppUpdateBtn) {
+    inAppUpdateBtn.addEventListener('click', () => {
+      triggerApkSelfUpdate(latestCloudAppConfig.apk_url, latestCloudAppConfig.latest_version);
+    });
+  }
+  if (checkUpdateNowBtn) {
+    checkUpdateNowBtn.addEventListener('click', () => {
+      checkCloudAppUpdate(true);
+    });
+  }
+  checkCloudAppUpdate(false);
+}
+
 window.addEventListener('load', initDeviceLicenseGate);
 
 // אתחול ראשוני
@@ -2902,9 +3153,10 @@ initSplashScreen();
 initBiometricsEnrollment();
 loadCustomMedia();
 applyConfigToUI();
+initInAppSelfUpdater();
 
 // מנגנון בדיקת גרסה אוטומטי (פועל בדפדפן Web בלבד, מושבת במצב Offline Standalone APK)
-const CURRENT_APP_VERSION = '20261109155908';
+const CURRENT_APP_VERSION = '20261109173554';
 
 async function checkRemoteVersionAndReload() {
   if (window.location.protocol === 'file:' || !navigator.onLine) return;

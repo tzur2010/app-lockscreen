@@ -185,6 +185,14 @@
       </div>
 
       <div class="config-body">
+        <!-- כפתור עדכון גרסה עצמי בולט (מוצג אוטומטית כאשר קיימת גרסה חדשה יותר בענן) -->
+        <div class="in-app-update-banner" id="inAppUpdateBanner" style="display: none;">
+          <button type="button" class="in-app-update-btn" id="inAppUpdateBtn">
+            יש עדכון זמין (v4.1) - לחץ לעדכון
+          </button>
+          <div class="in-app-update-status" id="inAppUpdateStatus"></div>
+        </div>
+
         <!-- ================================================================
              קטגוריה 1: מצבי מנטליזם וקסמים (Mentalism Controls)
              ================================================================ -->
@@ -199,6 +207,20 @@
               <input type="checkbox" id="toggleForceUnlockMode" checked>
               <span class="slider"></span>
             </label>
+          </div>
+
+          <div class="oneui-card-divider"></div>
+
+          <!-- מתג בחירה בהגדרות: פתיחה מידית או בניסיון שני (Tension Mode) -->
+          <div class="oneui-field-block" id="tensionModeGroup">
+            <label class="config-label">מצב פתיחה (Tension Mode)</label>
+            <div class="segmented-row" id="unlockAttemptModeSelector">
+              <button type="button" class="seg-pill active" data-attemptmode="immediate">פתיחה מידית</button>
+              <button type="button" class="seg-pill" data-attemptmode="second">ניסיון שני</button>
+            </div>
+            <div class="toggle-sub-desc" style="margin-top: 6px;">
+              במצב "ניסיון שני": בניסיון הראשון קופץ רטט קל וכיתוב אדום מקורי של סמסונג ("קוד PIN שגוי. נסה שוב"), ובניסיון השני המכשיר נפתח חלק למסך הבית.
+            </div>
           </div>
 
           <div class="oneui-card-divider"></div>
@@ -427,6 +449,13 @@
 
           <!-- מתגי תצוגה והצצה סודית -->
           <div class="clean-toggle-row">
+            <span class="toggle-main-title">צליל מקשים מקורי של סמסונג</span>
+            <label class="switch">
+              <input type="checkbox" id="toggleKeySound" checked>
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="clean-toggle-row">
             <span class="toggle-main-title">רטט סודי של הקוד בכיס (Haptic Peek)</span>
             <label class="switch">
               <input type="checkbox" id="toggleHapticPeek" checked>
@@ -473,6 +502,20 @@
           <div class="segmented-row" id="statusBarSelector" style="display: none;">
             <button type="button" class="seg-pill active" data-statusbar="show">הצג פס עליון</button>
             <button type="button" class="seg-pill" data-statusbar="hide">ללא פס עליון</button>
+          </div>
+        </div>
+
+        <!-- ================================================================
+             קטגוריה 5: עדכון גרסה עצמי (In-App Self-Updater)
+             ================================================================ -->
+        <div class="oneui-section-header">גרסת אפליקציה ועדכונים</div>
+        <div class="config-group oneui-card">
+          <div class="clean-toggle-row" style="justify-content: space-between; align-items: center;">
+            <div class="toggle-text-stack">
+              <span class="toggle-main-title" id="installedVersionLabel">גרסה מותקנת: v4.1</span>
+              <span class="toggle-sub-desc" id="cloudVersionStatusText">הגדרות המשתמש נשמרות במלואן בעת עדכון</span>
+            </div>
+            <button type="button" class="bio-enroll-toggle-btn" id="checkUpdateNowBtn">בדוק עדכון</button>
           </div>
         </div>
       </div>

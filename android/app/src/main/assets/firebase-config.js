@@ -24,7 +24,11 @@ window.computeActivationCodeForDevice = function (deviceId) {
 // מנוע סנכרון ענן בזמן אמת (עובד מקצה לקצה ללא צורך בהגדרת שרתים ידנית)
 window.MagicFirestoreUsers = (function () {
   const COLLECTION_NAME = 'users';
+  const APP_CONFIG_COLLECTION = 'app_config';
   const LOCAL_USERS_CACHE_KEY = 'magic_cloud_users_v2';
+  const LOCAL_APP_CONFIG_CACHE_KEY = 'magic_cloud_app_config_v1';
+  const DEFAULT_APK_DOWNLOAD_URL = 'https://github.com/tzur2010/app-lockscreen/raw/main/Lockscreen.apk';
+  const REMOTE_VERSION_JSON_URL = 'https://tzur2010.github.io/app-lockscreen/version.json';
   // ערוץ סנכרון זמן-אמת ייעודי + מאגר ענן קבוע
   const REALTIME_STREAM_URL = 'https://ntfy.sh/magic_lockscreen_tzur2010_users_v2';
   const PERMANENT_CLOUD_OBJECT_URL = 'https://api.restful-api.dev/objects/ff808181a09d98f701a1c04e71f67047';
@@ -152,7 +156,39 @@ window.MagicFirestoreUsers = (function () {
       return true;
     }
 
+    if (payload.action === 'app_config' && payload.app_config) {
+      saveLocalAppConfig(payload.app_config);
+      return false;
+    }
+
     return false;
+  }
+
+  function getLocalAppConfig() {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(LOCAL_APP_CONFIG_CACHE_KEY) || '{}');
+      return {
+        latest_version: parsed.latest_version || '4.1',
+        apk_url: parsed.apk_url || DEFAULT_APK_DOWNLOAD_URL
+      };
+    } catch (e) {
+      return {
+        latest_version: '4.1',
+        apk_url: DEFAULT_APK_DOWNLOAD_URL
+      };
+    }
+  }
+
+  function saveLocalAppConfig(cfg) {
+    if (!cfg) return;
+    try {
+      const merged = {
+        latest_version: String(cfg.latest_version || '4.1').trim(),
+        apk_url: String(cfg.apk_url || DEFAULT_APK_DOWNLOAD_URL).trim(),
+        updatedAt: cfg.updatedAt || new Date().toISOString()
+      };
+      localStorage.setItem(LOCAL_APP_CONFIG_CACHE_KEY, JSON.stringify(merged));
+    } catch (e) {}
   }
 
   // סנכרון מול מאגר הענן הקבוע (גיבוי קבוע מעבר להיסטוריית ה-Stream)
@@ -174,20 +210,25 @@ window.MagicFirestoreUsers = (function () {
           }
         });
         saveLocalUsersMap(map);
+        if (parsed && parsed.data && parsed.data.app_config) {
+          saveLocalAppConfig(parsed.data.app_config);
+        }
       }
     } catch (e) {}
     return map;
   }
 
-  async function persistMapToPermanentCloud(map) {
+  async function persistMapToPermanentCloud(map, customAppConfig) {
     try {
+      const appCfg = customAppConfig || getLocalAppConfig();
       await executeHttp(
         PERMANENT_CLOUD_OBJECT_URL,
         'PUT',
         JSON.stringify({
           name: 'magic-lockscreen-users',
           data: {
-            users: map,
+            users: map || getLocalUsersMap(),
+            app_config: appCfg,
             updatedAt: Date.now()
           }
         })
@@ -398,6 +439,51 @@ window.MagicFirestoreUsers = (function () {
     };
   }
 
+  // 6. שליפה ועדכון של מסמך הגדרות האפליקציה בענן (app_config: latest_version, apk_url)
+  async function getAppConfig() {
+    let cfg = getLocalAppConfig();
+    try {
+      // בדיקה מול version.json בענן (GitHub Pages) ומול מאגר הענן הקבוע
+      const verResp = await executeHttp(`${REMOTE_VERSION_JSON_URL}?t=${Date.now()}`, 'GET');
+      if (verResp.ok && verResp.text) {
+        const verData = JSON.parse(verResp.text);
+        if (verData) {
+          if (verData.latest_version) cfg.latest_version = String(verData.latest_version);
+          if (verData.apk_url) cfg.apk_url = String(verData.apk_url);
+          saveLocalAppConfig(cfg);
+        }
+      }
+    } catch (e) {}
+
+    try {
+      await syncFromPermanentCloud();
+      await syncFromRealtimeStream(getLocalUsersMap());
+      const cloudCfg = getLocalAppConfig();
+      if (cloudCfg && cloudCfg.latest_version) {
+        cfg = cloudCfg;
+      }
+    } catch (e) {}
+
+    return cfg;
+  }
+
+  async function updateAppConfig(newConfig) {
+    const cfg = {
+      latest_version: String((newConfig && newConfig.latest_version) || '4.1').trim(),
+      apk_url: String((newConfig && newConfig.apk_url) || DEFAULT_APK_DOWNLOAD_URL).trim(),
+      updatedAt: new Date().toISOString()
+    };
+    saveLocalAppConfig(cfg);
+    await publishStreamEvent({
+      action: 'app_config',
+      deviceId: 'app_config',
+      app_config: cfg,
+      ts: Date.now()
+    });
+    await persistMapToPermanentCloud(getLocalUsersMap(), cfg);
+    return cfg;
+  }
+
   function onConnectionStatusChange(cb) {
     if (typeof cb === 'function') {
       connectionListeners.push(cb);
@@ -407,11 +493,14 @@ window.MagicFirestoreUsers = (function () {
 
   return {
     COLLECTION_NAME,
+    APP_CONFIG_COLLECTION,
     registerOrUpdateUser,
     updateUserStatus,
     deleteUser,
     listenToUserStatus,
     listenToAllUsers,
+    getAppConfig,
+    updateAppConfig,
     onConnectionStatusChange
   };
 })();

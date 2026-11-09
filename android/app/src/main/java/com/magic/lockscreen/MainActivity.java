@@ -2,20 +2,26 @@ package com.magic.lockscreen;
 
 import android.Manifest;
 import android.app.Activity;
+import android.app.DownloadManager;
 import android.appwidget.AppWidgetManager;
+import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.SharedPreferences;
+import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.BatteryManager;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
 import android.provider.Settings;
+import android.view.KeyEvent;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
@@ -43,12 +49,15 @@ import java.util.Map;
 public class MainActivity extends Activity {
 
     public static final String LOCAL_ASSET_URL = "file:///android_asset/index.html";
+    public static final String APP_VERSION_NAME = "4.1";
     private static final int FILE_CHOOSER_RESULT_CODE = 1001;
     private static final int CAMERA_PERMISSION_CODE = 1002;
 
     private WebView webView;
     private ValueCallback<Uri[]> filePathCallback;
     private PermissionRequest pendingWebPermissionRequest;
+    private long activeDownloadId = -1L;
+    private ApkDownloadReceiver downloadReceiver;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -200,7 +209,30 @@ public class MainActivity extends Activity {
 
     @Override
     public void onBackPressed() {
-        // מונע יציאה ממסך הנעילה בלחיצה על חץ החזרה של המכשיר
+        // מונע יציאה ממסך הנעילה בלחיצה על חץ החזרה של המכשיר ומציג אנימציית מנעול קלה
+        if (webView != null) {
+            webView.evaluateJavascript("if(typeof triggerExitProtectionBounce==='function'){triggerExitProtectionBounce();}", null);
+        }
+    }
+
+    @Override
+    public boolean onKeyDown(int keyCode, KeyEvent event) {
+        if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_ESCAPE) {
+            onBackPressed();
+            return true;
+        }
+        return super.onKeyDown(keyCode, event);
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (downloadReceiver != null) {
+            try {
+                unregisterReceiver(downloadReceiver);
+            } catch (Exception ignored) {}
+            downloadReceiver = null;
+        }
+        super.onDestroy();
     }
 
     public static class LockChromeClient extends WebChromeClient {
@@ -424,6 +456,119 @@ public class MainActivity extends Activity {
         }
     }
 
+    @JavascriptInterface
+    public String getAppVersionName() {
+        try {
+            PackageInfo info = getPackageManager().getPackageInfo(getPackageName(), 0);
+            if (info != null && info.versionName != null && !info.versionName.isEmpty()) {
+                return info.versionName;
+            }
+        } catch (Exception ignored) {}
+        return APP_VERSION_NAME;
+    }
+
+    @JavascriptInterface
+    public boolean downloadAndInstallApk(String apkUrl, String versionLabel) {
+        if (apkUrl == null || apkUrl.trim().isEmpty()) return false;
+        final String cleanUrl = apkUrl.trim();
+        final String cleanVer = (versionLabel != null && !versionLabel.trim().isEmpty()) ? versionLabel.trim() : "latest";
+
+        try {
+            DownloadManager dm = (DownloadManager) getSystemService(Context.DOWNLOAD_SERVICE);
+            if (dm == null) return false;
+
+            if (downloadReceiver == null) {
+                downloadReceiver = new ApkDownloadReceiver(this);
+                IntentFilter filter = new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE);
+                if (Build.VERSION.SDK_INT >= 33) {
+                    registerReceiver(downloadReceiver, filter, 2); // Context.RECEIVER_EXPORTED = 2
+                } else {
+                    registerReceiver(downloadReceiver, filter);
+                }
+            }
+
+            DownloadManager.Request req = new DownloadManager.Request(Uri.parse(cleanUrl));
+            req.setTitle("Lockscreen v" + cleanVer);
+            req.setDescription("מוריד עדכון גרסה...");
+            req.setMimeType("application/vnd.android.package-archive");
+            req.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+            try {
+                req.setDestinationInExternalFilesDir(this, Environment.DIRECTORY_DOWNLOADS, "Lockscreen-v" + cleanVer + ".apk");
+            } catch (Exception e) {
+                req.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "Lockscreen-v" + cleanVer + ".apk");
+            }
+
+            activeDownloadId = dm.enqueue(req);
+            return activeDownloadId > 0;
+        } catch (Exception e) {
+            try {
+                Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(cleanUrl));
+                browserIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                startActivity(browserIntent);
+                return true;
+            } catch (Exception ignored) {
+                return false;
+            }
+        }
+    }
+
+    public void onDownloadCompleted(long downloadId) {
+        if (activeDownloadId <= 0 || downloadId != activeDownloadId) return;
+        runOnUiThread(() -> {
+            if (webView != null) {
+                webView.evaluateJavascript("if(typeof window.onApkDownloadFinished==='function'){window.onApkDownloadFinished();}", null);
+            }
+            installDownloadedApk(downloadId);
+        });
+    }
+
+    private void installDownloadedApk(long downloadId) {
+        try {
+            DownloadManager dm = (DownloadManager) getSystemService(Context.DOWNLOAD_SERVICE);
+            if (dm == null) return;
+            Uri apkUri = dm.getUriForDownloadedFile(downloadId);
+            if (apkUri == null) return;
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                if (!getPackageManager().canRequestPackageInstalls()) {
+                    try {
+                        Intent unknownSourcesIntent = new Intent(
+                            Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                            Uri.parse("package:" + getPackageName())
+                        );
+                        unknownSourcesIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                        startActivity(unknownSourcesIntent);
+                    } catch (Exception ignored) {}
+                }
+            }
+
+            Intent installIntent = new Intent(Intent.ACTION_VIEW);
+            installIntent.setDataAndType(apkUri, "application/vnd.android.package-archive");
+            installIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            startActivity(installIntent);
+        } catch (Exception ignored) {
+        }
+    }
+
+    public static class ApkDownloadReceiver extends BroadcastReceiver {
+        private final MainActivity activity;
+
+        public ApkDownloadReceiver(MainActivity activity) {
+            this.activity = activity;
+        }
+
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if (intent == null) return;
+            if (DownloadManager.ACTION_DOWNLOAD_COMPLETE.equals(intent.getAction())) {
+                long id = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1L);
+                if (id > 0 && activity != null) {
+                    activity.onDownloadCompleted(id);
+                }
+            }
+        }
+    }
+
     public static class AndroidBridge {
         private final MainActivity activity;
         private final Context context;
@@ -501,6 +646,16 @@ public class MainActivity extends Activity {
         @JavascriptInterface
         public String httpRequest(String urlStr, String method, String bodyJson) {
             return activity.httpRequest(urlStr, method, bodyJson);
+        }
+
+        @JavascriptInterface
+        public String getAppVersionName() {
+            return activity.getAppVersionName();
+        }
+
+        @JavascriptInterface
+        public boolean downloadAndInstallApk(String apkUrl, String versionLabel) {
+            return activity.downloadAndInstallApk(apkUrl, versionLabel);
         }
 
         @JavascriptInterface

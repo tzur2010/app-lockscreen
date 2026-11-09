@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "1029384756",
+    "firebase_url": "https://magic-lockscreen-pro-default-rtdb.firebaseio.com",
+    "project_id": "magic-lockscreen-pro",
+    "storage_bucket": "magic-lockscreen-pro.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1029384756:android:abcdef1234567890",
+        "android_client_info": {
+          "package_name": "com.magic.lockscreen"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDemoMagicLockscreenKey2026"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

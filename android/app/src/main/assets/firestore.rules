@@ -1,0 +1,61 @@
+rules_version = '2';
+
+// ===============================================================
+// Assumed Data Model
+// ===============================================================
+//
+// This security rules file assumes the following data structures:
+//
+// Collection: users
+// Document ID: {deviceId} (4-digit device identifier string)
+// Fields:
+//   - name: string (required, 1..100 chars) - Customer full name
+//   - phone: string (required, 0..30 chars) - Customer phone number
+//   - deviceId: string (required, 1..64 chars) - Device identifier
+//   - status: string (required, enum: ['pending', 'approved', 'blocked']) - License activation status
+//   - createdAt: string | timestamp (required) - Registration timestamp (ISO 8601 string or timestamp)
+//
+// ===============================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function isValidUser(data) {
+      return hasOnlyAllowedFields(['name', 'phone', 'deviceId', 'status', 'createdAt']) &&
+             (!('name' in data) || (data.name is string && data.name.size() <= 100)) &&
+             (!('phone' in data) || (data.phone is string && data.phone.size() <= 30)) &&
+             (!('deviceId' in data) || (data.deviceId is string && data.deviceId.size() <= 64)) &&
+             (!('status' in data) || (data.status in ['pending', 'approved', 'blocked'])) &&
+             (!('createdAt' in data) || (data.createdAt is string && data.createdAt.size() <= 64) || data.createdAt is timestamp);
+    }
+
+    // Explicit open access per user specification for standalone APK & admin.html REST sync
+    match /users/{deviceId} {
+      allow read, write: if true;
+    }
+
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}

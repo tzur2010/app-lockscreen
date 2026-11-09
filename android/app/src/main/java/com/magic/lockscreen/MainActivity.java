@@ -28,7 +28,14 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 
 import org.json.JSONArray;
+import org.json.JSONObject;
 
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.HashMap;
 import java.util.Map;
@@ -74,6 +81,9 @@ public class MainActivity extends Activity {
         settings.setAllowFileAccessFromFileURLs(true);
         settings.setAllowUniversalAccessFromFileURLs(true);
         settings.setMediaPlaybackRequiresUserGesture(false);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
+        }
 
         AndroidBridge bridge = new AndroidBridge(this);
         webView.addJavascriptInterface(bridge, "AndroidNative");
@@ -328,6 +338,88 @@ public class MainActivity extends Activity {
         return false;
     }
 
+    @JavascriptInterface
+    public String getGoogleServicesJson() {
+        try {
+            InputStream is = getAssets().open("google-services.json");
+            ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+            byte[] data = new byte[4096];
+            int nRead;
+            while ((nRead = is.read(data, 0, data.length)) != -1) {
+                buffer.write(data, 0, nRead);
+            }
+            is.close();
+            return new String(buffer.toByteArray(), StandardCharsets.UTF_8);
+        } catch (Exception ignored) {
+            return "";
+        }
+    }
+
+    @JavascriptInterface
+    public String httpRequest(String urlStr, String method, String bodyJson) {
+        HttpURLConnection conn = null;
+        try {
+            URL url = new URL(urlStr);
+            conn = (HttpURLConnection) url.openConnection();
+            conn.setConnectTimeout(10000);
+            conn.setReadTimeout(10000);
+            conn.setUseCaches(false);
+            conn.setRequestProperty("Accept", "application/json");
+
+            String upperMethod = (method != null) ? method.trim().toUpperCase() : "GET";
+            if ("PATCH".equals(upperMethod)) {
+                conn.setRequestMethod("POST");
+                conn.setRequestProperty("X-HTTP-Method-Override", "PATCH");
+            } else {
+                conn.setRequestMethod(upperMethod);
+            }
+
+            if (bodyJson != null && !bodyJson.isEmpty() && !"GET".equals(upperMethod) && !"DELETE".equals(upperMethod)) {
+                conn.setDoOutput(true);
+                conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
+                byte[] outBytes = bodyJson.getBytes(StandardCharsets.UTF_8);
+                OutputStream os = conn.getOutputStream();
+                os.write(outBytes);
+                os.flush();
+                os.close();
+            }
+
+            int status = conn.getResponseCode();
+            InputStream is = (status >= 200 && status < 400) ? conn.getInputStream() : conn.getErrorStream();
+            String respBody = "";
+            if (is != null) {
+                ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+                byte[] data = new byte[4096];
+                int nRead;
+                while ((nRead = is.read(data, 0, data.length)) != -1) {
+                    buffer.write(data, 0, nRead);
+                }
+                is.close();
+                respBody = new String(buffer.toByteArray(), StandardCharsets.UTF_8);
+            }
+
+            JSONObject result = new JSONObject();
+            result.put("ok", status >= 200 && status < 300);
+            result.put("status", status);
+            result.put("body", respBody);
+            return result.toString();
+        } catch (Exception e) {
+            try {
+                JSONObject err = new JSONObject();
+                err.put("ok", false);
+                err.put("status", 0);
+                err.put("error", e.getMessage() != null ? e.getMessage() : "Network error");
+                return err.toString();
+            } catch (Exception ignored) {
+                return "{\"ok\":false,\"status\":0}";
+            }
+        } finally {
+            if (conn != null) {
+                conn.disconnect();
+            }
+        }
+    }
+
     public static class AndroidBridge {
         private final MainActivity activity;
         private final Context context;
@@ -395,6 +487,16 @@ public class MainActivity extends Activity {
         @JavascriptInterface
         public boolean requestPinQuickWidget() {
             return activity.requestPinQuickWidget();
+        }
+
+        @JavascriptInterface
+        public String getGoogleServicesJson() {
+            return activity.getGoogleServicesJson();
+        }
+
+        @JavascriptInterface
+        public String httpRequest(String urlStr, String method, String bodyJson) {
+            return activity.httpRequest(urlStr, method, bodyJson);
         }
 
         @JavascriptInterface

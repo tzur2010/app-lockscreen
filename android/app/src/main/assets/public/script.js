@@ -2741,6 +2741,8 @@ function initDeviceLicenseGate() {
   const regFormSection = document.getElementById('regFormSection');
   const regNameInput = document.getElementById('regNameInput');
   const regPhoneInput = document.getElementById('regPhoneInput');
+  const regProjectIdBox = document.getElementById('regProjectIdBox');
+  const regProjectIdInput = document.getElementById('regProjectIdInput');
   const submitRegBtn = document.getElementById('submitRegBtn');
   const regWaitingBox = document.getElementById('regWaitingBox');
   const keyInput = document.getElementById('licenseKeyInput');
@@ -2831,6 +2833,13 @@ function initDeviceLicenseGate() {
         if (errorEl) errorEl.textContent = 'אנא מלא שם מלא ומספר טלפון';
         return;
       }
+      if (regProjectIdInput && regProjectIdInput.value.trim()) {
+        const customPid = regProjectIdInput.value.trim();
+        localStorage.setItem('fb_projectId', customPid);
+        if (window.MAGIC_FIREBASE_CONFIG) {
+          window.MAGIC_FIREBASE_CONFIG.projectId = customPid;
+        }
+      }
       if (errorEl) errorEl.textContent = '';
       submitRegBtn.disabled = true;
       submitRegBtn.textContent = 'שולח בקשה...';
@@ -2850,7 +2859,19 @@ function initDeviceLicenseGate() {
         if (regWaitingBox) regWaitingBox.style.display = 'flex';
         startApprovalListener();
       } catch (err) {
-        if (errorEl) errorEl.textContent = 'שגיאה בשליחה, ניתן להזין קוד הפעלה ידנית';
+        if (regProjectIdBox) regProjectIdBox.style.display = 'block';
+        const currentPid =
+          (window.MagicFirestoreUsers && window.MagicFirestoreUsers.getProjectId && window.MagicFirestoreUsers.getProjectId()) ||
+          'magic-lockscreen-pro';
+        if (regProjectIdInput && !regProjectIdInput.value) {
+          regProjectIdInput.value = currentPid === 'magic-lockscreen-pro' ? '' : currentPid;
+        }
+        if (errorEl) {
+          errorEl.textContent =
+            currentPid === 'magic-lockscreen-pro'
+              ? 'נא להזין את ה-Firebase Project ID שלך (או להטמיע את google-services.json)'
+              : 'שגיאת חיבור ל-Firestore (' + currentPid + ') - בדוק ש-Rules מוגדרים ל-allow read, write: if true';
+        }
       } finally {
         submitRegBtn.disabled = false;
         submitRegBtn.textContent = 'שלח בקשה לאישור';
@@ -2923,7 +2944,7 @@ loadCustomMedia();
 applyConfigToUI();
 
 // מנגנון בדיקת גרסה אוטומטי (פועל בדפדפן Web בלבד, מושבת במצב Offline Standalone APK)
-const CURRENT_APP_VERSION = '20261109005300';
+const CURRENT_APP_VERSION = '20261109011828';
 
 async function checkRemoteVersionAndReload() {
   if (window.location.protocol === 'file:' || !navigator.onLine) return;

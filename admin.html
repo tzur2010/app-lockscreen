@@ -355,14 +355,14 @@
       <div>
         <div class="brand-title">
           <span>לוח בקרה וניהול רישיונות (Admin Dashboard)</span>
-          <span class="live-badge"><span class="live-dot"></span> מחובר ל-Firebase</span>
+          <span class="live-badge" id="liveStatusBadge"><span class="live-dot" id="liveStatusDot"></span> <span id="liveStatusText">מחובר ל-Firebase</span></span>
         </div>
         <div style="font-size: 13px; color: #94a3b8; margin-top: 4px;">
           ניהול משתמשים בזמן אמת (קולקציית <code>users</code>), אישור מרחוק ושליחת קוד הפעלה בוואטסאפ (קוד מאסטר: <strong>MASTER999</strong>)
         </div>
       </div>
       <div class="top-actions">
-        <button type="button" class="btn btn-ghost" id="openFbConfigBtn">הגדרות Firebase</button>
+        <button type="button" class="btn btn-ghost" id="openFbConfigBtn">חיבור google-services.json / Firebase</button>
       </div>
     </div>
 
@@ -433,8 +433,12 @@
   <div class="modal-backdrop" id="fbConfigModal">
     <div class="modal-card">
       <h3>הגדרות חיבור Firebase Firestore</h3>
-      <p>הזן את ה-Project ID וה-API Key של פרויקט ה-Firebase שלך כדי לסנכרן את קולקציית <code>users</code> בין כל המכשירים:</p>
-      <input type="text" id="fbProjectIdInput" class="input-field" placeholder="Firebase Project ID (למשל magic-lockscreen-pro)" />
+      <p>העלה את קובץ <code>google-services.json</code> מפרויקט ה-Firebase שלך (או הזן Project ID ו-API Key) כדי לסנכרן את קולקציית <code>users</code> בזמן אמת:</p>
+      <label class="btn btn-ghost" style="width: 100%; justify-content: center; margin-bottom: 12px; border-style: dashed;">
+        <span>📂 בחר קובץ google-services.json לחילוץ אוטומטי</span>
+        <input type="file" id="googleServicesFileInput" accept=".json,application/json" hidden />
+      </label>
+      <input type="text" id="fbProjectIdInput" class="input-field" placeholder="Firebase Project ID (מתוך google-services.json)" />
       <input type="text" id="fbApiKeyInput" class="input-field" placeholder="Firebase Web API Key (AIzaSy...)" />
       <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 8px;">
         <button type="button" class="btn btn-ghost" id="closeFbConfigBtn">ביטול</button>
@@ -639,10 +643,51 @@
       window.open(buildWhatsappUrl(name, phone, devId, code), '_blank');
     });
 
-    // חלונית הגדרות Firebase
+    // חלונית הגדרות Firebase + העלאת google-services.json
     const fbConfigModal = document.getElementById('fbConfigModal');
     const fbProjectIdInput = document.getElementById('fbProjectIdInput');
     const fbApiKeyInput = document.getElementById('fbApiKeyInput');
+    const googleServicesFileInput = document.getElementById('googleServicesFileInput');
+    const liveStatusBadge = document.getElementById('liveStatusBadge');
+    const liveStatusDot = document.getElementById('liveStatusDot');
+    const liveStatusText = document.getElementById('liveStatusText');
+
+    if (googleServicesFileInput) {
+      googleServicesFileInput.addEventListener('change', (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          const parsed = window.parseAndApplyGoogleServicesJson(ev.target.result, true);
+          if (parsed && parsed.projectId) {
+            fbProjectIdInput.value = parsed.projectId;
+            fbApiKeyInput.value = parsed.apiKey || '';
+          }
+        };
+        reader.readAsText(file);
+      });
+    }
+
+    if (window.MagicFirestoreUsers && typeof window.MagicFirestoreUsers.onConnectionStatusChange === 'function') {
+      window.MagicFirestoreUsers.onConnectionStatusChange((state) => {
+        if (!liveStatusText || !liveStatusBadge || !liveStatusDot) return;
+        const pid = state.projectId || (window.MagicFirestoreUsers.getProjectId && window.MagicFirestoreUsers.getProjectId()) || '';
+        if (state.ok) {
+          liveStatusText.textContent = `מחובר ל-Firestore (${pid})`;
+          liveStatusBadge.style.color = '#4ade80';
+          liveStatusBadge.style.borderColor = 'rgba(74, 222, 128, 0.3)';
+          liveStatusDot.style.background = '#4ade80';
+        } else {
+          liveStatusText.textContent =
+            pid === 'magic-lockscreen-pro'
+              ? 'הגדר Project ID / google-services.json'
+              : `שגיאת חיבור (${pid}) - בדוק Rules`;
+          liveStatusBadge.style.color = '#facc15';
+          liveStatusBadge.style.borderColor = 'rgba(250, 204, 21, 0.4)';
+          liveStatusDot.style.background = '#facc15';
+        }
+      });
+    }
 
     document.getElementById('openFbConfigBtn').addEventListener('click', () => {
       fbProjectIdInput.value = localStorage.getItem('fb_projectId') || window.MAGIC_FIREBASE_CONFIG.projectId || '';

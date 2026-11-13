@@ -2928,6 +2928,30 @@ function isCachedApprovalValid() {
   return Boolean(cache && cache.status === 'approved' && Date.now() - Number(cache.checkedAt || 0) < LICENSE_OFFLINE_GRACE_MS);
 }
 
+// רישום שימוש לאתר הניהול (מתי נפתח לאחרונה, כמה פעמים, איזו גרסה).
+// לכל היותר פעם ב-20 דקות, ברקע, בלי להשפיע על האפליקציה אם אין רשת.
+const USAGE_PING_KEY = 'magic_last_usage_ping';
+const USAGE_PING_MIN_GAP_MS = 20 * 60 * 1000;
+let usagePingInFlight = false;
+
+function maybeReportUsage() {
+  if (usagePingInFlight || !window.MagicCloud || !window.MagicCloud.device.reportUsage) return;
+  const last = Number(localStorage.getItem(USAGE_PING_KEY) || 0);
+  if (Date.now() - last < USAGE_PING_MIN_GAP_MS) return;
+  usagePingInFlight = true;
+  window.MagicCloud.device
+    .reportUsage(getInstalledAppVersion())
+    .then(() => {
+      try {
+        localStorage.setItem(USAGE_PING_KEY, String(Date.now()));
+      } catch (e) {}
+    })
+    .catch(() => {})
+    .finally(() => {
+      usagePingInFlight = false;
+    });
+}
+
 function isLicenseOverlayVisible() {
   const overlay = document.getElementById('licenseLockOverlay');
   return Boolean(overlay && overlay.style.display !== 'none');
@@ -3015,6 +3039,7 @@ function initDeviceLicenseGate() {
       if (status === 'approved') {
         writeLicenseCache('approved');
         applyState('approved');
+        maybeReportUsage();
         schedule(LICENSE_RECHECK_MS);
       } else if (status === 'none') {
         // אין בקשה (או שהמנהל מחק אותה) -> טופס הרשמה
@@ -3108,7 +3133,7 @@ function initDeviceLicenseGate() {
 // החלון מוצג רק כשמסך ההגדרות פתוח (בפתיחת האפליקציה / בתפריט הסודי),
 // ולעולם לא מעל מסך הנעילה הפעיל מול קהל.
 // ============================================================================
-const APP_VERSION = '4.4';
+const APP_VERSION = '4.5';
 const DEFAULT_APK_URL = 'https://github.com/tzur2010/app-lockscreen/raw/main/Lockscreen.apk';
 const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 const UPDATE_DISMISS_KEY = 'magic_update_dismissed_version';
@@ -3321,7 +3346,65 @@ function initInAppSelfUpdater() {
   });
 }
 
+// ============================================================================
+// 22. משוב מהקוסם (תפריט ההגדרות) -> מגיע לאתר הניהול
+// ============================================================================
+const FEEDBACK_LAST_SENT_KEY = 'magic_feedback_last_sent';
+
+function initFeedbackBox() {
+  const input = document.getElementById('feedbackInput');
+  const btn = document.getElementById('feedbackSendBtn');
+  const statusEl = document.getElementById('feedbackStatus');
+  if (!input || !btn) return;
+
+  const setStatus = (msg, color) => {
+    if (!statusEl) return;
+    statusEl.textContent = msg || '';
+    statusEl.style.color = color || '';
+  };
+
+  btn.addEventListener('click', async () => {
+    const text = input.value.trim();
+    if (text.length < 2) {
+      setStatus('כתוב משהו לפני השליחה', '#f87171');
+      return;
+    }
+    const last = Number(localStorage.getItem(FEEDBACK_LAST_SENT_KEY) || 0);
+    if (Date.now() - last < 30 * 1000) {
+      setStatus('המשוב הקודם נשלח הרגע, נסה שוב בעוד חצי דקה', '#f59e0b');
+      return;
+    }
+    if (!window.MagicCloud || !window.MagicCloud.isConfigured()) {
+      setStatus('המערכת לא מחוברת כרגע', '#f87171');
+      return;
+    }
+    btn.disabled = true;
+    btn.textContent = 'שולח...';
+    setStatus('');
+    try {
+      await window.MagicCloud.device.sendFeedback({
+        text,
+        appVersion: getInstalledAppVersion(),
+        os: config.osTheme,
+        model: config.deviceModel
+      });
+      try {
+        localStorage.setItem(FEEDBACK_LAST_SENT_KEY, String(Date.now()));
+      } catch (e) {}
+      input.value = '';
+      triggerHaptic(30);
+      setStatus('תודה! המשוב נשלח ✓', '#22c55e');
+    } catch (err) {
+      setStatus(err && err.network ? 'אין חיבור לאינטרנט, נסה שוב' : 'השליחה נכשלה, נסה שוב', '#f87171');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'שלח משוב';
+    }
+  });
+}
+
 // אתחול ראשוני
+initFeedbackBox();
 initDeviceLicenseGate();
 initSplashScreen();
 initBiometricsEnrollment();

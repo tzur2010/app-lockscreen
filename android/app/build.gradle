@@ -8,8 +8,28 @@ android {
         applicationId "com.magic.lockscreen"
         minSdk 24
         targetSdk 34
-        versionCode 1
-        versionName "1.0"
+        // בכל עדכון: להעלות את שניהם (versionName זהה ל-APP_VERSION ב-app.js)
+        versionCode 43
+        versionName "4.3"
+    }
+
+    // מפתח החתימה הקבוע של האפליקציה (android/keystore.properties + magic-release.keystore).
+    // כל עדכון חייב להיחתם באותו מפתח, אחרת אנדרואיד לא יתקין אותו מעל הגרסה הקיימת.
+    def keystorePropsFile = rootProject.file('keystore.properties')
+    def keystoreProps = new Properties()
+    if (keystorePropsFile.exists()) {
+        keystorePropsFile.withInputStream { keystoreProps.load(it) }
+    }
+
+    signingConfigs {
+        release {
+            if (keystorePropsFile.exists()) {
+                storeFile rootProject.file(keystoreProps['storeFile'])
+                storePassword keystoreProps['storePassword']
+                keyAlias keystoreProps['keyAlias']
+                keyPassword keystoreProps['keyPassword']
+            }
+        }
     }
 
     buildTypes {
@@ -18,6 +38,9 @@ android {
         }
         release {
             minifyEnabled false
+            if (keystorePropsFile.exists()) {
+                signingConfig signingConfigs.release
+            }
         }
     }
 

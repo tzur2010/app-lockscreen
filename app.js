@@ -3140,7 +3140,7 @@ function initDeviceLicenseGate() {
 // החלון מוצג רק כשמסך ההגדרות פתוח (בפתיחת האפליקציה / בתפריט הסודי),
 // ולעולם לא מעל מסך הנעילה הפעיל מול קהל.
 // ============================================================================
-const APP_VERSION = '4.6';
+const APP_VERSION = '4.7';
 const DEFAULT_APK_URL = 'https://github.com/tzur2010/app-lockscreen/raw/main/Lockscreen.apk';
 const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 const UPDATE_DISMISS_KEY = 'magic_update_dismissed_version';
@@ -3383,10 +3383,66 @@ function buildRevealMessage(code) {
   return template.split('{קוד}').join(String(code || ''));
 }
 
+// תמונת השולח: נשמרת בנפרד מההגדרות (תמונה קטנה, 192 פיקסלים)
+const REVEAL_AVATAR_KEY = 'magic_reveal_avatar_v1';
+const AVATAR_COLORS = ['#0EA5E9', '#22C55E', '#F59E0B', '#EC4899', '#8B5CF6', '#EF4444', '#14B8A6'];
+
+function getRevealAvatar() {
+  try {
+    return localStorage.getItem(REVEAL_AVATAR_KEY) || '';
+  } catch (e) {
+    return '';
+  }
+}
+
+// אותו חישוב צבע כמו באנדרואיד (String.hashCode של ג'אווה), כדי שהעיגול ייראה זהה בשני המקומות
+function avatarColorFor(name) {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (Math.imul(31, h) + name.charCodeAt(i)) | 0;
+  return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length];
+}
+
+function paintAvatar(el, name, dataUrl) {
+  if (!el) return;
+  const clean = String(name || '').trim();
+  if (dataUrl) {
+    el.style.backgroundImage = `url("${dataUrl}")`;
+    el.style.backgroundColor = 'transparent';
+    el.textContent = '';
+  } else {
+    el.style.backgroundImage = 'none';
+    el.style.backgroundColor = avatarColorFor(clean);
+    el.textContent = clean ? Array.from(clean)[0] : '?';
+  }
+}
+
+function resizeImageToAvatar(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = reject;
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = reject;
+      img.onload = () => {
+        const size = 192;
+        const side = Math.min(img.width, img.height);
+        const canvas = document.createElement('canvas');
+        canvas.width = size;
+        canvas.height = size;
+        canvas.getContext('2d').drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, size, size);
+        resolve(canvas.toDataURL('image/jpeg', 0.85));
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 let fakeBannerTimer = null;
 function showFakeMessageBanner(sender, text) {
   const banner = document.getElementById('fakeMsgBanner');
   if (!banner) return;
+  paintAvatar(document.getElementById('fakeMsgAvatar'), sender, getRevealAvatar());
   document.getElementById('fakeMsgSender').textContent = sender;
   document.getElementById('fakeMsgText').textContent = text;
   banner.classList.toggle('light', config.osTheme === 'ios');
@@ -3414,9 +3470,13 @@ function scheduleCodeReveal(code, force = false) {
   const sender = String(config.revealSender || 'אמא');
   const text = buildRevealMessage(code);
   // באנדרואיד: הודעה אמיתית של המערכת (מגיעה גם אחרי שהאפליקציה נסגרה למסך הבית)
-  if (hasNativeNotifications() && typeof window.AndroidNative.scheduleRevealNotification === 'function') {
+  if (hasNativeNotifications()) {
     try {
-      if (window.AndroidNative.scheduleRevealNotification(sender, text, delayMs)) return true;
+      if (typeof window.AndroidNative.scheduleRevealNotificationV2 === 'function') {
+        if (window.AndroidNative.scheduleRevealNotificationV2(sender, text, delayMs, getRevealAvatar())) return true;
+      } else if (typeof window.AndroidNative.scheduleRevealNotification === 'function') {
+        if (window.AndroidNative.scheduleRevealNotification(sender, text, delayMs)) return true;
+      }
     } catch (e) {}
   }
   // בגרסת האתר: הודעה מדומה שקופצת בראש המסך
@@ -3449,6 +3509,11 @@ function syncMagicFeaturesUI() {
   document.querySelectorAll('#revealDelaySelector .seg-pill').forEach((btn) => {
     btn.classList.toggle('active', Number(btn.dataset.delay) === Number(config.revealDelaySec || 5));
   });
+
+  const avatar = getRevealAvatar();
+  paintAvatar(document.getElementById('revealAvatarPreview'), config.revealSender, avatar);
+  const clearBtn = document.getElementById('revealAvatarClear');
+  if (clearBtn) clearBtn.style.display = avatar ? '' : 'none';
 }
 
 function initMagicFeatures() {
@@ -3485,6 +3550,30 @@ function initMagicFeatures() {
     senderInput.addEventListener('input', () => {
       config.revealSender = senderInput.value.slice(0, 40);
       saveConfig();
+      paintAvatar(document.getElementById('revealAvatarPreview'), config.revealSender, getRevealAvatar());
+    });
+  }
+
+  const avatarInput = document.getElementById('revealAvatarInput');
+  if (avatarInput) {
+    avatarInput.addEventListener('change', async () => {
+      const file = avatarInput.files && avatarInput.files[0];
+      avatarInput.value = '';
+      if (!file) return;
+      try {
+        const dataUrl = await resizeImageToAvatar(file);
+        localStorage.setItem(REVEAL_AVATAR_KEY, dataUrl);
+      } catch (e) {}
+      syncMagicFeaturesUI();
+    });
+  }
+  const avatarClear = document.getElementById('revealAvatarClear');
+  if (avatarClear) {
+    avatarClear.addEventListener('click', () => {
+      try {
+        localStorage.removeItem(REVEAL_AVATAR_KEY);
+      } catch (e) {}
+      syncMagicFeaturesUI();
     });
   }
   if (textInput) {

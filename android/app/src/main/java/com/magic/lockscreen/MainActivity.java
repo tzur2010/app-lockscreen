@@ -26,13 +26,22 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 
 import org.json.JSONArray;
+import org.json.JSONObject;
 
+import java.io.BufferedReader;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import java.util.Iterator;
 import java.util.Random;
 
 public class MainActivity extends Activity {
 
     public static final String LOCAL_ASSET_URL = "file:///android_asset/index.html";
-    public static final String APP_VERSION_NAME = "4.2";
+    public static final String APP_VERSION_NAME = "4.4";
     private static final int FILE_CHOOSER_RESULT_CODE = 1001;
 
     private WebView webView;
@@ -171,7 +180,7 @@ public class MainActivity extends Activity {
         }
     }
 
-    @JavascriptInterface
+    // מזהה תצוגה קצר (4 ספרות) שעוזר למנהל לזהות את המכשיר. לא משמש לאימות.
     public String getSimpleDeviceId() {
         SharedPreferences prefs = getSharedPreferences("LockSettings", MODE_PRIVATE);
         String savedId = prefs.getString("simple_device_id", null);
@@ -184,67 +193,91 @@ public class MainActivity extends Activity {
         return newId;
     }
 
-    @JavascriptInterface
-    public boolean activateApp(String enteredCode) {
-        if (enteredCode == null) return false;
-        enteredCode = enteredCode.trim();
+    // בקשת רשת אסינכרונית עבור ה-JS (עוקף מגבלות CORS של file://).
+    // מותר רק HTTPS לשרתי Firebase, כדי שהגשר לא ישמש לשום דבר אחר.
+    private static final String[] ALLOWED_HTTP_HOSTS = {
+        "firestore.googleapis.com",
+        "identitytoolkit.googleapis.com",
+        "securetoken.googleapis.com"
+    };
 
-        if (enteredCode.equalsIgnoreCase("MASTER999")) {
-            saveActivation();
-            return true;
+    private static boolean isAllowedHost(String host) {
+        if (host == null) return false;
+        for (String allowed : ALLOWED_HTTP_HOSTS) {
+            if (allowed.equalsIgnoreCase(host)) return true;
         }
-
-        try {
-            int deviceIdNum = Integer.parseInt(getSimpleDeviceId());
-            int expectedKey = deviceIdNum + 5555;
-            if (enteredCode.equals(String.valueOf(expectedKey))) {
-                saveActivation();
-                return true;
-            }
-        } catch (Exception ignored) {}
-
         return false;
     }
 
-    private void saveActivation() {
-        SharedPreferences prefs = getSharedPreferences("LockSettings", MODE_PRIVATE);
-        prefs.edit().putBoolean("is_activated", true).putBoolean("is_licensed", true).apply();
-        SharedPreferences licensePrefs = getSharedPreferences("LicensePrefs", MODE_PRIVATE);
-        licensePrefs.edit().putBoolean("is_licensed", true).apply();
+    public void httpRequestAsync(final String callbackId, final String url, final String method,
+                                 final String headersJson, final String body) {
+        new Thread(() -> {
+            int status = 0;
+            String responseBody = "";
+            HttpURLConnection conn = null;
+            try {
+                URL u = new URL(url);
+                if (!"https".equalsIgnoreCase(u.getProtocol()) || !isAllowedHost(u.getHost())) {
+                    throw new IllegalArgumentException("Host not allowed");
+                }
+                String m = method == null ? "GET" : method.toUpperCase();
+                if (!m.equals("GET") && !m.equals("POST") && !m.equals("DELETE")) {
+                    throw new IllegalArgumentException("Method not allowed");
+                }
+                conn = (HttpURLConnection) u.openConnection();
+                conn.setConnectTimeout(15000);
+                conn.setReadTimeout(15000);
+                conn.setUseCaches(false);
+                conn.setRequestMethod(m);
+                if (headersJson != null && !headersJson.isEmpty()) {
+                    JSONObject headers = new JSONObject(headersJson);
+                    Iterator<String> keys = headers.keys();
+                    while (keys.hasNext()) {
+                        String key = keys.next();
+                        conn.setRequestProperty(key, headers.optString(key, ""));
+                    }
+                }
+                if (body != null && !body.isEmpty() && m.equals("POST")) {
+                    conn.setDoOutput(true);
+                    byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
+                    try (OutputStream os = conn.getOutputStream()) {
+                        os.write(bytes);
+                    }
+                }
+                status = conn.getResponseCode();
+                InputStream is = status >= 400 ? conn.getErrorStream() : conn.getInputStream();
+                if (is != null) {
+                    try (BufferedReader reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
+                        StringBuilder sb = new StringBuilder();
+                        char[] buf = new char[4096];
+                        int n;
+                        while ((n = reader.read(buf)) != -1) sb.append(buf, 0, n);
+                        responseBody = sb.toString();
+                    }
+                }
+            } catch (Exception e) {
+                status = 0;
+                responseBody = "";
+            } finally {
+                if (conn != null) conn.disconnect();
+            }
+
+            final String js;
+            try {
+                JSONObject result = new JSONObject();
+                result.put("status", status);
+                result.put("body", responseBody);
+                js = "window.__magicNativeHttpCallback && window.__magicNativeHttpCallback("
+                        + JSONObject.quote(callbackId) + "," + result.toString() + ");";
+            } catch (Exception e) {
+                return;
+            }
+            runOnUiThread(() -> {
+                if (webView != null) webView.evaluateJavascript(js, null);
+            });
+        }).start();
     }
 
-    @JavascriptInterface
-    public void approveLicenseLocally() {
-        saveActivation();
-    }
-
-    @JavascriptInterface
-    public String getRawAndroidId() {
-        return getSimpleDeviceId();
-    }
-
-    @JavascriptInterface
-    public boolean isActivated() {
-        SharedPreferences prefs = getSharedPreferences("LockSettings", MODE_PRIVATE);
-        return prefs.getBoolean("is_activated", false);
-    }
-
-    @JavascriptInterface
-    public String getAndroidDeviceId() {
-        return getSimpleDeviceId();
-    }
-
-    @JavascriptInterface
-    public boolean verifyLicenseKey(String enteredKey) {
-        return activateApp(enteredKey);
-    }
-
-    @JavascriptInterface
-    public boolean isAppLicensed() {
-        return isActivated();
-    }
-
-    @JavascriptInterface
     public void forceUnlockAndExit() {
         runOnUiThread(() -> {
             moveTaskToBack(true);
@@ -320,38 +353,8 @@ public class MainActivity extends Activity {
         }
 
         @JavascriptInterface
-        public boolean activateApp(String enteredCode) {
-            return activity.activateApp(enteredCode);
-        }
-
-        @JavascriptInterface
-        public boolean isActivated() {
-            return activity.isActivated();
-        }
-
-        @JavascriptInterface
-        public String getDeviceId() {
-            return activity.getSimpleDeviceId();
-        }
-
-        @JavascriptInterface
-        public boolean verifyLicenseKey(String enteredKey) {
-            return activity.activateApp(enteredKey);
-        }
-
-        @JavascriptInterface
-        public boolean isAppLicensed() {
-            return activity.isActivated();
-        }
-
-        @JavascriptInterface
-        public void approveLicenseLocally() {
-            activity.approveLicenseLocally();
-        }
-
-        @JavascriptInterface
-        public String getRawAndroidId() {
-            return activity.getRawAndroidId();
+        public void httpRequestAsync(String callbackId, String url, String method, String headersJson, String body) {
+            activity.httpRequestAsync(callbackId, url, method, headersJson, body);
         }
 
         @JavascriptInterface

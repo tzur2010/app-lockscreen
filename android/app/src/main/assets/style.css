@@ -2963,6 +2963,73 @@ html, body, .phone-container {
   text-align: center;
 }
 
+/* הודעה מדומה שקופצת מלמעלה (חשיפה בהתראה) */
+.fake-msg-banner {
+  position: fixed;
+  top: 10px;
+  left: 10px;
+  right: 10px;
+  z-index: 100001;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 22px;
+  background: rgba(30, 30, 34, 0.92);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  color: #fff;
+  direction: rtl;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+  transform: translateY(-140%);
+  transition: transform 0.38s cubic-bezier(0.22, 1, 0.36, 1);
+  font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+.fake-msg-banner.show {
+  transform: translateY(0);
+}
+
+.fake-msg-banner.light {
+  background: rgba(245, 245, 247, 0.94);
+  color: #111;
+}
+
+.fake-msg-icon {
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #34d399, #16a34a);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.fake-msg-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.fake-msg-top {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  opacity: 0.65;
+  margin-bottom: 2px;
+}
+
+.fake-msg-sender {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.fake-msg-text {
+  font-size: 14.5px;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
 /* תיבת משוב בהגדרות */
 .feedback-textarea {
   width: 100%;

@@ -2552,13 +2552,13 @@ html, body {
   bottom: 54px;
   left: 20px;
   color: #ffffff;
-  background: rgba(0, 0, 0, 0.85);
-  padding: 8px 16px;
-  border-radius: 12px;
-  font-size: 18px;
-  font-weight: 600;
+  background: rgba(0, 0, 0, 0.88);
+  padding: 14px 22px;
+  border-radius: 18px;
+  font-size: 34px;
+  font-weight: 700;
   font-family: monospace;
-  letter-spacing: 2.5px;
+  letter-spacing: 4px;
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.14s ease, transform 0.14s ease;
@@ -2567,8 +2567,10 @@ html, body {
   border: 1px solid rgba(255, 255, 255, 0.22);
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 16px;
   direction: ltr;
+  max-width: calc(100% - 40px);
+  word-break: break-all;
 }
 
 .secret-peek.visible {
@@ -2577,12 +2579,12 @@ html, body {
 }
 
 .peek-pattern-mini {
-  width: 44px;
-  height: 44px;
+  width: 110px;
+  height: 110px;
   flex-shrink: 0;
   background: rgba(255, 255, 255, 0.08);
-  border-radius: 6px;
-  padding: 3px;
+  border-radius: 12px;
+  padding: 4px;
   display: none;
 }
 
@@ -2959,6 +2961,56 @@ html, body, .phone-container {
   color: #a7f3d0;
   font-weight: 600;
   text-align: center;
+}
+
+/* חלון בחירת סוג הנעילה (אחרי "שמור וסגור") */
+.lock-type-card {
+  border-color: rgba(56, 136, 255, 0.45);
+  gap: 14px;
+}
+
+.lock-type-grid {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.lock-type-btn {
+  min-height: 72px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  font-size: 17px;
+  font-weight: 800;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  cursor: pointer;
+  transition: transform 0.12s ease, background 0.12s ease;
+}
+
+.lock-type-btn span {
+  font-size: 12px;
+  font-weight: 500;
+  color: #94a3b8;
+}
+
+.lock-type-btn:active {
+  transform: scale(0.96);
+}
+
+.lock-type-btn.active {
+  background: rgba(56, 136, 255, 0.22);
+  border-color: #3888ff;
+}
+
+.lock-type-wide {
+  grid-column: 1 / -1;
+  min-height: 58px;
 }
 
 /* חלון "יש עדכון חדש" */

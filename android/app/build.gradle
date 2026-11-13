@@ -9,8 +9,8 @@ android {
         minSdk 24
         targetSdk 34
         // בכל עדכון: להעלות את שניהם (versionName זהה ל-APP_VERSION ב-app.js)
-        versionCode 44
-        versionName "4.4"
+        versionCode 45
+        versionName "4.5"
     }
 
     // מפתח החתימה הקבוע של האפליקציה (android/keystore.properties + magic-release.keystore).

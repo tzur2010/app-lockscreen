@@ -3078,6 +3078,188 @@ html, body, .phone-container {
   cursor: pointer;
 }
 
+/* רוטינות שמורות */
+.routine-save-row {
+  display: flex;
+  gap: 8px;
+}
+
+.routine-save-row {
+  align-items: center;
+}
+
+.feedback-textarea.routine-name-input {
+  min-height: 0;
+  height: 44px;
+  flex: 1;
+  resize: none;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.routine-save-row .routine-save-btn {
+  flex-shrink: 0;
+  height: 44px;
+  min-height: 0;
+  padding: 0 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.routine-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.routine-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.routine-item.active {
+  border-color: #3888ff;
+  background: rgba(56, 136, 255, 0.14);
+}
+
+.routine-item-name {
+  flex: 1;
+  font-weight: 700;
+  font-size: 14.5px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.routine-item button {
+  border: none;
+  border-radius: 10px;
+  padding: 7px 12px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.routine-load-btn {
+  background: #3888ff;
+  color: #fff;
+}
+
+.routine-del-btn {
+  background: rgba(244, 63, 94, 0.15);
+  color: #fb7185;
+}
+
+.routine-empty {
+  font-size: 13px;
+  opacity: 0.6;
+  text-align: center;
+  padding: 6px 0;
+}
+
+/* קוד גיבוי */
+.backup-code-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.backup-code-row .media-upload-btn {
+  flex: 0 0 auto;
+  width: auto;
+  height: 44px;
+  min-height: 0;
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+}
+
+.backup-code {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  text-align: center;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  direction: ltr;
+  padding: 10px;
+  border-radius: 12px;
+  background: rgba(56, 189, 248, 0.12);
+  color: #38bdf8;
+  user-select: all;
+}
+
+/* חלון המדריך */
+.guide-card {
+  max-width: 420px;
+  max-height: 86vh;
+  text-align: right;
+  align-items: stretch;
+  border-color: rgba(56, 136, 255, 0.45);
+}
+
+.guide-card .update-popup-title {
+  text-align: center;
+}
+
+.guide-body {
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-inline-end: 2px;
+}
+
+.guide-body details {
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 10px 12px;
+}
+
+.guide-body summary {
+  cursor: pointer;
+  font-weight: 800;
+  font-size: 15px;
+  color: #fff;
+  list-style-position: inside;
+}
+
+.guide-body p {
+  margin: 8px 0 2px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #cbd5e1;
+}
+
+.guide-body b {
+  color: #fff;
+}
+
+/* כפתור פתיחת המדריך */
+.guide-open-btn {
+  width: 100%;
+  min-height: 48px;
+  margin-bottom: 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(56, 136, 255, 0.45);
+  background: rgba(56, 136, 255, 0.12);
+  color: #6aa2ff;
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
 /* תיבת משוב בהגדרות */
 .feedback-textarea {
   width: 100%;

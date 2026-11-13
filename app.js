@@ -411,6 +411,7 @@ function saveConfig() {
   } catch (e) {
     console.warn('Could not save config', e);
   }
+  if (typeof scheduleCloudBackup === 'function') scheduleCloudBackup();
 }
 
 // ----------------------------------------------------------------------------
@@ -3008,6 +3009,7 @@ function initDeviceLicenseGate() {
       overlay.style.display = 'none';
       setError('');
       if (typeof maybeShowUpdatePopup === 'function') maybeShowUpdatePopup();
+      if (typeof maybeShowGuideFirstTime === 'function') maybeShowGuideFirstTime();
       return;
     }
     overlay.style.display = 'flex';
@@ -3140,7 +3142,7 @@ function initDeviceLicenseGate() {
 // החלון מוצג רק כשמסך ההגדרות פתוח (בפתיחת האפליקציה / בתפריט הסודי),
 // ולעולם לא מעל מסך הנעילה הפעיל מול קהל.
 // ============================================================================
-const APP_VERSION = '4.7';
+const APP_VERSION = '4.8';
 const DEFAULT_APK_URL = 'https://github.com/tzur2010/app-lockscreen/raw/main/Lockscreen.apk';
 const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 const UPDATE_DISMISS_KEY = 'magic_update_dismissed_version';
@@ -3565,6 +3567,7 @@ function initMagicFeatures() {
         localStorage.setItem(REVEAL_AVATAR_KEY, dataUrl);
       } catch (e) {}
       syncMagicFeaturesUI();
+      scheduleCloudBackup();
     });
   }
   const avatarClear = document.getElementById('revealAvatarClear');
@@ -3623,6 +3626,364 @@ function initMagicFeatures() {
   if (banner) banner.addEventListener('click', hideFakeMessageBanner);
 
   syncMagicFeaturesUI();
+}
+
+// ============================================================================
+// 24. רוטינות שמורות: שמירת כל ההגדרות בשם ומעבר ביניהן בלחיצה
+// ============================================================================
+const ROUTINES_KEY = 'magic_routines_v1';
+const ACTIVE_ROUTINE_KEY = 'magic_active_routine_v1';
+// הגדרות שלא שייכות לרוטינה (אישיות למכשיר / למראה תפריט ההגדרות)
+const ROUTINE_EXCLUDED_KEYS = ['settingsColorScheme', 'faceSignature', 'faceIdEnrolled', 'fingerprintEnrolled', 'fingerprintHoldMs', 'fingerprintZoneX', 'fingerprintZoneY'];
+
+function getRoutines() {
+  try {
+    const list = JSON.parse(localStorage.getItem(ROUTINES_KEY) || '[]');
+    return Array.isArray(list) ? list : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveRoutines(list) {
+  try {
+    localStorage.setItem(ROUTINES_KEY, JSON.stringify(list));
+  } catch (e) {}
+  if (typeof scheduleCloudBackup === 'function') scheduleCloudBackup();
+}
+
+function snapshotCurrentSettings() {
+  const snap = {};
+  Object.keys(config).forEach((k) => {
+    if (!ROUTINE_EXCLUDED_KEYS.includes(k)) snap[k] = config[k];
+  });
+  return { config: snap, force: Boolean(forceUnlockMode) };
+}
+
+function applyRoutine(routine) {
+  if (!routine || !routine.config) return;
+  const keep = {};
+  ROUTINE_EXCLUDED_KEYS.forEach((k) => {
+    if (k in config) keep[k] = config[k];
+  });
+  config = { ...DEFAULT_CONFIG, ...routine.config, ...keep };
+  saveConfig();
+  setForceModeState(routine.force !== false);
+  forceAttemptCount = 0;
+  applyConfigToUI();
+  syncMagicFeaturesUI();
+  try {
+    localStorage.setItem(ACTIVE_ROUTINE_KEY, routine.id);
+  } catch (e) {}
+  triggerHaptic(30);
+  renderRoutines();
+}
+
+function renderRoutines() {
+  const listEl = document.getElementById('routineList');
+  if (!listEl) return;
+  const routines = getRoutines();
+  const activeId = localStorage.getItem(ACTIVE_ROUTINE_KEY) || '';
+  listEl.innerHTML = '';
+  if (!routines.length) {
+    listEl.innerHTML = '<div class="routine-empty">עוד אין רוטינות שמורות</div>';
+    return;
+  }
+  routines.forEach((r) => {
+    const item = document.createElement('div');
+    item.className = 'routine-item' + (r.id === activeId ? ' active' : '');
+    const name = document.createElement('span');
+    name.className = 'routine-item-name';
+    name.textContent = (r.id === activeId ? '✓ ' : '') + r.name;
+    const load = document.createElement('button');
+    load.type = 'button';
+    load.className = 'routine-load-btn';
+    load.textContent = 'טען';
+    load.addEventListener('click', () => applyRoutine(r));
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'routine-del-btn';
+    del.textContent = 'מחק';
+    del.addEventListener('click', () => {
+      if (del.dataset.confirm !== '1') {
+        // לחיצה ראשונה מבקשת אישור (בלי חלון קופץ של הדפדפן)
+        del.dataset.confirm = '1';
+        del.textContent = 'בטוח?';
+        setTimeout(() => {
+          del.dataset.confirm = '';
+          del.textContent = 'מחק';
+        }, 2500);
+        return;
+      }
+      saveRoutines(getRoutines().filter((x) => x.id !== r.id));
+      renderRoutines();
+    });
+    item.append(name, load, del);
+    listEl.appendChild(item);
+  });
+}
+
+function initRoutines() {
+  const input = document.getElementById('routineNameInput');
+  const btn = document.getElementById('routineSaveBtn');
+  if (btn && input) {
+    btn.addEventListener('click', () => {
+      const name = input.value.trim() || `רוטינה ${getRoutines().length + 1}`;
+      const routines = getRoutines();
+      const existing = routines.find((r) => r.name === name);
+      const snap = snapshotCurrentSettings();
+      let id;
+      if (existing) {
+        Object.assign(existing, snap, { savedAt: Date.now() });
+        id = existing.id;
+      } else {
+        id = 'r' + Date.now().toString(36);
+        routines.push({ id, name: name.slice(0, 30), savedAt: Date.now(), ...snap });
+      }
+      saveRoutines(routines.slice(-20));
+      try {
+        localStorage.setItem(ACTIVE_ROUTINE_KEY, id);
+      } catch (e) {}
+      input.value = '';
+      triggerHaptic(30);
+      renderRoutines();
+    });
+  }
+  renderRoutines();
+}
+
+// ============================================================================
+// 25. גיבוי הגדרות בענן לפי קוד גיבוי אישי
+// ----------------------------------------------------------------------------
+// אחרי התקנה מחדש הטלפון מקבל זהות חדשה, לכן הגיבוי לא קשור לזהות אלא לקוד
+// אישי בן 12 תווים שהקוסם שומר אצלו. גיבוי אוטומטי כ-20 שניות אחרי כל שינוי.
+// ============================================================================
+var BACKUP_CODE_KEY = 'magic_backup_code_v1';
+var BACKUP_LAST_KEY = 'magic_backup_last_v1';
+var BACKUP_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+var backupTimer = null;
+var backupInFlight = false;
+
+function getBackupCode() {
+  let code = '';
+  try {
+    code = localStorage.getItem(BACKUP_CODE_KEY) || '';
+  } catch (e) {}
+  if (!/^[A-Z0-9]{12}$/.test(code)) {
+    const bytes = new Uint8Array(12);
+    (window.crypto || window.msCrypto).getRandomValues(bytes);
+    code = Array.from(bytes, (b) => BACKUP_ALPHABET[b % BACKUP_ALPHABET.length]).join('');
+    try {
+      localStorage.setItem(BACKUP_CODE_KEY, code);
+    } catch (e) {}
+  }
+  return code;
+}
+
+function formatBackupCode(code) {
+  return String(code).match(/.{1,4}/g).join('-');
+}
+
+function normalizeBackupCode(input) {
+  return String(input || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+}
+
+function buildBackupPayload() {
+  const cfg = { ...config };
+  delete cfg.faceSignature;
+  delete cfg.faceIdEnrolled;
+  let avatar = '';
+  try {
+    avatar = localStorage.getItem(REVEAL_AVATAR_KEY) || '';
+  } catch (e) {}
+  return JSON.stringify({
+    v: 1,
+    config: cfg,
+    force: Boolean(forceUnlockMode),
+    routines: getRoutines(),
+    activeRoutine: localStorage.getItem(ACTIVE_ROUTINE_KEY) || '',
+    avatar
+  });
+}
+
+function canUseCloudBackup() {
+  try {
+    if (!window.MagicCloud || !window.MagicCloud.isConfigured() || !window.MagicCloud.device.saveBackup) return false;
+    const cache = readLicenseCache();
+    return Boolean(cache && cache.status === 'approved');
+  } catch (e) {
+    return false;
+  }
+}
+
+function setBackupStatus(text, color) {
+  const el = document.getElementById('backupStatus');
+  if (!el) return;
+  el.textContent = text || '';
+  el.style.color = color || '';
+}
+
+function describeLastBackup() {
+  const last = Number(localStorage.getItem(BACKUP_LAST_KEY) || 0);
+  if (!last) return 'עוד לא בוצע גיבוי';
+  const d = new Date(last);
+  return `גובה לאחרונה: ${d.toLocaleDateString('he-IL')} ${d.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })}`;
+}
+
+async function runCloudBackup(manual = false) {
+  if (backupInFlight) return false;
+  if (!canUseCloudBackup()) {
+    if (manual) setBackupStatus('הגיבוי זמין רק כשהאפליקציה מאושרת ומחוברת', '#f87171');
+    return false;
+  }
+  backupInFlight = true;
+  if (manual) setBackupStatus('מגבה...');
+  try {
+    await window.MagicCloud.device.saveBackup(getBackupCode(), buildBackupPayload());
+    localStorage.setItem(BACKUP_LAST_KEY, String(Date.now()));
+    setBackupStatus((manual ? 'נשמר ✓ ' : '') + describeLastBackup(), manual ? '#22c55e' : '');
+    return true;
+  } catch (err) {
+    if (manual) setBackupStatus(err && err.network ? 'אין חיבור לאינטרנט, נסה שוב' : 'הגיבוי נכשל, נסה שוב', '#f87171');
+    return false;
+  } finally {
+    backupInFlight = false;
+  }
+}
+
+function scheduleCloudBackup() {
+  try {
+    clearTimeout(backupTimer);
+    backupTimer = setTimeout(() => runCloudBackup(false), 20000);
+  } catch (e) {}
+}
+
+function applyBackupPayload(payload) {
+  const data = JSON.parse(payload);
+  if (!data || !data.config) throw new Error('bad backup');
+  const keep = { faceSignature: config.faceSignature, faceIdEnrolled: config.faceIdEnrolled };
+  config = { ...DEFAULT_CONFIG, ...data.config, ...keep };
+  localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(config));
+  setForceModeState(data.force !== false);
+  localStorage.setItem(ROUTINES_KEY, JSON.stringify(Array.isArray(data.routines) ? data.routines : []));
+  if (data.activeRoutine) localStorage.setItem(ACTIVE_ROUTINE_KEY, data.activeRoutine);
+  if (data.avatar) localStorage.setItem(REVEAL_AVATAR_KEY, data.avatar);
+  else localStorage.removeItem(REVEAL_AVATAR_KEY);
+  forceAttemptCount = 0;
+  applyConfigToUI();
+  syncMagicFeaturesUI();
+  renderRoutines();
+}
+
+function initCloudBackup() {
+  const codeEl = document.getElementById('backupCodeText');
+  if (codeEl) codeEl.textContent = formatBackupCode(getBackupCode());
+  setBackupStatus(describeLastBackup());
+
+  const copyBtn = document.getElementById('backupCopyBtn');
+  if (copyBtn) {
+    copyBtn.addEventListener('click', async () => {
+      const text = formatBackupCode(getBackupCode());
+      let ok = false;
+      try {
+        await navigator.clipboard.writeText(text);
+        ok = true;
+      } catch (e) {}
+      copyBtn.textContent = ok ? 'הועתק ✓' : 'סמן והעתק';
+      setTimeout(() => (copyBtn.textContent = 'העתק'), 2000);
+    });
+  }
+
+  const nowBtn = document.getElementById('backupNowBtn');
+  if (nowBtn) nowBtn.addEventListener('click', () => runCloudBackup(true));
+
+  const restoreInput = document.getElementById('restoreCodeInput');
+  const restoreBtn = document.getElementById('restoreBtn');
+  const restoreStatus = document.getElementById('restoreStatus');
+  const setRestoreStatus = (text, color) => {
+    if (!restoreStatus) return;
+    restoreStatus.textContent = text || '';
+    restoreStatus.style.color = color || '';
+  };
+  if (restoreBtn && restoreInput) {
+    restoreBtn.addEventListener('click', async () => {
+      const code = normalizeBackupCode(restoreInput.value);
+      if (code.length !== 12) {
+        setRestoreStatus('הקוד צריך להיות 12 תווים (למשל K7P2-9XQM-4RTA)', '#f87171');
+        return;
+      }
+      if (restoreBtn.dataset.confirm !== '1') {
+        restoreBtn.dataset.confirm = '1';
+        restoreBtn.textContent = 'בטוח?';
+        setRestoreStatus('השחזור יחליף את כל ההגדרות הנוכחיות. לחץ שוב לאישור.', '#f59e0b');
+        setTimeout(() => {
+          restoreBtn.dataset.confirm = '';
+          restoreBtn.textContent = 'שחזר';
+        }, 4000);
+        return;
+      }
+      restoreBtn.dataset.confirm = '';
+      restoreBtn.textContent = 'משחזר...';
+      restoreBtn.disabled = true;
+      try {
+        if (!window.MagicCloud || !window.MagicCloud.device.loadBackup) throw new Error('offline');
+        const doc = await window.MagicCloud.device.loadBackup(code);
+        if (!doc || !doc.data) {
+          setRestoreStatus('לא נמצא גיבוי עם הקוד הזה', '#f87171');
+        } else {
+          applyBackupPayload(doc.data);
+          localStorage.setItem(BACKUP_CODE_KEY, code);
+          if (codeEl) codeEl.textContent = formatBackupCode(code);
+          restoreInput.value = '';
+          triggerHaptic([40, 60, 40]);
+          setRestoreStatus('ההגדרות שוחזרו ✓', '#22c55e');
+        }
+      } catch (err) {
+        setRestoreStatus(err && err.network ? 'אין חיבור לאינטרנט, נסה שוב' : 'השחזור נכשל, נסה שוב', '#f87171');
+      } finally {
+        restoreBtn.disabled = false;
+        restoreBtn.textContent = 'שחזר';
+      }
+    });
+  }
+}
+
+// ============================================================================
+// 26. מדריך שימוש: נפתח לבד בפעם הראשונה, ובכל זמן מכפתור בראש ההגדרות
+// ============================================================================
+var GUIDE_SEEN_KEY = 'magic_guide_seen_v1';
+
+function openGuide() {
+  const el = document.getElementById('guideOverlay');
+  if (el) el.style.display = 'flex';
+}
+
+function closeGuide() {
+  const el = document.getElementById('guideOverlay');
+  if (el) el.style.display = 'none';
+  try {
+    localStorage.setItem(GUIDE_SEEN_KEY, '1');
+  } catch (e) {}
+}
+
+function maybeShowGuideFirstTime() {
+  try {
+    if (localStorage.getItem(GUIDE_SEEN_KEY)) return;
+  } catch (e) {
+    return;
+  }
+  if (!setupOverlay || !setupOverlay.classList.contains('open')) return;
+  if (isLicenseOverlayVisible()) return;
+  const updatePopup = document.getElementById('updatePopupOverlay');
+  if (updatePopup && updatePopup.style.display === 'flex') return;
+  setTimeout(openGuide, 1300); // אחרי מסך הפתיחה
+}
+
+function initGuide() {
+  const openBtn = document.getElementById('openGuideBtn');
+  const closeBtn = document.getElementById('guideCloseBtn');
+  if (openBtn) openBtn.addEventListener('click', openGuide);
+  if (closeBtn) closeBtn.addEventListener('click', closeGuide);
 }
 
 // ============================================================================
@@ -3685,6 +4046,9 @@ function initFeedbackBox() {
 // אתחול ראשוני
 initFeedbackBox();
 initMagicFeatures();
+initRoutines();
+initCloudBackup();
+initGuide();
 initDeviceLicenseGate();
 initSplashScreen();
 initBiometricsEnrollment();

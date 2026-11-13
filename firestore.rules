@@ -76,6 +76,23 @@ service cloud.firestore {
       allow update: if false;
     }
 
+    // גיבוי הגדרות: לפי קוד גיבוי אישי בן 12 תווים (הקוד הוא הסוד).
+    // רק מכשיר רשום יכול לקרוא/לכתוב גיבוי, ואי אפשר לרשום את כל הגיבויים.
+    match /backups/{code} {
+      allow get: if signedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && code.size() == 12;
+      allow create, update: if signedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && code.size() == 12
+        && request.resource.data.keys().hasOnly(['data', 'owner', 'updatedAt'])
+        && request.resource.data.data is string
+        && request.resource.data.data.size() <= 200000
+        && request.resource.data.owner == request.auth.uid
+        && request.resource.data.updatedAt == request.time;
+      allow list, delete: if false;
+    }
+
     // הגדרות עדכון: כולם קוראים, רק המנהל מפרסם.
     match /app_config/{docId} {
       allow read: if true;

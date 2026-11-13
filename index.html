@@ -71,6 +71,48 @@
     </div>
   </div>
 
+  <!-- מדריך שימוש -->
+  <div class="update-popup-overlay" id="guideOverlay" style="display: none;">
+    <div class="update-popup-card guide-card">
+      <div class="update-popup-title">📖 מדריך מהיר</div>
+      <div class="guide-body">
+        <details open>
+          <summary>🚀 התחלה מהירה</summary>
+          <p>1. בוחרים Samsung או iPhone ואת הדגם.<br>2. מגדירים בהגדרות מה שרוצים.<br>3. לוחצים <b>"שמור וסגור"</b> ובוחרים סוג נעילה: קוד 4 או 6 ספרות, סיסמה, דפוס או החלקה.<br>4. מסך הנעילה מוכן. נותנים את הטלפון לצופה.</p>
+        </details>
+        <details>
+          <summary>🔐 איך חוזרים להגדרות (בסתר)</summary>
+          <p>כל אחת מהדרכים פותחת את התפריט הסודי:<br>• לחיצה ארוכה של <b>3 שניות על השעון</b><br>• לחיצה ארוכה של <b>2.5 שניות בפינה הימנית העליונה</b><br>• <b>3 הקשות</b> על סמל המנעול<br>• <b>3 הקשות</b> בפינה השמאלית העליונה</p>
+        </details>
+        <details>
+          <summary>🎯 פתיחה בכל קוד ובחירת ניסיון</summary>
+          <p>כש<b>"פתיחה בכל קוד"</b> דולק, כל קוד שהצופה מקליד פותח את הטלפון. ב<b>"באיזה ניסיון הטלפון ייפתח"</b> בוחרים 1–5: למשל 2 = בפעם הראשונה "קוד שגוי", ובשנייה נפתח.<br><b>לחיצה כפולה על השעון</b> מדליקה/מכבה את "פתיחה בכל קוד" בסתר (מרגישים רטט קצר).</p>
+        </details>
+        <details>
+          <summary>👁️ איך רואים מה הצופה הקליד</summary>
+          <p>• <b>לחיצה ארוכה בשטח ריק</b> במסך: מופיעה תיבה עם הקוד. בדפוס, הנקודות ממוספרות לפי הסדר (1 בירוק = התחלה).<br>• <b>הקשה אחת על השעון</b>: השעון מציג לשלוש שניות את הקוד כאילו הוא השעה.<br>• <b>רטט בכיס</b>: הטלפון רוטט את הספרות. מספר הרטטים = הספרה, רטט ארוך = 0.<br>• <b>שעון חכם</b>: מדליקים "שלח את הקוד לשעון", והקוד מופיע על השעון שביד.</p>
+        </details>
+        <details>
+          <summary>💬 חשיפה בהתראה</summary>
+          <p>כמה שניות אחרי שהטלפון נפתח, מגיעה הודעה שבתוכה הקוד שהצופה בחר. בהגדרות בוחרים את שם השולח, את התמונה, את הטקסט (<b>{קוד}</b> מוחלף בקוד) ואחרי כמה שניות ההודעה מגיעה.</p>
+        </details>
+        <details>
+          <summary>🚪 יציאת חירום</summary>
+          <p>• <b>3 הקשות מהירות</b> על סמל הסוללה/Wi-Fi פותחות את הטלפון מיד.<br>• לחיצה על <b>חיישן טביעת האצבע</b> בתחתית (כש"החלקת אצבע סודית" דולק).</p>
+        </details>
+        <details>
+          <summary>⭐ רוטינות וגיבוי</summary>
+          <p><b>רוטינות</b>: מגדירים טריק, נותנים לו שם ולוחצים "שמור". אחר כך עוברים בין טריקים בלחיצה על "טען".<br><b>גיבוי</b>: ההגדרות נשמרות בענן אוטומטית. בטלפון חדש מכניסים את קוד הגיבוי ומקבלים הכל בחזרה. שמור את הקוד!</p>
+        </details>
+        <details>
+          <summary>⚡ הפעלה מהירה</summary>
+          <p>בהגדרות: <b>"הוסף ווידג'ט שקוף למסך הבית"</b>. לחיצה על המקום השקוף במסך הבית פותחת את מסך הנעילה המזויף, בלי לחפש את האפליקציה.</p>
+        </details>
+      </div>
+      <button type="button" class="update-popup-btn" id="guideCloseBtn">הבנתי</button>
+    </div>
+  </div>
+
   <!-- הודעה מדומה (חשיפה בהתראה) - בגרסת האתר / כשנשארים בתוך האפליקציה -->
   <div class="fake-msg-banner" id="fakeMsgBanner" style="display: none;">
     <span class="fake-msg-avatar" id="fakeMsgAvatar"></span>
@@ -214,6 +256,21 @@
             יש עדכון זמין (v4.1) - לחץ לעדכון
           </button>
           <div class="in-app-update-status" id="inAppUpdateStatus"></div>
+        </div>
+
+        <!-- מדריך + רוטינות שמורות (גישה מהירה בראש ההגדרות) -->
+        <button type="button" class="guide-open-btn" id="openGuideBtn">📖 מדריך: איך משתמשים באפליקציה</button>
+
+        <div class="oneui-section-header">רוטינות שמורות</div>
+        <div class="config-group oneui-card">
+          <div class="oneui-field-block">
+            <div class="toggle-sub-desc" style="margin-bottom: 8px;">שומרים את כל ההגדרות הנוכחיות בשם, ועוברים בין טריקים בלחיצה אחת.</div>
+            <div class="routine-save-row">
+              <input type="text" id="routineNameInput" class="feedback-textarea routine-name-input" maxlength="30" placeholder="שם הרוטינה, למשל: PIN בניסיון שני" dir="rtl">
+              <button type="button" class="media-upload-btn routine-save-btn" id="routineSaveBtn">שמור</button>
+            </div>
+            <div class="routine-list" id="routineList"></div>
+          </div>
         </div>
 
         <!-- ================================================================
@@ -587,6 +644,31 @@
           <div class="segmented-row" id="statusBarSelector" style="display: none;">
             <button type="button" class="seg-pill active" data-statusbar="show">הצג פס עליון</button>
             <button type="button" class="seg-pill" data-statusbar="hide">ללא פס עליון</button>
+          </div>
+        </div>
+
+        <!-- ================================================================
+             גיבוי הגדרות בענן (קוד גיבוי אישי)
+             ================================================================ -->
+        <div class="oneui-section-header">גיבוי הגדרות</div>
+        <div class="config-group oneui-card">
+          <div class="oneui-field-block">
+            <div class="toggle-sub-desc" style="margin-bottom: 8px;">ההגדרות והרוטינות נשמרות בענן אוטומטית. בטלפון חדש או אחרי התקנה מחדש, מכניסים את הקוד ומקבלים הכל בחזרה.</div>
+            <div class="backup-code-row">
+              <span class="backup-code" id="backupCodeText">----</span>
+              <button type="button" class="media-upload-btn" id="backupCopyBtn">העתק</button>
+            </div>
+            <div class="toggle-sub-desc" style="margin-top: 6px;">💡 שמור את הקוד, למשל שלח אותו לעצמך בוואטסאפ.</div>
+            <button type="button" class="media-upload-btn" id="backupNowBtn" style="width: 100%; margin-top: 10px;">גבה עכשיו</button>
+            <div class="toggle-sub-desc" id="backupStatus" style="margin-top: 6px; min-height: 16px;"></div>
+
+            <div class="oneui-card-divider" style="margin: 12px 0;"></div>
+            <label class="config-label" for="restoreCodeInput">שחזור מקוד גיבוי</label>
+            <div class="routine-save-row">
+              <input type="text" id="restoreCodeInput" class="feedback-textarea routine-name-input" maxlength="14" placeholder="XXXX-XXXX-XXXX" dir="ltr" autocapitalize="characters" autocomplete="off" spellcheck="false">
+              <button type="button" class="media-upload-btn routine-save-btn" id="restoreBtn">שחזר</button>
+            </div>
+            <div class="toggle-sub-desc" id="restoreStatus" style="margin-top: 6px; min-height: 16px;"></div>
           </div>
         </div>
 

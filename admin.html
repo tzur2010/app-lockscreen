@@ -3,504 +3,437 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>מערכת ניהול משתמשים ורישיונות - Magic Lockscreen Admin</title>
+  <meta name="robots" content="noindex, nofollow">
+  <title>ניהול לקוחות - Magic Lock</title>
   <style>
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+    body { min-height: 100vh; background: #0d0e14; color: #f8fafc; padding: 24px 16px 60px; direction: rtl; }
+    .container { max-width: 1120px; margin: 0 auto; }
 
-    body {
-      min-height: 100vh;
-      background: #0d0e14;
-      color: #f8fafc;
-      padding: 24px 16px 60px;
-      direction: rtl;
-    }
+    .card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 22px; }
+    .top-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 20px; padding: 20px 24px; }
+    .brand-title { font-size: 22px; font-weight: 800; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .sub { font-size: 13px; color: #94a3b8; margin-top: 4px; line-height: 1.5; }
+    .live-badge { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 999px; color: #4ade80; background: rgba(74,222,128,0.12); border: 1px solid rgba(74,222,128,0.3); }
+    .live-badge.offline { color: #fb7185; background: rgba(244,63,94,0.12); border-color: rgba(244,63,94,0.3); }
+    .live-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; box-shadow: 0 0 8px currentColor; }
 
-    .container {
-      max-width: 1120px;
-      margin: 0 auto;
-    }
+    .btn { border: none; border-radius: 12px; padding: 9px 15px; font-size: 13.5px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: transform .12s, opacity .12s; text-decoration: none; white-space: nowrap; }
+    .btn:active { transform: scale(0.96); }
+    .btn:disabled { opacity: .55; cursor: wait; }
+    .btn-ghost { background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.12); color: #e2e8f0; }
+    .btn-primary { background: linear-gradient(135deg, #3888ff 0%, #2563eb 100%); color: #fff; }
+    .btn-whatsapp { background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); color: #fff; box-shadow: 0 4px 14px rgba(34,197,94,.3); }
+    .btn-wa-outline { background: rgba(34,197,94,.12); border: 1px solid rgba(34,197,94,.38); color: #4ade80; }
+    .btn-block { background: rgba(245,158,11,.15); border: 1px solid rgba(245,158,11,.38); color: #fbbf24; }
+    .btn-delete { background: rgba(244,63,94,.15); border: 1px solid rgba(244,63,94,.38); color: #fb7185; }
 
-    .top-bar {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      justify-content: space-between;
-      gap: 16px;
-      margin-bottom: 24px;
-      padding: 20px 24px;
-      background: rgba(255, 255, 255, 0.04);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 22px;
-      backdrop-filter: blur(18px);
-    }
+    .input-field { height: 42px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.14); background: rgba(0,0,0,0.35); color: #fff; padding: 0 14px; font-size: 14px; width: 100%; }
+    textarea.input-field { height: auto; min-height: 210px; padding: 12px 14px; line-height: 1.55; resize: vertical; }
+    label.field-label { display: block; font-size: 12.5px; color: #94a3b8; margin: 0 0 6px; font-weight: 600; }
 
-    .brand-title {
-      font-size: 22px;
-      font-weight: 800;
-      color: #ffffff;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      flex-wrap: wrap;
-    }
+    /* מסך כניסה */
+    .login-wrap { min-height: 80vh; display: flex; align-items: center; justify-content: center; }
+    .login-card { width: 100%; max-width: 380px; padding: 30px 26px; display: flex; flex-direction: column; gap: 14px; }
+    .login-card h1 { font-size: 21px; font-weight: 800; text-align: center; }
+    .error-msg { color: #fb7185; font-size: 13px; min-height: 18px; text-align: center; }
 
-    .live-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 12px;
-      font-weight: 700;
-      color: #4ade80;
-      background: rgba(74, 222, 128, 0.12);
-      border: 1px solid rgba(74, 222, 128, 0.3);
-      padding: 4px 10px;
-      border-radius: 999px;
-    }
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 20px; }
+    .stat-card { padding: 18px 20px; border-radius: 20px; }
+    .stat-label { font-size: 13px; color: #94a3b8; margin-bottom: 6px; }
+    .stat-value { font-size: 28px; font-weight: 800; }
 
-    .live-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: #4ade80;
-      box-shadow: 0 0 8px #4ade80;
-    }
+    .panels { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px; margin-bottom: 20px; }
+    .panel { padding: 20px 22px; display: flex; flex-direction: column; gap: 12px; }
+    .panel h2 { font-size: 16px; font-weight: 800; }
+    .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
+    .row > div { flex: 1; min-width: 120px; }
+    .hint { font-size: 12px; color: #64748b; line-height: 1.55; }
+    .pill-info { display: inline-block; font-size: 12.5px; color: #38bdf8; background: rgba(56,189,248,.1); border-radius: 8px; padding: 4px 9px; direction: ltr; font-weight: 700; }
 
-    .top-actions {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      flex-wrap: wrap;
-    }
+    .table-header-bar { padding: 16px 20px; border-bottom: 1px solid rgba(255,255,255,0.07); display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+    .filter-tabs { display: flex; gap: 8px; flex-wrap: wrap; }
+    .tab-pill { border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.04); color: #cbd5e1; padding: 6px 14px; border-radius: 999px; font-size: 13px; font-weight: 600; cursor: pointer; }
+    .tab-pill.active { background: #3888ff; border-color: #3888ff; color: #fff; }
+    .table-wrap { width: 100%; overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; text-align: right; }
+    th, td { padding: 14px 18px; border-bottom: 1px solid rgba(255,255,255,0.06); font-size: 14.5px; vertical-align: middle; }
+    th { font-size: 13px; font-weight: 700; color: #94a3b8; background: rgba(0,0,0,0.25); }
+    tr:hover td { background: rgba(255,255,255,0.02); }
+    .muted { color: #94a3b8; font-size: 12.5px; }
+    .mono { font-family: ui-monospace, Consolas, monospace; color: #38bdf8; direction: ltr; display: inline-block; }
+    .status-badge { display: inline-flex; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+    .status-pending { background: rgba(234,179,8,.15); color: #facc15; border: 1px solid rgba(234,179,8,.35); }
+    .status-approved { background: rgba(34,197,94,.15); color: #4ade80; border: 1px solid rgba(34,197,94,.35); }
+    .status-blocked { background: rgba(244,63,94,.15); color: #fb7185; border: 1px solid rgba(244,63,94,.35); }
+    .actions-cell { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .empty-state { padding: 54px 20px; text-align: center; color: #64748b; font-size: 15px; }
 
-    .btn {
-      border: none;
-      border-radius: 12px;
-      padding: 9px 15px;
-      font-size: 13.5px;
-      font-weight: 700;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      transition: transform 0.12s ease, opacity 0.12s ease;
-      text-decoration: none;
-    }
-
-    .btn:active {
-      transform: scale(0.96);
-    }
-
-    .btn-ghost {
-      background: rgba(255, 255, 255, 0.07);
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      color: #e2e8f0;
-    }
-
-    .btn-primary {
-      background: linear-gradient(135deg, #3888ff 0%, #2563eb 100%);
-      color: #ffffff;
-    }
-
-    .btn-whatsapp-main {
-      background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
-      color: #ffffff;
-      box-shadow: 0 4px 14px rgba(34, 197, 94, 0.3);
-      padding: 10px 16px;
-      font-size: 14px;
-    }
-
-    .btn-block {
-      background: rgba(245, 158, 11, 0.15);
-      border: 1px solid rgba(245, 158, 11, 0.38);
-      color: #fbbf24;
-    }
-
-    .btn-delete {
-      background: rgba(244, 63, 94, 0.15);
-      border: 1px solid rgba(244, 63, 94, 0.38);
-      color: #fb7185;
-    }
-
-    /* כרטיסיות סטטיסטיקה */
-    .stats-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 14px;
-      margin-bottom: 22px;
-    }
-
-    .stat-card {
-      background: rgba(255, 255, 255, 0.04);
-      border: 1px solid rgba(255, 255, 255, 0.07);
-      border-radius: 20px;
-      padding: 18px 20px;
-    }
-
-    .stat-label {
-      font-size: 13px;
-      color: #94a3b8;
-      margin-bottom: 6px;
-    }
-
-    .stat-value {
-      font-size: 28px;
-      font-weight: 800;
-      color: #ffffff;
-    }
-
-    /* טבלת משתמשים */
-    .table-card {
-      background: rgba(255, 255, 255, 0.04);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 22px;
-      overflow: hidden;
-    }
-
-    .table-header-bar {
-      padding: 16px 20px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.07);
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-    }
-
-    .filter-tabs {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-    }
-
-    .tab-pill {
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      background: rgba(255, 255, 255, 0.04);
-      color: #cbd5e1;
-      padding: 6px 14px;
-      border-radius: 999px;
-      font-size: 13px;
-      font-weight: 600;
-      cursor: pointer;
-    }
-
-    .tab-pill.active {
-      background: #3888ff;
-      border-color: #3888ff;
-      color: #ffffff;
-    }
-
-    .input-field {
-      height: 42px;
-      border-radius: 12px;
-      border: 1px solid rgba(255, 255, 255, 0.14);
-      background: rgba(0, 0, 0, 0.35);
-      color: #ffffff;
-      padding: 0 14px;
-      font-size: 14px;
-    }
-
-    .table-wrap {
-      width: 100%;
-      overflow-x: auto;
-    }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      text-align: right;
-    }
-
-    th, td {
-      padding: 15px 18px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-      font-size: 14.5px;
-      vertical-align: middle;
-    }
-
-    th {
-      font-size: 13px;
-      font-weight: 700;
-      color: #94a3b8;
-      background: rgba(0, 0, 0, 0.25);
-    }
-
-    tr:hover td {
-      background: rgba(255, 255, 255, 0.02);
-    }
-
-    .mono-code {
-      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-      font-weight: 700;
-      color: #38bdf8;
-      background: rgba(56, 189, 248, 0.1);
-      padding: 4px 9px;
-      border-radius: 8px;
-      direction: ltr;
-      display: inline-block;
-    }
-
-    .status-badge {
-      display: inline-flex;
-      align-items: center;
-      padding: 4px 10px;
-      border-radius: 999px;
-      font-size: 12px;
-      font-weight: 700;
-    }
-
-    .status-pending {
-      background: rgba(234, 179, 8, 0.15);
-      color: #facc15;
-      border: 1px solid rgba(234, 179, 8, 0.35);
-    }
-
-    .status-approved {
-      background: rgba(34, 197, 94, 0.15);
-      color: #4ade80;
-      border: 1px solid rgba(34, 197, 94, 0.35);
-    }
-
-    .status-blocked {
-      background: rgba(244, 63, 94, 0.15);
-      color: #fb7185;
-      border: 1px solid rgba(244, 63, 94, 0.35);
-    }
-
-    .actions-cell {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      flex-wrap: wrap;
-    }
-
-    .empty-state {
-      padding: 54px 20px;
-      text-align: center;
-      color: #64748b;
-      font-size: 15px;
-    }
+    .toast { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%); background: #1e293b; border: 1px solid rgba(255,255,255,.15); color: #fff; padding: 12px 18px; border-radius: 14px; font-size: 14px; font-weight: 600; box-shadow: 0 10px 30px rgba(0,0,0,.4); display: none; z-index: 50; max-width: 90vw; }
+    .toast.error { border-color: rgba(244,63,94,.5); color: #fecdd3; }
+    .config-warning { padding: 18px 22px; margin-bottom: 20px; border-color: rgba(245,158,11,.4); color: #fde68a; font-size: 14px; line-height: 1.6; }
   </style>
 </head>
 <body>
   <div class="container">
-    <!-- סרגל עליון -->
-    <div class="top-bar">
-      <div>
-        <div class="brand-title">
-          <span>לוח בקרה וניהול לקוחות (Admin Dashboard)</span>
-          <span class="live-badge"><span class="live-dot"></span> מחובר בזמן אמת</span>
-        </div>
-        <div style="font-size: 13px; color: #94a3b8; margin-top: 4px;">
-          כל בקשה חדשה מהאפליקציה מופיעה כאן אוטומטית. לחיצה על <strong>"אשר ושלח בוואטסאפ"</strong> פותחת את האפליקציה אצל הלקוח מיד ושולחת לו הודעה מוכנה.
-        </div>
-      </div>
-      <div class="top-actions">
-        <div style="display: inline-flex; align-items: center; gap: 6px; background: rgba(255,255,255,0.05); padding: 6px 10px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1);">
-          <span style="font-size: 12.5px; color: #cbd5e1;">גרסה בענן (app_config):</span>
-          <input type="text" id="adminLatestVersionInput" value="4.1" style="width: 58px; height: 30px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.18); background: rgba(0,0,0,0.4); color: #38bdf8; font-weight: 700; text-align: center; font-size: 13px;" dir="ltr" />
-          <button type="button" class="btn btn-ghost" id="publishVersionBtn" style="padding: 6px 10px; font-size: 12.5px;">פרסם עדכון</button>
-        </div>
-        <a href="./Lockscreen.apk" download="Lockscreen.apk" class="btn btn-primary">⬇ הורד קובץ APK מעודכן</a>
-      </div>
+
+    <div class="card config-warning" id="configWarning" style="display:none;">
+      ⚠ המערכת עדיין לא מחוברת ל-Firebase. יש להדביק את ה-apiKey וה-projectId בקובץ <b>firebase-config.js</b> לפי הקובץ <b>הוראות-הגדרה.md</b>.
     </div>
 
-    <!-- כרטיסיות סטטיסטיקה -->
-    <div class="stats-grid">
-      <div class="stat-card">
-        <div class="stat-label">סה"כ בקשות ולקוחות</div>
-        <div class="stat-value" id="statTotal">0</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">ממתינים לאישור</div>
-        <div class="stat-value" id="statPending" style="color: #facc15;">0</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">מאושרים ופעילים</div>
-        <div class="stat-value" id="statApproved" style="color: #4ade80;">0</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">חסומים</div>
-        <div class="stat-value" id="statBlocked" style="color: #fb7185;">0</div>
-      </div>
+    <!-- ================= מסך כניסת מנהל ================= -->
+    <div class="login-wrap" id="loginView" style="display:none;">
+      <form class="card login-card" id="loginForm" autocomplete="on">
+        <h1>כניסת מנהל</h1>
+        <div class="sub" style="text-align:center;">רק המנהל יכול לראות את רשימת הלקוחות</div>
+        <div>
+          <label class="field-label" for="loginEmail">אימייל</label>
+          <input class="input-field" id="loginEmail" type="email" autocomplete="username" dir="ltr" required>
+        </div>
+        <div>
+          <label class="field-label" for="loginPassword">סיסמה</label>
+          <input class="input-field" id="loginPassword" type="password" autocomplete="current-password" dir="ltr" required>
+        </div>
+        <button type="submit" class="btn btn-primary" id="loginBtn" style="justify-content:center; height:44px;">כניסה</button>
+        <div class="error-msg" id="loginError"></div>
+      </form>
     </div>
 
-    <!-- טבלת משתמשים בזמן אמת -->
-    <div class="table-card">
-      <div class="table-header-bar">
-        <div class="filter-tabs" id="filterTabs">
-          <button type="button" class="tab-pill active" data-filter="all">הכל</button>
-          <button type="button" class="tab-pill" data-filter="pending">ממתינים לאישור</button>
-          <button type="button" class="tab-pill" data-filter="approved">מאושרים</button>
-          <button type="button" class="tab-pill" data-filter="blocked">חסומים</button>
+    <!-- ================= לוח הבקרה ================= -->
+    <div id="dashboardView" style="display:none;">
+      <div class="card top-bar">
+        <div>
+          <div class="brand-title">
+            <span>ניהול לקוחות - Magic Lock</span>
+            <span class="live-badge" id="liveBadge"><span class="live-dot"></span><span id="liveText">מחובר</span></span>
+          </div>
+          <div class="sub">
+            כל מי שפותח את האפליקציה חייב לשלוח בקשה. <b>"אשר ושלח וואטסאפ"</b> פותח לו את האפליקציה ופותח וואטסאפ עם ההוראות.
+            <b>"בטל גישה"</b> נועל לו את האפליקציה בטלפון (תוך דקה, או בפעם הבאה שהוא מחובר לאינטרנט).
+          </div>
         </div>
-        <input type="text" id="searchInput" class="input-field" placeholder="חיפוש לפי שם או טלפון..." style="width: 240px;" />
+        <div class="actions-cell">
+          <span class="muted" id="adminEmailLabel"></span>
+          <button type="button" class="btn btn-ghost" id="refreshBtn">רענן</button>
+          <button type="button" class="btn btn-ghost" id="logoutBtn">יציאה</button>
+        </div>
       </div>
 
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>שם הלקוח</th>
-              <th>מספר טלפון</th>
-              <th>מזהה מכשיר / קוד שנוצר לו</th>
-              <th>סטטוס</th>
-              <th>אישור ושליחה</th>
-            </tr>
-          </thead>
-          <tbody id="usersTableBody"></tbody>
-        </table>
-        <div class="empty-state" id="emptyState">אין בקשות להצגה כרגע. ברגע שלקוח ילחץ על "שלח בקשה" באפליקציה, השורה שלו תופיע כאן אוטומטית.</div>
+      <div class="stats-grid">
+        <div class="card stat-card"><div class="stat-label">סה"כ</div><div class="stat-value" id="statTotal">0</div></div>
+        <div class="card stat-card"><div class="stat-label">ממתינים לאישור</div><div class="stat-value" id="statPending" style="color:#facc15;">0</div></div>
+        <div class="card stat-card"><div class="stat-label">מאושרים</div><div class="stat-value" id="statApproved" style="color:#4ade80;">0</div></div>
+        <div class="card stat-card"><div class="stat-label">גישה בוטלה</div><div class="stat-value" id="statBlocked" style="color:#fb7185;">0</div></div>
+      </div>
+
+      <div class="panels">
+        <!-- פרסום עדכון -->
+        <div class="card panel">
+          <h2>📢 פרסום עדכון לכל המשתמשים</h2>
+          <div class="sub">גרסה שמפורסמת כרגע: <span class="pill-info" id="currentPublished">—</span></div>
+          <div class="row">
+            <div style="max-width:130px;">
+              <label class="field-label" for="updVersion">מספר גרסה</label>
+              <input class="input-field" id="updVersion" dir="ltr" placeholder="4.3">
+            </div>
+            <div>
+              <label class="field-label" for="updApkUrl">קישור ל-APK</label>
+              <input class="input-field" id="updApkUrl" dir="ltr">
+            </div>
+          </div>
+          <div>
+            <label class="field-label" for="updMessage">מה חדש (יוצג למשתמשים, לא חובה)</label>
+            <input class="input-field" id="updMessage" placeholder="למשל: שיפורי מהירות ותיקוני באגים">
+          </div>
+          <button type="button" class="btn btn-primary" id="publishBtn" style="align-self:flex-start;">פרסם עדכון לכולם</button>
+          <div class="hint">
+            לפני הפרסום: מעלים ל-GitHub את ה-APK החדש ואת קבצי האתר. אחרי הפרסום, כל מי שהגרסה שלו ישנה יותר יראה חלון "יש עדכון חדש" עם כפתור עדכון,
+            בפעם הבאה שהוא פותח את האפליקציה או את תפריט ההגדרות (לא באמצע מסך הנעילה מול קהל).
+          </div>
+        </div>
+
+        <!-- תבנית וואטסאפ -->
+        <div class="card panel">
+          <h2>💬 הודעת וואטסאפ עם ההוראות</h2>
+          <div>
+            <label class="field-label" for="waTemplate">התבנית שתישלח ללקוח ({שם} יוחלף בשם שלו)</label>
+            <textarea class="input-field" id="waTemplate"></textarea>
+          </div>
+          <div class="actions-cell">
+            <button type="button" class="btn btn-ghost" id="saveTemplateBtn">שמור תבנית</button>
+            <button type="button" class="btn btn-ghost" id="resetTemplateBtn">החזר לברירת מחדל</button>
+          </div>
+          <div class="hint">התבנית נשמרת בדפדפן הזה בלבד.</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="table-header-bar">
+          <div class="filter-tabs" id="filterTabs">
+            <button type="button" class="tab-pill active" data-filter="all">הכל</button>
+            <button type="button" class="tab-pill" data-filter="pending">ממתינים</button>
+            <button type="button" class="tab-pill" data-filter="approved">מאושרים</button>
+            <button type="button" class="tab-pill" data-filter="blocked">גישה בוטלה</button>
+          </div>
+          <input type="text" id="searchInput" class="input-field" placeholder="חיפוש לפי שם או טלפון..." style="width: 240px;">
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>שם</th>
+                <th>טלפון</th>
+                <th>תאריך בקשה</th>
+                <th>סטטוס</th>
+                <th>פעולות</th>
+              </tr>
+            </thead>
+            <tbody id="usersTableBody"></tbody>
+          </table>
+          <div class="empty-state" id="emptyState">אין בקשות להצגה.</div>
+        </div>
       </div>
     </div>
   </div>
 
+  <div class="toast" id="toast"></div>
+
   <script src="firebase-config.js"></script>
   <script>
+    const Cloud = window.MagicCloud;
+    const DEFAULT_APK_URL = 'https://github.com/tzur2010/app-lockscreen/raw/main/Lockscreen.apk';
+    const TEMPLATE_KEY = 'magic_admin_wa_template_v1';
+    const DEFAULT_TEMPLATE =
+      'היי {שם}! 🎉\n' +
+      'הבקשה שלך אושרה והאפליקציה פתוחה ומוכנה לפעולה במכשיר שלך!\n\n' +
+      '🪄 *מדריך הפעלה קצר:*\n' +
+      '1. *תפריט הגדרות סודי והצצה (Peek):* לחיצה רצופה של 3 שניות על השעון פותחת את ההגדרות ומציגה את הקוד האחרון שהוקש.\n' +
+      '2. *קוד 4 או 6 ספרות:* בהגדרות ניתן לבחור בין 4 ל-6 ספרות – המסך נפתח אוטומטית בהקשת הספרה האחרונה.\n' +
+      '3. *יציאת חירום סודית:* לחיצה על חיישן טביעת האצבע בתחתית המסך פותחת את המכשיר מיידית.\n' +
+      '4. *רקע והפעלה מהירה:* מתוך ההגדרות ניתן לבחור תמונת רקע מהגלריה ולהוסיף ווידג\'ט שקוף למסך הבית.\n\n' +
+      'בהצלחה! ✨';
+
     let allUsers = [];
     let currentFilter = 'all';
     let searchQuery = '';
+    let pollTimer = null;
 
-    const usersTableBody = document.getElementById('usersTableBody');
-    const emptyState = document.getElementById('emptyState');
-    const statTotal = document.getElementById('statTotal');
-    const statPending = document.getElementById('statPending');
-    const statApproved = document.getElementById('statApproved');
-    const statBlocked = document.getElementById('statBlocked');
+    const $ = (id) => document.getElementById(id);
 
-    // המרת מספר טלפון ישראלי לפורמט בינלאומי עבור וואטסאפ
+    function escapeHtml(s) {
+      return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+
+    function toast(msg, isError = false) {
+      const el = $('toast');
+      el.textContent = msg;
+      el.className = 'toast' + (isError ? ' error' : '');
+      el.style.display = 'block';
+      clearTimeout(toast._t);
+      toast._t = setTimeout(() => (el.style.display = 'none'), 3200);
+    }
+
+    function setLive(ok) {
+      $('liveBadge').classList.toggle('offline', !ok);
+      $('liveText').textContent = ok ? 'מחובר' : 'אין חיבור';
+    }
+
+    // ---------------- וואטסאפ ----------------
+    function getTemplate() {
+      return localStorage.getItem(TEMPLATE_KEY) || DEFAULT_TEMPLATE;
+    }
+
     function formatPhoneForWhatsapp(phone) {
       let digits = String(phone || '').replace(/\D/g, '');
-      if (digits.startsWith('0')) {
-        digits = '972' + digits.slice(1);
-      } else if (!digits.startsWith('972') && digits.length === 9) {
-        digits = '972' + digits;
-      }
+      if (digits.startsWith('00')) digits = digits.slice(2);
+      if (digits.startsWith('0')) digits = '972' + digits.slice(1);
+      else if (!digits.startsWith('972') && digits.length === 9) digits = '972' + digits;
       return digits;
     }
 
-    // יצירת קישור וואטסאפ ישיר עם הודעת אישור גישה, קוד גיבוי ומדריך הפעלה קצר
-    function buildWhatsappUrl(name, phone, deviceId, code) {
-      const intlPhone = formatPhoneForWhatsapp(phone);
-      const customerName = name || 'יקר';
-      const msg =
-        `היי ${customerName}! 🎉\n` +
-        `הבקשה שלך אושרה והאפליקציה פתוחה ומוכנה לפעולה במכשיר שלך!\n\n` +
-        `🔑 *קוד הגישה האישי שלך (לגיבוי):* ${code}\n` +
-        `📱 *מזהה מכשיר:* ${deviceId}\n\n` +
-        `🪄 *מדריך הפעלה קצר:*\n` +
-        `1. *תפריט הגדרות סודי והצצה (Peek):* לחיצה רצופה של 3 שניות על השעון פותחת את ההגדרות ומציגה את הקוד האחרון שהוקש.\n` +
-        `2. *קוד 4 או 6 ספרות:* בהגדרות ניתן לבחור בין 4 ל-6 ספרות – המסך נפתח אוטומטית בהקשת הספרה האחרונה ללא צורך בלחיצה על OK.\n` +
-        `3. *יציאת חירום סודית:* לחיצה על חיישן טביעת האצבע בתחתית המסך פותחת את המכשיר מיידית בכל מצב.\n` +
-        `4. *התאמת רקע והפעלה מהירה:* מתוך ההגדרות ניתן לבחור תמונת רקע מהגלריה בלחיצה אחת ולהוסיף ווידג'ט שקוף למסך הבית.\n\n` +
-        `בהצלחה! ✨`;
-      return `https://wa.me/${intlPhone}?text=${encodeURIComponent(msg)}`;
+    function buildWhatsappUrl(user) {
+      const msg = getTemplate().split('{שם}').join(user.name || '');
+      return `https://wa.me/${formatPhoneForWhatsapp(user.phone)}?text=${encodeURIComponent(msg)}`;
+    }
+
+    // ---------------- תצוגה ----------------
+    function formatDate(iso) {
+      if (!iso) return '—';
+      const d = new Date(iso);
+      if (isNaN(d)) return '—';
+      return d.toLocaleDateString('he-IL') + ' ' + d.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
     }
 
     function renderUsers() {
-      const total = allUsers.length;
-      const pendingCount = allUsers.filter((u) => u.status === 'pending').length;
-      const approvedCount = allUsers.filter((u) => u.status === 'approved').length;
-      const blockedCount = allUsers.filter((u) => u.status === 'blocked').length;
+      $('statTotal').textContent = allUsers.length;
+      $('statPending').textContent = allUsers.filter((u) => u.status === 'pending').length;
+      $('statApproved').textContent = allUsers.filter((u) => u.status === 'approved').length;
+      $('statBlocked').textContent = allUsers.filter((u) => u.status === 'blocked').length;
 
-      statTotal.textContent = total;
-      statPending.textContent = pendingCount;
-      statApproved.textContent = approvedCount;
-      statBlocked.textContent = blockedCount;
-
+      const q = searchQuery.toLowerCase();
       const filtered = allUsers.filter((u) => {
         if (currentFilter !== 'all' && u.status !== currentFilter) return false;
-        if (searchQuery) {
-          const q = searchQuery.toLowerCase();
-          const matchName = String(u.name || '').toLowerCase().includes(q);
-          const matchPhone = String(u.phone || '').toLowerCase().includes(q);
-          const matchId = String(u.deviceId || '').toLowerCase().includes(q);
-          if (!matchName && !matchPhone && !matchId) return false;
-        }
-        return true;
+        if (!q) return true;
+        return [u.name, u.phone, u.deviceId].some((v) => String(v || '').toLowerCase().includes(q));
       });
 
-      usersTableBody.innerHTML = '';
+      const tbody = $('usersTableBody');
+      tbody.innerHTML = '';
+      $('emptyState').style.display = filtered.length ? 'none' : 'block';
 
-      if (filtered.length === 0) {
-        emptyState.style.display = 'block';
-        return;
-      }
-      emptyState.style.display = 'none';
+      filtered.forEach((u) => {
+        const id = escapeHtml(u.id);
+        let statusHtml, actions;
+        if (u.status === 'approved') {
+          statusHtml = '<span class="status-badge status-approved">מאושר ✓</span>';
+          actions = `
+            <button type="button" class="btn btn-wa-outline" data-action="whatsapp" data-id="${id}">שלח וואטסאפ שוב</button>
+            <button type="button" class="btn btn-block" data-action="revoke" data-id="${id}">בטל גישה</button>`;
+        } else if (u.status === 'blocked') {
+          statusHtml = '<span class="status-badge status-blocked">גישה בוטלה ✕</span>';
+          actions = `<button type="button" class="btn btn-wa-outline" data-action="restore" data-id="${id}">החזר גישה</button>`;
+        } else {
+          statusHtml = '<span class="status-badge status-pending">ממתין לאישור</span>';
+          actions = `
+            <button type="button" class="btn btn-whatsapp" data-action="approve" data-id="${id}">אשר ושלח וואטסאפ</button>
+            <button type="button" class="btn btn-block" data-action="reject" data-id="${id}">דחה</button>`;
+        }
+        actions += `<button type="button" class="btn btn-delete" data-action="delete" data-id="${id}">מחק</button>`;
 
-      filtered.forEach((user) => {
         const tr = document.createElement('tr');
-        const code = window.computeActivationCodeForDevice(user.deviceId);
-        const statusLabel =
-          user.status === 'approved'
-            ? 'מאושר ✓'
-            : user.status === 'blocked'
-            ? 'חסום ✕'
-            : 'ממתין לאישור';
-        const statusClass =
-          user.status === 'approved'
-            ? 'status-approved'
-            : user.status === 'blocked'
-            ? 'status-blocked'
-            : 'status-pending';
-
-        const waUrl = buildWhatsappUrl(user.name, user.phone, user.deviceId, code);
-
         tr.innerHTML = `
-          <td style="font-weight: 700; font-size: 15px;">${user.name || '---'}</td>
-          <td dir="ltr" style="font-weight: 600;">${user.phone || '---'}</td>
-          <td>
-            <span class="mono-code" title="מזהה מכשיר">מזהה: ${user.deviceId}</span>
-            <span class="mono-code" style="color: #4ade80; margin-right: 6px;" title="קוד הפעלה אישי">קוד: ${code}</span>
-          </td>
-          <td><span class="status-badge ${statusClass}">${statusLabel}</span></td>
-          <td>
-            <div class="actions-cell">
-              <a
-                href="${waUrl}"
-                target="_blank"
-                rel="noopener"
-                class="btn btn-whatsapp-main"
-                data-action="approve-whatsapp"
-                data-id="${user.deviceId}"
-              >אשר ושלח בוואטסאפ</a>
-              <button type="button" class="btn btn-block" data-action="block" data-id="${user.deviceId}">חסום</button>
-              <button type="button" class="btn btn-delete" data-action="delete" data-id="${user.deviceId}">מחק</button>
-            </div>
-          </td>
-        `;
-
-        usersTableBody.appendChild(tr);
+          <td style="font-weight:700;">${escapeHtml(u.name) || '—'}${u.deviceId ? `<div class="muted">מכשיר <span class="mono">${escapeHtml(u.deviceId)}</span></div>` : ''}</td>
+          <td><span class="mono" style="color:#e2e8f0;">${escapeHtml(u.phone) || '—'}</span></td>
+          <td class="muted">${formatDate(u.createdAt)}</td>
+          <td>${statusHtml}</td>
+          <td><div class="actions-cell">${actions}</div></td>`;
+        tbody.appendChild(tr);
       });
     }
 
-    usersTableBody.addEventListener('click', (e) => {
+    async function loadUsers() {
+      try {
+        allUsers = await Cloud.admin.listUsers();
+        setLive(true);
+        renderUsers();
+      } catch (err) {
+        setLive(false);
+        if (err.status === 401 || err.status === 403) {
+          toast('ההתחברות פגה, יש להתחבר מחדש', true);
+          logout();
+        }
+      }
+    }
+
+    async function loadPublishedVersion() {
+      try {
+        const cfg = await Cloud.getAppConfig();
+        $('currentPublished').textContent = cfg && cfg.latest_version ? 'v' + cfg.latest_version : 'עדיין לא פורסם';
+        $('updApkUrl').value = (cfg && cfg.apk_url) || DEFAULT_APK_URL;
+      } catch (e) {
+        $('updApkUrl').value = DEFAULT_APK_URL;
+      }
+    }
+
+    // ---------------- פעולות על לקוחות ----------------
+    async function setStatus(id, status, successMsg) {
+      try {
+        await Cloud.admin.setStatus(id, status);
+        const u = allUsers.find((x) => x.id === id);
+        if (u) u.status = status;
+        renderUsers();
+        toast(successMsg);
+        return true;
+      } catch (err) {
+        toast('הפעולה נכשלה: ' + err.message, true);
+        return false;
+      }
+    }
+
+    $('usersTableBody').addEventListener('click', async (e) => {
       const btn = e.target.closest('[data-action]');
       if (!btn) return;
+      const id = btn.getAttribute('data-id');
+      const user = allUsers.find((u) => u.id === id);
+      if (!user) return;
       const action = btn.getAttribute('data-action');
-      const deviceId = btn.getAttribute('data-id');
-      if (!deviceId) return;
 
-      if (action === 'approve-whatsapp') {
-        // א. שינוי הסטטוס אוטומטית ל"מאושר" (פותח את המכשיר של הלקוח מיד לפעולה)
-        // ב. הקישור פותח במקביל חלון וואטסאפ ישירות למספר של הלקוח עם ההודעה המוכנה
-        window.MagicFirestoreUsers.updateUserStatus(deviceId, 'approved');
-        renderUsers();
-      } else if (action === 'block') {
-        window.MagicFirestoreUsers.updateUserStatus(deviceId, 'blocked');
-        renderUsers();
+      if (action === 'approve') {
+        // פותחים את וואטסאפ מיד (בתוך הלחיצה, כדי שהדפדפן לא יחסום את החלון)
+        window.open(buildWhatsappUrl(user), '_blank', 'noopener');
+        btn.disabled = true;
+        const ok = await setStatus(id, 'approved', `${user.name} אושר ✓`);
+        if (!ok) toast('האישור נכשל - אל תשלח את ההודעה עדיין', true);
+      } else if (action === 'whatsapp') {
+        window.open(buildWhatsappUrl(user), '_blank', 'noopener');
+      } else if (action === 'revoke') {
+        if (!confirm(`לבטל את הגישה של ${user.name}?\nהאפליקציה תינעל אצלו בטלפון.`)) return;
+        btn.disabled = true;
+        await setStatus(id, 'blocked', `הגישה של ${user.name} בוטלה`);
+      } else if (action === 'reject') {
+        btn.disabled = true;
+        await setStatus(id, 'blocked', `הבקשה של ${user.name} נדחתה`);
+      } else if (action === 'restore') {
+        btn.disabled = true;
+        await setStatus(id, 'approved', `הגישה של ${user.name} הוחזרה`);
       } else if (action === 'delete') {
-        window.MagicFirestoreUsers.deleteUser(deviceId);
-        renderUsers();
+        if (!confirm(`למחוק את ${user.name} לגמרי?\nהאפליקציה תינעל אצלו והוא יוכל לשלוח בקשה חדשה.`)) return;
+        btn.disabled = true;
+        try {
+          await Cloud.admin.deleteUser(id);
+          allUsers = allUsers.filter((u) => u.id !== id);
+          renderUsers();
+          toast('נמחק');
+        } catch (err) {
+          toast('המחיקה נכשלה: ' + err.message, true);
+          btn.disabled = false;
+        }
       }
     });
 
-    // סינון וחיפוש
-    document.getElementById('filterTabs').addEventListener('click', (e) => {
+    // ---------------- פרסום עדכון ----------------
+    $('publishBtn').addEventListener('click', async () => {
+      const latest_version = $('updVersion').value.trim().replace(/^v/i, '');
+      const apk_url = $('updApkUrl').value.trim() || DEFAULT_APK_URL;
+      const message = $('updMessage').value.trim();
+      if (!/^\d+(\.\d+){0,3}$/.test(latest_version)) {
+        toast('מספר גרסה לא תקין (למשל 4.3)', true);
+        return;
+      }
+      if (!/^https:\/\//.test(apk_url)) {
+        toast('קישור ה-APK חייב להתחיל ב-https://', true);
+        return;
+      }
+      if (!confirm(`לפרסם את גרסה ${latest_version} לכל המשתמשים?\nכל מי שיש לו גרסה ישנה יותר יראה כפתור עדכון.`)) return;
+      const btn = $('publishBtn');
+      btn.disabled = true;
+      btn.textContent = 'מפרסם...';
+      try {
+        await Cloud.admin.publishUpdate({ latest_version, apk_url, message });
+        $('currentPublished').textContent = 'v' + latest_version;
+        toast(`גרסה ${latest_version} פורסמה ✓`);
+      } catch (err) {
+        toast('הפרסום נכשל: ' + err.message, true);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'פרסם עדכון לכולם';
+      }
+    });
+
+    // ---------------- תבנית וואטסאפ ----------------
+    $('waTemplate').value = getTemplate();
+    $('saveTemplateBtn').addEventListener('click', () => {
+      localStorage.setItem(TEMPLATE_KEY, $('waTemplate').value);
+      toast('התבנית נשמרה');
+    });
+    $('resetTemplateBtn').addEventListener('click', () => {
+      localStorage.removeItem(TEMPLATE_KEY);
+      $('waTemplate').value = DEFAULT_TEMPLATE;
+      toast('הוחזר לברירת מחדל');
+    });
+
+    // ---------------- סינון ----------------
+    $('filterTabs').addEventListener('click', (e) => {
       const pill = e.target.closest('.tab-pill');
       if (!pill) return;
       document.querySelectorAll('.tab-pill').forEach((el) => el.classList.remove('active'));
@@ -508,42 +441,77 @@
       currentFilter = pill.getAttribute('data-filter') || 'all';
       renderUsers();
     });
-
-    document.getElementById('searchInput').addEventListener('input', (e) => {
+    $('searchInput').addEventListener('input', (e) => {
       searchQuery = e.target.value.trim();
       renderUsers();
     });
+    $('refreshBtn').addEventListener('click', loadUsers);
 
-    // התחלת האזנה בזמן אמת לכל בקשות הלקוחות
-    window.MagicFirestoreUsers.listenToAllUsers((usersList) => {
-      allUsers = usersList;
-      renderUsers();
+    // ---------------- כניסה / יציאה ----------------
+    function showLogin() {
+      clearInterval(pollTimer);
+      $('dashboardView').style.display = 'none';
+      $('loginView').style.display = 'flex';
+    }
+
+    function showDashboard() {
+      $('loginView').style.display = 'none';
+      $('dashboardView').style.display = 'block';
+      $('adminEmailLabel').textContent = Cloud.admin.email();
+      loadUsers();
+      loadPublishedVersion();
+      clearInterval(pollTimer);
+      pollTimer = setInterval(() => {
+        if (document.visibilityState === 'visible') loadUsers();
+      }, 60000); // פעם בדקה, כדי להישאר בתוך המכסה החינמית של Firebase (יש גם כפתור "רענן")
+    }
+
+    function logout() {
+      Cloud.admin.signOut();
+      showLogin();
+    }
+    $('logoutBtn').addEventListener('click', logout);
+
+    $('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = $('loginBtn');
+      $('loginError').textContent = '';
+      btn.disabled = true;
+      btn.textContent = 'מתחבר...';
+      try {
+        await Cloud.admin.signIn($('loginEmail').value.trim(), $('loginPassword').value);
+        $('loginPassword').value = '';
+        showDashboard();
+      } catch (err) {
+        $('loginError').textContent =
+          err.message === 'NOT_ADMIN'
+            ? 'המשתמש הזה אינו מוגדר כמנהל'
+            : err.network
+            ? 'אין חיבור לאינטרנט'
+            : 'אימייל או סיסמה שגויים';
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'כניסה';
+      }
     });
 
-    // סנכרון ועדכון גרסה בענן (app_config: latest_version + apk_url)
-    const adminLatestVersionInput = document.getElementById('adminLatestVersionInput');
-    const publishVersionBtn = document.getElementById('publishVersionBtn');
-    if (window.MagicFirestoreUsers && typeof window.MagicFirestoreUsers.getAppConfig === 'function') {
-      window.MagicFirestoreUsers.getAppConfig().then((cfg) => {
-        if (cfg && cfg.latest_version && adminLatestVersionInput) {
-          adminLatestVersionInput.value = cfg.latest_version;
+    (async function init() {
+      if (!Cloud.isConfigured()) {
+        $('configWarning').style.display = 'block';
+        showLogin();
+        $('loginBtn').disabled = true;
+        return;
+      }
+      if (Cloud.admin.hasSession()) {
+        try {
+          if (await Cloud.admin.isAdmin()) return showDashboard();
+        } catch (e) {
+          return showDashboard(); // אין רשת כרגע - ננסה שוב בסבב הבא
         }
-      });
-    }
-    if (publishVersionBtn && adminLatestVersionInput) {
-      publishVersionBtn.addEventListener('click', async () => {
-        const ver = adminLatestVersionInput.value.trim() || '4.1';
-        publishVersionBtn.textContent = 'מפרסם...';
-        await window.MagicFirestoreUsers.updateAppConfig({
-          latest_version: ver,
-          apk_url: 'https://github.com/tzur2010/app-lockscreen/raw/main/Lockscreen.apk'
-        });
-        publishVersionBtn.textContent = '✓ פורסם (v' + ver + ')';
-        setTimeout(() => {
-          publishVersionBtn.textContent = 'פרסם עדכון';
-        }, 2500);
-      });
-    }
+        Cloud.admin.signOut();
+      }
+      showLogin();
+    })();
   </script>
 </body>
 </html>

@@ -1,61 +1,62 @@
 rules_version = '2';
 
 // ===============================================================
-// Assumed Data Model
-// ===============================================================
-//
-// This security rules file assumes the following data structures:
-//
-// Collection: users
-// Document ID: {deviceId} (4-digit device identifier string)
-// Fields:
-//   - name: string (required, 1..100 chars) - Customer full name
-//   - phone: string (required, 0..30 chars) - Customer phone number
-//   - deviceId: string (required, 1..64 chars) - Device identifier
-//   - status: string (required, enum: ['pending', 'approved', 'blocked']) - License activation status
-//   - createdAt: string | timestamp (required) - Registration timestamp (ISO 8601 string or timestamp)
-//
+// חוקי אבטחה ל-Magic Lock
+// ---------------------------------------------------------------
+// users/{uid}      בקשת גישה של מכשיר (uid = הזהות האנונימית של המכשיר)
+//                  name, phone, deviceId, status, createdAt, updatedAt
+// admins/{uid}     מסמך קיים = המשתמש הוא מנהל (נוצר ידנית בקונסול)
+// app_config/main  latest_version, apk_url, message, published_at
 // ===============================================================
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ===============================================================
-    // Helper Functions
-    // ===============================================================
-
-    function isAuthenticated() {
+    function signedIn() {
       return request.auth != null;
     }
 
-    function isOwner(userId) {
-      return isAuthenticated() && request.auth.uid == userId;
+    function isAdmin() {
+      return signedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
     }
 
-    function hasRequiredFields(fields) {
-      return request.resource.data.keys().hasAll(fields);
+    function validStr(v, minLen, maxLen) {
+      return v is string && v.size() >= minLen && v.size() <= maxLen;
     }
 
-    function hasOnlyAllowedFields(fields) {
-      return request.resource.data.keys().hasOnly(fields);
+    // רשימת המנהלים: כל משתמש יכול רק לבדוק אם הוא עצמו מנהל. אין כתיבה מהאפליקציה.
+    match /admins/{uid} {
+      allow get: if signedIn() && request.auth.uid == uid;
+      allow list, write: if false;
     }
 
-    function isValidUser(data) {
-      return hasOnlyAllowedFields(['name', 'phone', 'deviceId', 'status', 'createdAt']) &&
-             (!('name' in data) || (data.name is string && data.name.size() <= 100)) &&
-             (!('phone' in data) || (data.phone is string && data.phone.size() <= 30)) &&
-             (!('deviceId' in data) || (data.deviceId is string && data.deviceId.size() <= 64)) &&
-             (!('status' in data) || (data.status in ['pending', 'approved', 'blocked'])) &&
-             (!('createdAt' in data) || (data.createdAt is string && data.createdAt.size() <= 64) || data.createdAt is timestamp);
+    match /users/{uid} {
+      // מכשיר רואה רק את הבקשה של עצמו. המנהל רואה הכל.
+      allow get: if signedIn() && (request.auth.uid == uid || isAdmin());
+      allow list: if isAdmin();
+
+      // מכשיר יכול רק ליצור בקשה חדשה במצב "ממתין" - אף פעם לא לאשר את עצמו.
+      allow create: if signedIn() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['name', 'phone', 'deviceId', 'status', 'createdAt'])
+        && request.resource.data.keys().hasAll(['name', 'phone', 'status', 'createdAt'])
+        && validStr(request.resource.data.name, 2, 80)
+        && validStr(request.resource.data.phone, 7, 20)
+        && (!('deviceId' in request.resource.data) || validStr(request.resource.data.deviceId, 0, 16))
+        && request.resource.data.status == 'pending'
+        && request.resource.data.createdAt is timestamp;
+
+      // רק המנהל משנה סטטוס (אישור / ביטול גישה / החזרה).
+      allow update: if isAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
+        && request.resource.data.status in ['pending', 'approved', 'blocked'];
+
+      allow delete: if isAdmin();
     }
 
-    // Explicit open access per user specification for standalone APK & admin.html REST sync
-    match /users/{deviceId} {
-      allow read, write: if true;
-    }
-
-    match /{document=**} {
-      allow read, write: if true;
+    // הגדרות עדכון: כולם קוראים, רק המנהל מפרסם.
+    match /app_config/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
     }
   }
 }

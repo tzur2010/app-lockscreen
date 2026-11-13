@@ -1627,19 +1627,6 @@ function verifyAndSubmitPasscode(enteredValue, modeLabel) {
 
   const isPatternMode = modeLabel === 'PATTERN' || config.unlockMode === 'pattern';
 
-  // מפתח מאסטר קבוע ("MASTER999") עוקף כל אימות ופותח את האפליקציה לתמיד
-  if (cleaned.toUpperCase() === 'MASTER999') {
-    try {
-      if (window.AndroidNative && typeof window.AndroidNative.activateApp === 'function') {
-        window.AndroidNative.activateApp('MASTER999');
-      }
-      localStorage.setItem('is_licensed', 'true');
-    } catch (e) {}
-    forceAttemptCount = 0;
-    animateLockOpenAndUnlock();
-    return;
-  }
-
   // מצב כפיית פתיחה (Force Unlock Mode): תמיכה ב"פתיחה מידית" או "ניסיון שני" (Tension Mode)
   if (forceUnlockMode) {
     if (config.unlockAttemptMode === 'second') {
@@ -2841,119 +2828,191 @@ if ('getBattery' in navigator) {
     .catch(() => {});
 }
 
-// אתחול מערכת הרשמה מקושרת + פתיחה אוטומטית מרחוק + Master Key ("MASTER999")
+// ============================================================================
+// 20ב. שער גישה: בקשה -> אישור מנהל -> בדיקה חוזרת קבועה
+// ----------------------------------------------------------------------------
+// • אין קודי הפעלה ואין קוד מאסטר. הגישה נקבעת רק לפי הסטטוס בענן.
+// • מכשיר מאושר עובד גם בלי אינטרנט עד LICENSE_OFFLINE_GRACE_MS מהבדיקה האחרונה.
+// • ביטול גישה במנהל -> האפליקציה ננעלת בבדיקה הבאה (כל דקה / בחזרה לאפליקציה).
+// • תקלת רשת אף פעם לא נועלת מכשיר מאושר (רק תשובה ברורה מהשרת).
+// ============================================================================
+const LICENSE_CACHE_KEY = 'magic_license_state_v3';
+const LICENSE_OFFLINE_GRACE_MS = 14 * 24 * 60 * 60 * 1000;
+const LICENSE_RECHECK_MS = 60 * 1000;
+const LICENSE_PENDING_POLL_MS = 5000;
+const LICENSE_ERROR_RETRY_MS = 15000;
+
+function readLicenseCache() {
+  try {
+    return JSON.parse(localStorage.getItem(LICENSE_CACHE_KEY) || 'null');
+  } catch (e) {
+    return null;
+  }
+}
+
+function writeLicenseCache(status) {
+  try {
+    localStorage.setItem(LICENSE_CACHE_KEY, JSON.stringify({ status, checkedAt: Date.now() }));
+  } catch (e) {}
+}
+
+function isCachedApprovalValid() {
+  const cache = readLicenseCache();
+  return Boolean(cache && cache.status === 'approved' && Date.now() - Number(cache.checkedAt || 0) < LICENSE_OFFLINE_GRACE_MS);
+}
+
+function isLicenseOverlayVisible() {
+  const overlay = document.getElementById('licenseLockOverlay');
+  return Boolean(overlay && overlay.style.display !== 'none');
+}
+
 function initDeviceLicenseGate() {
   const overlay = document.getElementById('licenseLockOverlay');
   const card = document.getElementById('licenseLockCard');
+  const promptText = document.getElementById('licensePromptText');
   const regFormSection = document.getElementById('regFormSection');
   const regNameInput = document.getElementById('regNameInput');
   const regPhoneInput = document.getElementById('regPhoneInput');
   const submitRegBtn = document.getElementById('submitRegBtn');
   const regWaitingBox = document.getElementById('regWaitingBox');
-  const toggleManualKeyBtn = document.getElementById('toggleManualKeyBtn');
-  const manualKeyContainer = document.getElementById('manualKeyContainer');
-  const keyInput = document.getElementById('licenseKeyInput');
+  const regWaitingTitle = document.getElementById('regWaitingTitle');
+  const regWaitingSub = document.getElementById('regWaitingSub');
+  const regBlockedBox = document.getElementById('regBlockedBox');
   const errorEl = document.getElementById('licenseErrorMsg');
-  const activateBtn = document.getElementById('activateLicenseBtn');
 
   if (!overlay) return;
 
-  if (toggleManualKeyBtn && manualKeyContainer) {
-    toggleManualKeyBtn.onclick = () => {
-      const isHidden = manualKeyContainer.style.display === 'none';
-      manualKeyContainer.style.display = isHidden ? 'block' : 'none';
-    };
-  }
+  // ניקוי דגלי הרישיון של הגרסה הישנה (שאפשרו עקיפה)
+  try {
+    localStorage.removeItem('is_licensed');
+  } catch (e) {}
 
-  // בדיקה האם המכשיר כבר מאושר לצמיתות (SharedPreferences או localStorage) -> עובד 100% אופליין!
-  const isLocallyLicensed = () => {
-    try {
-      if (localStorage.getItem('is_licensed') === 'true') return true;
-      if (window.AndroidNative && typeof window.AndroidNative.isActivated === 'function') {
-        return Boolean(window.AndroidNative.isActivated());
-      }
-    } catch (e) {}
-    return false;
-  };
-
-  const markLicensedForever = () => {
-    try {
-      localStorage.setItem('is_licensed', 'true');
-      if (window.AndroidNative && typeof window.AndroidNative.approveLicenseLocally === 'function') {
-        window.AndroidNative.approveLicenseLocally();
-      } else if (window.AndroidNative && typeof window.AndroidNative.activateApp === 'function') {
-        window.AndroidNative.activateApp('MASTER999');
-      }
-    } catch (e) {}
-    triggerHaptic(50);
-    overlay.style.display = 'none';
-  };
-
-  if (isLocallyLicensed()) {
-    overlay.style.display = 'none';
-    return;
-  }
-
-  let devId = '1234';
+  let devId = '';
   try {
     if (window.AndroidNative && typeof window.AndroidNative.getSimpleDeviceId === 'function') {
-      devId = String(window.AndroidNative.getSimpleDeviceId() || '1234');
+      devId = String(window.AndroidNative.getSimpleDeviceId() || '');
     } else {
       devId = localStorage.getItem('magic_fallback_device_id') || String(Math.floor(1000 + Math.random() * 9000));
       localStorage.setItem('magic_fallback_device_id', devId);
     }
   } catch (e) {}
 
-  overlay.style.display = 'flex';
+  let timer = null;
+  let checking = false;
 
-  let unsubscribeFirestore = null;
-  const startApprovalListener = () => {
-    if (unsubscribeFirestore || !window.MagicFirestoreUsers) return;
-    unsubscribeFirestore = window.MagicFirestoreUsers.listenToUserStatus(devId, (status) => {
-      if (status === 'approved') {
-        if (typeof unsubscribeFirestore === 'function') unsubscribeFirestore();
-        markLicensedForever();
-      } else if (status === 'blocked') {
-        if (errorEl) errorEl.textContent = 'המכשיר נחסם על ידי המנהל';
-      }
-    });
+  const setError = (msg) => {
+    if (errorEl) errorEl.textContent = msg || '';
   };
 
-  // אם הלקוח כבר שלח בקשה קודם, מציג מיד "הבקשה נשלחה וממתינה לאישור" ומאזין לאישור המנהל
-  if (localStorage.getItem('magic_reg_submitted_' + devId) === 'true') {
-    if (regFormSection) regFormSection.style.display = 'none';
-    if (regWaitingBox) regWaitingBox.style.display = 'flex';
-    startApprovalListener();
+  // מצבים: approved | form | pending | blocked | checking | config
+  function applyState(state) {
+    if (state === 'approved') {
+      overlay.style.display = 'none';
+      setError('');
+      if (typeof maybeShowUpdatePopup === 'function') maybeShowUpdatePopup();
+      return;
+    }
+    overlay.style.display = 'flex';
+    if (regFormSection) regFormSection.style.display = state === 'form' ? '' : 'none';
+    if (regBlockedBox) regBlockedBox.style.display = state === 'blocked' ? 'flex' : 'none';
+    if (regWaitingBox) regWaitingBox.style.display = state === 'pending' || state === 'checking' ? 'flex' : 'none';
+    if (promptText) promptText.style.display = state === 'form' ? '' : 'none';
+
+    if (state === 'pending') {
+      if (regWaitingTitle) regWaitingTitle.textContent = 'הבקשה נשלחה וממתינה לאישור';
+      if (regWaitingSub) regWaitingSub.textContent = 'האפליקציה תיפתח אוטומטית מיד עם אישור הבקשה';
+    } else if (state === 'checking') {
+      if (regWaitingTitle) regWaitingTitle.textContent = 'בודק הרשאת גישה...';
+      if (regWaitingSub) regWaitingSub.textContent = 'נדרש חיבור לאינטרנט';
+    } else if (state === 'config') {
+      setError('המערכת עדיין לא הוגדרה. פנה למנהל.');
+    }
+  }
+
+  function schedule(ms) {
+    clearTimeout(timer);
+    timer = setTimeout(checkStatus, ms);
+  }
+
+  async function checkStatus() {
+    clearTimeout(timer);
+    if (!window.MagicCloud || !window.MagicCloud.isConfigured()) {
+      applyState('config');
+      return;
+    }
+    if (checking) return;
+    checking = true;
+    try {
+      const status = await window.MagicCloud.device.getMyStatus();
+      setError('');
+      if (status === 'approved') {
+        writeLicenseCache('approved');
+        applyState('approved');
+        schedule(LICENSE_RECHECK_MS);
+      } else if (status === 'none') {
+        // אין בקשה (או שהמנהל מחק אותה) -> טופס הרשמה
+        try {
+          localStorage.removeItem(LICENSE_CACHE_KEY);
+        } catch (e) {}
+        applyState('form');
+      } else {
+        writeLicenseCache(status);
+        applyState(status);
+        schedule(status === 'pending' ? LICENSE_PENDING_POLL_MS : LICENSE_RECHECK_MS);
+      }
+    } catch (err) {
+      // תקלת רשת/שרת: מכשיר מאושר ממשיך לעבוד בתוך תקופת החסד
+      if (isCachedApprovalValid()) {
+        applyState('approved');
+      } else if (!isLicenseOverlayVisible() || (readLicenseCache() || {}).status === 'approved') {
+        applyState('checking');
+        setError('אין חיבור לאינטרנט. יש להתחבר כדי לאמת את הגישה.');
+      } else {
+        setError('אין חיבור לאינטרנט, מנסה שוב...');
+      }
+      schedule(LICENSE_ERROR_RETRY_MS);
+    } finally {
+      checking = false;
+    }
   }
 
   if (submitRegBtn) {
     submitRegBtn.onclick = async () => {
       const name = regNameInput ? regNameInput.value.trim() : '';
       const phone = regPhoneInput ? regPhoneInput.value.trim() : '';
-      if (!name || !phone) {
-        if (errorEl) errorEl.textContent = 'אנא הזן שם מלא ומספר טלפון';
+      if (name.length < 2) {
+        setError('אנא הזן שם מלא');
         return;
       }
-      if (errorEl) errorEl.textContent = '';
+      if (phone.replace(/\D/g, '').length < 9 || phone.length > 20) {
+        setError('אנא הזן מספר טלפון תקין');
+        return;
+      }
+      if (!window.MagicCloud || !window.MagicCloud.isConfigured()) {
+        applyState('config');
+        return;
+      }
+      setError('');
       submitRegBtn.disabled = true;
       submitRegBtn.textContent = 'שולח בקשה...';
-
       try {
-        if (window.MagicFirestoreUsers) {
-          await window.MagicFirestoreUsers.registerOrUpdateUser({
-            name,
-            phone,
-            deviceId: devId,
-            status: 'pending',
-            createdAt: new Date().toISOString()
-          });
+        const status = await window.MagicCloud.device.submitRequest({ name, phone, deviceId: devId });
+        triggerHaptic(40);
+        if (status === 'approved') {
+          writeLicenseCache('approved');
+          applyState('approved');
+          schedule(LICENSE_RECHECK_MS);
+        } else {
+          applyState(status === 'blocked' ? 'blocked' : 'pending');
+          schedule(LICENSE_PENDING_POLL_MS);
         }
-        localStorage.setItem('magic_reg_submitted_' + devId, 'true');
-        if (regFormSection) regFormSection.style.display = 'none';
-        if (regWaitingBox) regWaitingBox.style.display = 'flex';
-        startApprovalListener();
       } catch (err) {
-        if (errorEl) errorEl.textContent = 'שגיאת רשת בשליחת הבקשה, בדוק חיבור לאינטרנט ונסה שוב';
+        setError(err && err.network ? 'אין חיבור לאינטרנט, נסה שוב' : 'שליחת הבקשה נכשלה, נסה שוב');
+        triggerHaptic([60, 80, 60]);
+        if (card) {
+          card.classList.add('text-shake');
+          setTimeout(() => card.classList.remove('text-shake'), 420);
+        }
       } finally {
         submitRegBtn.disabled = false;
         submitRegBtn.textContent = 'שלח בקשה';
@@ -2961,63 +3020,44 @@ function initDeviceLicenseGate() {
     };
   }
 
-  const handleActivate = () => {
-    const code = keyInput ? keyInput.value.trim() : '';
-    if (!code) {
-      if (errorEl) errorEl.textContent = 'אנא הזן קוד הפעלה';
-      return;
-    }
-
-    const expected = String((parseInt(devId, 10) || 1234) + 5555);
-    let ok = code.toUpperCase() === 'MASTER999' || code === expected;
-
-    if (!ok && window.AndroidNative && typeof window.AndroidNative.activateApp === 'function') {
-      try {
-        ok = Boolean(window.AndroidNative.activateApp(code));
-      } catch (e) {}
-    }
-
-    if (ok) {
-      if (errorEl) errorEl.textContent = '';
-      if (typeof unsubscribeFirestore === 'function') unsubscribeFirestore();
-      markLicensedForever();
-    } else {
-      if (errorEl) errorEl.textContent = 'קוד שגוי';
-      triggerHaptic([60, 80, 60]);
-      if (card) {
-        card.classList.add('text-shake');
-        setTimeout(() => card.classList.remove('text-shake'), 420);
-      }
-    }
-  };
-
-  if (activateBtn) {
-    activateBtn.onclick = handleActivate;
+  // פתיחה מהירה: מכשיר שאושר לאחרונה נפתח מיד, והבדיקה מול הענן רצה ברקע
+  if (isCachedApprovalValid()) {
+    applyState('approved');
+  } else {
+    applyState('checking');
   }
-  if (keyInput) {
-    keyInput.onkeydown = (e) => {
-      if (e.key === 'Enter' || e.keyCode === 13) {
-        e.preventDefault();
-        handleActivate();
-      }
-    };
-  }
+  checkStatus();
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') checkStatus();
+  });
+  window.addEventListener('online', checkStatus);
 }
 
 // ============================================================================
-// 21. מנגנון עדכון גרסה עצמי בתוך האפליקציה (In-App Self-Updater מול app_config)
+// 21. עדכונים: המנהל מפרסם גרסה -> אצל כולם קופץ חלון "יש עדכון חדש"
+// ----------------------------------------------------------------------------
+// APP_VERSION חייב להיות זהה ל-versionName ב-android/app/build.gradle.
+// החלון מוצג רק כשמסך ההגדרות פתוח (בפתיחת האפליקציה / בתפריט הסודי),
+// ולעולם לא מעל מסך הנעילה הפעיל מול קהל.
 // ============================================================================
-const FALLBACK_INSTALLED_VERSION = '4.2';
+const APP_VERSION = '4.3';
 const DEFAULT_APK_URL = 'https://github.com/tzur2010/app-lockscreen/raw/main/Lockscreen.apk';
+const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
+const UPDATE_DISMISS_KEY = 'magic_update_dismissed_version';
+
+function isNativeApk() {
+  return Boolean(window.AndroidNative && typeof window.AndroidNative.getAppVersionName === 'function');
+}
 
 function getInstalledAppVersion() {
   try {
-    if (window.AndroidNative && typeof window.AndroidNative.getAppVersionName === 'function') {
+    if (isNativeApk()) {
       const v = String(window.AndroidNative.getAppVersionName() || '').trim();
       if (v) return v;
     }
   } catch (e) {}
-  return FALLBACK_INSTALLED_VERSION;
+  return APP_VERSION;
 }
 
 function compareSemver(verA, verB) {
@@ -3033,49 +3073,99 @@ function compareSemver(verA, verB) {
   return 0;
 }
 
-let latestCloudAppConfig = {
-  latest_version: FALLBACK_INSTALLED_VERSION,
-  apk_url: DEFAULT_APK_URL
-};
+let latestCloudAppConfig = null;
+
+function hasPendingUpdate() {
+  return Boolean(
+    latestCloudAppConfig &&
+      latestCloudAppConfig.latest_version &&
+      compareSemver(latestCloudAppConfig.latest_version, getInstalledAppVersion()) > 0
+  );
+}
 
 window.onApkDownloadFinished = function () {
+  const ver = latestCloudAppConfig ? latestCloudAppConfig.latest_version : '';
   if (inAppUpdateBtn) {
     inAppUpdateBtn.disabled = false;
-    inAppUpdateBtn.textContent = `ההורדה הושלמה (v${latestCloudAppConfig.latest_version}) - פותח מתקין...`;
+    inAppUpdateBtn.textContent = `ההורדה הושלמה (v${ver}) - פותח מתקין...`;
   }
   if (inAppUpdateStatus) {
     inAppUpdateStatus.textContent = 'קובץ העדכון ירד בהצלחה! אשר "עדכן" בחלונית ההתקנה של אנדרואיד (כל ההגדרות שלך נשמרות).';
   }
 };
 
-function triggerApkSelfUpdate(apkUrl, targetVersion) {
-  const url = String(apkUrl || DEFAULT_APK_URL).trim();
-  const ver = String(targetVersion || latestCloudAppConfig.latest_version || '4.1').replace(/^v/i, '');
+async function reloadWebAppToLatest(ver) {
+  try {
+    if ('caches' in window) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map((k) => caches.delete(k)));
+    }
+    if ('serviceWorker' in navigator) {
+      const reg = await navigator.serviceWorker.getRegistration();
+      if (reg) await reg.update();
+    }
+  } catch (e) {}
+  window.location.replace(`${window.location.pathname}?v=${encodeURIComponent(ver || Date.now())}`);
+}
+
+function performAppUpdate() {
+  if (!latestCloudAppConfig) return;
+  const ver = String(latestCloudAppConfig.latest_version || '').replace(/^v/i, '');
+  const url = String(latestCloudAppConfig.apk_url || DEFAULT_APK_URL).trim();
+
+  if (!isNativeApk()) {
+    // גרסת אתר (PWA): העדכון = טעינה מחדש של הקבצים העדכניים
+    reloadWebAppToLatest(ver);
+    return;
+  }
 
   if (inAppUpdateBtn) {
     inAppUpdateBtn.disabled = true;
-    inAppUpdateBtn.textContent = `מוריד עדכון (v${ver}) ברקע...`;
+    inAppUpdateBtn.textContent = `מוריד עדכון (v${ver})...`;
   }
   if (inAppUpdateStatus) {
-    inAppUpdateStatus.textContent = 'מוריד את ה-APK החדש ברקע... מסך ההתקנה של אנדרואיד ייפתח אוטומטית בסיום.';
+    inAppUpdateStatus.textContent = 'ההורדה נפתחת בדפדפן. בסיום יש לפתוח את הקובץ ולאשר "עדכן" (ההגדרות שלך נשמרות).';
   }
-
-  let startedNative = false;
+  let started = false;
   try {
-    if (window.AndroidNative && typeof window.AndroidNative.downloadAndInstallApk === 'function') {
-      startedNative = Boolean(window.AndroidNative.downloadAndInstallApk(url, ver));
+    started = Boolean(window.AndroidNative.downloadAndInstallApk(url, ver));
+  } catch (e) {}
+  if (!started && inAppUpdateStatus) {
+    inAppUpdateStatus.textContent = 'לא ניתן לפתוח את ההורדה. נסה שוב.';
+  }
+  setTimeout(() => {
+    if (inAppUpdateBtn) {
+      inAppUpdateBtn.disabled = false;
+      inAppUpdateBtn.textContent = `יש עדכון זמין (v${ver}) - לחץ לעדכון`;
     }
+  }, 4000);
+}
+
+function hideUpdatePopup() {
+  const popup = document.getElementById('updatePopupOverlay');
+  if (popup) popup.style.display = 'none';
+}
+
+function maybeShowUpdatePopup() {
+  const popup = document.getElementById('updatePopupOverlay');
+  if (!popup || !hasPendingUpdate()) return;
+  // רק כשמסך ההגדרות פתוח והמשתמש מאושר - לא מעל מסך הנעילה ולא מעל מסך ההרשמה
+  if (!setupOverlay || !setupOverlay.classList.contains('open')) return;
+  if (isLicenseOverlayVisible()) return;
+
+  const ver = String(latestCloudAppConfig.latest_version).replace(/^v/i, '');
+  try {
+    if (sessionStorage.getItem(UPDATE_DISMISS_KEY) === ver) return;
   } catch (e) {}
 
-  if (!startedNative) {
-    window.location.href = url;
-    setTimeout(() => {
-      if (inAppUpdateBtn) {
-        inAppUpdateBtn.disabled = false;
-        inAppUpdateBtn.textContent = `יש עדכון זמין (v${ver}) - לחץ לעדכון`;
-      }
-    }, 3000);
+  const titleEl = document.getElementById('updatePopupTitle');
+  const textEl = document.getElementById('updatePopupText');
+  if (titleEl) titleEl.textContent = `יש עדכון חדש (v${ver})`;
+  if (textEl) {
+    const note = String(latestCloudAppConfig.message || '').trim();
+    textEl.textContent = (note ? note + '\n\n' : '') + `הגרסה שלך: v${getInstalledAppVersion()}. כל ההגדרות נשמרות בעדכון.`;
   }
+  popup.style.display = 'flex';
 }
 
 async function checkCloudAppUpdate(isManualClick = false) {
@@ -3088,40 +3178,41 @@ async function checkCloudAppUpdate(isManualClick = false) {
     checkUpdateNowBtn.textContent = 'בודק...';
   }
 
+  let fetchFailed = false;
   try {
-    if (window.MagicFirestoreUsers && typeof window.MagicFirestoreUsers.getAppConfig === 'function') {
-      const cfg = await window.MagicFirestoreUsers.getAppConfig();
-      if (cfg && cfg.latest_version) {
-        latestCloudAppConfig = {
-          latest_version: String(cfg.latest_version).replace(/^v/i, ''),
-          apk_url: String(cfg.apk_url || DEFAULT_APK_URL)
-        };
-      }
+    if (window.MagicCloud && window.MagicCloud.isConfigured()) {
+      const cfg = await window.MagicCloud.getAppConfig();
+      if (cfg && cfg.latest_version) latestCloudAppConfig = cfg;
     }
-  } catch (e) {}
+  } catch (e) {
+    fetchFailed = true;
+  }
 
-  const remoteVer = latestCloudAppConfig.latest_version;
-  const hasNewer = compareSemver(remoteVer, installedVer) > 0;
-
+  const hasNewer = hasPendingUpdate();
   if (hasNewer) {
-    if (inAppUpdateBanner) {
-      inAppUpdateBanner.style.display = 'flex';
-    }
+    const remoteVer = String(latestCloudAppConfig.latest_version).replace(/^v/i, '');
+    if (inAppUpdateBanner) inAppUpdateBanner.style.display = 'flex';
     if (inAppUpdateBtn) {
       inAppUpdateBtn.disabled = false;
       inAppUpdateBtn.textContent = `יש עדכון זמין (v${remoteVer}) - לחץ לעדכון`;
     }
     if (cloudVersionStatusText) {
-      cloudVersionStatusText.textContent = `זמינה גרסה חדשה בענן (v${remoteVer}) — לחץ על הכפתור הירוק למעלה לעדכון`;
+      cloudVersionStatusText.textContent = `זמינה גרסה חדשה (v${remoteVer}) — לחץ על הכפתור הירוק למעלה`;
     }
+    if (isManualClick) {
+      try {
+        sessionStorage.removeItem(UPDATE_DISMISS_KEY);
+      } catch (e) {}
+    }
+    maybeShowUpdatePopup();
   } else {
-    if (inAppUpdateBanner) {
-      inAppUpdateBanner.style.display = 'none';
-    }
+    if (inAppUpdateBanner) inAppUpdateBanner.style.display = 'none';
     if (cloudVersionStatusText) {
-      cloudVersionStatusText.textContent = isManualClick
-        ? `האפליקציה מעודכנת לגרסה האחרונה (v${installedVer}) ✓`
-        : 'הגדרות המשתמש נשמרות במלואן בעת עדכון';
+      cloudVersionStatusText.textContent = !isManualClick
+        ? 'הגדרות המשתמש נשמרות במלואן בעת עדכון'
+        : fetchFailed
+        ? 'אין חיבור לאינטרנט, נסה שוב'
+        : `האפליקציה מעודכנת לגרסה האחרונה (v${installedVer}) ✓`;
     }
   }
 
@@ -3132,20 +3223,36 @@ async function checkCloudAppUpdate(isManualClick = false) {
 }
 
 function initInAppSelfUpdater() {
-  if (inAppUpdateBtn) {
-    inAppUpdateBtn.addEventListener('click', () => {
-      triggerApkSelfUpdate(latestCloudAppConfig.apk_url, latestCloudAppConfig.latest_version);
-    });
-  }
-  if (checkUpdateNowBtn) {
-    checkUpdateNowBtn.addEventListener('click', () => {
-      checkCloudAppUpdate(true);
-    });
-  }
-  checkCloudAppUpdate(false);
-}
+  if (inAppUpdateBtn) inAppUpdateBtn.addEventListener('click', performAppUpdate);
+  if (checkUpdateNowBtn) checkUpdateNowBtn.addEventListener('click', () => checkCloudAppUpdate(true));
 
-window.addEventListener('load', initDeviceLicenseGate);
+  const popupBtn = document.getElementById('updatePopupBtn');
+  const popupLater = document.getElementById('updatePopupLater');
+  if (popupBtn) {
+    popupBtn.addEventListener('click', () => {
+      hideUpdatePopup();
+      performAppUpdate();
+    });
+  }
+  if (popupLater) {
+    popupLater.addEventListener('click', () => {
+      try {
+        if (latestCloudAppConfig) {
+          sessionStorage.setItem(UPDATE_DISMISS_KEY, String(latestCloudAppConfig.latest_version).replace(/^v/i, ''));
+        }
+      } catch (e) {}
+      hideUpdatePopup();
+    });
+  }
+
+  checkCloudAppUpdate(false);
+  setInterval(() => {
+    if (document.visibilityState === 'visible') checkCloudAppUpdate(false);
+  }, UPDATE_CHECK_INTERVAL_MS);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') checkCloudAppUpdate(false);
+  });
+}
 
 // אתחול ראשוני
 initDeviceLicenseGate();
@@ -3155,64 +3262,11 @@ loadCustomMedia();
 applyConfigToUI();
 initInAppSelfUpdater();
 
-// מנגנון בדיקת גרסה אוטומטי (פועל בדפדפן Web בלבד, מושבת במצב Offline Standalone APK)
-const CURRENT_APP_VERSION = '20261109190141';
-
-async function checkRemoteVersionAndReload() {
-  if (window.location.protocol === 'file:' || !navigator.onLine) return;
-  try {
-    const res = await fetch(`./version.json?t=${Date.now()}`, { cache: 'no-store' });
-    if (!res.ok) return;
-    const data = await res.json();
-    if (data && data.version && String(data.version) !== CURRENT_APP_VERSION) {
-      if ('caches' in window) {
-        const keys = await caches.keys();
-        await Promise.all(keys.map((k) => caches.delete(k)));
-      }
-      if ('serviceWorker' in navigator) {
-        const regs = await navigator.serviceWorker.getRegistrations();
-        await Promise.all(regs.map((r) => r.unregister()));
-      }
-      window.location.replace(`${window.location.pathname}?v=${data.version}`);
-    }
-  } catch (e) {}
-}
-
+// Service Worker: מאפשר עבודה אופליין בגרסת האתר. הקבצים מתעדכנים בפתיחה הבאה,
+// בלי ריענון אוטומטי באמצע שימוש (כדי לא לשבור הופעה).
 if (window.location.protocol !== 'file:' && 'serviceWorker' in navigator) {
-  navigator.serviceWorker.register('./sw.js', { scope: './' }).then((reg) => {
-    // בדיקת עדכון בכל הפעלה
-    reg.update();
-    reg.addEventListener('updatefound', () => {
-      const newWorker = reg.installing;
-      if (!newWorker) return;
-      newWorker.addEventListener('statechange', () => {
-        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-          // טעינה מחדש של הגרסה המעודכנת
-          window.location.reload();
-        }
-      });
-    });
-  }).catch(() => {});
-
-  let refreshing = false;
-  navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (!refreshing) {
-      refreshing = true;
-      window.location.reload();
-    }
-  });
-
-  window.addEventListener('load', () => {
-    checkRemoteVersionAndReload();
-    setInterval(checkRemoteVersionAndReload, 25000);
-  });
-
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') {
-      navigator.serviceWorker.getRegistration().then((reg) => {
-        if (reg) reg.update();
-      }).catch(() => {});
-      checkRemoteVersionAndReload();
-    }
-  });
+  navigator.serviceWorker
+    .register('./sw.js', { scope: './' })
+    .then((reg) => reg.update())
+    .catch(() => {});
 }

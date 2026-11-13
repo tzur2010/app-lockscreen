@@ -2961,3 +2961,91 @@ html, body, .phone-container {
   text-align: center;
 }
 
+/* חלון "יש עדכון חדש" */
+.update-popup-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100000;
+  background: rgba(3, 6, 15, 0.72);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  direction: rtl;
+}
+
+.update-popup-card {
+  width: 100%;
+  max-width: 340px;
+  background: #151826;
+  border: 1px solid rgba(52, 211, 153, 0.4);
+  border-radius: 24px;
+  padding: 26px 22px 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+  animation: updatePopupIn 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes updatePopupIn {
+  from { transform: scale(0.92); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+.update-popup-icon {
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: #fff;
+  font-size: 26px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.update-popup-title {
+  font-size: 19px;
+  font-weight: 800;
+  color: #fff;
+}
+
+.update-popup-text {
+  font-size: 14px;
+  color: #cbd5e1;
+  line-height: 1.5;
+  white-space: pre-line;
+}
+
+.update-popup-btn {
+  width: 100%;
+  min-height: 48px;
+  margin-top: 6px;
+  border: none;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: #fff;
+  font-size: 16px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.update-popup-btn:disabled {
+  opacity: 0.7;
+}
+
+.update-popup-later {
+  background: none;
+  border: none;
+  color: #94a3b8;
+  font-size: 13.5px;
+  padding: 8px;
+  cursor: pointer;
+}
+

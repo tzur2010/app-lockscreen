@@ -11,6 +11,8 @@ android/app/build/
 # Ignore signing keys
 *.keystore
 *.idsig
+keystore.properties
+android/local.properties
 package-lock.json
 
 # Ignore OS / Editor files

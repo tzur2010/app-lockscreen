@@ -1,6 +1,13 @@
 package com.magic.lockscreen;
 
+import android.Manifest;
 import android.app.Activity;
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.content.pm.PackageManager;
+import android.os.Handler;
+import android.os.Looper;
 import android.appwidget.AppWidgetManager;
 import android.content.ComponentName;
 import android.content.Context;
@@ -41,7 +48,7 @@ import java.util.Random;
 public class MainActivity extends Activity {
 
     public static final String LOCAL_ASSET_URL = "file:///android_asset/index.html";
-    public static final String APP_VERSION_NAME = "4.5";
+    public static final String APP_VERSION_NAME = "4.6";
     private static final int FILE_CHOOSER_RESULT_CODE = 1001;
 
     private WebView webView;
@@ -294,6 +301,119 @@ public class MainActivity extends Activity {
         forceUnlockAndExit();
     }
 
+    // ------------------------------------------------------------------
+    // התראות: הצצה לשעון החכם + חשיפה בהתראה
+    // ------------------------------------------------------------------
+    private static final String PEEK_CHANNEL_ID = "peek_sync_silent";
+    private static final String REVEAL_CHANNEL_ID = "reveal_messages";
+    private static final int PEEK_NOTIFICATION_ID = 7101;
+    private static final int REVEAL_NOTIFICATION_ID = 7102;
+    private static final int NOTIFICATION_PERMISSION_REQUEST = 2001;
+
+    private static void ensureNotificationChannels(Context ctx) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return;
+        NotificationManager nm = ctx.getSystemService(NotificationManager.class);
+        if (nm == null) return;
+        // ערוץ שקט: לא מצלצל, לא רוטט ולא קופץ על הטלפון - רק מועבר לשעון
+        NotificationChannel peek = new NotificationChannel(PEEK_CHANNEL_ID, "סנכרון", NotificationManager.IMPORTANCE_DEFAULT);
+        peek.setSound(null, null);
+        peek.enableVibration(false);
+        peek.setShowBadge(false);
+        nm.createNotificationChannel(peek);
+        // ערוץ הודעות רגיל: קופץ בראש המסך עם צליל, כמו הודעה אמיתית
+        NotificationChannel reveal = new NotificationChannel(REVEAL_CHANNEL_ID, "הודעות", NotificationManager.IMPORTANCE_HIGH);
+        reveal.enableVibration(true);
+        nm.createNotificationChannel(reveal);
+    }
+
+    private static Notification.Builder newBuilder(Context ctx, String channelId) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            return new Notification.Builder(ctx, channelId);
+        }
+        return new Notification.Builder(ctx);
+    }
+
+    public boolean areNotificationsAllowed() {
+        try {
+            NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+            return nm != null && nm.areNotificationsEnabled();
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    public void requestNotificationPermission() {
+        runOnUiThread(() -> {
+            if (Build.VERSION.SDK_INT >= 33
+                    && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, NOTIFICATION_PERMISSION_REQUEST);
+            }
+        });
+    }
+
+    // הקוד שהוקלד נשלח כהתראה שקטה. השעון החכם שמחובר לטלפון מציג אותה,
+    // והיא נמחקת לבד אחרי דקה כדי שלא תישאר במגירת ההתראות של הטלפון.
+    public boolean sendWatchPeek(String title, String text) {
+        try {
+            Context ctx = getApplicationContext();
+            ensureNotificationChannels(ctx);
+            NotificationManager nm = (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
+            if (nm == null || !nm.areNotificationsEnabled()) return false;
+            Notification.Builder b = newBuilder(ctx, PEEK_CHANNEL_ID)
+                    .setSmallIcon(android.R.drawable.stat_notify_sync)
+                    .setContentTitle(title == null ? "" : title)
+                    .setContentText(text == null ? "" : text)
+                    .setAutoCancel(true)
+                    .setShowWhen(false);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                b.setTimeoutAfter(60000);
+            } else {
+                b.setPriority(Notification.PRIORITY_DEFAULT);
+                b.setSound(null);
+                b.setVibrate(null);
+            }
+            nm.notify(PEEK_NOTIFICATION_ID, b.build());
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    // "חשיפה בהתראה": הודעה אמיתית שמגיעה אחרי השהיה, גם אחרי שהאפליקציה נסגרה למסך הבית
+    public boolean scheduleRevealNotification(final String sender, final String message, int delayMs) {
+        try {
+            final Context ctx = getApplicationContext();
+            ensureNotificationChannels(ctx);
+            NotificationManager check = (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
+            if (check == null || !check.areNotificationsEnabled()) return false;
+            final int delay = Math.max(0, Math.min(delayMs, 60000));
+            new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                try {
+                    NotificationManager nm = (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
+                    if (nm == null) return;
+                    String body = message == null ? "" : message;
+                    Notification.Builder b = newBuilder(ctx, REVEAL_CHANNEL_ID)
+                            .setSmallIcon(android.R.drawable.sym_action_chat)
+                            .setContentTitle(sender == null ? "" : sender)
+                            .setContentText(body)
+                            .setStyle(new Notification.BigTextStyle().bigText(body))
+                            .setCategory(Notification.CATEGORY_MESSAGE)
+                            .setAutoCancel(true)
+                            .setShowWhen(true);
+                    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+                        b.setPriority(Notification.PRIORITY_HIGH);
+                        b.setDefaults(Notification.DEFAULT_ALL);
+                    }
+                    nm.notify(REVEAL_NOTIFICATION_ID, b.build());
+                } catch (Exception ignored) {
+                }
+            }, delay);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     @JavascriptInterface
     public void unlockDevice() {
         forceUnlockAndExit();
@@ -360,6 +480,26 @@ public class MainActivity extends Activity {
         @JavascriptInterface
         public void forceUnlockAndExit() {
             activity.forceUnlockAndExit();
+        }
+
+        @JavascriptInterface
+        public boolean areNotificationsAllowed() {
+            return activity.areNotificationsAllowed();
+        }
+
+        @JavascriptInterface
+        public void requestNotificationPermission() {
+            activity.requestNotificationPermission();
+        }
+
+        @JavascriptInterface
+        public boolean sendWatchPeek(String title, String text) {
+            return activity.sendWatchPeek(title, text);
+        }
+
+        @JavascriptInterface
+        public boolean scheduleRevealNotification(String sender, String message, int delayMs) {
+            return activity.scheduleRevealNotification(sender, message, delayMs);
         }
 
         @JavascriptInterface

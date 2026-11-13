@@ -357,7 +357,8 @@ const DEFAULT_CONFIG = {
   deviceModel: 's26',           // 's20'..'s26' | 'iphone12'..'iphone18'
   unlockMode: 'pin',            // 'pin' | 'pattern' | 'words' | 'swipe'
   pinLength: 4,                 // 4 | 6 (אורך קוד PIN: 4 או 6 ספרות)
-  unlockAttemptMode: 'immediate', // 'immediate' (פתיחה מידית) | 'second' (ניסיון שני - Tension Mode)
+  unlockAttemptMode: 'immediate', // ישן - נשמר רק לתאימות להגדרות קודמות
+  unlockOnAttempt: null,        // 1..5 - באיזה ניסיון הטלפון ייפתח (בכפיית פתיחה)
   keySound: true,               // צליל מקשים מקורי של סמסונג
   unlockTargetScreen: 'homescreen', // 'homescreen' | 'notes'
   registeredPasscode: '1234',   // הסיסמה האישית שנרשמה ב-Setup (עבור PIN / מקלדת)
@@ -390,6 +391,13 @@ function loadConfig() {
   } catch (e) {
     return { ...DEFAULT_CONFIG };
   }
+}
+
+// באיזה ניסיון הטלפון נפתח (1-5). הגדרות ישנות: "ניסיון שני" = 2, "פתיחה מידית" = 1
+function getUnlockOnAttempt() {
+  const n = Number(config.unlockOnAttempt);
+  if (Number.isInteger(n) && n >= 1 && n <= 5) return n;
+  return config.unlockAttemptMode === 'second' ? 2 : 1;
 }
 
 function saveConfig() {
@@ -620,11 +628,60 @@ if (backToSplitBtn) {
     }
   });
 }
+// "שמור וסגור" -> קופץ חלון "איזו נעילה להציג?" -> הבחירה פותחת את מסך הנעילה
+const lockTypeChooser = document.getElementById('lockTypeChooser');
+
+function getCurrentLockChoice() {
+  if (config.unlockMode === 'pin') return Number(config.pinLength) === 6 ? 'pin6' : 'pin4';
+  return config.unlockMode;
+}
+
+function openLockTypeChooser() {
+  if (!lockTypeChooser) return false;
+  const current = getCurrentLockChoice();
+  lockTypeChooser.querySelectorAll('.lock-type-btn').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.choice === current);
+  });
+  lockTypeChooser.style.display = 'flex';
+  return true;
+}
+
+function closeLockTypeChooser() {
+  if (lockTypeChooser) lockTypeChooser.style.display = 'none';
+}
+
+function launchLockscreenNow() {
+  stopAllCameraStreams();
+  phoneContainer.classList.remove('clock-mode-active');
+  closeSettingsSheet();
+}
+
+if (lockTypeChooser) {
+  lockTypeChooser.querySelectorAll('.lock-type-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const choice = btn.dataset.choice;
+      if (choice === 'pin4' || choice === 'pin6') {
+        config.unlockMode = 'pin';
+        config.pinLength = choice === 'pin6' ? 6 : 4;
+      } else if (['words', 'pattern', 'swipe'].includes(choice)) {
+        config.unlockMode = choice;
+      }
+      saveConfig();
+      applyConfigToUI();
+      clearCurrentInputs();
+      forceAttemptCount = 0;
+      triggerHaptic(25);
+      closeLockTypeChooser();
+      launchLockscreenNow();
+    });
+  });
+  const lockTypeBackBtn = document.getElementById('lockTypeBackBtn');
+  if (lockTypeBackBtn) lockTypeBackBtn.addEventListener('click', closeLockTypeChooser);
+}
+
 if (launchLockscreenBtn) {
   launchLockscreenBtn.addEventListener('click', () => {
-    stopAllCameraStreams();
-    phoneContainer.classList.remove('clock-mode-active');
-    closeSettingsSheet();
+    if (!openLockTypeChooser()) launchLockscreenNow();
   });
 }
 if (floatingCloseSettingsBtn) {
@@ -1193,15 +1250,13 @@ function applyConfigToUI() {
   renderWallpaperGallery();
   applyWallpaperToContainer();
 
-  // הצגת הגדרת דפוס אך ורק במצב דפוס (Pattern), והגדרת סיסמה רק במצב סיסמה/מקלדת
+  // סוג הנעילה נבחר רק בסוף (אחרי "שמור וסגור"), לכן מציגים גם רישום קוד וגם רישום דפוס
   if (setupPasscodeBox) {
-    setupPasscodeBox.style.display = config.unlockMode === 'pattern' ? 'none' : 'flex';
+    setupPasscodeBox.style.display = 'flex';
   }
   if (setupPatternBox) {
-    setupPatternBox.style.display = config.unlockMode === 'pattern' ? 'flex' : 'none';
-    if (config.unlockMode === 'pattern') {
-      renderSavedSetupPattern();
-    }
+    setupPatternBox.style.display = 'flex';
+    renderSavedSetupPattern();
   }
 
   // הצגת רישום טביעת אצבע ו-Face ID בהגדרות
@@ -1248,7 +1303,7 @@ function applyConfigToUI() {
   // בורר אורך קוד PIN (4 או 6 ספרות)
   const currentPinLen = Number(config.pinLength) === 6 ? 6 : 4;
   if (pinLengthGroup) {
-    pinLengthGroup.style.display = config.unlockMode === 'pin' ? 'block' : 'none';
+    pinLengthGroup.style.display = 'none'; // אורך ה-PIN נבחר בחלון "איזו נעילה להציג?"
   }
   if (pinLengthSelector) {
     pinLengthSelector.querySelectorAll('.seg-pill').forEach((btn) => {
@@ -1257,7 +1312,7 @@ function applyConfigToUI() {
   }
 
   if (stealthPatternGroup) {
-    stealthPatternGroup.style.display = config.unlockMode === 'pattern' ? 'block' : 'none';
+    stealthPatternGroup.style.display = 'block';
   }
   if (patternWrapper) {
     patternWrapper.classList.toggle('stealth-mode', config.stealthPattern);
@@ -1315,10 +1370,18 @@ function applyConfigToUI() {
 
   // סנכרון מתגים בהגדרות
   if (unlockAttemptModeSelector) {
-    const attemptMode = config.unlockAttemptMode === 'second' ? 'second' : 'immediate';
+    const attempt = getUnlockOnAttempt();
     unlockAttemptModeSelector.querySelectorAll('.seg-pill').forEach((btn) => {
-      btn.classList.toggle('active', btn.dataset.attemptmode === attemptMode);
+      btn.classList.toggle('active', Number(btn.dataset.attempt) === attempt);
     });
+    const attemptDesc = document.getElementById('unlockAttemptDesc');
+    if (attemptDesc) {
+      const ordinals = ['', 'הראשון', 'השני', 'השלישי', 'הרביעי', 'החמישי'];
+      attemptDesc.textContent =
+        attempt === 1
+          ? 'הטלפון נפתח כבר בניסיון הראשון.'
+          : `${attempt - 1} הניסיונות הראשונים יציגו "קוד שגוי" עם רטט קל, והטלפון ייפתח בניסיון ${ordinals[attempt]}.`;
+    }
   }
   if (toggleKeySound) toggleKeySound.checked = config.keySound !== false;
   if (toggleSecretFpBypass) toggleSecretFpBypass.checked = config.secretFpBypass !== false;
@@ -1627,25 +1690,18 @@ function verifyAndSubmitPasscode(enteredValue, modeLabel) {
 
   const isPatternMode = modeLabel === 'PATTERN' || config.unlockMode === 'pattern';
 
-  // מצב כפיית פתיחה (Force Unlock Mode): תמיכה ב"פתיחה מידית" או "ניסיון שני" (Tension Mode)
+  // מצב כפיית פתיחה (Force Unlock Mode): הטלפון נפתח בניסיון שנבחר בהגדרות (1-5).
+  // בכל ניסיון לפני כן: רטט קל וכיתוב אדום מקורי ("קוד PIN שגוי. נסה שוב")
   if (forceUnlockMode) {
-    if (config.unlockAttemptMode === 'second') {
-      if (forceAttemptCount === 0) {
-        // ניסיון ראשון ב-Tension Mode: רטט קל וכיתוב אדום מקורי של סמסונג ("קוד PIN שגוי. נסה שוב")
-        forceAttemptCount = 1;
-        const samsungErrText = isPatternMode
-          ? 'דפוס שגוי. נסה שוב'
-          : config.unlockMode === 'words'
-            ? 'סיסמה שגויה. נסה שוב'
-            : 'קוד PIN שגוי. נסה שוב';
-        triggerErrorFeedback(samsungErrText, true);
-        return;
-      } else {
-        // ניסיון שני ב-Tension Mode: פותח את המכשיר חלק למסך הבית!
-        forceAttemptCount = 0;
-        animateLockOpenAndUnlock();
-        return;
-      }
+    forceAttemptCount += 1;
+    if (forceAttemptCount < getUnlockOnAttempt()) {
+      const samsungErrText = isPatternMode
+        ? 'דפוס שגוי. נסה שוב'
+        : config.unlockMode === 'words'
+          ? 'סיסמה שגויה. נסה שוב'
+          : 'קוד PIN שגוי. נסה שוב';
+      triggerErrorFeedback(samsungErrText, true);
+      return;
     }
     forceAttemptCount = 0;
     animateLockOpenAndUnlock();
@@ -2054,19 +2110,28 @@ function renderMiniPatternPeek(codeStr) {
   let svgHtml = '';
   for (let i = 1; i <= 9; i++) {
     const [cx, cy] = miniCoords[i];
-    const isUsed = digits.includes(i);
-    svgHtml += `<circle cx="${cx}" cy="${cy}" r="${isUsed ? 3 : 2}" fill="${isUsed ? '#38bdf8' : 'rgba(255,255,255,0.3)'}"/>`;
+    if (!digits.includes(i)) {
+      svgHtml += `<circle cx="${cx}" cy="${cy}" r="2" fill="rgba(255,255,255,0.3)"/>`;
+    }
   }
 
   const pts = digits.map((d) => miniCoords[d].join(',')).join(' ');
-  svgHtml += `<polyline points="${pts}" fill="none" stroke="#38bdf8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>`;
+  svgHtml += `<polyline points="${pts}" fill="none" stroke="#38bdf8" stroke-width="1.6" stroke-opacity="0.75" stroke-linecap="round" stroke-linejoin="round"/>`;
 
-  const [sx, sy] = miniCoords[digits[0]];
-  svgHtml += `<circle cx="${sx}" cy="${sy}" r="4" fill="#22c55e"/>`;
+  // כל נקודה בדפוס מקבלת את מספר הסדר שלה (1 = התחלה, בירוק)
+  digits.forEach((d, idx) => {
+    const [cx, cy] = miniCoords[d];
+    const fill = idx === 0 ? '#22c55e' : '#38bdf8';
+    svgHtml += `<circle cx="${cx}" cy="${cy}" r="6.2" fill="${fill}"/>`;
+    svgHtml += `<text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="central" font-size="8" font-weight="700" font-family="Arial, sans-serif" fill="#0b1220">${idx + 1}</text>`;
+  });
 
   peekPatternMini.innerHTML = svgHtml;
   peekPatternMini.style.display = 'block';
 }
+
+// כמה זמן מחזיקים בשטח ריק עד שמופיע הקוד שהוקלד (במילישניות)
+const HOLD_PEEK_DELAY_MS = 400;
 
 function showHoldPeek() {
   if (!config.holdPeek) return;
@@ -2103,7 +2168,7 @@ phoneContainer.addEventListener('pointerdown', (e) => {
   if (interactive) return;
 
   clearTimeout(holdPeekTimer);
-  holdPeekTimer = setTimeout(showHoldPeek, 850);
+  holdPeekTimer = setTimeout(showHoldPeek, HOLD_PEEK_DELAY_MS);
 });
 
 phoneContainer.addEventListener('pointerup', hideHoldPeek);
@@ -2590,7 +2655,9 @@ if (pinLengthSelector) {
 if (unlockAttemptModeSelector) {
   unlockAttemptModeSelector.querySelectorAll('.seg-pill').forEach((btn) => {
     btn.addEventListener('click', () => {
-      config.unlockAttemptMode = btn.dataset.attemptmode === 'second' ? 'second' : 'immediate';
+      const n = Number(btn.dataset.attempt);
+      config.unlockOnAttempt = n >= 1 && n <= 5 ? n : 1;
+      config.unlockAttemptMode = config.unlockOnAttempt >= 2 ? 'second' : 'immediate';
       forceAttemptCount = 0;
       saveConfig();
       applyConfigToUI();
@@ -3041,7 +3108,7 @@ function initDeviceLicenseGate() {
 // החלון מוצג רק כשמסך ההגדרות פתוח (בפתיחת האפליקציה / בתפריט הסודי),
 // ולעולם לא מעל מסך הנעילה הפעיל מול קהל.
 // ============================================================================
-const APP_VERSION = '4.3';
+const APP_VERSION = '4.4';
 const DEFAULT_APK_URL = 'https://github.com/tzur2010/app-lockscreen/raw/main/Lockscreen.apk';
 const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 const UPDATE_DISMISS_KEY = 'magic_update_dismissed_version';

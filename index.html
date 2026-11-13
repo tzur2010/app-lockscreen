@@ -71,6 +71,21 @@
     </div>
   </div>
 
+  <!-- חלון בחירת סוג הנעילה: קופץ אחרי "שמור וסגור" בהגדרות -->
+  <div class="update-popup-overlay" id="lockTypeChooser" style="display: none;">
+    <div class="update-popup-card lock-type-card">
+      <div class="update-popup-title">איזו נעילה להציג?</div>
+      <div class="lock-type-grid" id="lockTypeGrid">
+        <button type="button" class="lock-type-btn" data-choice="pin4">קוד PIN<span>4 ספרות</span></button>
+        <button type="button" class="lock-type-btn" data-choice="pin6">קוד PIN<span>6 ספרות</span></button>
+        <button type="button" class="lock-type-btn" data-choice="words">סיסמה<span>אותיות ומספרים</span></button>
+        <button type="button" class="lock-type-btn" data-choice="pattern">דפוס<span>ציור 3×3</span></button>
+        <button type="button" class="lock-type-btn lock-type-wide" data-choice="swipe">החלקה<span>בלי קוד</span></button>
+      </div>
+      <button type="button" class="update-popup-later" id="lockTypeBackBtn">חזרה להגדרות</button>
+    </div>
+  </div>
+
   <!-- חלון "יש עדכון חדש" (מוצג רק במסך ההגדרות, אף פעם לא מעל מסך הנעילה הפעיל) -->
   <div class="update-popup-overlay" id="updatePopupOverlay" style="display: none;">
     <div class="update-popup-card">
@@ -208,13 +223,16 @@
 
           <!-- מתג בחירה בהגדרות: פתיחה מידית או בניסיון שני (Tension Mode) -->
           <div class="oneui-field-block" id="tensionModeGroup">
-            <label class="config-label">מצב פתיחה (Tension Mode)</label>
+            <label class="config-label">באיזה ניסיון הטלפון ייפתח</label>
             <div class="segmented-row" id="unlockAttemptModeSelector">
-              <button type="button" class="seg-pill active" data-attemptmode="immediate">פתיחה מידית</button>
-              <button type="button" class="seg-pill" data-attemptmode="second">ניסיון שני</button>
+              <button type="button" class="seg-pill active" data-attempt="1">1</button>
+              <button type="button" class="seg-pill" data-attempt="2">2</button>
+              <button type="button" class="seg-pill" data-attempt="3">3</button>
+              <button type="button" class="seg-pill" data-attempt="4">4</button>
+              <button type="button" class="seg-pill" data-attempt="5">5</button>
             </div>
-            <div class="toggle-sub-desc" style="margin-top: 6px;">
-              במצב "ניסיון שני": בניסיון הראשון קופץ רטט קל וכיתוב אדום מקורי של סמסונג ("קוד PIN שגוי. נסה שוב"), ובניסיון השני המכשיר נפתח חלק למסך הבית.
+            <div class="toggle-sub-desc" style="margin-top: 6px;" id="unlockAttemptDesc">
+              הטלפון נפתח כבר בניסיון הראשון.
             </div>
           </div>
 
@@ -272,8 +290,8 @@
 
           <div class="oneui-card-divider"></div>
 
-          <!-- בחירת מצב נעילה: כפתורי בחירה שטוחים ונקיים (PIN / סיסמה / דפוס) -->
-          <div class="oneui-field-block">
+          <!-- בחירת מצב נעילה: הועברה לחלון שקופץ אחרי "שמור וסגור" (lockTypeChooser). נשאר מוסתר לתאימות. -->
+          <div class="oneui-field-block" style="display: none;">
             <label class="config-label">בחירת מצב נעילה</label>
             <div class="segmented-row" id="modeSelector">
               <button type="button" class="seg-pill active" data-mode="pin">PIN</button>

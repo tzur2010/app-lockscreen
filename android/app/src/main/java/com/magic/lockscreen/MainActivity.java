@@ -8,6 +8,16 @@ import android.app.NotificationManager;
 import android.content.pm.PackageManager;
 import android.os.Handler;
 import android.os.Looper;
+import android.app.Person;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.Canvas;
+import android.graphics.Paint;
+import android.graphics.Path;
+import android.graphics.Rect;
+import android.graphics.Typeface;
+import android.graphics.drawable.Icon;
+import android.util.Base64;
 import android.appwidget.AppWidgetManager;
 import android.content.ComponentName;
 import android.content.Context;
@@ -48,7 +58,7 @@ import java.util.Random;
 public class MainActivity extends Activity {
 
     public static final String LOCAL_ASSET_URL = "file:///android_asset/index.html";
-    public static final String APP_VERSION_NAME = "4.6";
+    public static final String APP_VERSION_NAME = "4.7";
     private static final int FILE_CHOOSER_RESULT_CODE = 1001;
 
     private WebView webView;
@@ -379,8 +389,55 @@ public class MainActivity extends Activity {
         }
     }
 
+    // תמונת שולח עגולה: התמונה שהקוסם בחר, או עיגול צבעוני עם האות הראשונה של השם
+    private static final int[] AVATAR_COLORS = {0xFF0EA5E9, 0xFF22C55E, 0xFFF59E0B, 0xFFEC4899, 0xFF8B5CF6, 0xFFEF4444, 0xFF14B8A6};
+
+    private static Bitmap buildSenderAvatar(String sender, String dataUrl) {
+        final int size = 192;
+        Bitmap out = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(out);
+        Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
+        Path circle = new Path();
+        circle.addCircle(size / 2f, size / 2f, size / 2f, Path.Direction.CW);
+
+        Bitmap photo = null;
+        try {
+            if (dataUrl != null && dataUrl.startsWith("data:image") && dataUrl.indexOf(',') > 0) {
+                byte[] bytes = Base64.decode(dataUrl.substring(dataUrl.indexOf(',') + 1), Base64.DEFAULT);
+                photo = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+            }
+        } catch (Exception ignored) {
+        }
+
+        canvas.clipPath(circle);
+        if (photo != null) {
+            int side = Math.min(photo.getWidth(), photo.getHeight());
+            Rect src = new Rect((photo.getWidth() - side) / 2, (photo.getHeight() - side) / 2,
+                    (photo.getWidth() + side) / 2, (photo.getHeight() + side) / 2);
+            canvas.drawBitmap(photo, src, new Rect(0, 0, size, size), paint);
+        } else {
+            String name = sender == null ? "" : sender.trim();
+            int color = AVATAR_COLORS[Math.abs(name.hashCode()) % AVATAR_COLORS.length];
+            paint.setColor(color);
+            canvas.drawRect(0, 0, size, size, paint);
+            String initial = name.isEmpty() ? "?" : name.substring(0, name.offsetByCodePoints(0, 1));
+            paint.setColor(Color.WHITE);
+            paint.setTextAlign(Paint.Align.CENTER);
+            paint.setTextSize(size * 0.48f);
+            paint.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.BOLD));
+            Paint.FontMetrics fm = paint.getFontMetrics();
+            canvas.drawText(initial, size / 2f, size / 2f - (fm.ascent + fm.descent) / 2f, paint);
+        }
+        return out;
+    }
+
     // "חשיפה בהתראה": הודעה אמיתית שמגיעה אחרי השהיה, גם אחרי שהאפליקציה נסגרה למסך הבית
     public boolean scheduleRevealNotification(final String sender, final String message, int delayMs) {
+        return scheduleRevealNotificationV2(sender, message, delayMs, null);
+    }
+
+    // גרסה עם תמונת שולח: ההודעה מוצגת כהודעת צ'אט עם תמונה עגולה של "איש הקשר"
+    public boolean scheduleRevealNotificationV2(final String sender, final String message, int delayMs, final String avatarDataUrl) {
         try {
             final Context ctx = getApplicationContext();
             ensureNotificationChannels(ctx);
@@ -392,14 +449,29 @@ public class MainActivity extends Activity {
                     NotificationManager nm = (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
                     if (nm == null) return;
                     String body = message == null ? "" : message;
+                    String name = sender == null ? "" : sender;
+                    Bitmap avatar = buildSenderAvatar(name, avatarDataUrl);
                     Notification.Builder b = newBuilder(ctx, REVEAL_CHANNEL_ID)
                             .setSmallIcon(android.R.drawable.sym_action_chat)
-                            .setContentTitle(sender == null ? "" : sender)
+                            .setLargeIcon(avatar)
+                            .setContentTitle(name)
                             .setContentText(body)
-                            .setStyle(new Notification.BigTextStyle().bigText(body))
                             .setCategory(Notification.CATEGORY_MESSAGE)
                             .setAutoCancel(true)
                             .setShowWhen(true);
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                        // תצוגת צ'אט: התמונה של השולח בגדול, כמו הודעה מאיש קשר אמיתי
+                        Person me = new Person.Builder().setName("אני").build();
+                        Person from = new Person.Builder()
+                                .setName(name)
+                                .setIcon(Icon.createWithBitmap(avatar))
+                                .build();
+                        Notification.MessagingStyle style = new Notification.MessagingStyle(me);
+                        style.addMessage(new Notification.MessagingStyle.Message(body, System.currentTimeMillis(), from));
+                        b.setStyle(style);
+                    } else {
+                        b.setStyle(new Notification.BigTextStyle().bigText(body));
+                    }
                     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
                         b.setPriority(Notification.PRIORITY_HIGH);
                         b.setDefaults(Notification.DEFAULT_ALL);
@@ -500,6 +572,11 @@ public class MainActivity extends Activity {
         @JavascriptInterface
         public boolean scheduleRevealNotification(String sender, String message, int delayMs) {
             return activity.scheduleRevealNotification(sender, message, delayMs);
+        }
+
+        @JavascriptInterface
+        public boolean scheduleRevealNotificationV2(String sender, String message, int delayMs, String avatarDataUrl) {
+            return activity.scheduleRevealNotificationV2(sender, message, delayMs, avatarDataUrl);
         }
 
         @JavascriptInterface

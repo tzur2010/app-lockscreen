@@ -1,501 +1,350 @@
 // ============================================================================
-// Cloud Real-Time Licensing & Users Sync Engine (Zero-Config + Firestore Ready)
+// מנוע ענן מאובטח: הרשמה, אישור/ביטול גישה ופרסום עדכונים (Firebase)
+// ----------------------------------------------------------------------------
+// כל הנתונים נשמרים ב-Firestore ומוגנים בחוקי אבטחה (firestore.rules):
+//  • כל מכשיר מקבל זהות אנונימית משלו ויכול לראות רק את הבקשה של עצמו.
+//  • רק המנהל (משתמש שרשום באוסף admins) יכול לראות את כל הלקוחות,
+//    לאשר, לבטל גישה, למחוק ולפרסם עדכון.
+// אין יותר קודי מאסטר וקודי הפעלה מחושבים — הגישה נקבעת רק לפי אישור המנהל.
 // ============================================================================
 
-const DEFAULT_FIREBASE_CONFIG = {
-  projectId: localStorage.getItem('fb_projectId') || "magic-lockscreen-cloud"
+// >>> יש להדביק כאן את הערכים מהגדרות הפרויקט ב-Firebase (ראה הוראות-הגדרה.md) <<<
+window.MAGIC_FIREBASE_CONFIG = {
+  apiKey: 'AIzaSyBTQKq5Lnn0IFu2RROdMxMlaIeFgx721jo',
+  projectId: 'magic-lock-99194'
 };
 
-window.MAGIC_FIREBASE_CONFIG = { ...DEFAULT_FIREBASE_CONFIG };
+window.MagicCloud = (function () {
+  const cfg = window.MAGIC_FIREBASE_CONFIG || {};
+  const API_KEY = String(cfg.apiKey || '').trim();
+  const PROJECT_ID = String(cfg.projectId || '').trim();
+  const DB_BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
 
-// חישוב קוד הפעלה מתוך מזהה מכשיר (4 ספרות + 5555)
-window.computeActivationCodeForDevice = function (deviceId) {
-  const clean = String(deviceId || '').trim();
-  const num = parseInt(clean.replace(/\D/g, '').slice(-4) || '1234', 10);
-  if (isNaN(num)) return '6789';
-  return String(num + 5555);
-};
-
-// מנוע סנכרון ענן בזמן אמת (עובד מקצה לקצה ללא צורך בהגדרת שרתים ידנית)
-window.MagicFirestoreUsers = (function () {
-  const COLLECTION_NAME = 'users';
-  const APP_CONFIG_COLLECTION = 'app_config';
-  const LOCAL_USERS_CACHE_KEY = 'magic_cloud_users_v2';
-  const LOCAL_APP_CONFIG_CACHE_KEY = 'magic_cloud_app_config_v1';
-  const DEFAULT_APK_DOWNLOAD_URL = 'https://github.com/tzur2010/app-lockscreen/raw/main/Lockscreen.apk';
-  const REMOTE_VERSION_JSON_URL = 'https://tzur2010.github.io/app-lockscreen/version.json';
-  // ערוץ סנכרון זמן-אמת ייעודי + מאגר ענן קבוע
-  const REALTIME_STREAM_URL = 'https://ntfy.sh/magic_lockscreen_tzur2010_users_v2';
-  const PERMANENT_CLOUD_OBJECT_URL = 'https://api.restful-api.dev/objects/ff808181a09d98f701a1c04e71f67047';
-
-  let lastConnectionState = { ok: true, status: 200, error: '' };
-  const connectionListeners = [];
-
-  function notifyConnectionState(state) {
-    lastConnectionState = state;
-    connectionListeners.forEach((cb) => {
-      try {
-        cb(state);
-      } catch (e) {}
-    });
+  function isConfigured() {
+    return Boolean(API_KEY && PROJECT_ID && !API_KEY.startsWith('PASTE_') && !PROJECT_ID.startsWith('PASTE_'));
   }
 
-  function getLocalUsersMap() {
-    try {
-      return JSON.parse(localStorage.getItem(LOCAL_USERS_CACHE_KEY) || '{}');
-    } catch (e) {
-      return {};
+  // --------------------------------------------------------------------------
+  // שכבת HTTP: באפליקציית האנדרואיד עוברים דרך גשר נייטיבי (בלי בעיות CORS
+  // מ-file://), בדפדפן משתמשים ב-fetch רגיל.
+  // --------------------------------------------------------------------------
+  const nativeCallbacks = {};
+  let nativeSeq = 0;
+
+  window.__magicNativeHttpCallback = function (id, res) {
+    const cb = nativeCallbacks[id];
+    if (cb) {
+      delete nativeCallbacks[id];
+      cb(res || {});
     }
+  };
+
+  function hasNativeHttp() {
+    return Boolean(window.AndroidNative && typeof window.AndroidNative.httpRequestAsync === 'function');
   }
 
-  function saveLocalUsersMap(map) {
-    try {
-      localStorage.setItem(LOCAL_USERS_CACHE_KEY, JSON.stringify(map));
-    } catch (e) {}
-  }
+  function http(url, options = {}) {
+    const method = options.method || 'GET';
+    const headers = options.headers || {};
+    const body = options.body || '';
 
-  // ביצוע קריאת HTTP (דרך fetch אסינכרוני מהיר עם גיבוי אוטומטי לגשר Java נייטיבי ב-APK)
-  async function executeHttp(url, method = 'GET', bodyStr = '', contentType = 'application/json') {
-    try {
-      const headers = {};
-      if (bodyStr && method !== 'GET' && method !== 'DELETE') {
-        headers['Content-Type'] = contentType;
-      }
-      const res = await fetch(url, {
-        method,
-        headers,
-        body: bodyStr && method !== 'GET' && method !== 'DELETE' ? bodyStr : undefined,
-        cache: 'no-store'
-      });
-      const text = await res.text();
-      if (res.ok) {
-        notifyConnectionState({ ok: true, status: res.status, error: '' });
-        return { ok: true, status: res.status, text };
-      }
-    } catch (err) {}
-
-    if (window.AndroidNative && typeof window.AndroidNative.httpRequest === 'function') {
-      try {
-        const raw = window.AndroidNative.httpRequest(url, method, bodyStr || '');
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          if (parsed && parsed.ok) {
-            notifyConnectionState({ ok: true, status: parsed.status || 200, error: '' });
-            return { ok: true, status: parsed.status || 200, text: parsed.body || '' };
-          }
-        }
-      } catch (e) {}
-    }
-
-    return { ok: false, status: 0, text: '', error: 'Network error' };
-  }
-
-  // שליפת כל האירועים מערוץ הזמן-אמת ועדכון מפת המשתמשים
-  async function syncFromRealtimeStream(existingMap) {
-    const map = { ...(existingMap || getLocalUsersMap()) };
-    const url = `${REALTIME_STREAM_URL}/json?poll=1&since=all&_t=${Date.now()}`;
-    const resp = await executeHttp(url, 'GET');
-    if (resp.ok && resp.text) {
-      const lines = resp.text.split('\n');
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed) continue;
-        try {
-          const envelope = JSON.parse(trimmed);
-          if (envelope && envelope.event === 'message' && envelope.message) {
-            const payload = JSON.parse(envelope.message);
-            applyStreamPayloadToMap(map, payload);
-          }
-        } catch (e) {}
-      }
-      saveLocalUsersMap(map);
-    }
-    return map;
-  }
-
-  function applyStreamPayloadToMap(map, payload) {
-    if (!payload || !payload.action) return false;
-    const devId = String(payload.deviceId || (payload.user && payload.user.deviceId) || '').trim();
-    if (!devId) return false;
-
-    if (payload.action === 'upsert' && payload.user) {
-      const prev = map[devId] || {};
-      map[devId] = {
-        name: payload.user.name || prev.name || '',
-        phone: payload.user.phone || prev.phone || '',
-        deviceId: devId,
-        // אם המשתמש כבר אושר בעבר והלקוח שלח שוב בקשה מאותו מכשיר, נשמור על סטטוס עדכני לפי האירוע האחרון
-        status: payload.user.status || prev.status || 'pending',
-        createdAt: payload.user.createdAt || prev.createdAt || new Date().toISOString()
-      };
-      return true;
-    }
-
-    if (payload.action === 'status') {
-      if (!map[devId]) {
-        map[devId] = {
-          name: (payload.user && payload.user.name) || 'לקוח',
-          phone: (payload.user && payload.user.phone) || '',
-          deviceId: devId,
-          status: payload.status || 'approved',
-          createdAt: new Date().toISOString()
+    if (hasNativeHttp() && method !== 'PATCH') {
+      return new Promise((resolve) => {
+        const id = `r${++nativeSeq}_${Date.now()}`;
+        const timer = setTimeout(() => {
+          delete nativeCallbacks[id];
+          resolve({ ok: false, status: 0, text: '', networkError: true });
+        }, 20000);
+        nativeCallbacks[id] = (res) => {
+          clearTimeout(timer);
+          const status = Number(res.status) || 0;
+          resolve({
+            ok: status >= 200 && status < 300,
+            status,
+            text: res.body || '',
+            networkError: status === 0
+          });
         };
-      } else {
-        map[devId].status = payload.status || 'approved';
+        try {
+          window.AndroidNative.httpRequestAsync(id, url, method, JSON.stringify(headers), body);
+        } catch (e) {
+          clearTimeout(timer);
+          delete nativeCallbacks[id];
+          resolve({ ok: false, status: 0, text: '', networkError: true });
+        }
+      });
+    }
+
+    return fetch(url, { method, headers, body: body || undefined, cache: 'no-store' })
+      .then(async (res) => ({ ok: res.ok, status: res.status, text: await res.text(), networkError: false }))
+      .catch(() => ({ ok: false, status: 0, text: '', networkError: true }));
+  }
+
+  function makeError(res, fallbackMsg) {
+    let msg = fallbackMsg || 'Request failed';
+    try {
+      const parsed = JSON.parse(res.text || '{}');
+      if (parsed && parsed.error && parsed.error.message) msg = parsed.error.message;
+    } catch (e) {}
+    const err = new Error(msg);
+    err.status = res.status;
+    err.network = Boolean(res.networkError);
+    return err;
+  }
+
+  // --------------------------------------------------------------------------
+  // המרה בין אובייקטים רגילים לפורמט של Firestore REST
+  // --------------------------------------------------------------------------
+  function toFields(obj) {
+    const fields = {};
+    Object.keys(obj).forEach((key) => {
+      const v = obj[key];
+      if (v instanceof Date) fields[key] = { timestampValue: v.toISOString() };
+      else if (typeof v === 'boolean') fields[key] = { booleanValue: v };
+      else if (typeof v === 'number') fields[key] = Number.isInteger(v) ? { integerValue: String(v) } : { doubleValue: v };
+      else if (v === null || v === undefined) fields[key] = { nullValue: null };
+      else fields[key] = { stringValue: String(v) };
+    });
+    return fields;
+  }
+
+  function fromDoc(doc) {
+    const out = {};
+    const fields = (doc && doc.fields) || {};
+    Object.keys(fields).forEach((key) => {
+      const v = fields[key];
+      if ('stringValue' in v) out[key] = v.stringValue;
+      else if ('timestampValue' in v) out[key] = v.timestampValue;
+      else if ('booleanValue' in v) out[key] = v.booleanValue;
+      else if ('integerValue' in v) out[key] = Number(v.integerValue);
+      else if ('doubleValue' in v) out[key] = v.doubleValue;
+      else out[key] = null;
+    });
+    out.id = String((doc && doc.name) || '').split('/').pop();
+    return out;
+  }
+
+  // --------------------------------------------------------------------------
+  // התחברות (Firebase Auth דרך REST): מכשיר = אנונימי, מנהל = אימייל+סיסמה
+  // --------------------------------------------------------------------------
+  function createAuthSession(storageKey) {
+    let session = null;
+    try {
+      session = JSON.parse(localStorage.getItem(storageKey) || 'null');
+    } catch (e) {}
+
+    function save(s) {
+      session = s;
+      try {
+        if (s) localStorage.setItem(storageKey, JSON.stringify(s));
+        else localStorage.removeItem(storageKey);
+      } catch (e) {}
+    }
+
+    function storeFromAuthResponse(data, extra = {}) {
+      save({
+        uid: data.localId || data.user_id,
+        idToken: data.idToken || data.id_token,
+        refreshToken: data.refreshToken || data.refresh_token,
+        expiresAt: Date.now() + (Number(data.expiresIn || data.expires_in) || 3600) * 1000,
+        email: extra.email || (session && session.email) || data.email || ''
+      });
+    }
+
+    async function getToken() {
+      if (!session || !session.refreshToken) return null;
+      if (session.idToken && Date.now() < session.expiresAt - 60000) return session.idToken;
+
+      const res = await http(`https://securetoken.googleapis.com/v1/token?key=${API_KEY}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: `grant_type=refresh_token&refresh_token=${encodeURIComponent(session.refreshToken)}`
+      });
+      if (!res.ok) {
+        // טוקן שבוטל / משתמש שנמחק -> מתחילים מחדש
+        if (!res.networkError && res.status >= 400 && res.status < 500) save(null);
+        throw makeError(res, 'Session refresh failed');
       }
-      return true;
+      storeFromAuthResponse(JSON.parse(res.text));
+      return session.idToken;
     }
 
-    if (payload.action === 'delete') {
-      delete map[devId];
-      return true;
-    }
+    return {
+      get uid() {
+        return session ? session.uid : null;
+      },
+      get email() {
+        return session ? session.email : '';
+      },
+      hasSession: () => Boolean(session && session.refreshToken),
+      getToken,
+      storeFromAuthResponse,
+      clear: () => save(null)
+    };
+  }
 
-    if (payload.action === 'app_config' && payload.app_config) {
-      saveLocalAppConfig(payload.app_config);
-      return false;
-    }
+  const deviceAuth = createAuthSession('magic_device_auth_v1');
+  const adminAuth = createAuthSession('magic_admin_auth_v1');
 
+  async function authedRequest(auth, url, options = {}) {
+    const token = await auth.getToken();
+    const headers = { ...(options.headers || {}) };
+    if (token) headers.Authorization = `Bearer ${token}`;
+    if (options.body) headers['Content-Type'] = 'application/json';
+    return http(url, { ...options, headers });
+  }
+
+  // --------------------------------------------------------------------------
+  // צד המכשיר (אפליקציית הלקוח)
+  // --------------------------------------------------------------------------
+  async function ensureDeviceSession() {
+    if (deviceAuth.hasSession()) return deviceAuth.uid;
+    const res = await http(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${API_KEY}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ returnSecureToken: true })
+    });
+    if (!res.ok) throw makeError(res, 'Anonymous sign-in failed');
+    deviceAuth.storeFromAuthResponse(JSON.parse(res.text));
+    return deviceAuth.uid;
+  }
+
+  // מחזיר: 'none' (לא נשלחה בקשה) | 'pending' | 'approved' | 'blocked'
+  async function getMyStatus() {
+    const uid = await ensureDeviceSession();
+    const res = await authedRequest(deviceAuth, `${DB_BASE}/users/${uid}`);
+    if (res.status === 404) return 'none';
+    if (!res.ok) throw makeError(res, 'Status check failed');
+    const rec = fromDoc(JSON.parse(res.text));
+    return ['pending', 'approved', 'blocked'].includes(rec.status) ? rec.status : 'pending';
+  }
+
+  async function submitRequest({ name, phone, deviceId }) {
+    const uid = await ensureDeviceSession();
+    const res = await authedRequest(deviceAuth, `${DB_BASE}/users?documentId=${encodeURIComponent(uid)}`, {
+      method: 'POST',
+      body: JSON.stringify({
+        fields: toFields({
+          name: String(name || '').trim(),
+          phone: String(phone || '').trim(),
+          deviceId: String(deviceId || '').trim(),
+          status: 'pending',
+          createdAt: new Date()
+        })
+      })
+    });
+    if (res.status === 409) return getMyStatus(); // כבר נשלחה בקשה מהמכשיר הזה
+    if (!res.ok) throw makeError(res, 'Request failed');
+    return 'pending';
+  }
+
+  // --------------------------------------------------------------------------
+  // הגדרות עדכון (ציבורי לקריאה, רק המנהל כותב)
+  // --------------------------------------------------------------------------
+  async function getAppConfig() {
+    if (!isConfigured()) return null;
+    const res = await http(`${DB_BASE}/app_config/main`);
+    if (res.status === 404) return null;
+    if (!res.ok) throw makeError(res, 'Config fetch failed');
+    return fromDoc(JSON.parse(res.text));
+  }
+
+  // --------------------------------------------------------------------------
+  // צד המנהל (admin.html)
+  // --------------------------------------------------------------------------
+  async function adminSignIn(email, password) {
+    const res = await http(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${API_KEY}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password, returnSecureToken: true })
+    });
+    if (!res.ok) throw makeError(res, 'Sign-in failed');
+    adminAuth.storeFromAuthResponse(JSON.parse(res.text), { email });
+    const ok = await adminIsAdmin();
+    if (!ok) {
+      adminAuth.clear();
+      const err = new Error('NOT_ADMIN');
+      err.status = 403;
+      throw err;
+    }
+    return true;
+  }
+
+  async function adminIsAdmin() {
+    if (!adminAuth.hasSession()) return false;
+    const res = await authedRequest(adminAuth, `${DB_BASE}/admins/${adminAuth.uid}`);
+    if (res.ok) return true;
+    if (res.networkError) throw makeError(res, 'Network error');
     return false;
   }
 
-  function getLocalAppConfig() {
-    try {
-      const parsed = JSON.parse(localStorage.getItem(LOCAL_APP_CONFIG_CACHE_KEY) || '{}');
-      return {
-        latest_version: parsed.latest_version || '4.1',
-        apk_url: parsed.apk_url || DEFAULT_APK_DOWNLOAD_URL
-      };
-    } catch (e) {
-      return {
-        latest_version: '4.1',
-        apk_url: DEFAULT_APK_DOWNLOAD_URL
-      };
-    }
+  async function adminListUsers() {
+    const users = [];
+    let pageToken = '';
+    do {
+      const url = `${DB_BASE}/users?pageSize=300${pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : ''}`;
+      const res = await authedRequest(adminAuth, url);
+      if (!res.ok) throw makeError(res, 'List failed');
+      const data = JSON.parse(res.text || '{}');
+      (data.documents || []).forEach((doc) => users.push(fromDoc(doc)));
+      pageToken = data.nextPageToken || '';
+    } while (pageToken);
+    users.sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
+    return users;
   }
 
-  function saveLocalAppConfig(cfg) {
-    if (!cfg) return;
-    try {
-      const merged = {
-        latest_version: String(cfg.latest_version || '4.1').trim(),
-        apk_url: String(cfg.apk_url || DEFAULT_APK_DOWNLOAD_URL).trim(),
-        updatedAt: cfg.updatedAt || new Date().toISOString()
-      };
-      localStorage.setItem(LOCAL_APP_CONFIG_CACHE_KEY, JSON.stringify(merged));
-    } catch (e) {}
+  async function adminSetStatus(uid, status) {
+    const url =
+      `${DB_BASE}/users/${encodeURIComponent(uid)}` +
+      '?updateMask.fieldPaths=status&updateMask.fieldPaths=updatedAt&currentDocument.exists=true';
+    const res = await authedRequest(adminAuth, url, {
+      method: 'PATCH',
+      body: JSON.stringify({ fields: toFields({ status, updatedAt: new Date() }) })
+    });
+    if (!res.ok) throw makeError(res, 'Update failed');
+    return true;
   }
 
-  // סנכרון מול מאגר הענן הקבוע (גיבוי קבוע מעבר להיסטוריית ה-Stream)
-  async function syncFromPermanentCloud() {
-    const map = getLocalUsersMap();
-    try {
-      const resp = await executeHttp(PERMANENT_CLOUD_OBJECT_URL, 'GET');
-      if (resp.ok && resp.text) {
-        const parsed = JSON.parse(resp.text);
-        const cloudUsers = (parsed && parsed.data && parsed.data.users) || {};
-        Object.keys(cloudUsers).forEach((devId) => {
-          if (cloudUsers[devId] && !map[devId]) {
-            map[devId] = cloudUsers[devId];
-          } else if (cloudUsers[devId] && map[devId]) {
-            // אם בענן הקבוע הסטטוס מאושר, נעדכן
-            if (cloudUsers[devId].status === 'approved') {
-              map[devId].status = 'approved';
-            }
-          }
-        });
-        saveLocalUsersMap(map);
-        if (parsed && parsed.data && parsed.data.app_config) {
-          saveLocalAppConfig(parsed.data.app_config);
-        }
-      }
-    } catch (e) {}
-    return map;
+  async function adminDeleteUser(uid) {
+    const res = await authedRequest(adminAuth, `${DB_BASE}/users/${encodeURIComponent(uid)}`, { method: 'DELETE' });
+    if (!res.ok && res.status !== 404) throw makeError(res, 'Delete failed');
+    return true;
   }
 
-  async function persistMapToPermanentCloud(map, customAppConfig) {
-    try {
-      const appCfg = customAppConfig || getLocalAppConfig();
-      await executeHttp(
-        PERMANENT_CLOUD_OBJECT_URL,
-        'PUT',
-        JSON.stringify({
-          name: 'magic-lockscreen-users',
-          data: {
-            users: map || getLocalUsersMap(),
-            app_config: appCfg,
-            updatedAt: Date.now()
-          }
+  async function adminPublishUpdate({ latest_version, apk_url, message }) {
+    const res = await authedRequest(adminAuth, `${DB_BASE}/app_config/main`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        fields: toFields({
+          latest_version: String(latest_version || '').trim(),
+          apk_url: String(apk_url || '').trim(),
+          message: String(message || '').trim(),
+          published_at: new Date()
         })
-      );
-    } catch (e) {}
-  }
-
-  // פרסום אירוע לערוץ הזמן-אמת
-  async function publishStreamEvent(payloadObj) {
-    const body = JSON.stringify(payloadObj);
-    const resp = await executeHttp(REALTIME_STREAM_URL, 'POST', body, 'text/plain; charset=utf-8');
-    return resp.ok;
-  }
-
-  // 1. רישום או עדכון בקשת לקוח חדשה ('pending')
-  async function registerOrUpdateUser(userData) {
-    const deviceId = String(userData.deviceId || '').trim();
-    if (!deviceId) throw new Error('Missing deviceId');
-
-    const record = {
-      name: String(userData.name || '').trim(),
-      phone: String(userData.phone || '').trim(),
-      deviceId: deviceId,
-      status: userData.status || 'pending',
-      createdAt: userData.createdAt || new Date().toISOString()
-    };
-
-    const localMap = getLocalUsersMap();
-    localMap[deviceId] = record;
-    saveLocalUsersMap(localMap);
-
-    // שידור מיידי לערוץ הזמן-אמת (מופיע ב-Admin Dashboard תוך חצי שנייה)
-    const streamOk = await publishStreamEvent({
-      action: 'upsert',
-      deviceId: deviceId,
-      user: record,
-      ts: Date.now()
+      })
     });
-
-    // גיבוי למאגר הענן הקבוע ברקע
-    persistMapToPermanentCloud(localMap);
-
-    if (!streamOk) {
-      // ניסיון נוסף מול המאגר הקבוע
-      await persistMapToPermanentCloud(localMap);
-    }
-
-    return record;
-  }
-
-  // 2. עדכון סטטוס משתמש ('approved' / 'blocked' / 'pending')
-  async function updateUserStatus(deviceId, newStatus) {
-    const cleanId = String(deviceId || '').trim();
-    if (!cleanId) return false;
-
-    const localMap = getLocalUsersMap();
-    if (localMap[cleanId]) {
-      localMap[cleanId].status = newStatus;
-    } else {
-      localMap[cleanId] = {
-        name: 'לקוח',
-        phone: '',
-        deviceId: cleanId,
-        status: newStatus,
-        createdAt: new Date().toISOString()
-      };
-    }
-    saveLocalUsersMap(localMap);
-
-    await publishStreamEvent({
-      action: 'status',
-      deviceId: cleanId,
-      status: newStatus,
-      user: localMap[cleanId],
-      ts: Date.now()
-    });
-
-    persistMapToPermanentCloud(localMap);
+    if (!res.ok) throw makeError(res, 'Publish failed');
     return true;
-  }
-
-  // 3. מחיקת משתמש
-  async function deleteUser(deviceId) {
-    const cleanId = String(deviceId || '').trim();
-    if (!cleanId) return false;
-
-    const localMap = getLocalUsersMap();
-    delete localMap[cleanId];
-    saveLocalUsersMap(localMap);
-
-    await publishStreamEvent({
-      action: 'delete',
-      deviceId: cleanId,
-      ts: Date.now()
-    });
-
-    persistMapToPermanentCloud(localMap);
-    return true;
-  }
-
-  // 4. האזנה בזמן אמת לסטטוס המכשיר באפליקציית הלקוח (נפתח אוטומטית ברגע שהמנהל לוחץ "אשר")
-  function listenToUserStatus(deviceId, onStatusChange) {
-    const cleanId = String(deviceId || '').trim();
-    let stopped = false;
-    let sse = null;
-
-    const checkNow = async () => {
-      if (stopped) return;
-      const map = await syncFromRealtimeStream(getLocalUsersMap());
-      if (map[cleanId] && map[cleanId].status) {
-        onStatusChange(map[cleanId].status, map[cleanId]);
-        if (map[cleanId].status === 'approved') return;
-      }
-      const permMap = await syncFromPermanentCloud();
-      if (permMap[cleanId] && permMap[cleanId].status) {
-        onStatusChange(permMap[cleanId].status, permMap[cleanId]);
-      }
-    };
-
-    // פתיחת חיבור EventSource חי (SSE) לעדכון מיידי תוך שבריר שנייה
-    try {
-      if (typeof EventSource !== 'undefined') {
-        sse = new EventSource(`${REALTIME_STREAM_URL}/sse?since=all`);
-        sse.onmessage = (ev) => {
-          if (stopped || !ev || !ev.data) return;
-          try {
-            const payload = JSON.parse(ev.data);
-            const map = getLocalUsersMap();
-            if (applyStreamPayloadToMap(map, payload)) {
-              saveLocalUsersMap(map);
-              if (map[cleanId] && map[cleanId].status) {
-                onStatusChange(map[cleanId].status, map[cleanId]);
-              }
-            }
-          } catch (e) {}
-        };
-      }
-    } catch (e) {}
-
-    checkNow();
-    const timer = setInterval(checkNow, 2500);
-
-    return function unsubscribe() {
-      stopped = true;
-      clearInterval(timer);
-      if (sse) {
-        try {
-          sse.close();
-        } catch (e) {}
-      }
-    };
-  }
-
-  // 5. האזנה בזמן אמת לכל המשתמשים עבור אתר הניהול (Admin Dashboard)
-  function listenToAllUsers(onUsersList) {
-    let stopped = false;
-    let sse = null;
-
-    const emitSorted = (map) => {
-      if (stopped) return;
-      const list = Object.values(map || {}).sort((a, b) =>
-        String(b.createdAt || '').localeCompare(String(a.createdAt || ''))
-      );
-      onUsersList(list);
-    };
-
-    const syncAll = async () => {
-      if (stopped) return;
-      const map = await syncFromRealtimeStream(getLocalUsersMap());
-      emitSorted(map);
-    };
-
-    // טעינה ראשונית גם מהמאגר הקבוע וגם מערוץ הזמן-אמת
-    syncFromPermanentCloud().then((permMap) => {
-      syncFromRealtimeStream(permMap).then((merged) => {
-        emitSorted(merged);
-      });
-    });
-
-    // האזנה חיה (SSE) לכל בקשה חדשה שנשלחת מטלפון של לקוח
-    try {
-      if (typeof EventSource !== 'undefined') {
-        sse = new EventSource(`${REALTIME_STREAM_URL}/sse?since=all`);
-        sse.onmessage = (ev) => {
-          if (stopped || !ev || !ev.data) return;
-          try {
-            const payload = JSON.parse(ev.data);
-            const map = getLocalUsersMap();
-            if (applyStreamPayloadToMap(map, payload)) {
-              saveLocalUsersMap(map);
-              emitSorted(map);
-            }
-          } catch (e) {}
-        };
-      }
-    } catch (e) {}
-
-    const timer = setInterval(syncAll, 3000);
-
-    return function unsubscribe() {
-      stopped = true;
-      clearInterval(timer);
-      if (sse) {
-        try {
-          sse.close();
-        } catch (e) {}
-      }
-    };
-  }
-
-  // 6. שליפה ועדכון של מסמך הגדרות האפליקציה בענן (app_config: latest_version, apk_url)
-  async function getAppConfig() {
-    let cfg = getLocalAppConfig();
-    try {
-      // בדיקה מול version.json בענן (GitHub Pages) ומול מאגר הענן הקבוע
-      const verResp = await executeHttp(`${REMOTE_VERSION_JSON_URL}?t=${Date.now()}`, 'GET');
-      if (verResp.ok && verResp.text) {
-        const verData = JSON.parse(verResp.text);
-        if (verData) {
-          if (verData.latest_version) cfg.latest_version = String(verData.latest_version);
-          if (verData.apk_url) cfg.apk_url = String(verData.apk_url);
-          saveLocalAppConfig(cfg);
-        }
-      }
-    } catch (e) {}
-
-    try {
-      await syncFromPermanentCloud();
-      await syncFromRealtimeStream(getLocalUsersMap());
-      const cloudCfg = getLocalAppConfig();
-      if (cloudCfg && cloudCfg.latest_version) {
-        cfg = cloudCfg;
-      }
-    } catch (e) {}
-
-    return cfg;
-  }
-
-  async function updateAppConfig(newConfig) {
-    const cfg = {
-      latest_version: String((newConfig && newConfig.latest_version) || '4.1').trim(),
-      apk_url: String((newConfig && newConfig.apk_url) || DEFAULT_APK_DOWNLOAD_URL).trim(),
-      updatedAt: new Date().toISOString()
-    };
-    saveLocalAppConfig(cfg);
-    await publishStreamEvent({
-      action: 'app_config',
-      deviceId: 'app_config',
-      app_config: cfg,
-      ts: Date.now()
-    });
-    await persistMapToPermanentCloud(getLocalUsersMap(), cfg);
-    return cfg;
-  }
-
-  function onConnectionStatusChange(cb) {
-    if (typeof cb === 'function') {
-      connectionListeners.push(cb);
-      cb(lastConnectionState);
-    }
   }
 
   return {
-    COLLECTION_NAME,
-    APP_CONFIG_COLLECTION,
-    registerOrUpdateUser,
-    updateUserStatus,
-    deleteUser,
-    listenToUserStatus,
-    listenToAllUsers,
+    isConfigured,
     getAppConfig,
-    updateAppConfig,
-    onConnectionStatusChange
+    device: {
+      ensureSession: ensureDeviceSession,
+      getMyStatus,
+      submitRequest
+    },
+    admin: {
+      signIn: adminSignIn,
+      signOut: () => adminAuth.clear(),
+      hasSession: () => adminAuth.hasSession(),
+      email: () => adminAuth.email,
+      isAdmin: adminIsAdmin,
+      listUsers: adminListUsers,
+      setStatus: adminSetStatus,
+      deleteUser: adminDeleteUser,
+      publishUpdate: adminPublishUpdate
+    }
   };
 })();

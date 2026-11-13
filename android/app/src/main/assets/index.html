@@ -57,33 +57,28 @@
       <!-- מצב המתנה לאישור מרחוק -->
       <div class="reg-waiting-box" id="regWaitingBox" style="display: none;">
         <div class="reg-spinner"></div>
-        <div class="reg-waiting-title">הבקשה נשלחה וממתינה לאישור</div>
-        <div class="reg-waiting-sub">האפליקציה תיפתח אוטומטית מיד עם אישור הבקשה</div>
+        <div class="reg-waiting-title" id="regWaitingTitle">הבקשה נשלחה וממתינה לאישור</div>
+        <div class="reg-waiting-sub" id="regWaitingSub">האפליקציה תיפתח אוטומטית מיד עם אישור הבקשה</div>
+      </div>
+
+      <!-- הגישה בוטלה על ידי המנהל -->
+      <div class="reg-waiting-box" id="regBlockedBox" style="display: none;">
+        <div class="reg-waiting-title" style="color: #fb7185;">הגישה למכשיר זה בוטלה</div>
+        <div class="reg-waiting-sub">לפרטים יש לפנות למנהל</div>
       </div>
 
       <div class="license-error-msg" id="licenseErrorMsg"></div>
+    </div>
+  </div>
 
-      <!-- כניסת קוד גיבוי / מאסטר מוסתרת כברירת מחדל כדי לשמור על מסך נקי ללקוח -->
-      <div style="margin-top: 14px; text-align: center;">
-        <button type="button" id="toggleManualKeyBtn" style="background: none; border: none; color: rgba(148, 163, 184, 0.7); font-size: 12px; cursor: pointer; text-decoration: underline;">
-          יש לך קוד הפעלה?
-        </button>
-      </div>
-
-      <div id="manualKeyContainer" style="display: none; margin-top: 10px; width: 100%;">
-        <input
-          type="text"
-          id="licenseKeyInput"
-          class="license-key-input"
-          placeholder="הזן קוד הפעלה"
-          autocomplete="off"
-          autocorrect="off"
-          autocapitalize="characters"
-          spellcheck="false"
-          dir="ltr"
-        />
-        <button type="button" class="license-activate-btn" id="activateLicenseBtn" style="margin-top: 8px;">הפעל</button>
-      </div>
+  <!-- חלון "יש עדכון חדש" (מוצג רק במסך ההגדרות, אף פעם לא מעל מסך הנעילה הפעיל) -->
+  <div class="update-popup-overlay" id="updatePopupOverlay" style="display: none;">
+    <div class="update-popup-card">
+      <div class="update-popup-icon">⬆</div>
+      <div class="update-popup-title" id="updatePopupTitle">יש עדכון חדש</div>
+      <div class="update-popup-text" id="updatePopupText"></div>
+      <button type="button" class="update-popup-btn" id="updatePopupBtn">עדכן עכשיו</button>
+      <button type="button" class="update-popup-later" id="updatePopupLater">אחר כך</button>
     </div>
   </div>
 

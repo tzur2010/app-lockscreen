@@ -71,6 +71,21 @@
     </div>
   </div>
 
+  <!-- הודעה מדומה (חשיפה בהתראה) - בגרסת האתר / כשנשארים בתוך האפליקציה -->
+  <div class="fake-msg-banner" id="fakeMsgBanner" style="display: none;">
+    <div class="fake-msg-icon">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="#fff"><path d="M12 3C6.5 3 2 6.8 2 11.5c0 2.6 1.4 4.9 3.6 6.5L5 21.5l3.9-2.1c1 .3 2 .4 3.1.4 5.5 0 10-3.8 10-8.5S17.5 3 12 3z"/></svg>
+    </div>
+    <div class="fake-msg-body">
+      <div class="fake-msg-top">
+        <span class="fake-msg-app">הודעות</span>
+        <span class="fake-msg-time">עכשיו</span>
+      </div>
+      <div class="fake-msg-sender" id="fakeMsgSender"></div>
+      <div class="fake-msg-text" id="fakeMsgText"></div>
+    </div>
+  </div>
+
   <!-- חלון בחירת סוג הנעילה: קופץ אחרי "שמור וסגור" בהגדרות -->
   <div class="update-popup-overlay" id="lockTypeChooser" style="display: none;">
     <div class="update-popup-card lock-type-card">
@@ -234,6 +249,55 @@
             <div class="toggle-sub-desc" style="margin-top: 6px;" id="unlockAttemptDesc">
               הטלפון נפתח כבר בניסיון הראשון.
             </div>
+          </div>
+
+          <div class="oneui-card-divider"></div>
+
+          <!-- הצצה לשעון החכם -->
+          <div class="clean-toggle-row oneui-row-with-sub">
+            <div class="toggle-text-stack">
+              <span class="toggle-main-title">⌚ שלח את הקוד לשעון החכם</span>
+              <span class="toggle-sub-desc" id="watchPeekDesc">כל קוד או דפוס שהצופה מקליד מופיע מיד על השעון שמחובר לטלפון, בלי לגעת בטלפון. בטלפון עצמו לא רואים ולא שומעים כלום.</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="toggleWatchPeek">
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="oneui-field-block" id="watchPeekExtra" style="display: none; padding-top: 0;">
+            <button type="button" class="media-upload-btn" id="watchPeekTestBtn" style="width: 100%;">שלח בדיקה לשעון</button>
+            <div class="toggle-sub-desc" id="watchPeekStatus" style="margin-top: 6px;">
+              בשעון Galaxy: באפליקציית Galaxy Wearable ← התראות ← יש להדליק "הצג התראות בשעון גם כשהטלפון בשימוש", ולוודא שההתראות של Lockscreen מופעלות.
+            </div>
+          </div>
+
+          <div class="oneui-card-divider"></div>
+
+          <!-- חשיפה בהתראה -->
+          <div class="clean-toggle-row oneui-row-with-sub">
+            <div class="toggle-text-stack">
+              <span class="toggle-main-title">💬 חשיפה בהתראה</span>
+              <span class="toggle-sub-desc">כמה שניות אחרי שהטלפון נפתח, מגיעה הודעה שבתוכה הקוד שהצופה בחר.</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="toggleReveal">
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="oneui-field-block" id="revealExtra" style="display: none; padding-top: 0;">
+            <label class="config-label" for="revealSenderInput">שם השולח</label>
+            <input type="text" id="revealSenderInput" class="feedback-textarea" style="min-height: 0; height: 42px;" maxlength="40" dir="rtl">
+            <label class="config-label" for="revealTextInput" style="margin-top: 8px;">תוכן ההודעה ({קוד} יוחלף בקוד שהוקלד)</label>
+            <textarea id="revealTextInput" class="feedback-textarea" rows="3" maxlength="300" dir="rtl"></textarea>
+            <label class="config-label" style="margin-top: 8px;">אחרי כמה שניות ההודעה מגיעה</label>
+            <div class="segmented-row" id="revealDelaySelector">
+              <button type="button" class="seg-pill" data-delay="3">3</button>
+              <button type="button" class="seg-pill active" data-delay="5">5</button>
+              <button type="button" class="seg-pill" data-delay="10">10</button>
+              <button type="button" class="seg-pill" data-delay="20">20</button>
+            </div>
+            <button type="button" class="media-upload-btn" id="revealTestBtn" style="width: 100%; margin-top: 10px;">נסה עכשיו (עם הקוד 1234)</button>
+            <div class="toggle-sub-desc" id="revealStatus" style="margin-top: 6px; min-height: 16px;"></div>
           </div>
 
           <div class="oneui-card-divider"></div>

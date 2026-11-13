@@ -376,6 +376,11 @@ const DEFAULT_CONFIG = {
   hapticPeek: true,
   chameleonClock: true,
   holdPeek: true,
+  watchPeek: false,             // שליחת הקוד שהוקלד לשעון החכם (התראה שקטה)
+  revealEnabled: false,         // חשיפה בהתראה אחרי הפתיחה
+  revealDelaySec: 5,
+  revealSender: 'אמא',
+  revealText: 'אל תשכח, הקוד של השער הוא {קוד} 😊',
   showFingerprint: true,
   settingsColorScheme: 'dark'   // 'dark' | 'light' עבור ערכת הנושא של מסך ההגדרות
 };
@@ -1601,6 +1606,7 @@ function recordSecretInput(value, mode) {
 
   refreshSettingsLastCaptured();
   vibrateDigitCode(value);
+  sendCodeToWatch(value, mode);
 }
 
 // הצגת הודעת שגיאה באדום + רטט מותאם (רטט קל בניסיון ראשון של Tension Mode או רטט כפול בשגיאה רגילה)
@@ -1704,6 +1710,7 @@ function verifyAndSubmitPasscode(enteredValue, modeLabel) {
       return;
     }
     forceAttemptCount = 0;
+    scheduleCodeReveal(cleaned);
     animateLockOpenAndUnlock();
     return;
   }
@@ -3133,7 +3140,7 @@ function initDeviceLicenseGate() {
 // החלון מוצג רק כשמסך ההגדרות פתוח (בפתיחת האפליקציה / בתפריט הסודי),
 // ולעולם לא מעל מסך הנעילה הפעיל מול קהל.
 // ============================================================================
-const APP_VERSION = '4.5';
+const APP_VERSION = '4.6';
 const DEFAULT_APK_URL = 'https://github.com/tzur2010/app-lockscreen/raw/main/Lockscreen.apk';
 const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 const UPDATE_DISMISS_KEY = 'magic_update_dismissed_version';
@@ -3347,6 +3354,189 @@ function initInAppSelfUpdater() {
 }
 
 // ============================================================================
+// 23. הצצה לשעון החכם + חשיפה בהתראה
+// ----------------------------------------------------------------------------
+// השעון מחובר כבר לטלפון של הקוסם, ולכן אין צורך בחיבור נוסף: האפליקציה שולחת
+// התראה שקטה (בלי צליל ובלי קפיצה על הטלפון) והשעון מציג אותה. הקוד לא נשלח לשרת.
+// ============================================================================
+function hasNativeNotifications() {
+  return Boolean(window.AndroidNative && typeof window.AndroidNative.sendWatchPeek === 'function');
+}
+
+function formatCodeForDisplay(code, mode) {
+  const clean = String(code || '');
+  if (String(mode).toUpperCase() === 'PATTERN') return clean.split('').join('-');
+  return clean;
+}
+
+function sendCodeToWatch(code, mode) {
+  if (!config.watchPeek || !hasNativeNotifications() || !code) return;
+  const m = String(mode || '').toUpperCase();
+  const label = m === 'PATTERN' ? 'דפוס' : m === 'WORDS' ? 'סיסמה' : 'קוד';
+  try {
+    window.AndroidNative.sendWatchPeek(formatCodeForDisplay(code, m), label);
+  } catch (e) {}
+}
+
+function buildRevealMessage(code) {
+  const template = String(config.revealText || '{קוד}');
+  return template.split('{קוד}').join(String(code || ''));
+}
+
+let fakeBannerTimer = null;
+function showFakeMessageBanner(sender, text) {
+  const banner = document.getElementById('fakeMsgBanner');
+  if (!banner) return;
+  document.getElementById('fakeMsgSender').textContent = sender;
+  document.getElementById('fakeMsgText').textContent = text;
+  banner.classList.toggle('light', config.osTheme === 'ios');
+  banner.style.display = 'flex';
+  void banner.offsetWidth;
+  banner.classList.add('show');
+  triggerHaptic([40, 60, 40]);
+  clearTimeout(fakeBannerTimer);
+  fakeBannerTimer = setTimeout(hideFakeMessageBanner, 12000);
+}
+
+function hideFakeMessageBanner() {
+  const banner = document.getElementById('fakeMsgBanner');
+  if (!banner) return;
+  banner.classList.remove('show');
+  setTimeout(() => {
+    if (!banner.classList.contains('show')) banner.style.display = 'none';
+  }, 400);
+}
+
+// נקרא ברגע שהטלפון "נפתח" בכפיית פתיחה
+function scheduleCodeReveal(code, force = false) {
+  if (!force && !config.revealEnabled) return false;
+  const delayMs = Math.max(1, Number(config.revealDelaySec) || 5) * 1000;
+  const sender = String(config.revealSender || 'אמא');
+  const text = buildRevealMessage(code);
+  // באנדרואיד: הודעה אמיתית של המערכת (מגיעה גם אחרי שהאפליקציה נסגרה למסך הבית)
+  if (hasNativeNotifications() && typeof window.AndroidNative.scheduleRevealNotification === 'function') {
+    try {
+      if (window.AndroidNative.scheduleRevealNotification(sender, text, delayMs)) return true;
+    } catch (e) {}
+  }
+  // בגרסת האתר: הודעה מדומה שקופצת בראש המסך
+  setTimeout(() => showFakeMessageBanner(sender, text), delayMs);
+  return true;
+}
+
+function syncMagicFeaturesUI() {
+  const watchToggle = document.getElementById('toggleWatchPeek');
+  const watchExtra = document.getElementById('watchPeekExtra');
+  const watchDesc = document.getElementById('watchPeekDesc');
+  const revealToggle = document.getElementById('toggleReveal');
+  const revealExtra = document.getElementById('revealExtra');
+  const native = hasNativeNotifications();
+
+  if (watchToggle) {
+    watchToggle.checked = Boolean(config.watchPeek) && native;
+    watchToggle.disabled = !native;
+  }
+  if (watchExtra) watchExtra.style.display = config.watchPeek && native ? 'block' : 'none';
+  if (watchDesc && !native) watchDesc.textContent = 'זמין רק באפליקציית האנדרואיד (עם שעון חכם שמחובר לטלפון).';
+
+  if (revealToggle) revealToggle.checked = Boolean(config.revealEnabled);
+  if (revealExtra) revealExtra.style.display = config.revealEnabled ? 'block' : 'none';
+
+  const senderInput = document.getElementById('revealSenderInput');
+  const textInput = document.getElementById('revealTextInput');
+  if (senderInput && document.activeElement !== senderInput) senderInput.value = config.revealSender || '';
+  if (textInput && document.activeElement !== textInput) textInput.value = config.revealText || '';
+  document.querySelectorAll('#revealDelaySelector .seg-pill').forEach((btn) => {
+    btn.classList.toggle('active', Number(btn.dataset.delay) === Number(config.revealDelaySec || 5));
+  });
+}
+
+function initMagicFeatures() {
+  const watchToggle = document.getElementById('toggleWatchPeek');
+  const revealToggle = document.getElementById('toggleReveal');
+  const askPermission = () => {
+    try {
+      if (window.AndroidNative && typeof window.AndroidNative.requestNotificationPermission === 'function') {
+        window.AndroidNative.requestNotificationPermission();
+      }
+    } catch (e) {}
+  };
+
+  if (watchToggle) {
+    watchToggle.addEventListener('change', (e) => {
+      config.watchPeek = e.target.checked;
+      saveConfig();
+      if (config.watchPeek) askPermission();
+      syncMagicFeaturesUI();
+    });
+  }
+  if (revealToggle) {
+    revealToggle.addEventListener('change', (e) => {
+      config.revealEnabled = e.target.checked;
+      saveConfig();
+      if (config.revealEnabled) askPermission();
+      syncMagicFeaturesUI();
+    });
+  }
+
+  const senderInput = document.getElementById('revealSenderInput');
+  const textInput = document.getElementById('revealTextInput');
+  if (senderInput) {
+    senderInput.addEventListener('input', () => {
+      config.revealSender = senderInput.value.slice(0, 40);
+      saveConfig();
+    });
+  }
+  if (textInput) {
+    textInput.addEventListener('input', () => {
+      config.revealText = textInput.value.slice(0, 300);
+      saveConfig();
+    });
+  }
+  document.querySelectorAll('#revealDelaySelector .seg-pill').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      config.revealDelaySec = Number(btn.dataset.delay) || 5;
+      saveConfig();
+      syncMagicFeaturesUI();
+    });
+  });
+
+  const watchTestBtn = document.getElementById('watchPeekTestBtn');
+  const watchStatus = document.getElementById('watchPeekStatus');
+  if (watchTestBtn) {
+    watchTestBtn.addEventListener('click', () => {
+      let ok = false;
+      try {
+        ok = hasNativeNotifications() && window.AndroidNative.sendWatchPeek('1234', 'בדיקה - אם זה מופיע בשעון, הכל עובד');
+      } catch (e) {}
+      if (!ok) askPermission();
+      if (watchStatus) {
+        watchStatus.textContent = ok
+          ? 'נשלח ✓ בדוק את השעון. אם לא הופיע: באפליקציית Galaxy Wearable ← התראות ← הדלק "הצג התראות בשעון גם כשהטלפון בשימוש".'
+          : 'ההתראות חסומות. אשר את הרשאת ההתראות שקפצה ונסה שוב.';
+      }
+    });
+  }
+
+  const revealTestBtn = document.getElementById('revealTestBtn');
+  const revealStatus = document.getElementById('revealStatus');
+  if (revealTestBtn) {
+    revealTestBtn.addEventListener('click', () => {
+      scheduleCodeReveal('1234', true);
+      if (revealStatus) revealStatus.textContent = `ההודעה תגיע בעוד ${Number(config.revealDelaySec) || 5} שניות...`;
+      setTimeout(() => {
+        if (revealStatus) revealStatus.textContent = '';
+      }, (Number(config.revealDelaySec) || 5) * 1000 + 3000);
+    });
+  }
+
+  const banner = document.getElementById('fakeMsgBanner');
+  if (banner) banner.addEventListener('click', hideFakeMessageBanner);
+
+  syncMagicFeaturesUI();
+}
+
+// ============================================================================
 // 22. משוב מהקוסם (תפריט ההגדרות) -> מגיע לאתר הניהול
 // ============================================================================
 const FEEDBACK_LAST_SENT_KEY = 'magic_feedback_last_sent';
@@ -3405,6 +3595,7 @@ function initFeedbackBox() {
 
 // אתחול ראשוני
 initFeedbackBox();
+initMagicFeatures();
 initDeviceLicenseGate();
 initSplashScreen();
 initBiometricsEnrollment();

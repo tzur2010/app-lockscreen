@@ -46,11 +46,34 @@ service cloud.firestore {
         && request.resource.data.createdAt is timestamp;
 
       // רק המנהל משנה סטטוס (אישור / ביטול גישה / החזרה).
-      allow update: if isAdmin()
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
-        && request.resource.data.status in ['pending', 'approved', 'blocked'];
+      // המכשיר עצמו יכול לעדכן רק את נתוני השימוש שלו (זמן אחרון, מספר פתיחות, גרסה).
+      allow update: if (isAdmin()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
+          && request.resource.data.status in ['pending', 'approved', 'blocked'])
+        || (signedIn() && request.auth.uid == uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastSeen', 'openCount', 'appVersion'])
+          && request.resource.data.lastSeen == request.time
+          && request.resource.data.openCount is int
+          && request.resource.data.openCount <= 1000000
+          && validStr(request.resource.data.appVersion, 0, 20));
 
       allow delete: if isAdmin();
+    }
+
+    // משוב: מכשיר רשום יכול רק לשלוח משוב בשמו. רק המנהל קורא ומוחק.
+    match /feedback/{feedbackId} {
+      allow create: if signedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && request.resource.data.keys().hasOnly(['uid', 'text', 'appVersion', 'os', 'model', 'createdAt'])
+        && request.resource.data.keys().hasAll(['uid', 'text', 'createdAt'])
+        && request.resource.data.uid == request.auth.uid
+        && validStr(request.resource.data.text, 1, 2000)
+        && (!('appVersion' in request.resource.data) || validStr(request.resource.data.appVersion, 0, 20))
+        && (!('os' in request.resource.data) || validStr(request.resource.data.os, 0, 20))
+        && (!('model' in request.resource.data) || validStr(request.resource.data.model, 0, 40))
+        && request.resource.data.createdAt is timestamp;
+      allow read, delete: if isAdmin();
+      allow update: if false;
     }
 
     // הגדרות עדכון: כולם קוראים, רק המנהל מפרסם.

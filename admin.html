@@ -69,6 +69,11 @@
     .actions-cell { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
     .empty-state { padding: 54px 20px; text-align: center; color: #64748b; font-size: 15px; }
 
+    .feedback-list { display: flex; flex-direction: column; gap: 10px; max-height: 420px; overflow-y: auto; }
+    .feedback-item { background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.07); border-radius: 14px; padding: 12px 14px; }
+    .feedback-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
+    .feedback-head .btn { margin-inline-start: auto; }
+    .feedback-text { font-size: 14.5px; line-height: 1.6; white-space: pre-wrap; word-break: break-word; color: #e2e8f0; }
     .toast { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%); background: #1e293b; border: 1px solid rgba(255,255,255,.15); color: #fff; padding: 12px 18px; border-radius: 14px; font-size: 14px; font-weight: 600; box-shadow: 0 10px 30px rgba(0,0,0,.4); display: none; z-index: 50; max-width: 90vw; }
     .toast.error { border-color: rgba(244,63,94,.5); color: #fecdd3; }
     .config-warning { padding: 18px 22px; margin-bottom: 20px; border-color: rgba(245,158,11,.4); color: #fde68a; font-size: 14px; line-height: 1.6; }
@@ -167,6 +172,11 @@
         </div>
       </div>
 
+      <div class="card panel" style="margin-bottom: 20px;">
+        <h2>💬 משובים מהקוסמים (<span id="feedbackCount">0</span>)</h2>
+        <div id="feedbackList" class="feedback-list"></div>
+      </div>
+
       <div class="card">
         <div class="table-header-bar">
           <div class="filter-tabs" id="filterTabs">
@@ -184,6 +194,7 @@
                 <th>שם</th>
                 <th>טלפון</th>
                 <th>תאריך בקשה</th>
+                <th>שימוש</th>
                 <th>סטטוס</th>
                 <th>פעולות</th>
               </tr>
@@ -214,6 +225,7 @@
       'בהצלחה! ✨';
 
     let allUsers = [];
+    let allFeedback = [];
     let currentFilter = 'all';
     let searchQuery = '';
     let pollTimer = null;
@@ -264,6 +276,61 @@
       return d.toLocaleDateString('he-IL') + ' ' + d.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
     }
 
+    function timeAgo(iso) {
+      if (!iso) return '';
+      const diff = Date.now() - new Date(iso).getTime();
+      if (isNaN(diff)) return '';
+      const min = Math.floor(diff / 60000);
+      if (min < 2) return 'עכשיו';
+      if (min < 60) return `לפני ${min} דק'`;
+      const hours = Math.floor(min / 60);
+      if (hours < 24) return hours === 1 ? 'לפני שעה' : `לפני ${hours} שעות`;
+      const days = Math.floor(hours / 24);
+      return days === 1 ? 'אתמול' : `לפני ${days} ימים`;
+    }
+
+    function usageHtml(u) {
+      if (!u.lastSeen) return '<span class="muted">עוד לא השתמש</span>';
+      const opens = Number(u.openCount) || 0;
+      const ver = u.appVersion ? ` · <span class="mono">v${escapeHtml(u.appVersion)}</span>` : '';
+      return `<div style="font-weight:600; font-size:13.5px;">${timeAgo(u.lastSeen)}</div>` +
+        `<div class="muted">${opens} פתיחות${ver}</div>`;
+    }
+
+    function renderFeedback() {
+      const list = $('feedbackList');
+      $('feedbackCount').textContent = allFeedback.length;
+      list.innerHTML = '';
+      if (!allFeedback.length) {
+        list.innerHTML = '<div class="empty-state" style="padding:26px 10px;">עוד לא התקבל משוב. הקוסמים שולחים משוב מתוך תפריט ההגדרות באפליקציה.</div>';
+        return;
+      }
+      allFeedback.forEach((f) => {
+        const user = allUsers.find((u) => u.id === f.uid);
+        const who = user ? escapeHtml(user.name) : 'משתמש שנמחק';
+        const meta = [formatDate(f.createdAt), f.appVersion ? 'v' + escapeHtml(f.appVersion) : '', escapeHtml(f.model || '')]
+          .filter(Boolean)
+          .join(' · ');
+        const item = document.createElement('div');
+        item.className = 'feedback-item';
+        item.innerHTML = `
+          <div class="feedback-head">
+            <span style="font-weight:800;">${who}</span>
+            <span class="muted">${meta}</span>
+            <button type="button" class="btn btn-delete" style="padding:4px 10px; font-size:12px;" data-fb-delete="${escapeHtml(f.id)}">מחק</button>
+          </div>
+          <div class="feedback-text">${escapeHtml(f.text)}</div>`;
+        list.appendChild(item);
+      });
+    }
+
+    async function loadFeedback() {
+      try {
+        allFeedback = await Cloud.admin.listFeedback();
+        renderFeedback();
+      } catch (e) {}
+    }
+
     function renderUsers() {
       $('statTotal').textContent = allUsers.length;
       $('statPending').textContent = allUsers.filter((u) => u.status === 'pending').length;
@@ -305,6 +372,7 @@
           <td style="font-weight:700;">${escapeHtml(u.name) || '—'}${u.deviceId ? `<div class="muted">מכשיר <span class="mono">${escapeHtml(u.deviceId)}</span></div>` : ''}</td>
           <td><span class="mono" style="color:#e2e8f0;">${escapeHtml(u.phone) || '—'}</span></td>
           <td class="muted">${formatDate(u.createdAt)}</td>
+          <td>${usageHtml(u)}</td>
           <td>${statusHtml}</td>
           <td><div class="actions-cell">${actions}</div></td>`;
         tbody.appendChild(tr);
@@ -316,6 +384,7 @@
         allUsers = await Cloud.admin.listUsers();
         setLive(true);
         renderUsers();
+        loadFeedback();
       } catch (err) {
         setLive(false);
         if (err.status === 401 || err.status === 403) {
@@ -388,6 +457,22 @@
           toast('המחיקה נכשלה: ' + err.message, true);
           btn.disabled = false;
         }
+      }
+    });
+
+    $('feedbackList').addEventListener('click', async (e) => {
+      const btn = e.target.closest('[data-fb-delete]');
+      if (!btn) return;
+      if (!confirm('למחוק את המשוב הזה?')) return;
+      btn.disabled = true;
+      try {
+        await Cloud.admin.deleteFeedback(btn.getAttribute('data-fb-delete'));
+        allFeedback = allFeedback.filter((f) => f.id !== btn.getAttribute('data-fb-delete'));
+        renderFeedback();
+        toast('המשוב נמחק');
+      } catch (err) {
+        toast('המחיקה נכשלה: ' + err.message, true);
+        btn.disabled = false;
       }
     });
 

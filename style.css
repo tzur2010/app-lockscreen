@@ -2963,6 +2963,30 @@ html, body, .phone-container {
   text-align: center;
 }
 
+/* תיבת משוב בהגדרות */
+.feedback-textarea {
+  width: 100%;
+  min-height: 96px;
+  resize: vertical;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(0, 0, 0, 0.25);
+  color: inherit;
+  padding: 10px 12px;
+  font-size: 14px;
+  line-height: 1.5;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+.feedback-send-btn {
+  width: 100%;
+  margin-top: 8px;
+  border-style: solid;
+  border-color: rgba(34, 197, 94, 0.5);
+  color: #22c55e;
+}
+
 /* חלון בחירת סוג הנעילה (אחרי "שמור וסגור") */
 .lock-type-card {
   border-color: rgba(56, 136, 255, 0.45);

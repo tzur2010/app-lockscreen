@@ -238,6 +238,53 @@ window.MagicCloud = (function () {
     return 'pending';
   }
 
+  // רישום שימוש: מתי נפתחה האפליקציה לאחרונה, כמה פעמים ובאיזו גרסה.
+  // הזמן והספירה מחושבים בשרת (לא ניתן לזייף מהטלפון).
+  async function reportUsage(appVersion) {
+    const uid = await ensureDeviceSession();
+    const res = await authedRequest(deviceAuth, `${DB_BASE}:commit`, {
+      method: 'POST',
+      body: JSON.stringify({
+        writes: [
+          {
+            update: {
+              name: `projects/${PROJECT_ID}/databases/(default)/documents/users/${uid}`,
+              fields: toFields({ appVersion: String(appVersion || '').slice(0, 20) })
+            },
+            updateMask: { fieldPaths: ['appVersion'] },
+            updateTransforms: [
+              { fieldPath: 'lastSeen', setToServerValue: 'REQUEST_TIME' },
+              { fieldPath: 'openCount', increment: { integerValue: '1' } }
+            ],
+            currentDocument: { exists: true }
+          }
+        ]
+      })
+    });
+    if (!res.ok) throw makeError(res, 'Usage report failed');
+    return true;
+  }
+
+  // שליחת משוב מהקוסם (מגיע לאתר הניהול)
+  async function sendFeedback({ text, appVersion, os, model }) {
+    const uid = await ensureDeviceSession();
+    const res = await authedRequest(deviceAuth, `${DB_BASE}/feedback`, {
+      method: 'POST',
+      body: JSON.stringify({
+        fields: toFields({
+          uid,
+          text: String(text || '').trim().slice(0, 2000),
+          appVersion: String(appVersion || '').slice(0, 20),
+          os: String(os || '').slice(0, 20),
+          model: String(model || '').slice(0, 40),
+          createdAt: new Date()
+        })
+      })
+    });
+    if (!res.ok) throw makeError(res, 'Feedback failed');
+    return true;
+  }
+
   // --------------------------------------------------------------------------
   // הגדרות עדכון (ציבורי לקריאה, רק המנהל כותב)
   // --------------------------------------------------------------------------
@@ -311,6 +358,27 @@ window.MagicCloud = (function () {
     return true;
   }
 
+  async function adminListFeedback() {
+    const items = [];
+    let pageToken = '';
+    do {
+      const url = `${DB_BASE}/feedback?pageSize=300${pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : ''}`;
+      const res = await authedRequest(adminAuth, url);
+      if (!res.ok) throw makeError(res, 'Feedback list failed');
+      const data = JSON.parse(res.text || '{}');
+      (data.documents || []).forEach((doc) => items.push(fromDoc(doc)));
+      pageToken = data.nextPageToken || '';
+    } while (pageToken);
+    items.sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
+    return items;
+  }
+
+  async function adminDeleteFeedback(id) {
+    const res = await authedRequest(adminAuth, `${DB_BASE}/feedback/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    if (!res.ok && res.status !== 404) throw makeError(res, 'Delete failed');
+    return true;
+  }
+
   async function adminPublishUpdate({ latest_version, apk_url, message }) {
     const res = await authedRequest(adminAuth, `${DB_BASE}/app_config/main`, {
       method: 'PATCH',
@@ -333,7 +401,9 @@ window.MagicCloud = (function () {
     device: {
       ensureSession: ensureDeviceSession,
       getMyStatus,
-      submitRequest
+      submitRequest,
+      reportUsage,
+      sendFeedback
     },
     admin: {
       signIn: adminSignIn,
@@ -344,6 +414,8 @@ window.MagicCloud = (function () {
       listUsers: adminListUsers,
       setStatus: adminSetStatus,
       deleteUser: adminDeleteUser,
+      listFeedback: adminListFeedback,
+      deleteFeedback: adminDeleteFeedback,
       publishUpdate: adminPublishUpdate
     }
   };

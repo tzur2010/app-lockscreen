@@ -73,9 +73,7 @@
 
   <!-- הודעה מדומה (חשיפה בהתראה) - בגרסת האתר / כשנשארים בתוך האפליקציה -->
   <div class="fake-msg-banner" id="fakeMsgBanner" style="display: none;">
-    <div class="fake-msg-icon">
-      <svg viewBox="0 0 24 24" width="22" height="22" fill="#fff"><path d="M12 3C6.5 3 2 6.8 2 11.5c0 2.6 1.4 4.9 3.6 6.5L5 21.5l3.9-2.1c1 .3 2 .4 3.1.4 5.5 0 10-3.8 10-8.5S17.5 3 12 3z"/></svg>
-    </div>
+    <span class="fake-msg-avatar" id="fakeMsgAvatar"></span>
     <div class="fake-msg-body">
       <div class="fake-msg-top">
         <span class="fake-msg-app">הודעות</span>
@@ -287,6 +285,16 @@
           <div class="oneui-field-block" id="revealExtra" style="display: none; padding-top: 0;">
             <label class="config-label" for="revealSenderInput">שם השולח</label>
             <input type="text" id="revealSenderInput" class="feedback-textarea" style="min-height: 0; height: 42px;" maxlength="40" dir="rtl">
+            <label class="config-label" style="margin-top: 8px;">תמונת השולח (מה שמופיע בהודעה במקום הלוגו)</label>
+            <div class="reveal-avatar-row">
+              <span class="reveal-avatar-preview" id="revealAvatarPreview"></span>
+              <label class="media-upload-btn reveal-avatar-pick">
+                בחר תמונה מהגלריה
+                <input type="file" id="revealAvatarInput" accept="image/*" hidden>
+              </label>
+              <button type="button" class="media-clear-btn" id="revealAvatarClear" style="display: none;">הסר</button>
+            </div>
+            <div class="toggle-sub-desc" style="margin-top: 4px;">בלי תמונה: עיגול צבעוני עם האות הראשונה של השם, כמו איש קשר בלי תמונה.</div>
             <label class="config-label" for="revealTextInput" style="margin-top: 8px;">תוכן ההודעה ({קוד} יוחלף בקוד שהוקלד)</label>
             <textarea id="revealTextInput" class="feedback-textarea" rows="3" maxlength="300" dir="rtl"></textarea>
             <label class="config-label" style="margin-top: 8px;">אחרי כמה שניות ההודעה מגיעה</label>

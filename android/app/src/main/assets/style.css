@@ -3030,6 +3030,54 @@ html, body, .phone-container {
   word-break: break-word;
 }
 
+/* בורר "באיזה ניסיון הטלפון ייפתח" - חמשת הכפתורים בשורה אחת */
+#unlockAttemptModeSelector {
+  grid-template-columns: repeat(5, 1fr);
+}
+
+#unlockAttemptModeSelector .seg-pill {
+  flex: 1 1 0;
+  min-width: 0;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+/* תמונת השולח (חשיפה בהתראה) */
+.reveal-avatar-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.reveal-avatar-preview,
+.fake-msg-avatar {
+  width: 46px;
+  height: 46px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-weight: 800;
+  font-size: 21px;
+  background-size: cover;
+  background-position: center;
+}
+
+.fake-msg-avatar {
+  width: 40px;
+  height: 40px;
+  font-size: 18px;
+}
+
+.reveal-avatar-pick {
+  flex: 1;
+  text-align: center;
+  cursor: pointer;
+}
+
 /* תיבת משוב בהגדרות */
 .feedback-textarea {
   width: 100%;

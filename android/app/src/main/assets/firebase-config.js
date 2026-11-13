@@ -265,6 +265,36 @@ window.MagicCloud = (function () {
     return true;
   }
 
+  // גיבוי הגדרות בענן לפי קוד גיבוי אישי (12 תווים). הקוד הוא "המפתח":
+  // רק מי שיודע אותו יכול לקרוא או לעדכן את הגיבוי.
+  async function saveBackup(code, dataString) {
+    const uid = await ensureDeviceSession();
+    const res = await authedRequest(deviceAuth, `${DB_BASE}:commit`, {
+      method: 'POST',
+      body: JSON.stringify({
+        writes: [
+          {
+            update: {
+              name: `projects/${PROJECT_ID}/databases/(default)/documents/backups/${code}`,
+              fields: toFields({ data: String(dataString || ''), owner: uid })
+            },
+            updateTransforms: [{ fieldPath: 'updatedAt', setToServerValue: 'REQUEST_TIME' }]
+          }
+        ]
+      })
+    });
+    if (!res.ok) throw makeError(res, 'Backup failed');
+    return true;
+  }
+
+  async function loadBackup(code) {
+    await ensureDeviceSession();
+    const res = await authedRequest(deviceAuth, `${DB_BASE}/backups/${encodeURIComponent(code)}`);
+    if (res.status === 404) return null;
+    if (!res.ok) throw makeError(res, 'Restore failed');
+    return fromDoc(JSON.parse(res.text));
+  }
+
   // שליחת משוב מהקוסם (מגיע לאתר הניהול)
   async function sendFeedback({ text, appVersion, os, model }) {
     const uid = await ensureDeviceSession();
@@ -403,7 +433,9 @@ window.MagicCloud = (function () {
       getMyStatus,
       submitRequest,
       reportUsage,
-      sendFeedback
+      sendFeedback,
+      saveBackup,
+      loadBackup
     },
     admin: {
       signIn: adminSignIn,

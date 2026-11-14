@@ -2667,7 +2667,8 @@ const BACK_CLOSABLE_POPUPS = [
   ['adminMsgOverlay', () => document.getElementById('adminMsgOkBtn').click()],
   ['guideOverlay', () => closeGuide()],
   ['lockTypeChooser', () => closeLockTypeChooser()],
-  ['updatePopupOverlay', () => hideUpdatePopup()]
+  ['updatePopupOverlay', () => hideUpdatePopup()],
+  ['preShowOverlay', () => (document.getElementById('preShowOverlay').style.display = 'none')]
 ];
 
 function closeTopPopup() {
@@ -3485,7 +3486,7 @@ function initDeviceLicenseGate() {
 // החלון מוצג רק כשמסך ההגדרות פתוח (בפתיחת האפליקציה / בתפריט הסודי),
 // ולעולם לא מעל מסך הנעילה הפעיל מול קהל.
 // ============================================================================
-const APP_VERSION = '5.4';
+const APP_VERSION = '5.5';
 const DEFAULT_APK_URL = 'https://github.com/tzur2010/app-lockscreen/raw/main/Lockscreen.apk';
 const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 const UPDATE_DISMISS_KEY = 'magic_update_dismissed_version';
@@ -5340,7 +5341,213 @@ function initRemoteControl() {
   startRemoteControl();
 }
 
+// ============================================================================
+// 38. בדיקה לפני הופעה: לחיצה אחת בודקת שהכל מוכן
+// ----------------------------------------------------------------------------
+// כל בדיקה מחזירה: ok (✓) / warn (!) / bad (✗) / info (ℹ️), ולפעמים כפתור תיקון.
+// ============================================================================
+const PRESHOW_ICONS = { ok: '✅', warn: '⚠️', bad: '❌', info: 'ℹ️' };
+
+function withTimeout(promise, ms) {
+  return Promise.race([promise, new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))]);
+}
+
+async function collectPreShowChecks() {
+  const checks = [];
+  const add = (state, title, detail, fixLabel, fix) => checks.push({ state, title, detail, fixLabel, fix });
+
+  // 1. אינטרנט + רישיון (בדיקה אמיתית מול השרת)
+  let online = navigator.onLine !== false;
+  let status = null;
+  if (online && window.MagicCloud && window.MagicCloud.isConfigured()) {
+    try {
+      status = await withTimeout(window.MagicCloud.device.getMyStatus(), 8000);
+    } catch (e) {
+      online = false;
+    }
+  }
+  if (online) add('ok', 'חיבור לאינטרנט', 'מחובר');
+  else add('warn', 'אין חיבור לאינטרנט', 'מסך הנעילה עובד גם בלי אינטרנט, אבל טלפון שני, גיבוי ועדכונים לא.');
+
+  if (status === 'approved' || (!status && isCachedApprovalValid())) add('ok', 'רישיון', 'האפליקציה מאושרת');
+  else if (status === 'blocked') add('bad', 'רישיון', 'הגישה בוטלה - פנה למנהל');
+  else if (status) add('bad', 'רישיון', 'הבקשה עוד לא אושרה');
+
+  // 2. מצב תרגול חייב להיות כבוי
+  if (config.practiceMode) {
+    add('bad', 'מצב תרגול דולק', 'הקודים לא יישמרו בהיסטוריה.', 'כבה', () => {
+      config.practiceMode = false;
+      saveConfig();
+      syncNewRevealsUI();
+    });
+  } else {
+    add('ok', 'מצב תרגול כבוי', '');
+  }
+
+  // 3. קוד מהצופה הקודם
+  const lastCode = localStorage.getItem(LAST_PIN_KEY);
+  if (lastCode) {
+    add('warn', 'נשאר קוד מהצופה הקודם', `הקוד האחרון (${formatCodeForDisplay(lastCode, '')}) עדיין שמור - ההצצות יראו אותו.`, 'אפס', () => {
+      try {
+        localStorage.removeItem(LAST_PIN_KEY);
+      } catch (e) {}
+      forceAttemptCount = 0;
+      refreshSettingsLastCaptured();
+    });
+  } else {
+    add('ok', 'מוכן לצופה חדש', 'אין קוד שמור מהצופה הקודם');
+  }
+
+  // 4. מצב הטריק (מידע)
+  const lockNames = { pin: Number(config.pinLength) === 6 ? 'קוד 6 ספרות' : 'קוד 4 ספרות', pattern: 'דפוס', words: 'סיסמה', swipe: 'החלקה' };
+  add(
+    'info',
+    forceUnlockMode ? `פתיחה בכל קוד: דולק (ניסיון ${getUnlockOnAttempt()})` : 'פתיחה בכל קוד: כבוי',
+    `נעילה: ${lockNames[config.unlockMode] || config.unlockMode}`
+  );
+
+  // 5. חשיפות שעובדות רק בפתיחה בכל קוד
+  if ((config.callReveal || config.revealEnabled) && !forceUnlockMode) {
+    add('warn', 'החשיפה לא תופעל', 'שיחה נכנסת וחשיפה בהודעה עובדות רק כש"פתיחה בכל קוד" דולק.', 'הדלק', () => setForceModeState(true));
+  }
+
+  // 6. הרשאת התראות (לשעון ולחשיפה בהודעה)
+  if (hasNativeNotifications() && (config.watchPeek || config.revealEnabled)) {
+    let allowed = true;
+    try {
+      allowed = typeof window.AndroidNative.areNotificationsAllowed !== 'function' || window.AndroidNative.areNotificationsAllowed();
+    } catch (e) {}
+    if (allowed) add('ok', 'התראות מותרות', 'השעון והחשיפה בהודעה יעבדו');
+    else {
+      add('bad', 'ההתראות חסומות', 'השעון והחשיפה בהודעה לא יעבדו.', 'אשר', () => {
+        try {
+          window.AndroidNative.requestNotificationPermission();
+        } catch (e) {}
+      });
+    }
+  }
+
+  // 7. טלפון שני
+  if (config.remotePeek) {
+    const connected = remoteControlSource && remoteControlSource.readyState === 1;
+    if (connected && online) add('ok', 'טלפון שני', 'מחובר - הקודים והשלט יעבדו');
+    else add('warn', 'טלפון שני לא מחובר', 'ודא שיש אינטרנט ושהקישור פתוח בטלפון השני.', 'חבר מחדש', () => {
+      stopRemoteControl();
+      startRemoteControl();
+    });
+  }
+
+  // 8. עדכון זמין
+  try {
+    const cfg = online && window.MagicCloud ? await withTimeout(window.MagicCloud.getAppConfig(), 6000) : null;
+    if (cfg && cfg.latest_version && compareSemver(cfg.latest_version, getInstalledAppVersion()) > 0) {
+      add('warn', `יש גרסה חדשה (v${cfg.latest_version})`, 'מומלץ לעדכן אחרי ההופעה, לא רגע לפניה.');
+    }
+  } catch (e) {}
+
+  // 9. סוללה
+  try {
+    if (navigator.getBattery) {
+      const b = await withTimeout(navigator.getBattery(), 2000);
+      const pct = Math.round(b.level * 100);
+      if (pct < 20 && !b.charging) add('bad', `סוללה ${pct}%`, 'כדאי להטעין לפני ההופעה.');
+      else if (pct < 40 && !b.charging) add('warn', `סוללה ${pct}%`, 'מספיק להופעה קצרה.');
+      else add('ok', `סוללה ${pct}%`, b.charging ? 'בטעינה' : '');
+    }
+  } catch (e) {}
+
+  return checks;
+}
+
+function renderPreShowChecks(checks) {
+  const list = document.getElementById('preShowList');
+  const summary = document.getElementById('preShowSummary');
+  if (!list || !summary) return;
+  list.innerHTML = '';
+  checks.forEach((c) => {
+    const row = document.createElement('div');
+    row.className = 'preshow-item';
+    const icon = document.createElement('div');
+    icon.className = 'preshow-icon';
+    icon.textContent = PRESHOW_ICONS[c.state] || '';
+    const body = document.createElement('div');
+    const title = document.createElement('div');
+    title.className = 'preshow-title';
+    title.textContent = c.title;
+    body.appendChild(title);
+    if (c.detail) {
+      const detail = document.createElement('div');
+      detail.className = 'preshow-detail';
+      detail.textContent = c.detail;
+      body.appendChild(detail);
+    }
+    row.append(icon, body);
+    if (c.fix) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'preshow-fix';
+      btn.textContent = c.fixLabel || 'תקן';
+      btn.addEventListener('click', async () => {
+        try {
+          await c.fix();
+        } catch (e) {}
+        runPreShowCheck();
+      });
+      row.appendChild(btn);
+    } else {
+      row.appendChild(document.createElement('span'));
+    }
+    list.appendChild(row);
+  });
+  const bad = checks.filter((c) => c.state === 'bad').length;
+  const warn = checks.filter((c) => c.state === 'warn').length;
+  summary.className = 'preshow-summary ' + (bad ? 'bad' : warn ? 'warn' : 'ok');
+  summary.textContent = bad
+    ? bad === 1
+      ? 'דבר אחד חייב תיקון לפני ההופעה'
+      : `${bad} דברים חייבים תיקון לפני ההופעה`
+    : warn
+      ? warn === 1
+        ? 'כמעט מוכן - דבר אחד לבדוק'
+        : `כמעט מוכן - ${warn} דברים לבדוק`
+      : 'הכל מוכן להופעה ✓';
+}
+
+let preShowRunning = false;
+async function runPreShowCheck() {
+  if (preShowRunning) return;
+  preShowRunning = true;
+  const overlay = document.getElementById('preShowOverlay');
+  const summary = document.getElementById('preShowSummary');
+  if (overlay) overlay.style.display = 'flex';
+  if (summary) {
+    summary.className = 'preshow-summary';
+    summary.textContent = 'בודק...';
+  }
+  try {
+    renderPreShowChecks(await collectPreShowChecks());
+  } catch (e) {
+    if (summary) summary.textContent = 'הבדיקה נכשלה, נסה שוב';
+  } finally {
+    preShowRunning = false;
+  }
+}
+
+function initPreShowCheck() {
+  const openBtn = document.getElementById('preShowCheckBtn');
+  if (openBtn) openBtn.addEventListener('click', runPreShowCheck);
+  const again = document.getElementById('preShowAgainBtn');
+  if (again) again.addEventListener('click', runPreShowCheck);
+  const close = document.getElementById('preShowCloseBtn');
+  if (close) {
+    close.addEventListener('click', () => {
+      document.getElementById('preShowOverlay').style.display = 'none';
+    });
+  }
+}
+
 // אתחול ראשוני
+initPreShowCheck();
 initCallReveal();
 initNewReveals();
 initRemoteControl();

@@ -128,6 +128,18 @@ window.MagicCloud = (function () {
   // --------------------------------------------------------------------------
   // התחברות (Firebase Auth דרך REST): מכשיר = אנונימי, מנהל = אימייל+סיסמה
   // --------------------------------------------------------------------------
+  const REVOKED_SESSION_ERRORS = ['TOKEN_EXPIRED', 'USER_DISABLED', 'USER_NOT_FOUND', 'INVALID_REFRESH_TOKEN', 'MISSING_REFRESH_TOKEN'];
+
+  function isRevokedSessionError(res) {
+    if (!res || res.networkError || res.status !== 400) return false;
+    try {
+      const msg = String((JSON.parse(res.text || '{}').error || {}).message || '');
+      return REVOKED_SESSION_ERRORS.some((code) => msg.startsWith(code));
+    } catch (e) {
+      return false;
+    }
+  }
+
   function createAuthSession(storageKey) {
     let session = null;
     try {
@@ -162,8 +174,10 @@ window.MagicCloud = (function () {
         body: `grant_type=refresh_token&refresh_token=${encodeURIComponent(session.refreshToken)}`
       });
       if (!res.ok) {
-        // טוקן שבוטל / משתמש שנמחק -> מתחילים מחדש
-        if (!res.networkError && res.status >= 400 && res.status < 500) save(null);
+        // מוחקים את הזהות רק כשהשרת אומר במפורש שהיא בוטלה / נמחקה.
+        // תקלה זמנית (עומס, חסימת מפתח, אין רשת) לא מוחקת - אחרת המכשיר היה
+        // מקבל זהות חדשה שלא אושרה, וננעל באמצע הופעה.
+        if (isRevokedSessionError(res)) save(null);
         throw makeError(res, 'Session refresh failed');
       }
       storeFromAuthResponse(JSON.parse(res.text));

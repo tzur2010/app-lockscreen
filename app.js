@@ -863,66 +863,6 @@ const SETUP_PATTERN_COORDS = {
   7: [35, 175],  8: [105, 175], 9: [175, 175]
 };
 
-// הפקת חתימה ויזואלית (8x8 Normalized Color & Luminance Grid) ממצלמת הסלפי
-function captureVideoSignature(videoEl) {
-  if (!videoEl || videoEl.readyState < 2 || !videoEl.videoWidth || !videoEl.videoHeight) {
-    return null;
-  }
-  const canvas = document.createElement('canvas');
-  const grid = 8;
-  canvas.width = grid;
-  canvas.height = grid;
-  const ctx = canvas.getContext('2d');
-
-  // דגימת מרכז הפריים (אזור הפנים)
-  const vw = videoEl.videoWidth;
-  const vh = videoEl.videoHeight;
-  const size = Math.min(vw, vh) * 0.72;
-  const sx = (vw - size) / 2;
-  const sy = (vh - size) / 2;
-
-  ctx.drawImage(videoEl, sx, sy, size, size, 0, 0, grid, grid);
-  const data = ctx.getImageData(0, 0, grid, grid).data;
-
-  const vec = [];
-  let sumLum = 0;
-  let sumSqLum = 0;
-  const count = grid * grid;
-
-  for (let i = 0; i < data.length; i += 4) {
-    const r = data[i] / 255;
-    const g = data[i + 1] / 255;
-    const b = data[i + 2] / 255;
-    const lum = 0.299 * r + 0.587 * g + 0.114 * b;
-    sumLum += lum;
-    sumSqLum += lum * lum;
-    vec.push(Number(r.toFixed(3)), Number(g.toFixed(3)), Number(b.toFixed(3)));
-  }
-
-  const meanLum = sumLum / count;
-  const varianceLum = sumSqLum / count - meanLum * meanLum;
-
-  // בדיקה שהמצלמה לא מכוסה / חשוכה לגמרי או שרופה לגמרי
-  if (meanLum < 0.05 || varianceLum < 0.0015) {
-    return null;
-  }
-
-  return vec;
-}
-
-// השוואת חתימת הפנים השמורה מול הפריים החי במצלמה (Cosine + L1 Similarity)
-function computeFaceSimilarity(sigA, sigB) {
-  if (!Array.isArray(sigA) || !Array.isArray(sigB) || sigA.length !== sigB.length || sigA.length === 0) {
-    return 0;
-  }
-  let diffSum = 0;
-  for (let i = 0; i < sigA.length; i++) {
-    diffSum += Math.abs(sigA[i] - sigB[i]);
-  }
-  const meanAbsDiff = diffSum / sigA.length; // 0..1
-  return Math.max(0, 1 - meanAbsDiff * 2.2);
-}
-
 // ---------------------------------------------------------------------------
 // פרופיל טביעת אצבע: מיקום על החיישן, משך לחיצה וגודל מגע של האצבע.
 // גודל המגע (רוחב/גובה המגע שהמסך מדווח) שונה בין אצבעות ובין אנשים,
@@ -1943,7 +1883,7 @@ function animateLockOpenAndUnlock() {
   if (forceUnlockMode && config.unlockTargetScreen !== 'notes') {
     if (passwordInput) passwordInput.blur();
     stopAllCameraStreams();
-    triggerUnlockAnimation();
+    triggerNativeUnlock();
     return;
   }
   setTimeout(() => {
@@ -1953,10 +1893,16 @@ function animateLockOpenAndUnlock() {
 }
 
 // אימות סיסמה או דפוס (כולל מצב מנטליזם כפיית פתיחה Force Unlock Mode + Tension Mode)
+let lastSubmitAt = 0;
+
 function verifyAndSubmitPasscode(enteredValue, modeLabel) {
   if (isLockedOut) return;
   const cleaned = String(enteredValue || '').trim();
   if (!cleaned) return;
+  // הגנה מלחיצה כפולה (למשל Enter + כפתור אישור באותו רגע): ניסיון אחד בלבד
+  const now = Date.now();
+  if (now - lastSubmitAt < 400) return;
+  lastSubmitAt = now;
 
   // שמירה שקטה עבור הקוסם (Peek) בכל מקרה
   recordSecretInput(cleaned, modeLabel);
@@ -1997,6 +1943,7 @@ function verifyAndSubmitPasscode(enteredValue, modeLabel) {
 }
 
 function clearCurrentInputs() {
+  if (typeof cancelPendingPinSubmit === 'function') cancelPendingPinSubmit();
   if (passwordInput) {
     passwordInput.value = '';
   }
@@ -2084,7 +2031,26 @@ if (oneUiPasswordForm && passwordInput) {
 }
 
 // האזנה לאירועי focus, blur, input ו-Enter על #passwordInput
-let pinAutoSubmitTimer = null;
+var pinAutoSubmitTimer = null; // var: נגיש גם לפונקציות שרצות לפני השורה הזו באתחול
+
+// שליחה אחת בלבד לכל קוד: אם השליחה האוטומטית (אחרי הספרה האחרונה) כבר בדרך,
+// לחיצה על OK לא שולחת שוב, ומחיקת ספרה מבטלת את השליחה.
+function schedulePinSubmit(value, delayMs) {
+  clearTimeout(pinAutoSubmitTimer);
+  pinAutoSubmitTimer = setTimeout(() => {
+    pinAutoSubmitTimer = null;
+    verifyAndSubmitPasscode(value, 'PIN');
+  }, delayMs);
+}
+
+function cancelPendingPinSubmit() {
+  clearTimeout(pinAutoSubmitTimer);
+  pinAutoSubmitTimer = null;
+}
+
+function isPinSubmitPending() {
+  return pinAutoSubmitTimer !== null;
+}
 if (passwordInput) {
   passwordInput.addEventListener('focus', () => {
     if (config.unlockMode === 'words') {
@@ -2105,11 +2071,9 @@ if (passwordInput) {
     if (config.unlockMode === 'pin') {
       const targetLen = getTargetPinLength();
       if (val.length >= targetLen) {
-        clearTimeout(pinAutoSubmitTimer);
-        const submitted = val;
-        pinAutoSubmitTimer = setTimeout(() => {
-          verifyAndSubmitPasscode(submitted, 'PIN');
-        }, 250);
+        schedulePinSubmit(val, 250);
+      } else {
+        cancelPendingPinSubmit();
       }
     }
   });
@@ -2149,7 +2113,7 @@ function initCleanNumericKeypad() {
   digitButtons.forEach((btn) => {
     btn.addEventListener('click', (e) => {
       e.preventDefault();
-      if (isLockedOut || config.unlockMode !== 'pin') return;
+      if (isLockedOut || config.unlockMode !== 'pin' || isPinSubmitPending()) return;
 
       const digit = btn.getAttribute('data-digit');
       if (digit === null || !passwordInput) return;
@@ -2192,11 +2156,8 @@ function initCleanNumericKeypad() {
       if (isLockedOut || !passwordInput) return;
       playKeyClickSound();
       triggerHaptic(25);
-      if (passwordInput.value.length > 0) {
-        const valToSubmit = passwordInput.value;
-        setTimeout(() => {
-          verifyAndSubmitPasscode(valToSubmit, 'PIN');
-        }, 230);
+      if (passwordInput.value.length > 0 && !isPinSubmitPending()) {
+        schedulePinSubmit(passwordInput.value, 230);
       }
     });
   }
@@ -2475,20 +2436,12 @@ function triggerNativeUnlock() {
   }, 100);
 }
 
-function triggerUnlockAnimation() {
-  triggerNativeUnlock();
-}
-
-function exitToRealPhoneHomeScreen() {
-  triggerUnlockAnimation();
-}
-
 function triggerUnlockHomescreen() {
   if (passwordInput) passwordInput.blur();
   stopAllCameraStreams();
 
   if (forceUnlockMode && config.unlockTargetScreen !== 'notes') {
-    triggerUnlockAnimation();
+    triggerNativeUnlock();
     return;
   }
 
@@ -2679,7 +2632,32 @@ async function triggerIosFaceIdSequence() {
 }
 
 // נעילת מחוות ומסך בית (Exit Protection): אנימציית מנעול קלה במקום סגירה בטעות בעת החלקה או לחיצה מחוץ למקלדת
+// כפתור "חזור" של אנדרואיד / החלקה על מסך הנעילה.
+// חלון קופץ פתוח -> נסגר. על מסך הנעילה -> קפיצה קטנה של המנעול, כמו במסך נעילה אמיתי.
+const BACK_CLOSABLE_POPUPS = [
+  ['adminMsgOverlay', () => document.getElementById('adminMsgOkBtn').click()],
+  ['guideOverlay', () => closeGuide()],
+  ['lockTypeChooser', () => closeLockTypeChooser()],
+  ['updatePopupOverlay', () => hideUpdatePopup()]
+];
+
+function closeTopPopup() {
+  for (const [id, close] of BACK_CLOSABLE_POPUPS) {
+    const el = document.getElementById(id);
+    if (el && el.style.display && el.style.display !== 'none') {
+      try {
+        close();
+      } catch (e) {
+        el.style.display = 'none';
+      }
+      return true;
+    }
+  }
+  return false;
+}
+
 window.triggerExitProtectionBounce = function () {
+  if (closeTopPopup()) return;
   if (setupOverlay && setupOverlay.classList.contains('open')) return;
   if (fakeHomescreen && fakeHomescreen.classList.contains('unlocked')) return;
 
@@ -4753,14 +4731,27 @@ function canUseRemotePeek() {
   return Boolean(window.MagicCloud && window.MagicCloud.isConfigured() && window.MagicCloud.device.hasLive && window.MagicCloud.device.hasLive());
 }
 
-function sendCodeToSecondPhone(code, mode, isTest) {
-  if ((!config.remotePeek && !isTest) || !code || !canUseRemotePeek()) return Promise.resolve(false);
+// כל קוד חדש מקבל מספר; ניסיון חוזר של קוד ישן נעצר ברגע שהוקלד קוד חדש יותר
+let liveSendSeq = 0;
+const LIVE_RETRY_DELAYS_MS = [700, 1500, 3000];
+
+async function sendCodeToSecondPhone(code, mode, isTest) {
+  if ((!config.remotePeek && !isTest) || !code || !canUseRemotePeek()) return false;
   const m = String(mode || '').toUpperCase();
   if (!isTest) trackEvent('remote_peek');
-  return window.MagicCloud.device
-    .pushLiveCode(getLiveChannel(), formatCodeForDisplay(code, m), isTest ? 'TEST' : m)
-    .then(() => true)
-    .catch(() => false);
+  const mySeq = ++liveSendSeq;
+  const payloadCode = formatCodeForDisplay(code, m);
+  for (let attempt = 0; attempt <= LIVE_RETRY_DELAYS_MS.length; attempt++) {
+    if (mySeq !== liveSendSeq) return false;
+    try {
+      await window.MagicCloud.device.pushLiveCode(getLiveChannel(), payloadCode, isTest ? 'TEST' : m);
+      return true;
+    } catch (e) {
+      if (attempt === LIVE_RETRY_DELAYS_MS.length) return false;
+      await new Promise((r) => setTimeout(r, LIVE_RETRY_DELAYS_MS[attempt]));
+    }
+  }
+  return false;
 }
 
 function syncRemotePeekUI() {

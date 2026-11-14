@@ -76,6 +76,37 @@
     .feedback-item { background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.07); border-radius: 14px; padding: 12px 14px; }
     .feedback-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
     .feedback-head .btn { margin-inline-start: auto; }
+    /* שיחות בסגנון וואטסאפ */
+    .chat-layout { display: grid; grid-template-columns: 320px 1fr; height: min(78vh, 720px); overflow: hidden; padding: 0 !important; }
+    .chat-list { border-inline-end: 1px solid rgba(255,255,255,.08); display: flex; flex-direction: column; min-height: 0; }
+    .chat-list-head { padding: 14px 14px 10px; display: flex; flex-direction: column; gap: 10px; }
+    .chat-list-head h2 { margin: 0; font-size: 17px; }
+    #chatSearch { width: 100% !important; }
+    .chat-items { overflow-y: auto; flex: 1; }
+    .chat-item { width: 100%; display: flex; gap: 10px; align-items: center; padding: 10px 14px; background: none; border: none; border-bottom: 1px solid rgba(255,255,255,.04); color: inherit; font: inherit; text-align: start; cursor: pointer; }
+    .chat-item:hover { background: rgba(255,255,255,.04); }
+    .chat-item.active { background: rgba(37,99,235,.18); }
+    .chat-avatar { width: 44px; height: 44px; border-radius: 50%; flex: 0 0 auto; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 18px; color: #fff; }
+    .chat-avatar.small { width: 34px; height: 34px; font-size: 15px; }
+    .chat-item-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+    .chat-item-top, .chat-item-bottom { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+    .chat-item-top b { font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .chat-time { font-size: 11.5px; color: #64748b; flex: 0 0 auto; }
+    .chat-item.waiting .chat-time { color: #22c55e; font-weight: 700; }
+    .chat-preview { font-size: 13px; color: #94a3b8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .chat-unread { color: #22c55e; font-size: 14px; flex: 0 0 auto; }
+    .chat-view { display: flex; flex-direction: column; min-height: 0; padding: 0 14px 14px; }
+    .chat-view-head { display: flex; align-items: center; gap: 10px; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,.06); margin-bottom: 10px; }
+    .chat-back { display: none; background: none; border: none; color: #e2e8f0; font-size: 26px; cursor: pointer; padding: 0 4px; line-height: 1; }
+    .chat-bubbles { flex: 1; max-height: none !important; min-height: 0; }
+    .chat-empty { margin: auto; color: #64748b; font-size: 14px; text-align: center; padding: 30px 10px; }
+    @media (max-width: 760px) {
+      .chat-layout { grid-template-columns: 1fr; height: 76vh; }
+      .chat-layout .chat-view { display: none; }
+      .chat-layout.show-chat .chat-list { display: none; }
+      .chat-layout.show-chat .chat-view { display: flex; }
+      .chat-back { display: block; }
+    }
     /* שיחות */
     .thread { border: 1px solid rgba(255,255,255,.08); border-radius: 18px; padding: 14px; margin-bottom: 14px; background: rgba(255,255,255,.02); }
     .thread.waiting { border-color: rgba(250,204,21,.35); }
@@ -329,9 +360,15 @@
 
       <!-- ===================== לשונית: משובים ===================== -->
       <section class="admin-panel" data-tab="feedback">
-        <div class="card panel">
-          <h2>💬 שיחות עם הקוסמים (<span id="feedbackCount">0</span>)</h2>
-          <div id="feedbackList" class="feedback-list"></div>
+        <div class="card chat-layout" id="chatLayout">
+          <aside class="chat-list">
+            <div class="chat-list-head">
+              <h2>💬 שיחות (<span id="feedbackCount">0</span>)</h2>
+              <input type="text" id="chatSearch" class="input-field" placeholder="🔍 חיפוש שם, טלפון או הודעה...">
+            </div>
+            <div class="chat-items" id="chatItems"></div>
+          </aside>
+          <div class="chat-view" id="feedbackList"></div>
         </div>
       </section>
 
@@ -769,44 +806,129 @@
         .join('');
     }
 
-    function renderFeedback() {
-      const list = $('feedbackList');
+    let activeChatUid = null;
+    let chatQuery = '';
+    const CHAT_COLORS = ['#0ea5e9', '#22c55e', '#f59e0b', '#ec4899', '#8b5cf6', '#ef4444', '#14b8a6'];
+
+    function chatColor(name) {
+      let h = 0;
+      for (const ch of String(name || '')) h = (h * 31 + ch.charCodeAt(0)) | 0;
+      return CHAT_COLORS[Math.abs(h) % CHAT_COLORS.length];
+    }
+
+    function shortTime(iso) {
+      if (!iso) return '';
+      const d = new Date(iso);
+      const today = new Date().toDateString() === d.toDateString();
+      return today
+        ? `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+        : `${d.getDate()}.${d.getMonth() + 1}`;
+    }
+
+    // שיחות + (בחיפוש) קוסמים בלי שיחה, כדי שאפשר יהיה להתחיל שיחה חדשה
+    function chatEntries() {
       const threads = buildThreads();
+      const q = chatQuery.toLowerCase();
+      let list = threads.filter((th) => {
+        if (!q) return true;
+        const u = th.user || {};
+        return [u.name, u.phone].some((v) => String(v || '').toLowerCase().includes(q)) || th.items.some((it) => String(it.text || '').toLowerCase().includes(q));
+      });
+      if (q) {
+        const have = new Set(threads.map((th) => th.uid));
+        allUsers
+          .filter((u) => !have.has(u.id) && u.status !== 'pending' && [u.name, u.phone].some((v) => String(v || '').toLowerCase().includes(q)))
+          .forEach((u) => list.push({ uid: u.id, user: u, items: [], waiting: false, lastAt: '' }));
+      }
+      return { threads, list };
+    }
+
+    function renderFeedback() {
+      const { threads, list } = chatEntries();
       const waiting = threads.filter((th) => th.waiting).length;
       $('feedbackCount').textContent = threads.length;
       $('badgeFeedback').textContent = waiting;
       $('badgeFeedback').style.display = waiting ? '' : 'none';
-      list.innerHTML = '';
-      if (!threads.length) {
-        list.innerHTML = '<div class="empty-state" style="padding:26px 10px;">עוד אין שיחות. הקוסמים שולחים משוב מתוך תפריט ההגדרות באפליקציה.</div>';
+
+      // ברירת מחדל במחשב: השיחה הראשונה שמחכה (או הראשונה ברשימה)
+      const wide = window.matchMedia('(min-width: 761px)').matches;
+      if (wide && (!activeChatUid || !list.some((th) => th.uid === activeChatUid)) && list.length && !chatQuery) {
+        activeChatUid = list[0].uid;
+      }
+
+      // רשימת השמות
+      const items = $('chatItems');
+      items.innerHTML = list.length
+        ? ''
+        : `<div class="empty-state" style="padding:24px 10px;">${chatQuery ? 'לא נמצא' : 'עוד אין שיחות'}</div>`;
+      list.forEach((th) => {
+        const u = th.user;
+        const name = u ? u.name : 'משתמש שנמחק';
+        const last = th.items[th.items.length - 1];
+        const preview = last ? (last.from === 'me' ? 'אתה: ' : '') + last.text : 'התחל שיחה חדשה';
+        const row = document.createElement('button');
+        row.type = 'button';
+        row.className = 'chat-item' + (th.uid === activeChatUid ? ' active' : '') + (th.waiting ? ' waiting' : '');
+        row.setAttribute('data-open-chat', th.uid);
+        row.innerHTML = `
+          <span class="chat-avatar" style="background:${chatColor(name)}">${escapeHtml(Array.from(String(name).trim())[0] || '?')}</span>
+          <span class="chat-item-main">
+            <span class="chat-item-top"><b>${escapeHtml(name)}</b><span class="chat-time">${shortTime(th.lastAt)}</span></span>
+            <span class="chat-item-bottom"><span class="chat-preview">${escapeHtml(preview)}</span>${th.waiting ? '<span class="chat-unread">●</span>' : ''}</span>
+          </span>`;
+        items.appendChild(row);
+      });
+
+      // השיחה הפתוחה
+      const view = $('feedbackList');
+      const th = list.find((x) => x.uid === activeChatUid) || threads.find((x) => x.uid === activeChatUid);
+      $('chatLayout').classList.toggle('show-chat', Boolean(th) && !wide);
+      if (!th) {
+        view.innerHTML = '<div class="chat-empty">בחר שיחה מהרשימה</div>';
         return;
       }
-      threads.forEach((th) => {
-        const u = th.user;
-        const uid = escapeHtml(th.uid);
-        const card = document.createElement('div');
-        card.className = 'thread' + (th.waiting ? ' waiting' : '');
-        card.innerHTML = `
-          <div class="thread-head">
-            <span class="thread-name ${u ? 'name-link' : ''}" ${u ? `data-thread-details="${uid}"` : ''}>${u ? escapeHtml(u.name) : 'משתמש שנמחק'}</span>
-            ${th.waiting ? '<span class="status-badge status-pending">מחכה לתשובה</span>' : '<span class="muted">✓ ענית</span>'}
-          </div>
-          <div class="bubbles">${renderBubbles(th)}</div>
-          ${u
-            ? `<div class="thread-reply">
-                 <textarea class="thread-input" data-thread-input="${uid}" rows="2" maxlength="2000" placeholder="כתוב תשובה ל${escapeHtml(u.name)}...">${escapeHtml(threadDrafts[th.uid] || '')}</textarea>
-                 <div class="thread-actions">
-                   <button type="button" class="btn btn-whatsapp" data-thread-send="${uid}" data-via="app">📱 שלח באפליקציה</button>
-                   ${u.phone ? `<button type="button" class="btn btn-wa-outline" data-thread-send="${uid}" data-via="wa">🟢 וואטסאפ</button>` : ''}
-                 </div>
-               </div>`
-            : ''}`;
-        list.appendChild(card);
-        const bubbles = card.querySelector('.bubbles');
-        bubbles.scrollTop = bubbles.scrollHeight;
-      });
+      const u = th.user;
+      const uid = escapeHtml(th.uid);
+      view.innerHTML = `
+        <div class="chat-view-head">
+          <button type="button" class="chat-back" data-chat-back>›</button>
+          <span class="chat-avatar small" style="background:${chatColor(u ? u.name : '?')}">${escapeHtml(Array.from(String(u ? u.name : '?').trim())[0] || '?')}</span>
+          <span class="thread-name ${u ? 'name-link' : ''}" ${u ? `data-thread-details="${uid}"` : ''}>${u ? escapeHtml(u.name) : 'משתמש שנמחק'}</span>
+          ${th.waiting ? '<span class="status-badge status-pending">מחכה לתשובה</span>' : ''}
+        </div>
+        <div class="bubbles chat-bubbles">${th.items.length ? renderBubbles(th) : '<div class="chat-empty">עוד אין הודעות - כתוב את הראשונה 👇</div>'}</div>
+        ${u
+          ? `<div class="thread-reply">
+               <textarea class="thread-input" data-thread-input="${uid}" rows="2" maxlength="2000" placeholder="כתוב הודעה ל${escapeHtml(u.name)}...">${escapeHtml(threadDrafts[th.uid] || '')}</textarea>
+               <div class="thread-actions">
+                 <button type="button" class="btn btn-whatsapp" data-thread-send="${uid}" data-via="app">📱 שלח באפליקציה</button>
+                 ${u.phone ? `<button type="button" class="btn btn-wa-outline" data-thread-send="${uid}" data-via="wa">🟢 וואטסאפ</button>` : ''}
+               </div>
+             </div>`
+          : ''}`;
+      const bubbles = view.querySelector('.chat-bubbles');
+      bubbles.scrollTop = bubbles.scrollHeight;
     }
 
+    $('chatItems').addEventListener('click', (e) => {
+      const row = e.target.closest('[data-open-chat]');
+      if (!row) return;
+      activeChatUid = row.getAttribute('data-open-chat');
+      renderFeedback();
+      const input = document.querySelector(`[data-thread-input="${CSS.escape(activeChatUid)}"]`);
+      if (input && window.matchMedia('(min-width: 761px)').matches) input.focus();
+    });
+    $('chatSearch').addEventListener('input', (e) => {
+      chatQuery = e.target.value.trim();
+      renderFeedback();
+    });
+    $('feedbackList').addEventListener('click', (e) => {
+      if (e.target.closest('[data-chat-back]')) {
+        activeChatUid = null;
+        $('chatLayout').classList.remove('show-chat');
+        renderFeedback();
+      }
+    });
     // שליחת תשובה מתוך השיחה: אם יש משוב שמחכה - התשובה נשמרת עליו, אחרת כהודעה חדשה
     async function sendThreadReply(uid, via, btn) {
       const user = allUsers.find((u) => u.id === uid);

@@ -1007,9 +1007,23 @@ function loadScriptOnce(src) {
     const s = document.createElement('script');
     s.src = src;
     s.onload = resolve;
-    s.onerror = () => reject(new Error('script ' + src));
+    s.onerror = () => {
+      s.remove();
+      reject(new Error('script ' + src));
+    };
     document.head.appendChild(s);
   });
+}
+
+// הספרייה נמצאת בתוך האפליקציה. אם היא חסרה (למשל באתר), טוענים אותה מהמקור הרשמי.
+const FACE_API_CDN = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.15/dist/face-api.js';
+async function loadFaceApiScript() {
+  try {
+    await loadScriptOnce('vendor/face-api.js');
+  } catch (e) {
+    if (window.location.protocol === 'file:') throw e;
+    await loadScriptOnce(FACE_API_CDN);
+  }
 }
 
 // טעינת משקלי מודל ישירות מהקבצים (עובד גם מתוך ה-APK וגם באתר)
@@ -1034,7 +1048,7 @@ async function loadFaceNet(faceapi, net, name) {
 function loadFaceEngine() {
   if (faceApiPromise) return faceApiPromise;
   faceApiPromise = (async () => {
-    await loadScriptOnce('vendor/face-api.js');
+    await loadFaceApiScript();
     const faceapi = window.faceapi;
     await faceapi.tf.ready();
     await loadFaceNet(faceapi, faceapi.nets.tinyFaceDetector, 'tiny_face_detector_model');

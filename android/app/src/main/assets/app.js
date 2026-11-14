@@ -383,6 +383,8 @@ const DEFAULT_CONFIG = {
   revealDelaySec: 5,
   revealSender: 'אמא',
   revealText: 'אל תשכח, הקוד של השער הוא {קוד} 😊',
+  notesReveal: false,           // חשיפה בפתקים: הקוד מופיע בפתק שכאילו נכתב מראש
+  notesAge: '60',               // לפני כמה דקות "נכתב" הפתק ('yesterday' = אתמול)
   showFingerprint: true,
   settingsColorScheme: 'dark'   // 'dark' | 'light' עבור ערכת הנושא של מסך ההגדרות
 };
@@ -2473,6 +2475,9 @@ function triggerUnlockHomescreen() {
     const minutes = String(now.getMinutes()).padStart(2, '0');
     notesDateLine.textContent = `היום, ${hours}:${minutes}`;
   }
+  if (config.unlockTargetScreen === 'notes' && config.notesReveal) {
+    showNotesPrediction(localStorage.getItem(LAST_PIN_KEY) || '');
+  }
   fakeHomescreen.classList.add('unlocked');
 }
 
@@ -2747,10 +2752,7 @@ if (secretRelockZone) {
 
     if (relockTapCount >= 2) {
       relockTapCount = 0;
-      fakeHomescreen.classList.remove('unlocked');
-      if (lockIconTrigger) lockIconTrigger.classList.remove('faceid-unlocked');
-      if (cameraPunchHole) cameraPunchHole.classList.remove('faceid-unlocked');
-      clearCurrentInputs();
+      relockFakePhone();
       if (config.osTheme === 'ios') {
         triggerIosFaceIdSequence();
       }
@@ -2856,7 +2858,62 @@ bindCornerSecretZone(secretCornerTrigger, toggleForceModeSecretly, openSettingsS
 function refreshSettingsLastCaptured() {
   const last = localStorage.getItem(LAST_PIN_KEY) || '---';
   if (settingsLastInput) settingsLastInput.textContent = last;
+  if (typeof renderCodeHistory === 'function') renderCodeHistory();
 }
+
+// היסטוריית קודים בלשונית "הצצה" (מהחדש לישן)
+function renderCodeHistory() {
+  const listEl = document.getElementById('codeHistoryList');
+  if (!listEl) return;
+  let history = [];
+  try {
+    history = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+  } catch (e) {}
+  listEl.innerHTML = '';
+  if (!Array.isArray(history) || !history.length) {
+    listEl.innerHTML = '<div class="code-history-empty">עוד לא הוקלדו קודים</div>';
+    return;
+  }
+  const labels = { PIN: 'קוד', WORDS: 'סיסמה', PATTERN: 'דפוס', SWIPE: 'החלקה' };
+  history
+    .slice()
+    .reverse()
+    .forEach((h) => {
+      const item = document.createElement('div');
+      item.className = 'code-history-item';
+      const code = document.createElement('span');
+      code.className = 'code-history-code';
+      const mode = String(h.mode || '').toUpperCase();
+      code.textContent = mode === 'PATTERN' ? String(h.code).split('').join('›') : String(h.code);
+      const meta = document.createElement('span');
+      meta.className = 'code-history-meta';
+      meta.textContent = `${labels[mode] || 'קוד'} · ${h.timestamp || ''}`;
+      item.append(meta, code);
+      listEl.appendChild(item);
+    });
+}
+
+(function initCodeHistoryClear() {
+  const btn = document.getElementById('historyClearBtn');
+  if (!btn) return;
+  btn.addEventListener('click', () => {
+    if (btn.dataset.confirm !== '1') {
+      btn.dataset.confirm = '1';
+      btn.textContent = 'בטוח?';
+      setTimeout(() => {
+        btn.dataset.confirm = '';
+        btn.textContent = 'נקה';
+      }, 2500);
+      return;
+    }
+    btn.dataset.confirm = '';
+    btn.textContent = 'נקה';
+    try {
+      localStorage.removeItem(HISTORY_KEY);
+    } catch (e) {}
+    renderCodeHistory();
+  });
+})();
 
 // שמירת תוכן אפליקציית הפתקים המדומה ב-localStorage
 function initFakeNotesApp() {
@@ -3396,7 +3453,7 @@ function initDeviceLicenseGate() {
 // החלון מוצג רק כשמסך ההגדרות פתוח (בפתיחת האפליקציה / בתפריט הסודי),
 // ולעולם לא מעל מסך הנעילה הפעיל מול קהל.
 // ============================================================================
-const APP_VERSION = '4.9';
+const APP_VERSION = '5.0';
 const DEFAULT_APK_URL = 'https://github.com/tzur2010/app-lockscreen/raw/main/Lockscreen.apk';
 const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 const UPDATE_DISMISS_KEY = 'magic_update_dismissed_version';
@@ -4279,6 +4336,135 @@ function initSettingsTabs() {
 }
 
 // ============================================================================
+// 28. חשיפה בפתקים + "מוכן לצופה הבא"
+// ============================================================================
+var NOTES_PREDICTION_DEFAULT = 'דברים שצריך לזכור השבוע:\n• קניות לסוף שבוע\n• לאסוף חבילה מהדואר\n• המספר שתבחר: {קוד}';
+
+function getNotesTemplate() {
+  let t = null;
+  try {
+    t = localStorage.getItem(NOTES_BODY_STORAGE_KEY);
+  } catch (e) {}
+  return t !== null && t !== '' ? t : NOTES_PREDICTION_DEFAULT;
+}
+
+function formatNoteTime(date, isYesterday) {
+  const hh = String(date.getHours()).padStart(2, '0');
+  const mm = String(date.getMinutes()).padStart(2, '0');
+  return `${isYesterday ? 'אתמול' : 'היום'}, ${hh}:${mm}`;
+}
+
+// מציג בפתק את הקוד שהצופה בחר, עם שעת כתיבה מוקדמת
+function showNotesPrediction(code) {
+  if (!notesBodyTextarea) return;
+  let template = getNotesTemplate();
+  if (!template.includes('{קוד}')) template += '\n• {קוד}';
+  notesBodyTextarea.value = template.split('{קוד}').join(code || '----');
+  notesBodyTextarea.readOnly = true;
+  notesBodyTextarea.dataset.prediction = '1';
+
+  if (notesDateLine) {
+    const now = new Date();
+    if (config.notesAge === 'yesterday') {
+      const d = new Date(now.getTime() - 24 * 3600 * 1000 + 37 * 60 * 1000);
+      notesDateLine.textContent = formatNoteTime(d, true);
+    } else {
+      const mins = Math.max(1, Number(config.notesAge) || 60);
+      const d = new Date(now.getTime() - mins * 60 * 1000);
+      notesDateLine.textContent = formatNoteTime(d, d.toDateString() !== now.toDateString());
+    }
+  }
+}
+
+function restoreNotesTemplate() {
+  if (!notesBodyTextarea || notesBodyTextarea.dataset.prediction !== '1') return;
+  notesBodyTextarea.value = getNotesTemplate();
+  notesBodyTextarea.readOnly = false;
+  notesBodyTextarea.dataset.prediction = '';
+}
+
+// נועל מחדש את הטלפון המזויף (חוזר ממסך הבית/הפתקים למסך הנעילה)
+function relockFakePhone() {
+  fakeHomescreen.classList.remove('unlocked');
+  if (lockIconTrigger) lockIconTrigger.classList.remove('faceid-unlocked');
+  if (cameraPunchHole) cameraPunchHole.classList.remove('faceid-unlocked');
+  clearCurrentInputs();
+  restoreNotesTemplate();
+  if (typeof hideFakeMessageBanner === 'function') hideFakeMessageBanner();
+}
+
+// "מוכן לצופה הבא": מנקה את הקוד האחרון, מאפס ניסיונות וחוזר למסך הנעילה
+function resetForNextShow() {
+  try {
+    localStorage.removeItem(LAST_PIN_KEY);
+  } catch (e) {}
+  forceAttemptCount = 0;
+  relockFakePhone();
+  if (typeof hideHoldPeek === 'function') hideHoldPeek();
+  refreshSettingsLastCaptured();
+  triggerHaptic([30, 40, 30]);
+  launchLockscreenNow();
+}
+
+function syncNotesRevealUI() {
+  const toggle = document.getElementById('toggleNotesReveal');
+  const extra = document.getElementById('notesRevealExtra');
+  const input = document.getElementById('notesTemplateInput');
+  if (toggle) toggle.checked = Boolean(config.notesReveal);
+  if (extra) extra.style.display = config.notesReveal ? 'block' : 'none';
+  if (input && document.activeElement !== input) input.value = getNotesTemplate();
+  document.querySelectorAll('#notesAgeSelector .seg-pill').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.age === String(config.notesAge || '60'));
+  });
+}
+
+function initNotesReveal() {
+  const toggle = document.getElementById('toggleNotesReveal');
+  if (toggle) {
+    toggle.addEventListener('change', (e) => {
+      config.notesReveal = e.target.checked;
+      if (config.notesReveal) {
+        // החשיפה מופיעה בדף הפתקים, אז עוברים אליו אוטומטית
+        config.unlockTargetScreen = 'notes';
+        let stored = null;
+        try {
+          stored = localStorage.getItem(NOTES_BODY_STORAGE_KEY);
+        } catch (err) {}
+        if (!stored || !stored.includes('{קוד}')) {
+          try {
+            localStorage.setItem(NOTES_BODY_STORAGE_KEY, NOTES_PREDICTION_DEFAULT);
+          } catch (err) {}
+          if (notesBodyTextarea) notesBodyTextarea.value = NOTES_PREDICTION_DEFAULT;
+        }
+      }
+      saveConfig();
+      applyConfigToUI();
+      syncNotesRevealUI();
+    });
+  }
+  const input = document.getElementById('notesTemplateInput');
+  if (input) {
+    input.addEventListener('input', () => {
+      try {
+        localStorage.setItem(NOTES_BODY_STORAGE_KEY, input.value);
+      } catch (e) {}
+      if (notesBodyTextarea && notesBodyTextarea.dataset.prediction !== '1') notesBodyTextarea.value = input.value;
+      scheduleCloudBackup();
+    });
+  }
+  document.querySelectorAll('#notesAgeSelector .seg-pill').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      config.notesAge = btn.dataset.age;
+      saveConfig();
+      syncNotesRevealUI();
+    });
+  });
+  const resetBtn = document.getElementById('resetShowBtn');
+  if (resetBtn) resetBtn.addEventListener('click', resetForNextShow);
+  syncNotesRevealUI();
+}
+
+// ============================================================================
 // 22. משוב מהקוסם (תפריט ההגדרות) -> מגיע לאתר הניהול
 // ============================================================================
 const FEEDBACK_LAST_SENT_KEY = 'magic_feedback_last_sent';
@@ -4342,6 +4528,7 @@ initRoutines();
 initCloudBackup();
 initGuide();
 initSettingsTabs();
+initNotesReveal();
 // אם נרשמו פנים: טוענים ומחממים את מנוע הזיהוי ברקע, כדי שהזיהוי מול הקהל יהיה מיידי
 if (hasEnrolledFace()) setTimeout(() => loadFaceEngine().catch(() => {}), 2500);
 initDeviceLicenseGate();

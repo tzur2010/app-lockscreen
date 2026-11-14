@@ -97,6 +97,14 @@
           <p>כמה שניות אחרי שהטלפון נפתח, מגיעה הודעה שבתוכה הקוד שהצופה בחר. בהגדרות בוחרים את שם השולח, את התמונה, את הטקסט (<b>{קוד}</b> מוחלף בקוד) ואחרי כמה שניות ההודעה מגיעה.</p>
         </details>
         <details>
+          <summary>📝 חשיפה בפתקים</summary>
+          <p>בלשונית <b>מראה</b> מדליקים "חשיפה בפתקים". אחרי שהטלפון נפתח מופיע פתק שבו כבר כתוב הקוד שהצופה בחר, עם שעה מוקדמת ("לפני שעה" / "אתמול"), כאילו חזית אותו מראש. במקום שבו המספר צריך להופיע כותבים <b>{קוד}</b>.</p>
+        </details>
+        <details>
+          <summary>🔄 בין צופה לצופה</summary>
+          <p>בלשונית <b>טריק</b> לוחצים <b>"מוכן לצופה הבא"</b>: הקוד האחרון נמחק, הניסיונות מתאפסים והטלפון חוזר למסך הנעילה. כל הקודים נשמרים ב<b>היסטוריית הקודים</b> בלשונית הצצה.<br>בלי להיכנס להגדרות: <b>2 הקשות בפינה הימנית העליונה</b> של מסך הבית/הפתקים נועלות מחדש.</p>
+        </details>
+        <details>
           <summary>🚪 יציאת חירום</summary>
           <p>• <b>3 הקשות מהירות</b> על סמל הסוללה/Wi-Fi פותחות את הטלפון מיד.<br>• לחיצה על <b>חיישן טביעת האצבע</b> בתחתית, עם האצבע שרשמת בהגדרות. אצבע אחרת תקבל "טביעת אצבע לא תואמת".</p>
         </details>
@@ -270,6 +278,8 @@
 
         <!-- ===================== לשונית: טריק ===================== -->
         <section class="settings-panel active" data-tab="trick">
+
+        <button type="button" class="reset-show-btn" id="resetShowBtn">🔄 מוכן לצופה הבא</button>
 
         <div class="oneui-section-header">רוטינות שמורות</div>
         <div class="config-group oneui-card">
@@ -448,6 +458,31 @@
 
           <div class="oneui-card-divider"></div>
 
+          <!-- חשיפה בפתקים: "תחזית" שכאילו נכתבה מראש -->
+          <div class="clean-toggle-row oneui-row-with-sub">
+            <div class="toggle-text-stack">
+              <span class="toggle-main-title">📝 חשיפה בפתקים (תחזית)</span>
+              <span class="toggle-sub-desc">אחרי הפתיחה נפתח פתק שבו כבר כתוב הקוד שהצופה בחר, עם שעה מוקדמת, כאילו חזית אותו מראש.</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="toggleNotesReveal">
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="oneui-field-block" id="notesRevealExtra" style="display: none; padding-top: 0;">
+            <label class="config-label" for="notesTemplateInput">תוכן הפתק ({קוד} יוחלף בקוד שהוקלד)</label>
+            <textarea id="notesTemplateInput" class="feedback-textarea" rows="5" maxlength="600" dir="rtl"></textarea>
+            <label class="config-label" style="margin-top: 8px;">הפתק "נכתב"</label>
+            <div class="segmented-row notes-age-row" id="notesAgeSelector">
+              <button type="button" class="seg-pill" data-age="15">לפני רבע שעה</button>
+              <button type="button" class="seg-pill active" data-age="60">לפני שעה</button>
+              <button type="button" class="seg-pill" data-age="180">לפני 3 שעות</button>
+              <button type="button" class="seg-pill" data-age="yesterday">אתמול</button>
+            </div>
+          </div>
+
+          <div class="oneui-card-divider"></div>
+
           <div class="media-actions-row">
             <label class="media-upload-btn">
               <span>צילום מסך בית אישי</span>
@@ -582,6 +617,13 @@
             <span>קוד אחרון שנקלט:</span>
             <strong id="settingsLastInput">---</strong>
           </div>
+
+          <!-- היסטוריית קודים: כל מה שהוקלד, מהחדש לישן -->
+          <div class="history-head">
+            <span class="toggle-main-title">היסטוריית קודים</span>
+            <button type="button" class="routine-del-btn history-clear-btn" id="historyClearBtn">נקה</button>
+          </div>
+          <div class="code-history-list" id="codeHistoryList"></div>
 
           <div class="oneui-card-divider"></div>
 

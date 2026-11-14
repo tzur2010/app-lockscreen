@@ -645,6 +645,7 @@
       document.querySelectorAll('.admin-tab').forEach((b) => b.classList.toggle('active', b.dataset.tab === tab));
       document.querySelectorAll('.admin-panel').forEach((p) => p.classList.toggle('active', p.dataset.tab === tab));
       localStorage.setItem(ADMIN_TAB_KEY, tab);
+      if (tab === 'update' && $('dashboardView').style.display === 'block') loadPublishedVersion();
     }
     document.querySelectorAll('.admin-tab').forEach((b) => b.addEventListener('click', () => showAdminTab(b.dataset.tab)));
     showAdminTab(localStorage.getItem(ADMIN_TAB_KEY) || 'users');
@@ -878,7 +879,17 @@
       searchQuery = e.target.value.trim();
       renderUsers();
     });
-    $('refreshBtn').addEventListener('click', loadUsers);
+    $('refreshBtn').addEventListener('click', () => {
+      loadUsers();
+      loadPublishedVersion();
+    });
+    // חוזרים לאתר (מעבר לשונית / פתיחת הטלפון) -> בודקים מיד אם יש משהו חדש
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && $('dashboardView').style.display === 'block') {
+        loadUsers();
+        loadPublishedVersion();
+      }
+    });
 
     // ---------------- כניסה / יציאה ----------------
     function showLogin() {
@@ -895,7 +906,10 @@
       loadPublishedVersion();
       clearInterval(pollTimer);
       pollTimer = setInterval(() => {
-        if (document.visibilityState === 'visible') loadUsers();
+        if (document.visibilityState === 'visible') {
+          loadUsers();
+          loadPublishedVersion();
+        }
       }, 60000); // פעם בדקה, כדי להישאר בתוך המכסה החינמית של Firebase (יש גם כפתור "רענן")
     }
 

@@ -160,6 +160,17 @@
     </div>
   </div>
 
+  <!-- הודעה אישית מהמפתח (מוצגת רק כשנכנסים להגדרות, אף פעם לא באמצע קסם) -->
+  <div class="update-popup-overlay" id="adminMsgOverlay" style="display: none;">
+    <div class="update-popup-card">
+      <div class="update-popup-icon">💬</div>
+      <div class="update-popup-title">הודעה מהמפתח</div>
+      <div class="update-popup-text admin-msg-text" id="adminMsgText"></div>
+      <button type="button" class="update-popup-btn" id="adminMsgOkBtn">תודה, הבנתי</button>
+      <button type="button" class="update-popup-later" id="adminMsgReplyBtn">רוצה לענות? כתוב משוב</button>
+    </div>
+  </div>
+
   <!-- ========================================================================
        1. מסך פתיח אנימטיבי קצר (Intro Splash - 1.1s)
        ======================================================================== -->
@@ -760,6 +771,7 @@
               <span class="toggle-main-title">ספר לנו מה דעתך</span>
               <span class="toggle-sub-desc">מה עבד טוב, מה לא עבד ומה חסר לך. המשוב נשלח ישירות למפתח.</span>
             </div>
+            <div class="admin-msg-last" id="adminMsgLast" style="display: none;"></div>
             <textarea id="feedbackInput" class="feedback-textarea" maxlength="2000" rows="4" placeholder="כתוב כאן את המשוב שלך..." dir="rtl"></textarea>
             <button type="button" class="media-upload-btn feedback-send-btn" id="feedbackSendBtn">שלח משוב</button>
             <div class="toggle-sub-desc" id="feedbackStatus" style="margin-top: 6px; min-height: 16px;"></div>

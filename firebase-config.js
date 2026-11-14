@@ -209,6 +209,13 @@ window.MagicCloud = (function () {
     return deviceAuth.uid;
   }
 
+  // הרשומה האחרונה שנקראה מהשרת (כוללת הודעה מהמנהל, אם יש)
+  let lastMyRecord = null;
+  function getMyMessage() {
+    if (!lastMyRecord || !lastMyRecord.adminMessage) return null;
+    return { text: lastMyRecord.adminMessage, at: lastMyRecord.adminMessageAt || '' };
+  }
+
   // מחזיר: 'none' (לא נשלחה בקשה) | 'pending' | 'approved' | 'blocked'
   async function getMyStatus() {
     const uid = await ensureDeviceSession();
@@ -216,6 +223,7 @@ window.MagicCloud = (function () {
     if (res.status === 404) return 'none';
     if (!res.ok) throw makeError(res, 'Status check failed');
     const rec = fromDoc(JSON.parse(res.text));
+    lastMyRecord = rec;
     return ['pending', 'approved', 'blocked'].includes(rec.status) ? rec.status : 'pending';
   }
 
@@ -409,6 +417,33 @@ window.MagicCloud = (function () {
     return true;
   }
 
+  // הודעה אישית מהמנהל לקוסם מסוים (מופיעה אצלו באפליקציה כשהוא נכנס להגדרות)
+  async function adminSendMessage(uid, text) {
+    const url =
+      `${DB_BASE}/users/${encodeURIComponent(uid)}` +
+      '?updateMask.fieldPaths=adminMessage&updateMask.fieldPaths=adminMessageAt&currentDocument.exists=true';
+    const res = await authedRequest(adminAuth, url, {
+      method: 'PATCH',
+      body: JSON.stringify({ fields: toFields({ adminMessage: String(text || '').trim().slice(0, 2000), adminMessageAt: new Date() }) })
+    });
+    if (!res.ok) throw makeError(res, 'Message failed');
+    return true;
+  }
+
+  // תשובה למשוב: נשלחת לקוסם כהודעה, ונשמרת על המשוב כדי שתראה שכבר ענית
+  async function adminReplyFeedback(feedbackId, uid, text, { inApp = true } = {}) {
+    if (inApp) await adminSendMessage(uid, text);
+    const url =
+      `${DB_BASE}/feedback/${encodeURIComponent(feedbackId)}` +
+      '?updateMask.fieldPaths=reply&updateMask.fieldPaths=repliedAt&currentDocument.exists=true';
+    const res = await authedRequest(adminAuth, url, {
+      method: 'PATCH',
+      body: JSON.stringify({ fields: toFields({ reply: String(text || '').trim().slice(0, 2000), repliedAt: new Date() }) })
+    });
+    if (!res.ok) throw makeError(res, 'Reply save failed');
+    return true;
+  }
+
   async function adminPublishUpdate({ latest_version, apk_url, message }) {
     const res = await authedRequest(adminAuth, `${DB_BASE}/app_config/main`, {
       method: 'PATCH',
@@ -431,6 +466,7 @@ window.MagicCloud = (function () {
     device: {
       ensureSession: ensureDeviceSession,
       getMyStatus,
+      getMyMessage,
       submitRequest,
       reportUsage,
       sendFeedback,
@@ -448,6 +484,8 @@ window.MagicCloud = (function () {
       deleteUser: adminDeleteUser,
       listFeedback: adminListFeedback,
       deleteFeedback: adminDeleteFeedback,
+      sendMessage: adminSendMessage,
+      replyFeedback: adminReplyFeedback,
       publishUpdate: adminPublishUpdate
     }
   };

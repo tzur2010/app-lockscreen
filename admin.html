@@ -73,6 +73,15 @@
     .feedback-item { background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.07); border-radius: 14px; padding: 12px 14px; }
     .feedback-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
     .feedback-head .btn { margin-inline-start: auto; }
+    .feedback-reply { margin-top: 10px; padding: 9px 12px; border-radius: 12px; background: rgba(34,197,94,.08); border: 1px solid rgba(34,197,94,.25); color: #bbf7d0; font-size: 13.5px; line-height: 1.55; white-space: pre-wrap; word-break: break-word; }
+    .reply-btn { margin-top: 10px; padding: 7px 14px; font-size: 13px; }
+    .msg-overlay { position: fixed; inset: 0; background: rgba(2,6,23,.72); backdrop-filter: blur(6px); z-index: 60; display: flex; align-items: center; justify-content: center; padding: 16px; }
+    .msg-card { width: 100%; max-width: 480px; padding: 20px; }
+    .msg-title { font-size: 18px; font-weight: 800; margin-bottom: 10px; }
+    .msg-quote { font-size: 13px; color: #94a3b8; border-inline-start: 3px solid rgba(255,255,255,.2); padding: 4px 10px; margin-bottom: 10px; white-space: pre-wrap; max-height: 90px; overflow: auto; }
+    #msgText { width: 100%; box-sizing: border-box; background: rgba(0,0,0,.3); border: 1px solid rgba(255,255,255,.14); border-radius: 12px; color: #fff; padding: 10px 12px; font: inherit; font-size: 15px; resize: vertical; }
+    .msg-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .msg-actions .btn { flex: 1; justify-content: center; }
     .feedback-text { font-size: 14.5px; line-height: 1.6; white-space: pre-wrap; word-break: break-word; color: #e2e8f0; }
     /* לשוניות */
     .admin-tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 18px; padding: 6px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 18px; position: sticky; top: 8px; z-index: 10; backdrop-filter: blur(16px); }
@@ -321,6 +330,24 @@
 
   <div class="toast" id="toast"></div>
 
+  <!-- חלון כתיבת הודעה / תשובה לקוסם -->
+  <div class="msg-overlay" id="msgOverlay" style="display:none;">
+    <div class="msg-card glass">
+      <div class="msg-title" id="msgTitle">הודעה ל...</div>
+      <div class="msg-quote" id="msgQuote" style="display:none;"></div>
+      <textarea id="msgText" rows="5" maxlength="2000" dir="rtl" placeholder="כתוב כאן את התשובה..."></textarea>
+      <div class="muted" style="margin:6px 0 12px; line-height:1.5;">
+        📱 <b>באפליקציה</b> – תופיע לו בפעם הבאה שהוא נכנס להגדרות (אף פעם לא באמצע קסם).<br>
+        🟢 <b>בוואטסאפ</b> – נפתח וואטסאפ עם ההודעה מוכנה.
+      </div>
+      <div class="msg-actions">
+        <button type="button" class="btn btn-whatsapp" id="msgSendApp">📱 שלח באפליקציה</button>
+        <button type="button" class="btn btn-wa-outline" id="msgSendWa">🟢 שלח בוואטסאפ</button>
+        <button type="button" class="btn btn-ghost" id="msgCancel">ביטול</button>
+      </div>
+    </div>
+  </div>
+
   <script src="firebase-config.js"></script>
   <script>
     const Cloud = window.MagicCloud;
@@ -424,8 +451,10 @@
     function renderFeedback() {
       const list = $('feedbackList');
       $('feedbackCount').textContent = allFeedback.length;
-      $('badgeFeedback').textContent = allFeedback.length;
-      $('badgeFeedback').style.display = allFeedback.length ? '' : 'none';
+      // על הלשונית: כמה משובים עוד מחכים לתשובה
+      const unanswered = allFeedback.filter((f) => !f.reply).length;
+      $('badgeFeedback').textContent = unanswered;
+      $('badgeFeedback').style.display = unanswered ? '' : 'none';
       list.innerHTML = '';
       if (!allFeedback.length) {
         list.innerHTML = '<div class="empty-state" style="padding:26px 10px;">עוד לא התקבל משוב. הקוסמים שולחים משוב מתוך תפריט ההגדרות באפליקציה.</div>';
@@ -445,7 +474,13 @@
             <span class="muted">${meta}</span>
             <button type="button" class="btn btn-delete" style="padding:4px 10px; font-size:12px;" data-fb-delete="${escapeHtml(f.id)}">מחק</button>
           </div>
-          <div class="feedback-text">${escapeHtml(f.text)}</div>`;
+          <div class="feedback-text">${escapeHtml(f.text)}</div>
+          ${f.reply
+            ? `<div class="feedback-reply"><b>↩️ ענית (${formatDate(f.repliedAt)}):</b> ${escapeHtml(f.reply)}</div>`
+            : ''}
+          ${user
+            ? `<button type="button" class="btn ${f.reply ? 'btn-ghost' : 'btn-whatsapp'} reply-btn" data-fb-reply="${escapeHtml(f.id)}">${f.reply ? 'ענה שוב' : '↩️ ענה לו'}</button>`
+            : ''}`;
         list.appendChild(item);
       });
     }
@@ -507,6 +542,9 @@
           actions = `
             <button type="button" class="btn btn-whatsapp" data-action="approve" data-id="${id}">אשר ושלח וואטסאפ</button>
             <button type="button" class="btn btn-block" data-action="reject" data-id="${id}">דחה</button>`;
+        }
+        if (u.status !== 'pending') {
+          actions = `<button type="button" class="btn btn-ghost" data-action="message" data-id="${id}">💬 הודעה</button>` + actions;
         }
         actions += `<button type="button" class="btn btn-delete" data-action="delete" data-id="${id}">מחק</button>`;
 
@@ -675,6 +713,8 @@
         if (!ok) toast('האישור נכשל - אל תשלח את ההודעה עדיין', true);
       } else if (action === 'whatsapp') {
         window.open(buildWhatsappUrl(user), '_blank', 'noopener');
+      } else if (action === 'message') {
+        openMessageBox(user, null);
       } else if (action === 'revoke') {
         if (!confirm(`לבטל את הגישה של ${user.name}?\nהאפליקציה תינעל אצלו בטלפון.`)) return;
         btn.disabled = true;
@@ -700,7 +740,86 @@
       }
     });
 
+    // ---------------- הודעה / תשובה לקוסם ----------------
+    let msgTarget = null; // { user, feedback }
+
+    function openMessageBox(user, feedback) {
+      msgTarget = { user, feedback };
+      $('msgTitle').textContent = feedback ? `תשובה ל${user.name}` : `הודעה ל${user.name}`;
+      $('msgQuote').style.display = feedback ? '' : 'none';
+      $('msgQuote').textContent = feedback ? feedback.text : '';
+      $('msgText').value = feedback ? `היי ${user.name}, תודה על המשוב! ` : '';
+      $('msgSendWa').style.display = user.phone ? '' : 'none';
+      $('msgOverlay').style.display = 'flex';
+      setTimeout(() => {
+        $('msgText').focus();
+        $('msgText').setSelectionRange($('msgText').value.length, $('msgText').value.length);
+      }, 50);
+    }
+
+    function closeMessageBox() {
+      $('msgOverlay').style.display = 'none';
+      msgTarget = null;
+    }
+
+    $('msgCancel').addEventListener('click', closeMessageBox);
+    $('msgOverlay').addEventListener('click', (e) => {
+      if (e.target === $('msgOverlay')) closeMessageBox();
+    });
+
+    $('msgSendApp').addEventListener('click', async () => {
+      if (!msgTarget) return;
+      const text = $('msgText').value.trim();
+      if (!text) return toast('כתוב משהו לפני השליחה', true);
+      const { user, feedback } = msgTarget;
+      const btn = $('msgSendApp');
+      btn.disabled = true;
+      btn.textContent = 'שולח...';
+      try {
+        if (feedback) {
+          await Cloud.admin.replyFeedback(feedback.id, user.id, text);
+          feedback.reply = text;
+          feedback.repliedAt = new Date().toISOString();
+          renderFeedback();
+        } else {
+          await Cloud.admin.sendMessage(user.id, text);
+        }
+        closeMessageBox();
+        toast(`נשלח ל${user.name} ✓ יופיע לו באפליקציה`);
+      } catch (err) {
+        toast('השליחה נכשלה: ' + err.message, true);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '📱 שלח באפליקציה';
+      }
+    });
+
+    $('msgSendWa').addEventListener('click', async () => {
+      if (!msgTarget) return;
+      const text = $('msgText').value.trim();
+      if (!text) return toast('כתוב משהו לפני השליחה', true);
+      const { user, feedback } = msgTarget;
+      window.open(`https://wa.me/${formatPhoneForWhatsapp(user.phone)}?text=${encodeURIComponent(text)}`, '_blank', 'noopener');
+      // מסמנים שענית, כדי שהמשוב לא ייראה כמחכה לתשובה
+      if (feedback) {
+        try {
+          await Cloud.admin.replyFeedback(feedback.id, user.id, text, { inApp: false });
+          feedback.reply = text;
+          feedback.repliedAt = new Date().toISOString();
+          renderFeedback();
+        } catch (e) {}
+      }
+      closeMessageBox();
+    });
+
     $('feedbackList').addEventListener('click', async (e) => {
+      const replyBtn = e.target.closest('[data-fb-reply]');
+      if (replyBtn) {
+        const fb = allFeedback.find((f) => f.id === replyBtn.getAttribute('data-fb-reply'));
+        const user = fb && allUsers.find((u) => u.id === fb.uid);
+        if (fb && user) openMessageBox(user, fb);
+        return;
+      }
       const btn = e.target.closest('[data-fb-delete]');
       if (!btn) return;
       if (!confirm('למחוק את המשוב הזה?')) return;

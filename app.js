@@ -2806,6 +2806,7 @@ function bindCornerSecretZone(element, onDoubleTap, onTripleTap) {
 function openSettingsSheet() {
   forceAttemptCount = 0;
   refreshSettingsLastCaptured();
+  setTimeout(maybeShowAdminMessage, 600);
   if (typeof checkCloudAppUpdate === 'function') {
     checkCloudAppUpdate(false);
   }
@@ -3360,6 +3361,7 @@ function initDeviceLicenseGate() {
         writeLicenseCache('approved');
         applyState('approved');
         maybeReportUsage();
+        storeAdminMessage();
         schedule(LICENSE_RECHECK_MS);
       } else if (status === 'none') {
         // אין בקשה (או שהמנהל מחק אותה) -> טופס הרשמה
@@ -3453,7 +3455,7 @@ function initDeviceLicenseGate() {
 // החלון מוצג רק כשמסך ההגדרות פתוח (בפתיחת האפליקציה / בתפריט הסודי),
 // ולעולם לא מעל מסך הנעילה הפעיל מול קהל.
 // ============================================================================
-const APP_VERSION = '5.0';
+const APP_VERSION = '5.1';
 const DEFAULT_APK_URL = 'https://github.com/tzur2010/app-lockscreen/raw/main/Lockscreen.apk';
 const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 const UPDATE_DISMISS_KEY = 'magic_update_dismissed_version';
@@ -4469,6 +4471,85 @@ function initNotesReveal() {
 // ============================================================================
 const FEEDBACK_LAST_SENT_KEY = 'magic_feedback_last_sent';
 
+// ---------------- הודעה אישית מהמפתח (תשובה למשוב) ----------------
+// נשמרת בטלפון כשהיא מגיעה, ומוצגת רק כשהקוסם נכנס להגדרות - אף פעם לא מעל מסך הנעילה.
+const ADMIN_MSG_KEY = 'magic_admin_msg_v1'; // { text, at, seen }
+
+function readAdminMessage() {
+  try {
+    return JSON.parse(localStorage.getItem(ADMIN_MSG_KEY) || 'null');
+  } catch (e) {
+    return null;
+  }
+}
+
+function storeAdminMessage() {
+  if (!window.MagicCloud || typeof window.MagicCloud.device.getMyMessage !== 'function') return;
+  const msg = window.MagicCloud.device.getMyMessage();
+  if (!msg || !msg.text) return;
+  const prev = readAdminMessage();
+  if (prev && prev.at === msg.at && prev.text === msg.text) return;
+  try {
+    localStorage.setItem(ADMIN_MSG_KEY, JSON.stringify({ text: msg.text, at: msg.at, seen: false }));
+  } catch (e) {}
+  renderAdminMessageLast();
+  // אם ההגדרות כבר פתוחות - מציגים מיד
+  if (setupOverlay && setupOverlay.classList.contains('open')) maybeShowAdminMessage();
+}
+
+function renderAdminMessageLast() {
+  const box = document.getElementById('adminMsgLast');
+  const msg = readAdminMessage();
+  if (!box) return;
+  if (!msg || !msg.text) {
+    box.style.display = 'none';
+    return;
+  }
+  box.innerHTML = '';
+  const title = document.createElement('b');
+  title.textContent = '💬 הודעה אחרונה מהמפתח:';
+  box.appendChild(title);
+  box.appendChild(document.createTextNode('\n' + msg.text));
+  box.style.display = '';
+}
+
+function maybeShowAdminMessage() {
+  const msg = readAdminMessage();
+  const overlay = document.getElementById('adminMsgOverlay');
+  if (!msg || msg.seen || !overlay) return;
+  if (!setupOverlay || !setupOverlay.classList.contains('open')) return;
+  const updatePopup = document.getElementById('updatePopupOverlay');
+  if (updatePopup && updatePopup.style.display !== 'none') return; // נציג בכניסה הבאה
+  document.getElementById('adminMsgText').textContent = msg.text;
+  overlay.style.display = 'flex';
+}
+
+function initAdminMessage() {
+  const overlay = document.getElementById('adminMsgOverlay');
+  if (!overlay) return;
+  const markSeen = () => {
+    const msg = readAdminMessage();
+    if (msg) {
+      msg.seen = true;
+      try {
+        localStorage.setItem(ADMIN_MSG_KEY, JSON.stringify(msg));
+      } catch (e) {}
+    }
+    overlay.style.display = 'none';
+  };
+  document.getElementById('adminMsgOkBtn').addEventListener('click', markSeen);
+  document.getElementById('adminMsgReplyBtn').addEventListener('click', () => {
+    markSeen();
+    if (typeof showSettingsTab === 'function') showSettingsTab('more');
+    const input = document.getElementById('feedbackInput');
+    if (input) {
+      input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setTimeout(() => input.focus(), 400);
+    }
+  });
+  renderAdminMessageLast();
+}
+
 function initFeedbackBox() {
   const input = document.getElementById('feedbackInput');
   const btn = document.getElementById('feedbackSendBtn');
@@ -4523,6 +4604,7 @@ function initFeedbackBox() {
 
 // אתחול ראשוני
 initFeedbackBox();
+initAdminMessage();
 initMagicFeatures();
 initRoutines();
 initCloudBackup();

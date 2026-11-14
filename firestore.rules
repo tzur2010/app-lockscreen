@@ -47,9 +47,11 @@ service cloud.firestore {
 
       // רק המנהל משנה סטטוס (אישור / ביטול גישה / החזרה).
       // המכשיר עצמו יכול לעדכן רק את נתוני השימוש שלו (זמן אחרון, מספר פתיחות, גרסה).
+      // המנהל יכול גם לשלוח לקוסם הודעה אישית (adminMessage).
       allow update: if (isAdmin()
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
-          && request.resource.data.status in ['pending', 'approved', 'blocked'])
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt', 'adminMessage', 'adminMessageAt'])
+          && request.resource.data.status in ['pending', 'approved', 'blocked']
+          && (!('adminMessage' in request.resource.data) || validStr(request.resource.data.adminMessage, 1, 2000)))
         || (signedIn() && request.auth.uid == uid
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastSeen', 'openCount', 'appVersion'])
           && request.resource.data.lastSeen == request.time
@@ -73,7 +75,10 @@ service cloud.firestore {
         && (!('model' in request.resource.data) || validStr(request.resource.data.model, 0, 40))
         && request.resource.data.createdAt is timestamp;
       allow read, delete: if isAdmin();
-      allow update: if false;
+      // המנהל רק מוסיף תשובה למשוב (לא משנה את תוכן המשוב עצמו)
+      allow update: if isAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reply', 'repliedAt'])
+        && validStr(request.resource.data.reply, 1, 2000);
     }
 
     // גיבוי הגדרות: לפי קוד גיבוי אישי בן 12 תווים (הקוד הוא הסוד).

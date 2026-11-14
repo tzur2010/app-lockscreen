@@ -658,6 +658,32 @@
 
           <div class="oneui-card-divider"></div>
 
+          <!-- הצצה מטלפון שני -->
+          <div class="clean-toggle-row oneui-row-with-sub">
+            <div class="toggle-text-stack">
+              <span class="toggle-main-title">📲 שלח את הקוד לטלפון שני</span>
+              <span class="toggle-sub-desc">כל קוד שהצופה מקליד מופיע מיד בגדול בטלפון אחר: של עוזר בקהל, או טלפון שני בכיס שלך. הטלפון השני רק פותח קישור - לא צריך להתקין כלום.</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="toggleRemotePeek">
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="oneui-field-block" id="remotePeekExtra" style="display: none; padding-top: 0;">
+            <div class="remote-peek-link" id="remotePeekLink" dir="ltr"></div>
+            <div class="remote-peek-actions">
+              <button type="button" class="media-upload-btn" id="remotePeekWaBtn">שלח קישור בוואטסאפ</button>
+              <button type="button" class="media-upload-btn" id="remotePeekCopyBtn">העתק קישור</button>
+            </div>
+            <div class="remote-peek-actions">
+              <button type="button" class="media-upload-btn" id="remotePeekTestBtn">שלח בדיקה</button>
+              <button type="button" class="media-clear-btn" id="remotePeekNewBtn">קישור חדש</button>
+            </div>
+            <div class="toggle-sub-desc" id="remotePeekStatus" style="margin-top: 6px; min-height: 16px;">פתח את הקישור בטלפון השני והשאר את המסך דולק. הקישור סודי - מי שיש לו אותו רואה את הקודים.</div>
+          </div>
+
+          <div class="oneui-card-divider"></div>
+
           <!-- מתגי תצוגה והצצה סודית -->
           <div class="clean-toggle-row">
             <span class="toggle-main-title">צליל מקשים מקורי של סמסונג</span>
@@ -722,6 +748,16 @@
         <section class="settings-panel" data-tab="more">
 
         <button type="button" class="guide-open-btn" id="openGuideBtn">📖 מדריך: איך משתמשים באפליקציה</button>
+
+        <div class="oneui-section-header">🌐 שפה / Language</div>
+        <div class="config-group oneui-card">
+          <div class="oneui-field-block">
+            <div class="segmented-row" id="uiLangSelector">
+              <button type="button" class="seg-pill" data-lang="he">עברית</button>
+              <button type="button" class="seg-pill" data-lang="en">English</button>
+            </div>
+          </div>
+        </div>
 
         <div class="oneui-section-header">הפעלה מהירה</div>
         <div class="config-group oneui-card">
@@ -1108,6 +1144,7 @@
 
   </div>
 
+  <script src="i18n.js"></script>
   <script src="firebase-config.js"></script>
   <script src="app.js"></script>
 </body>

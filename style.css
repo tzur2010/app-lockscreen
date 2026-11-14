@@ -3588,3 +3588,27 @@ html, body, .phone-container {
 .admin-msg-text { white-space: pre-wrap; word-break: break-word; text-align: right; max-height: 45vh; overflow-y: auto; }
 .admin-msg-last { margin: 8px 0 10px; padding: 10px 12px; border-radius: 12px; background: rgba(34,197,94,.1); border: 1px solid rgba(34,197,94,.28); color: #dcfce7; font-size: 13px; line-height: 1.55; white-space: pre-wrap; word-break: break-word; }
 .admin-msg-last b { color: #86efac; }
+
+/* הצצה מטלפון שני */
+.remote-peek-link { font-family: ui-monospace, monospace; font-size: 11.5px; padding: 8px 10px; border-radius: 10px; background: rgba(0,0,0,.25); border: 1px solid rgba(255,255,255,.12); word-break: break-all; margin-bottom: 8px; user-select: all; }
+.remote-peek-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+.remote-peek-actions > * { width: 100%; margin: 0; }
+
+/* iOS 26 - Liquid Glass (iPhone 17 / 18) */
+.theme-ios.ios-liquid-glass .key-btn {
+  background: linear-gradient(160deg, rgba(255,255,255,.26), rgba(255,255,255,.08) 55%, rgba(255,255,255,.14)) !important;
+  -webkit-backdrop-filter: blur(18px) saturate(1.8);
+  backdrop-filter: blur(18px) saturate(1.8);
+  border: 0.5px solid rgba(255,255,255,.32) !important;
+  box-shadow: inset 0 1.5px 1px rgba(255,255,255,.55), inset 0 -1px 2px rgba(255,255,255,.18), 0 6px 22px rgba(0,0,0,.14) !important;
+}
+.theme-ios.ios-liquid-glass .key-btn:active {
+  background: linear-gradient(160deg, rgba(255,255,255,.55), rgba(255,255,255,.3)) !important;
+}
+
+/* English (LTR): כל הממשק משמאל לימין */
+html[dir="ltr"] body,
+html[dir="ltr"] body * { direction: ltr !important; }
+html[dir="ltr"] .oneui-password-input,
+html[dir="ltr"] .guide-card,
+html[dir="ltr"] .admin-msg-text { text-align: left !important; }

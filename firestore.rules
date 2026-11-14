@@ -53,7 +53,8 @@ service cloud.firestore {
           && request.resource.data.status in ['pending', 'approved', 'blocked']
           && (!('adminMessage' in request.resource.data) || validStr(request.resource.data.adminMessage, 1, 2000)))
         || (signedIn() && request.auth.uid == uid
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastSeen', 'openCount', 'appVersion'])
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastSeen', 'openCount', 'appVersion', 'stats'])
+          && (!('stats' in request.resource.data) || validStr(request.resource.data.stats, 0, 3000))
           && request.resource.data.lastSeen == request.time
           && request.resource.data.openCount is int
           && request.resource.data.openCount <= 1000000
@@ -79,6 +80,21 @@ service cloud.firestore {
       allow update: if isAdmin()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reply', 'repliedAt'])
         && validStr(request.resource.data.reply, 1, 2000);
+    }
+
+    // דיווח תקלות אוטומטי: מכשיר רשום שולח תקלה בשמו. רק המנהל קורא ומוחק.
+    match /errors/{errorId} {
+      allow create: if signedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && request.resource.data.keys().hasOnly(['uid', 'msg', 'src', 'appVersion', 'model', 'createdAt'])
+        && request.resource.data.uid == request.auth.uid
+        && validStr(request.resource.data.msg, 1, 500)
+        && validStr(request.resource.data.src, 0, 200)
+        && validStr(request.resource.data.appVersion, 0, 20)
+        && validStr(request.resource.data.model, 0, 40)
+        && request.resource.data.createdAt is timestamp;
+      allow read, delete: if isAdmin();
+      allow update: if false;
     }
 
     // גיבוי הגדרות: לפי קוד גיבוי אישי בן 12 תווים (הקוד הוא הסוד).

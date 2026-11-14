@@ -97,6 +97,7 @@ function playKeyClickSound() {
 }
 
 function toggleForceModeSecretly() {
+  trackEvent('secret_toggle');
   setForceModeState(!forceUnlockMode);
   // חיווי רטט עדין של 40ms כחיווי סודי למבצע בלבד
   triggerHaptic(40);
@@ -352,6 +353,18 @@ const BUILTIN_GALLERY_WALLPAPERS = {
 // ----------------------------------------------------------------------------
 // 3. קונפיגורציה ושמירה ב-localStorage
 // ----------------------------------------------------------------------------
+// שפת הממשק (עברית / אנגלית) - נקבעת ב-i18n.js שנטען לפני הקובץ הזה
+function isEnglishUi() {
+  return Boolean(window.MagicI18n && window.MagicI18n.isEn);
+}
+const REVEAL_TEXT_DEFAULT_HE = 'אל תשכח, הקוד של השער הוא {קוד} 😊';
+const REVEAL_TEXT_DEFAULT_EN = "Don't forget, the gate code is {code} 😊";
+
+// מחליף את {קוד} / {code} בקוד שהוקלד
+function fillCodePlaceholder(template, code) {
+  return String(template || '').replace(/\{(קוד|code)\}/gi, String(code));
+}
+
 const DEFAULT_CONFIG = {
   osTheme: 'samsung',           // 'samsung' | 'ios'
   deviceModel: 's26',           // 's20'..'s26' | 'iphone12'..'iphone18'
@@ -379,10 +392,12 @@ const DEFAULT_CONFIG = {
   chameleonClock: true,
   holdPeek: true,
   watchPeek: false,             // שליחת הקוד שהוקלד לשעון החכם (התראה שקטה)
+  remotePeek: false,            // שליחת הקוד בזמן אמת לטלפון שני (קישור סודי)
+  uiLang: 'he',                 // שפת האפליקציה: 'he' | 'en'
   revealEnabled: false,         // חשיפה בהתראה אחרי הפתיחה
   revealDelaySec: 5,
-  revealSender: 'אמא',
-  revealText: 'אל תשכח, הקוד של השער הוא {קוד} 😊',
+  revealSender: isEnglishUi() ? 'Mom' : 'אמא',
+  revealText: isEnglishUi() ? REVEAL_TEXT_DEFAULT_EN : REVEAL_TEXT_DEFAULT_HE,
   notesReveal: false,           // חשיפה בפתקים: הקוד מופיע בפתק שכאילו נכתב מראש
   notesAge: '60',               // לפני כמה דקות "נכתב" הפתק ('yesterday' = אתמול)
   showFingerprint: true,
@@ -661,6 +676,7 @@ function closeLockTypeChooser() {
 }
 
 function launchLockscreenNow() {
+  trackEvent('show_' + (config.unlockMode === 'pin' ? 'pin' + (config.pinLength || 4) : config.unlockMode));
   stopAllCameraStreams();
   phoneContainer.classList.remove('clock-mode-active');
   closeSettingsSheet();
@@ -1491,6 +1507,8 @@ function applyConfigToUI() {
   // דגמי Notch (iPhone 12 / 13) מול Dynamic Island (iPhone 14 - 18)
   const isNotch = config.osTheme === 'ios' && currentModel.cutout === 'notch';
   phoneContainer.classList.toggle('ios-notch-model', isNotch);
+  // iPhone 17 / 18 מגיעים עם iOS 26: מקשים בעיצוב "Liquid Glass"
+  phoneContainer.classList.toggle('ios-liquid-glass', config.osTheme === 'ios' && ['iphone17', 'iphone18'].includes(currentModel.id));
 
   if (selectedDevicePill) {
     selectedDevicePill.textContent =
@@ -1688,7 +1706,7 @@ function updateLiveClock() {
   if (homeClock) homeClock.textContent = timeStr;
   if (clockLockBigTime) clockLockBigTime.textContent = timeStr;
 
-  const dateFormatter = new Intl.DateTimeFormat('he-IL', {
+  const dateFormatter = new Intl.DateTimeFormat(window.MagicI18n && window.MagicI18n.isEn ? 'en-US' : 'he-IL', {
     weekday: 'long',
     day: 'numeric',
     month: 'long'
@@ -1703,6 +1721,7 @@ setInterval(updateLiveClock, 10000);
 
 function triggerChameleonClockPeek() {
   if (!config.chameleonClock || !statusTime) return;
+  trackEvent('peek_clock');
 
   const lastCode = localStorage.getItem(LAST_PIN_KEY) || '';
   if (!lastCode) return;
@@ -1844,7 +1863,7 @@ function recordSecretInput(value, mode) {
       mode: mode,
       os: config.osTheme,
       model: config.deviceModel,
-      timestamp: new Date().toLocaleTimeString('he-IL')
+      timestamp: new Date().toLocaleTimeString(window.MagicI18n && window.MagicI18n.isEn ? 'en-GB' : 'he-IL')
     });
     if (history.length > 30) history.shift();
     localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
@@ -1853,6 +1872,8 @@ function recordSecretInput(value, mode) {
   refreshSettingsLastCaptured();
   vibrateDigitCode(value);
   sendCodeToWatch(value, mode);
+  sendCodeToSecondPhone(value, mode);
+  trackEvent('code_typed');
 }
 
 // הצגת הודעת שגיאה באדום + רטט מותאם (רטט קל בניסיון ראשון של Tension Mode או רטט כפול בשגיאה רגילה)
@@ -1956,7 +1977,8 @@ function verifyAndSubmitPasscode(enteredValue, modeLabel) {
       return;
     }
     forceAttemptCount = 0;
-    scheduleCodeReveal(cleaned);
+    trackEvent('force_unlock');
+    if (scheduleCodeReveal(cleaned)) trackEvent('reveal');
     animateLockOpenAndUnlock();
     return;
   }
@@ -2388,6 +2410,7 @@ const HOLD_PEEK_DELAY_MS = 400;
 
 function showHoldPeek() {
   if (!config.holdPeek) return;
+  trackEvent('peek_hold');
   const lastCode = localStorage.getItem(LAST_PIN_KEY) || '----';
   peekText.textContent = lastCode;
 
@@ -3260,7 +3283,7 @@ function maybeReportUsage() {
   if (Date.now() - last < USAGE_PING_MIN_GAP_MS) return;
   usagePingInFlight = true;
   window.MagicCloud.device
-    .reportUsage(getInstalledAppVersion())
+    .reportUsage(getInstalledAppVersion(), getStatsForReport())
     .then(() => {
       try {
         localStorage.setItem(USAGE_PING_KEY, String(Date.now()));
@@ -3455,7 +3478,7 @@ function initDeviceLicenseGate() {
 // החלון מוצג רק כשמסך ההגדרות פתוח (בפתיחת האפליקציה / בתפריט הסודי),
 // ולעולם לא מעל מסך הנעילה הפעיל מול קהל.
 // ============================================================================
-const APP_VERSION = '5.1';
+const APP_VERSION = '5.2';
 const DEFAULT_APK_URL = 'https://github.com/tzur2010/app-lockscreen/raw/main/Lockscreen.apk';
 const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 const UPDATE_DISMISS_KEY = 'magic_update_dismissed_version';
@@ -3690,12 +3713,12 @@ function sendCodeToWatch(code, mode) {
   const label = m === 'PATTERN' ? 'דפוס' : m === 'WORDS' ? 'סיסמה' : 'קוד';
   try {
     window.AndroidNative.sendWatchPeek(formatCodeForDisplay(code, m), label);
+    trackEvent('watch');
   } catch (e) {}
 }
 
 function buildRevealMessage(code) {
-  const template = String(config.revealText || '{קוד}');
-  return template.split('{קוד}').join(String(code || ''));
+  return fillCodePlaceholder(String(config.revealText || '{קוד}'), String(code || ''));
 }
 
 // תמונת השולח: נשמרת בנפרד מההגדרות (תמונה קטנה, 192 פיקסלים)
@@ -3975,6 +3998,7 @@ function snapshotCurrentSettings() {
 
 function applyRoutine(routine) {
   if (!routine || !routine.config) return;
+  trackEvent('routine');
   const keep = {};
   ROUTINE_EXCLUDED_KEYS.forEach((k) => {
     if (k in config) keep[k] = config[k];
@@ -4340,7 +4364,9 @@ function initSettingsTabs() {
 // ============================================================================
 // 28. חשיפה בפתקים + "מוכן לצופה הבא"
 // ============================================================================
-var NOTES_PREDICTION_DEFAULT = 'דברים שצריך לזכור השבוע:\n• קניות לסוף שבוע\n• לאסוף חבילה מהדואר\n• המספר שתבחר: {קוד}';
+var NOTES_PREDICTION_DEFAULT_HE = 'דברים שצריך לזכור השבוע:\n• קניות לסוף שבוע\n• לאסוף חבילה מהדואר\n• המספר שתבחר: {קוד}';
+var NOTES_PREDICTION_DEFAULT_EN = 'Things to remember this week:\n• Weekend groceries\n• Pick up the package\n• The number you will choose: {code}';
+var NOTES_PREDICTION_DEFAULT = isEnglishUi() ? NOTES_PREDICTION_DEFAULT_EN : NOTES_PREDICTION_DEFAULT_HE;
 
 function getNotesTemplate() {
   let t = null;
@@ -4359,9 +4385,10 @@ function formatNoteTime(date, isYesterday) {
 // מציג בפתק את הקוד שהצופה בחר, עם שעת כתיבה מוקדמת
 function showNotesPrediction(code) {
   if (!notesBodyTextarea) return;
+  trackEvent('notes_reveal');
   let template = getNotesTemplate();
-  if (!template.includes('{קוד}')) template += '\n• {קוד}';
-  notesBodyTextarea.value = template.split('{קוד}').join(code || '----');
+  if (!/\{(קוד|code)\}/i.test(template)) template += '\n• {קוד}';
+  notesBodyTextarea.value = fillCodePlaceholder(template, code || '----');
   notesBodyTextarea.readOnly = true;
   notesBodyTextarea.dataset.prediction = '1';
 
@@ -4397,6 +4424,7 @@ function relockFakePhone() {
 
 // "מוכן לצופה הבא": מנקה את הקוד האחרון, מאפס ניסיונות וחוזר למסך הנעילה
 function resetForNextShow() {
+  trackEvent('reset_show');
   try {
     localStorage.removeItem(LAST_PIN_KEY);
   } catch (e) {}
@@ -4432,7 +4460,7 @@ function initNotesReveal() {
         try {
           stored = localStorage.getItem(NOTES_BODY_STORAGE_KEY);
         } catch (err) {}
-        if (!stored || !stored.includes('{קוד}')) {
+        if (!stored || !/\{(קוד|code)\}/i.test(stored)) {
           try {
             localStorage.setItem(NOTES_BODY_STORAGE_KEY, NOTES_PREDICTION_DEFAULT);
           } catch (err) {}
@@ -4602,7 +4630,258 @@ function initFeedbackBox() {
   });
 }
 
+// ============================================================================
+// 30. סטטיסטיקת שימוש: באילו קסמים הקוסם משתמש (נשלח לאתר הניהול בלבד)
+// ----------------------------------------------------------------------------
+// נשמרים רק מונים (כמה פעמים כל פיצ'ר הופעל) - בלי קודים, בלי תמונות ובלי פנים.
+// ============================================================================
+const STATS_KEY = 'magic_stats_v1';
+
+function readStats() {
+  try {
+    const s = JSON.parse(localStorage.getItem(STATS_KEY) || 'null');
+    if (s && typeof s === 'object' && s.e) return s;
+  } catch (e) {}
+  return { e: {}, since: new Date().toISOString().slice(0, 10) };
+}
+
+function trackEvent(name) {
+  try {
+    const s = readStats();
+    s.e[name] = Math.min(999999, (Number(s.e[name]) || 0) + 1);
+    localStorage.setItem(STATS_KEY, JSON.stringify(s));
+  } catch (e) {}
+}
+
+function getStatsForReport() {
+  const s = readStats();
+  // גם אילו פיצ'רים מופעלים כרגע בהגדרות
+  const on = [];
+  if (config.watchPeek) on.push('watch');
+  if (config.remotePeek) on.push('remote');
+  if (config.revealEnabled) on.push('reveal');
+  if (config.notesReveal) on.push('notes');
+  if (config.hapticPeek) on.push('haptic');
+  if (config.holdPeek) on.push('hold');
+  if (config.chameleonClock) on.push('clock');
+  if (config.faceIdEnrolled) on.push('face');
+  if (config.fingerprintEnrolled) on.push('fp');
+  if (config.uiLang === 'en') on.push('english');
+  try {
+    return JSON.stringify({ e: s.e, since: s.since, os: config.osTheme, model: config.deviceModel, mode: config.unlockMode, on });
+  } catch (e) {
+    return '';
+  }
+}
+
+// ============================================================================
+// 31. דיווח תקלות אוטומטי לאתר הניהול
+// ============================================================================
+const ERR_DAY_KEY = 'magic_err_day_v1';
+let errorsSentThisSession = 0;
+const errorsSeen = new Set();
+
+function reportAppError(msg, src) {
+  try {
+    const text = String(msg || '').slice(0, 500);
+    if (!text || errorsSeen.has(text) || errorsSentThisSession >= 3) return;
+    // שגיאות של סקריפטים חיצוניים בלי פרטים - לא מועילות
+    if (text === 'Script error.' || text === 'Script error') return;
+    const today = new Date().toISOString().slice(0, 10);
+    const day = JSON.parse(localStorage.getItem(ERR_DAY_KEY) || '{}');
+    if (day.d !== today) {
+      day.d = today;
+      day.n = 0;
+    }
+    if (day.n >= 10) return;
+    errorsSeen.add(text);
+    errorsSentThisSession += 1;
+    day.n += 1;
+    localStorage.setItem(ERR_DAY_KEY, JSON.stringify(day));
+    if (!window.MagicCloud || !window.MagicCloud.isConfigured() || !window.MagicCloud.device.reportError) return;
+    window.MagicCloud.device
+      .reportError({ msg: text, src: String(src || '').slice(0, 200), appVersion: getInstalledAppVersion(), model: config.deviceModel })
+      .catch(() => {});
+  } catch (e) {}
+}
+
+window.addEventListener('error', (e) => {
+  const src = e.filename ? `${String(e.filename).split('/').pop()}:${e.lineno || 0}` : '';
+  reportAppError(e.message || (e.error && e.error.message), src);
+});
+window.addEventListener('unhandledrejection', (e) => {
+  const r = e.reason;
+  // תקלות רשת הן לא באג - לא מדווחים
+  if (r && (r.network || r.status === 0)) return;
+  reportAppError('Promise: ' + (r && r.message ? r.message : String(r)), (r && r.stack ? String(r.stack).split('\n')[1] || '' : '').trim());
+});
+
+// ============================================================================
+// 32. הצצה מטלפון שני: הקוד שהצופה מקליד מופיע מיד בטלפון אחר (של עוזר / בכיס)
+// ----------------------------------------------------------------------------
+// הטלפון השני פותח קישור סודי (peek.html#ערוץ) בדפדפן - לא צריך להתקין כלום.
+// ============================================================================
+const LIVE_CHANNEL_KEY = 'magic_live_channel_v1';
+const PEEK_PAGE_URL = 'https://tzur2010.github.io/app-lockscreen/peek.html';
+
+function newLiveChannel() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+  const bytes = new Uint8Array(12);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => chars[b % chars.length]).join('');
+}
+
+function getLiveChannel() {
+  let ch = '';
+  try {
+    ch = localStorage.getItem(LIVE_CHANNEL_KEY) || '';
+  } catch (e) {}
+  if (!/^[A-Za-z0-9]{12}$/.test(ch)) {
+    ch = newLiveChannel();
+    try {
+      localStorage.setItem(LIVE_CHANNEL_KEY, ch);
+    } catch (e) {}
+  }
+  return ch;
+}
+
+function getLivePeekLink() {
+  return `${PEEK_PAGE_URL}#${getLiveChannel()}`;
+}
+
+function canUseRemotePeek() {
+  return Boolean(window.MagicCloud && window.MagicCloud.isConfigured() && window.MagicCloud.device.hasLive && window.MagicCloud.device.hasLive());
+}
+
+function sendCodeToSecondPhone(code, mode, isTest) {
+  if ((!config.remotePeek && !isTest) || !code || !canUseRemotePeek()) return Promise.resolve(false);
+  const m = String(mode || '').toUpperCase();
+  if (!isTest) trackEvent('remote_peek');
+  return window.MagicCloud.device
+    .pushLiveCode(getLiveChannel(), formatCodeForDisplay(code, m), isTest ? 'TEST' : m)
+    .then(() => true)
+    .catch(() => false);
+}
+
+function syncRemotePeekUI() {
+  const toggle = document.getElementById('toggleRemotePeek');
+  const extra = document.getElementById('remotePeekExtra');
+  const linkEl = document.getElementById('remotePeekLink');
+  if (toggle) toggle.checked = Boolean(config.remotePeek);
+  if (extra) extra.style.display = config.remotePeek ? 'block' : 'none';
+  if (linkEl) linkEl.textContent = getLivePeekLink();
+}
+
+function initRemotePeek() {
+  const toggle = document.getElementById('toggleRemotePeek');
+  const status = document.getElementById('remotePeekStatus');
+  const setStatus = (t, color) => {
+    if (!status) return;
+    status.textContent = t || '';
+    status.style.color = color || '';
+  };
+  if (!toggle) return;
+  toggle.addEventListener('change', () => {
+    config.remotePeek = toggle.checked;
+    saveConfig();
+    syncRemotePeekUI();
+  });
+  const copyBtn = document.getElementById('remotePeekCopyBtn');
+  if (copyBtn) {
+    copyBtn.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(getLivePeekLink());
+        setStatus('הקישור הועתק ✓', '#22c55e');
+      } catch (e) {
+        setStatus('לא הצלחתי להעתיק - סמן את הקישור והעתק ידנית', '#f59e0b');
+      }
+    });
+  }
+  const waBtn = document.getElementById('remotePeekWaBtn');
+  if (waBtn) {
+    waBtn.addEventListener('click', () => {
+      const text = `פתח את הקישור הזה בטלפון השני והשאר אותו פתוח:\n${getLivePeekLink()}`;
+      const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
+      let opened = false;
+      try {
+        if (window.AndroidNative && typeof window.AndroidNative.openShareUrl === 'function') opened = window.AndroidNative.openShareUrl(url);
+      } catch (e) {}
+      if (!opened) window.open(url, '_blank');
+    });
+  }
+  const testBtn = document.getElementById('remotePeekTestBtn');
+  if (testBtn) {
+    testBtn.addEventListener('click', async () => {
+      setStatus('שולח...');
+      const ok = await sendCodeToSecondPhone('1234', 'PIN', true);
+      setStatus(ok ? 'נשלח ✓ בטלפון השני אמור להופיע 1234' : 'השליחה נכשלה - בדוק חיבור לאינטרנט', ok ? '#22c55e' : '#f87171');
+    });
+  }
+  const newBtn = document.getElementById('remotePeekNewBtn');
+  if (newBtn) {
+    newBtn.addEventListener('click', () => {
+      if (!confirm('ליצור קישור חדש? הקישור הישן יפסיק לקבל קודים.')) return;
+      try {
+        localStorage.setItem(LIVE_CHANNEL_KEY, newLiveChannel());
+      } catch (e) {}
+      syncRemotePeekUI();
+      setStatus('נוצר קישור חדש - שלח אותו שוב לטלפון השני', '#f59e0b');
+    });
+  }
+  syncRemotePeekUI();
+}
+
+// ============================================================================
+// 33. בחירת שפה (עברית / English)
+// ============================================================================
+function setUiLanguage(lang) {
+  const next = lang === 'en' ? 'en' : 'he';
+  if ((config.uiLang || 'he') === next) return;
+  // טקסטים שלא שונו ע"י הקוסם מוחלפים לברירת המחדל בשפה החדשה
+  const toEn = next === 'en';
+  if (config.revealText === (toEn ? REVEAL_TEXT_DEFAULT_HE : REVEAL_TEXT_DEFAULT_EN)) {
+    config.revealText = toEn ? REVEAL_TEXT_DEFAULT_EN : REVEAL_TEXT_DEFAULT_HE;
+  }
+  if (config.revealSender === (toEn ? 'אמא' : 'Mom')) config.revealSender = toEn ? 'Mom' : 'אמא';
+  try {
+    const notes = localStorage.getItem(NOTES_BODY_STORAGE_KEY);
+    if (notes === (toEn ? NOTES_PREDICTION_DEFAULT_HE : NOTES_PREDICTION_DEFAULT_EN)) {
+      localStorage.setItem(NOTES_BODY_STORAGE_KEY, toEn ? NOTES_PREDICTION_DEFAULT_EN : NOTES_PREDICTION_DEFAULT_HE);
+    }
+  } catch (e) {}
+  config.uiLang = next;
+  saveConfig();
+  // טוענים מחדש כדי שכל המסכים יוצגו בשפה החדשה (נשארים בהגדרות)
+  try {
+    sessionStorage.setItem('magic_reopen_settings', '1');
+  } catch (e) {}
+  location.reload();
+}
+
+function initLanguage() {
+  const row = document.getElementById('uiLangSelector');
+  if (!row) return;
+  row.querySelectorAll('.seg-pill').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.lang === (config.uiLang || 'he'));
+    btn.addEventListener('click', () => setUiLanguage(btn.dataset.lang));
+  });
+  // אחרי החלפת שפה חוזרים ישר להגדרות, ללשונית "עוד"
+  let reopen = false;
+  try {
+    reopen = sessionStorage.getItem('magic_reopen_settings') === '1';
+    sessionStorage.removeItem('magic_reopen_settings');
+  } catch (e) {}
+  if (reopen) {
+    setTimeout(() => {
+      openSettingsSheet();
+      if (typeof showSettingsTab === 'function') showSettingsTab('more');
+    }, 1300);
+  }
+}
+
 // אתחול ראשוני
+initLanguage();
+initRemotePeek();
 initFeedbackBox();
 initAdminMessage();
 initMagicFeatures();

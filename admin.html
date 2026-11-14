@@ -73,6 +73,15 @@
     .feedback-item { background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.07); border-radius: 14px; padding: 12px 14px; }
     .feedback-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
     .feedback-head .btn { margin-inline-start: auto; }
+    .bars { display: flex; flex-direction: column; gap: 7px; }
+    .bar-row { display: grid; grid-template-columns: 150px 1fr 54px; align-items: center; gap: 10px; font-size: 13.5px; }
+    .bar-track { height: 10px; border-radius: 6px; background: rgba(255,255,255,.06); overflow: hidden; }
+    .bar-fill { height: 100%; border-radius: 6px; background: linear-gradient(90deg, #6366f1, #a855f7); }
+    .bar-num { text-align: left; font-variant-numeric: tabular-nums; color: #cbd5e1; font-weight: 700; }
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+    .err-src { font-family: ui-monospace, monospace; font-size: 12px; color: #94a3b8; direction: ltr; text-align: left; }
+    .user-tricks { font-size: 12px; color: #a5b4fc; margin-top: 2px; }
+    @media (max-width: 760px) { .bar-row { grid-template-columns: 110px 1fr 44px; font-size: 12.5px; } .two-col { grid-template-columns: 1fr; } }
     .feedback-reply { margin-top: 10px; padding: 9px 12px; border-radius: 12px; background: rgba(34,197,94,.08); border: 1px solid rgba(34,197,94,.25); color: #bbf7d0; font-size: 13.5px; line-height: 1.55; white-space: pre-wrap; word-break: break-word; }
     .reply-btn { margin-top: 10px; padding: 7px 14px; font-size: 13px; }
     .msg-overlay { position: fixed; inset: 0; background: rgba(2,6,23,.72); backdrop-filter: blur(6px); z-index: 60; display: flex; align-items: center; justify-content: center; padding: 16px; }
@@ -84,7 +93,7 @@
     .msg-actions .btn { flex: 1; justify-content: center; }
     .feedback-text { font-size: 14.5px; line-height: 1.6; white-space: pre-wrap; word-break: break-word; color: #e2e8f0; }
     /* לשוניות */
-    .admin-tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 18px; padding: 6px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 18px; position: sticky; top: 8px; z-index: 10; backdrop-filter: blur(16px); }
+    .admin-tabs { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-bottom: 18px; padding: 6px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 18px; position: sticky; top: 8px; z-index: 10; backdrop-filter: blur(16px); }
     .admin-tab { border: none; background: transparent; color: #cbd5e1; border-radius: 13px; padding: 11px 6px; font-size: 14.5px; font-weight: 800; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; transition: background .2s, color .2s; }
     .admin-tab.active { background: #3888ff; color: #fff; box-shadow: 0 6px 16px rgba(56,136,255,.35); }
     .tab-badge { min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; background: #f59e0b; color: #111; font-size: 12px; font-weight: 900; display: inline-flex; align-items: center; justify-content: center; }
@@ -120,7 +129,7 @@
       .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
       .stat-card { padding: 12px 14px; }
       .stat-value { font-size: 24px; }
-      .admin-tab { font-size: 12.5px; padding: 10px 2px; flex-direction: column; gap: 2px; }
+      .admin-tabs { gap: 3px; padding: 4px; } .admin-tab { font-size: 11.5px; padding: 9px 1px; flex-direction: column; gap: 2px; }
       .table-header-bar { padding: 12px; }
       #searchInput { width: 100% !important; }
       table, thead, tbody, tr, td { display: block; width: 100%; }
@@ -187,6 +196,7 @@
         <button type="button" class="admin-tab active" data-tab="users">👥 לקוחות <span class="tab-badge" id="badgePending" style="display:none;">0</span></button>
         <button type="button" class="admin-tab" data-tab="feedback">💬 משובים <span class="tab-badge tab-badge-blue" id="badgeFeedback" style="display:none;">0</span></button>
         <button type="button" class="admin-tab" data-tab="update">📢 עדכון <span class="tab-badge tab-badge-green" id="badgeUpdate" style="display:none;">!</span></button>
+        <button type="button" class="admin-tab" data-tab="stats">📊 נתונים <span class="tab-badge" id="badgeErrors" style="display:none;">0</span></button>
         <button type="button" class="admin-tab" data-tab="invite">✉️ הזמנה</button>
       </nav>
 
@@ -226,6 +236,40 @@
           <div class="empty-state" id="emptyState">אין בקשות להצגה.</div>
         </div>
       </div>
+      </section>
+
+      <!-- ===================== לשונית: נתונים ===================== -->
+      <section class="admin-panel" data-tab="stats">
+        <div class="stats-grid">
+          <div class="card stat-card"><div class="stat-label">הופעות (מסך נעילה הוצג)</div><div class="stat-value" id="kpiShows">0</div></div>
+          <div class="card stat-card"><div class="stat-label">קודים שצופים הקלידו</div><div class="stat-value" id="kpiCodes" style="color:#60a5fa;">0</div></div>
+          <div class="card stat-card"><div class="stat-label">קוסמים פעילים השבוע</div><div class="stat-value" id="kpiActive" style="color:#4ade80;">0</div></div>
+          <div class="card stat-card"><div class="stat-label">תקלות פתוחות</div><div class="stat-value" id="kpiErrors" style="color:#fb7185;">0</div></div>
+        </div>
+        <div class="card panel">
+          <h2>🎩 באילו קסמים משתמשים הכי הרבה</h2>
+          <div class="muted" style="margin-bottom:10px;">סה"כ פעמים מכל הקוסמים. הנתונים מתעדכנים מהטלפונים פעם ב-20 דקות (רק מגרסה 5.2 והלאה).</div>
+          <div id="featureBars" class="bars"></div>
+        </div>
+        <div class="card panel">
+          <h2>⚙️ מה מופעל אצל הקוסמים</h2>
+          <div id="enabledBars" class="bars"></div>
+        </div>
+        <div class="card panel">
+          <h2>📱 טלפון וסוג נעילה</h2>
+          <div class="two-col">
+            <div id="osBars" class="bars"></div>
+            <div id="modeBars" class="bars"></div>
+          </div>
+        </div>
+        <div class="card panel">
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
+            <h2 style="margin:0;">🐞 תקלות שדווחו אוטומטית (<span id="errorsCount">0</span>)</h2>
+            <button type="button" class="btn btn-ghost" id="clearErrorsBtn" style="display:none;">מחק את כולן</button>
+          </div>
+          <div class="muted" style="margin:6px 0 10px;">כשמשהו קורס באפליקציה אצל קוסם, זה מגיע לכאן לבד. שלח לי את השגיאה ואתקן.</div>
+          <div id="errorsList" class="feedback-list"></div>
+        </div>
       </section>
 
       <!-- ===================== לשונית: משובים ===================== -->
@@ -444,9 +488,160 @@
       if (!u.lastSeen) return '<span class="muted">עוד לא השתמש</span>';
       const opens = Number(u.openCount) || 0;
       const ver = u.appVersion ? ` · <span class="mono">v${escapeHtml(u.appVersion)}</span>` : '';
+      const st = parseStats(u);
+      let tricks = '';
+      if (st) {
+        const shows = sumShows(st.e);
+        const codes = Number(st.e.code_typed) || 0;
+        tricks = `<div class="user-tricks">🎩 ${shows} הופעות · ${codes} קודים${st.on && st.on.includes('english') ? ' · 🇬🇧' : ''}</div>`;
+      }
       return `<div style="font-weight:600; font-size:13.5px;">${timeAgo(u.lastSeen)}</div>` +
-        `<div class="muted">${opens} פתיחות${ver}</div>`;
+        `<div class="muted">${opens} פתיחות${ver}</div>` + tricks;
     }
+
+    // ---------------- נתונים (סטטיסטיקה ותקלות) ----------------
+    const EVENT_NAMES = {
+      code_typed: 'קוד הוקלד ע"י צופה',
+      force_unlock: 'פתיחה בכל קוד',
+      reveal: 'חשיפה בהודעה',
+      notes_reveal: 'חשיפה בפתקים',
+      watch: 'הצצה בשעון',
+      remote_peek: 'הצצה בטלפון שני',
+      peek_hold: 'הצצה בלחיצה ארוכה',
+      peek_clock: 'הצצה בשעון הזיקית',
+      secret_toggle: 'הדלקה סודית (לחיצה כפולה)',
+      routine: 'מעבר רוטינה',
+      reset_show: 'איפוס לצופה הבא'
+    };
+    const ON_NAMES = {
+      watch: '⌚ שעון חכם', remote: '📲 טלפון שני', reveal: '💬 חשיפה בהודעה', notes: '📝 חשיפה בפתקים',
+      haptic: '📳 רטט בכיס', hold: '👆 לחיצה ארוכה', clock: '🕐 שעון זיקית', face: '🙂 זיהוי פנים', fp: '👆 טביעת אצבע', english: '🇬🇧 באנגלית'
+    };
+    const MODE_NAMES = { pin: 'קוד PIN', pattern: 'דפוס', words: 'סיסמה', swipe: 'החלקה' };
+    let allErrors = [];
+
+    function parseStats(u) {
+      if (!u || !u.stats) return null;
+      try {
+        const s = JSON.parse(u.stats);
+        return s && s.e ? s : null;
+      } catch (e) {
+        return null;
+      }
+    }
+
+    function sumShows(e) {
+      return Object.keys(e || {}).filter((k) => k.startsWith('show_')).reduce((a, k) => a + (Number(e[k]) || 0), 0);
+    }
+
+    function renderBars(el, entries, labels) {
+      const rows = entries.filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
+      if (!rows.length) {
+        el.innerHTML = '<div class="muted">עוד אין נתונים.</div>';
+        return;
+      }
+      const max = rows[0][1];
+      el.innerHTML = rows
+        .map(([k, v]) => `<div class="bar-row"><span>${escapeHtml(labels[k] || k)}</span>` +
+          `<div class="bar-track"><div class="bar-fill" style="width:${Math.max(3, Math.round((v / max) * 100))}%"></div></div>` +
+          `<span class="bar-num">${v}</span></div>`)
+        .join('');
+    }
+
+    function renderStats() {
+      const totals = {};
+      const enabled = {};
+      const os = {};
+      const modes = {};
+      let shows = 0;
+      let active = 0;
+      const weekAgo = Date.now() - 7 * 24 * 3600 * 1000;
+      allUsers.forEach((u) => {
+        if (u.lastSeen && new Date(u.lastSeen).getTime() > weekAgo) active += 1;
+        const st = parseStats(u);
+        if (!st) return;
+        Object.entries(st.e).forEach(([k, v]) => {
+          if (k.startsWith('show_')) return;
+          totals[k] = (totals[k] || 0) + (Number(v) || 0);
+        });
+        shows += sumShows(st.e);
+        (st.on || []).forEach((k) => (enabled[k] = (enabled[k] || 0) + 1));
+        const osName = st.os === 'ios' ? '🍎 iPhone' : '🤖 Samsung';
+        os[osName] = (os[osName] || 0) + 1;
+        if (st.mode) modes[st.mode] = (modes[st.mode] || 0) + 1;
+      });
+      $('kpiShows').textContent = shows;
+      $('kpiCodes').textContent = totals.code_typed || 0;
+      $('kpiActive').textContent = active;
+      renderBars($('featureBars'), Object.entries(totals).filter(([k]) => k !== 'code_typed'), EVENT_NAMES);
+      renderBars($('enabledBars'), Object.entries(enabled), ON_NAMES);
+      renderBars($('osBars'), Object.entries(os), {});
+      renderBars($('modeBars'), Object.entries(modes), MODE_NAMES);
+    }
+
+    function renderErrors() {
+      $('errorsCount').textContent = allErrors.length;
+      $('kpiErrors').textContent = allErrors.length;
+      $('badgeErrors').textContent = allErrors.length;
+      $('badgeErrors').style.display = allErrors.length ? '' : 'none';
+      $('clearErrorsBtn').style.display = allErrors.length ? '' : 'none';
+      const list = $('errorsList');
+      if (!allErrors.length) {
+        list.innerHTML = '<div class="empty-state" style="padding:20px 10px;">אין תקלות 🎉</div>';
+        return;
+      }
+      list.innerHTML = '';
+      allErrors.forEach((er) => {
+        const user = allUsers.find((u) => u.id === er.uid);
+        const meta = [formatDate(er.createdAt), er.appVersion ? 'v' + escapeHtml(er.appVersion) : '', escapeHtml(er.model || '')].filter(Boolean).join(' · ');
+        const item = document.createElement('div');
+        item.className = 'feedback-item';
+        item.innerHTML = `
+          <div class="feedback-head">
+            <span style="font-weight:800;">${user ? escapeHtml(user.name) : 'לא ידוע'}</span>
+            <span class="muted">${meta}</span>
+            <button type="button" class="btn btn-delete" style="padding:4px 10px; font-size:12px;" data-err-delete="${escapeHtml(er.id)}">מחק</button>
+          </div>
+          <div class="feedback-text" dir="ltr" style="text-align:left;">${escapeHtml(er.msg)}</div>
+          ${er.src ? `<div class="err-src">${escapeHtml(er.src)}</div>` : ''}`;
+        list.appendChild(item);
+      });
+    }
+
+    async function loadErrors() {
+      try {
+        allErrors = await Cloud.admin.listErrors();
+        renderErrors();
+      } catch (e) {}
+    }
+
+    $('errorsList').addEventListener('click', async (e) => {
+      const btn = e.target.closest('[data-err-delete]');
+      if (!btn) return;
+      const id = btn.getAttribute('data-err-delete');
+      btn.disabled = true;
+      try {
+        await Cloud.admin.deleteError(id);
+        allErrors = allErrors.filter((x) => x.id !== id);
+        renderErrors();
+      } catch (err) {
+        toast('המחיקה נכשלה: ' + err.message, true);
+        btn.disabled = false;
+      }
+    });
+
+    $('clearErrorsBtn').addEventListener('click', async () => {
+      if (!confirm(`למחוק את כל ${allErrors.length} התקלות?`)) return;
+      const ids = allErrors.map((x) => x.id);
+      for (const id of ids) {
+        try {
+          await Cloud.admin.deleteError(id);
+          allErrors = allErrors.filter((x) => x.id !== id);
+        } catch (e) {}
+      }
+      renderErrors();
+      toast('נמחק');
+    });
 
     function renderFeedback() {
       const list = $('feedbackList');
@@ -565,7 +760,9 @@
         allUsers = await Cloud.admin.listUsers();
         setLive(true);
         renderUsers();
+        renderStats();
         loadFeedback();
+        loadErrors();
       } catch (err) {
         setLive(false);
         if (err.status === 401 || err.status === 403) {

@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#000000">
+  <title>&#8203;</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    html, body { height: 100%; background: #000; color: #fff; font-family: -apple-system, 'Segoe UI', Roboto, Arial, sans-serif; overflow: hidden; user-select: none; }
+    .wrap { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; text-align: center; transition: opacity .3s; }
+    .code { font-size: min(26vw, 190px); font-weight: 800; letter-spacing: .06em; line-height: 1; font-variant-numeric: tabular-nums; direction: ltr; word-break: break-all; }
+    .code.flash { animation: flash .9s ease-out; }
+    @keyframes flash { 0% { color: #4ade80; transform: scale(1.08); } 100% { color: #fff; transform: scale(1); } }
+    .mode { margin-top: 14px; font-size: 15px; color: #64748b; font-weight: 600; }
+    .history { margin-top: 26px; display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; direction: ltr; }
+    .history span { font-size: 15px; color: #475569; font-variant-numeric: tabular-nums; }
+    .status { position: fixed; bottom: calc(14px + env(safe-area-inset-bottom)); left: 0; right: 0; text-align: center; font-size: 12px; color: #334155; }
+    .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #475569; margin-inline-end: 6px; vertical-align: middle; }
+    .dot.on { background: #22c55e; }
+    .wait { font-size: 18px; color: #475569; line-height: 1.6; }
+    /* מצב סמוי: כמעט שחור, ספרות קטנות ואפורות */
+    body.stealth .code { font-size: min(12vw, 70px); color: #1f2937; }
+    body.stealth .code.flash { animation: none; }
+    body.stealth .mode, body.stealth .history, body.stealth .wait { display: none; }
+    body.stealth .status { color: #111827; }
+    .bad { color: #f87171; font-size: 17px; line-height: 1.7; padding: 0 20px; }
+  </style>
+</head>
+<body>
+  <div class="wrap" id="wrap">
+    <div class="wait" id="wait">מחכה לקוד...<br><small>Waiting for code...</small></div>
+    <div class="code" id="code" style="display:none;"></div>
+    <div class="mode" id="mode"></div>
+    <div class="history" id="history"></div>
+  </div>
+  <div class="status"><span class="dot" id="dot"></span><span id="statusText">מתחבר...</span> · לחיצה כפולה = מצב סמוי</div>
+
+  <script>
+    (function () {
+      var DB = 'https://magic-lock-99194-default-rtdb.europe-west1.firebasedatabase.app';
+      var channel = String(location.hash || '').replace('#', '');
+      var $ = function (id) { return document.getElementById(id); };
+      var history = [];
+      var lastAt = 0;
+      var first = true;
+
+      if (!/^[A-Za-z0-9]{12}$/.test(channel)) {
+        $('wrap').innerHTML = '<div class="bad">הקישור לא תקין.<br>פתח אותו שוב מתוך האפליקציה (הגדרות ← הצצה ← שלח את הקוד לטלפון שני).</div>';
+        $('statusText').textContent = '';
+        return;
+      }
+
+      // המסך נשאר דלוק כל עוד הדף פתוח
+      var wakeLock = null;
+      function keepAwake() {
+        try {
+          if (navigator.wakeLock && document.visibilityState === 'visible') {
+            navigator.wakeLock.request('screen').then(function (l) { wakeLock = l; }).catch(function () {});
+          }
+        } catch (e) {}
+      }
+      keepAwake();
+      document.addEventListener('visibilitychange', keepAwake);
+
+      var lastTap = 0;
+      document.addEventListener('click', function () {
+        var now = Date.now();
+        if (now - lastTap < 350) document.body.classList.toggle('stealth');
+        lastTap = now;
+        keepAwake();
+      });
+
+      function modeLabel(m) {
+        m = String(m || '').toUpperCase();
+        if (m === 'PATTERN') return 'דפוס · Pattern';
+        if (m === 'WORDS') return 'סיסמה · Password';
+        if (m === 'TEST') return 'בדיקה ✓ · Test';
+        return 'קוד · PIN';
+      }
+
+      function show(data) {
+        if (!data || !data.code) return;
+        var at = Number(data.at) || 0;
+        if (at && at <= lastAt) return;
+        lastAt = at;
+        // הקוד האחרון שהיה שמור לפני שפתחנו - מציגים בלי רטט
+        var isOld = first && at && Date.now() - at > 30000;
+        first = false;
+        $('wait').style.display = 'none';
+        var c = $('code');
+        c.style.display = '';
+        c.textContent = data.code;
+        c.classList.remove('flash');
+        void c.offsetWidth;
+        if (!isOld) c.classList.add('flash');
+        $('mode').textContent = isOld ? 'קוד קודם · Previous' : modeLabel(data.mode);
+        if (!isOld) {
+          try { navigator.vibrate && navigator.vibrate([60, 60, 60]); } catch (e) {}
+          history.unshift(data.code);
+          history = history.slice(0, 6);
+          $('history').innerHTML = '';
+          history.slice(1).forEach(function (h) {
+            var s = document.createElement('span');
+            s.textContent = h;
+            $('history').appendChild(s);
+          });
+        }
+      }
+
+      function setOnline(on, text) {
+        $('dot').classList.toggle('on', on);
+        $('statusText').textContent = text;
+      }
+
+      var es = null;
+      function connect() {
+        if (es) es.close();
+        es = new EventSource(DB + '/live/' + channel + '.json');
+        es.addEventListener('open', function () { setOnline(true, 'מחובר · Live'); });
+        es.addEventListener('put', function (e) {
+          try {
+            var msg = JSON.parse(e.data);
+            if (msg.path === '/') show(msg.data);
+          } catch (err) {}
+        });
+        es.addEventListener('patch', function () {});
+        es.addEventListener('auth_revoked', connect);
+        es.addEventListener('cancel', function () { setOnline(false, 'אין גישה לערוץ'); });
+        es.onerror = function () { setOnline(false, 'מתחבר מחדש...'); };
+      }
+      connect();
+    })();
+  </script>
+</body>
+</html>

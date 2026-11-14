@@ -1,0 +1,13 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "live": {
+      "$ch": {
+        ".read": "$ch.length === 12",
+        ".write": "auth != null && $ch.length === 12 && (!data.exists() || data.child('owner').val() === auth.uid) && newData.child('owner').val() === auth.uid",
+        ".validate": "newData.hasChildren(['owner', 'code', 'at']) && newData.child('code').isString() && newData.child('code').val().length <= 64 && newData.child('at').val() === now"
+      }
+    }
+  }
+}

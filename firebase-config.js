@@ -11,7 +11,8 @@
 // >>> יש להדביק כאן את הערכים מהגדרות הפרויקט ב-Firebase (ראה הוראות-הגדרה.md) <<<
 window.MAGIC_FIREBASE_CONFIG = {
   apiKey: 'AIzaSyBTQKq5Lnn0IFu2RROdMxMlaIeFgx721jo',
-  projectId: 'magic-lock-99194'
+  projectId: 'magic-lock-99194',
+  databaseURL: 'https://magic-lock-99194-default-rtdb.europe-west1.firebasedatabase.app'
 };
 
 window.MagicCloud = (function () {
@@ -248,8 +249,14 @@ window.MagicCloud = (function () {
 
   // רישום שימוש: מתי נפתחה האפליקציה לאחרונה, כמה פעמים ובאיזו גרסה.
   // הזמן והספירה מחושבים בשרת (לא ניתן לזייף מהטלפון).
-  async function reportUsage(appVersion) {
+  async function reportUsage(appVersion, stats) {
     const uid = await ensureDeviceSession();
+    const fields = { appVersion: String(appVersion || '').slice(0, 20) };
+    const paths = ['appVersion'];
+    if (stats) {
+      fields.stats = String(stats).slice(0, 3000);
+      paths.push('stats');
+    }
     const res = await authedRequest(deviceAuth, `${DB_BASE}:commit`, {
       method: 'POST',
       body: JSON.stringify({
@@ -257,9 +264,9 @@ window.MagicCloud = (function () {
           {
             update: {
               name: `projects/${PROJECT_ID}/databases/(default)/documents/users/${uid}`,
-              fields: toFields({ appVersion: String(appVersion || '').slice(0, 20) })
+              fields: toFields(fields)
             },
-            updateMask: { fieldPaths: ['appVersion'] },
+            updateMask: { fieldPaths: paths },
             updateTransforms: [
               { fieldPath: 'lastSeen', setToServerValue: 'REQUEST_TIME' },
               { fieldPath: 'openCount', increment: { integerValue: '1' } }
@@ -320,6 +327,49 @@ window.MagicCloud = (function () {
       })
     });
     if (!res.ok) throw makeError(res, 'Feedback failed');
+    return true;
+  }
+
+  // דיווח תקלה אוטומטי (שגיאת JavaScript באפליקציה) לאתר הניהול
+  async function reportError({ msg, src, appVersion, model }) {
+    const uid = await ensureDeviceSession();
+    const res = await authedRequest(deviceAuth, `${DB_BASE}/errors`, {
+      method: 'POST',
+      body: JSON.stringify({
+        fields: toFields({
+          uid,
+          msg: String(msg || 'Unknown error').slice(0, 500),
+          src: String(src || '').slice(0, 200),
+          appVersion: String(appVersion || '').slice(0, 20),
+          model: String(model || '').slice(0, 40),
+          createdAt: new Date()
+        })
+      })
+    });
+    if (!res.ok) throw makeError(res, 'Error report failed');
+    return true;
+  }
+
+  // --------------------------------------------------------------------------
+  // שיתוף הקוד בזמן אמת לטלפון שני (Realtime Database)
+  // --------------------------------------------------------------------------
+  const RTDB_URL = String(cfg.databaseURL || '').replace(/\/$/, '');
+
+  async function pushLiveCode(channel, code, mode) {
+    if (!RTDB_URL || !/^[A-Za-z0-9]{12}$/.test(String(channel || ''))) throw new Error('No live channel');
+    const uid = await ensureDeviceSession();
+    const token = await deviceAuth.getToken();
+    const res = await http(`${RTDB_URL}/live/${channel}.json?auth=${encodeURIComponent(token)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        owner: uid,
+        code: String(code || '').slice(0, 64),
+        mode: String(mode || '').slice(0, 12),
+        at: { '.sv': 'timestamp' }
+      })
+    });
+    if (!res.ok) throw makeError(res, 'Live push failed');
     return true;
   }
 
@@ -444,6 +494,21 @@ window.MagicCloud = (function () {
     return true;
   }
 
+  async function adminListErrors() {
+    const res = await authedRequest(adminAuth, `${DB_BASE}/errors?pageSize=300`);
+    if (!res.ok) throw makeError(res, 'Errors list failed');
+    const data = JSON.parse(res.text || '{}');
+    const items = (data.documents || []).map(fromDoc);
+    items.sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
+    return items;
+  }
+
+  async function adminDeleteError(id) {
+    const res = await authedRequest(adminAuth, `${DB_BASE}/errors/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    if (!res.ok && res.status !== 404) throw makeError(res, 'Delete failed');
+    return true;
+  }
+
   async function adminPublishUpdate({ latest_version, apk_url, message }) {
     const res = await authedRequest(adminAuth, `${DB_BASE}/app_config/main`, {
       method: 'PATCH',
@@ -470,6 +535,9 @@ window.MagicCloud = (function () {
       submitRequest,
       reportUsage,
       sendFeedback,
+      reportError,
+      pushLiveCode,
+      hasLive: () => Boolean(RTDB_URL),
       saveBackup,
       loadBackup
     },
@@ -485,6 +553,8 @@ window.MagicCloud = (function () {
       listFeedback: adminListFeedback,
       deleteFeedback: adminDeleteFeedback,
       sendMessage: adminSendMessage,
+      listErrors: adminListErrors,
+      deleteError: adminDeleteError,
       replyFeedback: adminReplyFeedback,
       publishUpdate: adminPublishUpdate
     }

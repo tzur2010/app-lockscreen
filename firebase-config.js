@@ -387,6 +387,21 @@ window.MagicCloud = (function () {
     return true;
   }
 
+  // המצב הנוכחי של הטלפון (לשלט בטלפון השני): פתיחה בכל קוד + באיזה ניסיון
+  async function pushLiveState(channel, force, attempt) {
+    if (!RTDB_URL || !/^[A-Za-z0-9]{12}$/.test(String(channel || ''))) throw new Error('No live channel');
+    const uid = await ensureDeviceSession();
+    const token = await deviceAuth.getToken();
+    const n = Math.min(5, Math.max(1, Number(attempt) || 1));
+    const res = await http(`${RTDB_URL}/state/${channel}.json?auth=${encodeURIComponent(token)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ owner: uid, force: Boolean(force), attempt: n, at: { '.sv': 'timestamp' } })
+    });
+    if (!res.ok) throw makeError(res, 'Live state failed');
+    return true;
+  }
+
   // --------------------------------------------------------------------------
   // הגדרות עדכון (ציבורי לקריאה, רק המנהל כותב)
   // --------------------------------------------------------------------------
@@ -551,7 +566,9 @@ window.MagicCloud = (function () {
       sendFeedback,
       reportError,
       pushLiveCode,
+      pushLiveState,
       hasLive: () => Boolean(RTDB_URL),
+      liveUrl: () => RTDB_URL,
       saveBackup,
       loadBackup
     },

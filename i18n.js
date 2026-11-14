@@ -333,7 +333,26 @@
     'כתוב כאן את המשוב שלך...': 'Write your feedback here...',
     'הצג/הסתר תווים': 'Show/hide characters',
     'חזרה למסך השעון הראשי': 'Back to the main clock screen',
-    'אמא': 'Mom'
+    'אמא': 'Mom',
+
+    // 5.4: גלריה, שיחה נכנסת, תרגול, שלט רחוק
+    '🖼️ גלריה (תחזית בתמונה)': '🖼️ Gallery (photo prediction)',
+    'אחרי הפתיחה נפתחת הגלריה, והתמונה האחרונה (מ"אתמול") היא פתק בכתב יד עם הקוד שהצופה בחר.': 'After unlocking, the gallery opens and the latest photo (from "yesterday") is a handwritten note with the spectator\'s code.',
+    'מה כתוב על הפתק ({קוד} יוחלף בקוד)': 'Text on the note ({code} is replaced with the code)',
+    '📞 חשיפה בשיחה נכנסת': '📞 Incoming call reveal',
+    'כמה שניות אחרי שהטלפון נפתח הוא "מצלצל", ושם המתקשר על המסך הוא הקוד שהצופה בחר.': 'A few seconds after unlocking, the phone "rings" and the caller name on screen is the spectator\'s code.',
+    'שם המתקשר ({קוד} יוחלף בקוד)': 'Caller name ({code} is replaced with the code)',
+    'אחרי כמה שניות הטלפון מצלצל': 'Seconds until the phone rings',
+    '💡 עובד כשהטלפון נפתח בכל קוד. באנדרואיד האפליקציה נשארת פתוחה אחרי הפתיחה (במקום לצאת למסך הבית האמיתי) כדי שהשיחה תופיע.': '💡 Works when "unlock with any code" is on. On Android the app stays open after unlocking (instead of going to the real home screen) so the call can appear.',
+    '🎯 מצב תרגול': '🎯 Practice mode',
+    'מתרגלים את ההצצות (רטט, שעון, לחיצה ארוכה, שעון חכם, טלפון שני) בלי שהקודים נשמרים בהיסטוריה ובלי שזה נספר בסטטיסטיקה. זכור לכבות לפני הופעה.': 'Practice the peeks (vibration, clock, long-press, smartwatch, second phone) without saving codes to history or counting stats. Remember to turn it off before a show.',
+    'שיחה נכנסת': 'Incoming call',
+    'נייד': 'mobile',
+    'דחה': 'Decline',
+    'ענה': 'Accept',
+    'נתק': 'End',
+    'שלט רחוק:': 'Remote control:',
+    'בטלפון השני יש גם כפתורים: להדליק/לכבות "פתיחה בכל קוד", לבחור באיזה ניסיון הטלפון ייפתח, לאפס לצופה הבא, ולהפעיל את החשיפה או את השיחה הנכנסת ברגע שתבחר.': 'the second phone also has buttons: turn "unlock with any code" on/off, choose which attempt unlocks, reset for the next spectator, and trigger the reveal or the incoming call whenever you want.'
   };
 
   var ORD = { 'הראשון': '1st', 'השני': '2nd', 'השלישי': '3rd', 'הרביעי': '4th', 'החמישי': '5th' };

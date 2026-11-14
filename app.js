@@ -47,6 +47,12 @@ function setForceModeState(nextState) {
       btn.classList.toggle('active', (btn.dataset.forcemode === 'true') === forceUnlockMode);
     });
   }
+  // מעדכן את השלט בטלפון השני (אם מחובר)
+  if (typeof scheduleLiveStatePublish === 'function') {
+    try {
+      scheduleLiveStatePublish();
+    } catch (e) {}
+  }
 }
 
 function triggerHaptic(msOrPattern) {
@@ -360,6 +366,12 @@ function isEnglishUi() {
 const REVEAL_TEXT_DEFAULT_HE = 'אל תשכח, הקוד של השער הוא {קוד} 😊';
 const REVEAL_TEXT_DEFAULT_EN = "Don't forget, the gate code is {code} 😊";
 
+// באנדרואיד, אחרי "פתיחה בכל קוד" האפליקציה יוצאת למסך הבית האמיתי -
+// חוץ מכשיש חשיפה שקורית בתוך האפליקציה (פתקים, גלריה, שיחה נכנסת).
+function staysInAppAfterUnlock() {
+  return config.unlockTargetScreen === 'notes' || config.unlockTargetScreen === 'gallery' || Boolean(config.callReveal);
+}
+
 // מחליף את {קוד} / {code} בקוד שהוקלד
 function fillCodePlaceholder(template, code) {
   return String(template || '').replace(/\{(קוד|code)\}/gi, String(code));
@@ -400,6 +412,11 @@ const DEFAULT_CONFIG = {
   revealText: isEnglishUi() ? REVEAL_TEXT_DEFAULT_EN : REVEAL_TEXT_DEFAULT_HE,
   notesReveal: false,           // חשיפה בפתקים: הקוד מופיע בפתק שכאילו נכתב מראש
   notesAge: '60',               // לפני כמה דקות "נכתב" הפתק ('yesterday' = אתמול)
+  galleryText: isEnglishUi() ? '{code}' : '{קוד}', // מה כתוב על הפתק בתמונה בגלריה
+  callReveal: false,            // חשיפה בשיחה נכנסת אחרי הפתיחה
+  callName: isEnglishUi() ? '{code}' : '{קוד}',    // שם המתקשר שמופיע על המסך
+  callDelaySec: 4,
+  practiceMode: false,          // מצב תרגול: בלי היסטוריה ובלי סטטיסטיקה
   showFingerprint: true,
   settingsColorScheme: 'dark'   // 'dark' | 'light' עבור ערכת הנושא של מסך ההגדרות
 };
@@ -431,6 +448,7 @@ function saveConfig() {
     console.warn('Could not save config', e);
   }
   if (typeof scheduleCloudBackup === 'function') scheduleCloudBackup();
+  if (typeof scheduleLiveStatePublish === 'function') scheduleLiveStatePublish();
 }
 
 // ----------------------------------------------------------------------------
@@ -1557,8 +1575,13 @@ function applyConfigToUI() {
     });
   }
   if (fakeNotesApp && defaultHomescreenUi) {
+    const galleryApp = document.getElementById('fakeGalleryApp');
+    if (galleryApp) galleryApp.style.display = targetScreen === 'gallery' ? 'flex' : 'none';
     if (targetScreen === 'notes') {
       fakeNotesApp.style.display = 'flex';
+      defaultHomescreenUi.style.display = 'none';
+    } else if (targetScreen === 'gallery') {
+      fakeNotesApp.style.display = 'none';
       defaultHomescreenUi.style.display = 'none';
     } else {
       fakeNotesApp.style.display = 'none';
@@ -1796,7 +1819,8 @@ function recordSecretInput(value, mode) {
   if (!value) return;
   localStorage.setItem(LAST_PIN_KEY, value);
 
-  try {
+  // במצב תרגול: ההצצות עובדות, אבל הקוד לא נשמר בהיסטוריה
+  if (!config.practiceMode) try {
     const history = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
     history.push({
       code: value,
@@ -1880,7 +1904,7 @@ function animateLockOpenAndUnlock() {
     cameraPunchHole.classList.add('faceid-unlocked');
   }
   triggerHaptic(45);
-  if (forceUnlockMode && config.unlockTargetScreen !== 'notes') {
+  if (forceUnlockMode && !staysInAppAfterUnlock()) {
     if (passwordInput) passwordInput.blur();
     stopAllCameraStreams();
     triggerNativeUnlock();
@@ -2440,7 +2464,7 @@ function triggerUnlockHomescreen() {
   if (passwordInput) passwordInput.blur();
   stopAllCameraStreams();
 
-  if (forceUnlockMode && config.unlockTargetScreen !== 'notes') {
+  if (forceUnlockMode && !staysInAppAfterUnlock()) {
     triggerNativeUnlock();
     return;
   }
@@ -2451,10 +2475,15 @@ function triggerUnlockHomescreen() {
     const minutes = String(now.getMinutes()).padStart(2, '0');
     notesDateLine.textContent = `היום, ${hours}:${minutes}`;
   }
+  const lastCode = localStorage.getItem(LAST_PIN_KEY) || '';
   if (config.unlockTargetScreen === 'notes' && config.notesReveal) {
-    showNotesPrediction(localStorage.getItem(LAST_PIN_KEY) || '');
+    showNotesPrediction(lastCode);
+  }
+  if (config.unlockTargetScreen === 'gallery') {
+    showGalleryReveal(lastCode);
   }
   fakeHomescreen.classList.add('unlocked');
+  if (config.callReveal && forceUnlockMode) scheduleCallReveal(lastCode);
 }
 
 // 17A. סמסונג: אימות טביעת אצבע קפדני (נפתח רק למי שהגדיר: בודק מיקום מדויק + לא קצר מדי + לא ארוך מדי)
@@ -3456,7 +3485,7 @@ function initDeviceLicenseGate() {
 // החלון מוצג רק כשמסך ההגדרות פתוח (בפתיחת האפליקציה / בתפריט הסודי),
 // ולעולם לא מעל מסך הנעילה הפעיל מול קהל.
 // ============================================================================
-const APP_VERSION = '5.3';
+const APP_VERSION = '5.4';
 const DEFAULT_APK_URL = 'https://github.com/tzur2010/app-lockscreen/raw/main/Lockscreen.apk';
 const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 const UPDATE_DISMISS_KEY = 'magic_update_dismissed_version';
@@ -3780,9 +3809,9 @@ function hideFakeMessageBanner() {
 }
 
 // נקרא ברגע שהטלפון "נפתח" בכפיית פתיחה
-function scheduleCodeReveal(code, force = false) {
+function scheduleCodeReveal(code, force = false, delayOverrideMs = null) {
   if (!force && !config.revealEnabled) return false;
-  const delayMs = Math.max(1, Number(config.revealDelaySec) || 5) * 1000;
+  const delayMs = delayOverrideMs !== null ? Math.max(0, delayOverrideMs) : Math.max(1, Number(config.revealDelaySec) || 5) * 1000;
   const sender = String(config.revealSender || 'אמא');
   const text = buildRevealMessage(code);
   // באנדרואיד: הודעה אמיתית של המערכת (מגיעה גם אחרי שהאפליקציה נסגרה למסך הבית)
@@ -4398,6 +4427,7 @@ function relockFakePhone() {
   clearCurrentInputs();
   restoreNotesTemplate();
   if (typeof hideFakeMessageBanner === 'function') hideFakeMessageBanner();
+  if (typeof endFakeCall === 'function') endFakeCall();
 }
 
 // "מוכן לצופה הבא": מנקה את הקוד האחרון, מאפס ניסיונות וחוזר למסך הנעילה
@@ -4624,6 +4654,7 @@ function readStats() {
 }
 
 function trackEvent(name) {
+  if (config && config.practiceMode) return; // תרגול לא נספר בסטטיסטיקה
   try {
     const s = readStats();
     s.e[name] = Math.min(999999, (Number(s.e[name]) || 0) + 1);
@@ -4645,6 +4676,8 @@ function getStatsForReport() {
   if (config.faceIdEnrolled) on.push('face');
   if (config.fingerprintEnrolled) on.push('fp');
   if (config.uiLang === 'en') on.push('english');
+  if (config.callReveal) on.push('call');
+  if (config.unlockTargetScreen === 'gallery') on.push('gallery');
   try {
     return JSON.stringify({ e: s.e, since: s.since, os: config.osTheme, model: config.deviceModel, mode: config.unlockMode, on });
   } catch (e) {
@@ -4870,7 +4903,447 @@ function initLanguage() {
   }
 }
 
+// ============================================================================
+// 34. חשיפה בגלריה: התמונה האחרונה היא "צילום" של פתק בכתב יד עם הקוד
+// ============================================================================
+// מספר אקראי קבוע לפי זרע (כדי שאותו קוד ייתן אותה תמונה ואותה שעה)
+function seededRandom(seedText) {
+  let h = 2166136261;
+  for (let i = 0; i < seedText.length; i++) h = Math.imul(h ^ seedText.charCodeAt(i), 16777619);
+  return () => {
+    h += 0x6d2b79f5;
+    let x = Math.imul(h ^ (h >>> 15), 1 | h);
+    x ^= x + Math.imul(x ^ (x >>> 7), 61 | x);
+    return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+const HANDWRITING_FONT = '"Segoe Print", "Bradley Hand", "Marker Felt", "Comic Sans MS", "Dancing Script", cursive';
+
+function drawNotePhoto(canvas, text, rand) {
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width;
+  const h = canvas.height;
+
+  // שולחן עץ חם
+  const desk = ctx.createLinearGradient(0, 0, w, h);
+  desk.addColorStop(0, '#8a5a36');
+  desk.addColorStop(0.5, '#a06a40');
+  desk.addColorStop(1, '#6e4528');
+  ctx.fillStyle = desk;
+  ctx.fillRect(0, 0, w, h);
+  ctx.globalAlpha = 0.12;
+  for (let i = 0; i < 60; i++) {
+    ctx.strokeStyle = rand() > 0.5 ? '#3b2414' : '#c08a5a';
+    ctx.lineWidth = 1 + rand() * 3;
+    ctx.beginPath();
+    const y = rand() * h;
+    ctx.moveTo(0, y);
+    ctx.bezierCurveTo(w * 0.3, y + (rand() - 0.5) * 40, w * 0.7, y + (rand() - 0.5) * 40, w, y + (rand() - 0.5) * 30);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+
+  // פתק צהוב מעט מסובב, עם צל
+  const noteSize = w * 0.72;
+  ctx.save();
+  ctx.translate(w / 2 + (rand() - 0.5) * 40, h / 2 + (rand() - 0.5) * 60);
+  ctx.rotate(((rand() - 0.5) * 9 * Math.PI) / 180);
+  ctx.shadowColor = 'rgba(0,0,0,0.45)';
+  ctx.shadowBlur = 38;
+  ctx.shadowOffsetY = 18;
+  const paper = ctx.createLinearGradient(-noteSize / 2, -noteSize / 2, noteSize / 2, noteSize / 2);
+  paper.addColorStop(0, '#fff6a8');
+  paper.addColorStop(1, '#f7e477');
+  ctx.fillStyle = paper;
+  ctx.fillRect(-noteSize / 2, -noteSize / 2, noteSize, noteSize);
+  ctx.shadowColor = 'transparent';
+  // פס הדבק העליון כהה מעט
+  ctx.fillStyle = 'rgba(0,0,0,0.05)';
+  ctx.fillRect(-noteSize / 2, -noteSize / 2, noteSize, noteSize * 0.12);
+
+  // כתב יד בעט כחול
+  const clean = String(text || '').slice(0, 40);
+  let size = noteSize * (clean.length <= 6 ? 0.26 : clean.length <= 12 ? 0.15 : 0.1);
+  ctx.font = `${size}px ${HANDWRITING_FONT}`;
+  while (ctx.measureText(clean).width > noteSize * 0.84 && size > 20) {
+    size -= 4;
+    ctx.font = `${size}px ${HANDWRITING_FONT}`;
+  }
+  ctx.fillStyle = '#1e3a8a';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.rotate(((rand() - 0.5) * 4 * Math.PI) / 180);
+  ctx.fillText(clean, 0, noteSize * 0.04);
+  // קו תחתון בכתב יד
+  ctx.strokeStyle = 'rgba(30,58,138,0.75)';
+  ctx.lineWidth = size * 0.05;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  const half = Math.min(noteSize * 0.4, ctx.measureText(clean).width / 2 + 10);
+  ctx.moveTo(-half, size * 0.62);
+  ctx.quadraticCurveTo(0, size * 0.62 + (rand() - 0.5) * 18, half, size * 0.55);
+  ctx.stroke();
+  ctx.restore();
+
+  // מראה של צילום: הצללה בקצוות ורעש עדין
+  const vignette = ctx.createRadialGradient(w / 2, h / 2, w * 0.3, w / 2, h / 2, w * 0.85);
+  vignette.addColorStop(0, 'rgba(0,0,0,0)');
+  vignette.addColorStop(1, 'rgba(0,0,0,0.38)');
+  ctx.fillStyle = vignette;
+  ctx.fillRect(0, 0, w, h);
+  const img = ctx.getImageData(0, 0, w, h);
+  for (let i = 0; i < img.data.length; i += 4) {
+    const n = (rand() - 0.5) * 14;
+    img.data[i] += n;
+    img.data[i + 1] += n;
+    img.data[i + 2] += n;
+  }
+  ctx.putImageData(img, 0, 0);
+}
+
+// תמונות "רגילות" קודמות בגלריה (שקיעה, ים, אוכל...) - רק צבעים, בלי תוכן אמיתי
+const GALLERY_THUMB_PALETTES = [
+  ['#f97316', '#fde68a'], ['#0ea5e9', '#e0f2fe'], ['#16a34a', '#bbf7d0'], ['#7c3aed', '#fbcfe8'],
+  ['#334155', '#94a3b8'], ['#b45309', '#fef3c7'], ['#be123c', '#fecdd3'], ['#0f766e', '#99f6e4']
+];
+
+function buildGalleryStrip(rand, noteCanvas) {
+  const strip = document.getElementById('galleryStrip');
+  if (!strip) return;
+  strip.innerHTML = '';
+  for (let i = 0; i < 7; i++) {
+    const thumb = document.createElement('canvas');
+    thumb.width = 80;
+    thumb.height = 80;
+    thumb.className = 'gallery-thumb';
+    const c = thumb.getContext('2d');
+    const pal = GALLERY_THUMB_PALETTES[Math.floor(rand() * GALLERY_THUMB_PALETTES.length)];
+    const g = c.createLinearGradient(0, 0, 0, 80);
+    g.addColorStop(0, pal[0]);
+    g.addColorStop(1, pal[1]);
+    c.fillStyle = g;
+    c.fillRect(0, 0, 80, 80);
+    c.fillStyle = 'rgba(255,255,255,0.25)';
+    c.beginPath();
+    c.arc(20 + rand() * 40, 20 + rand() * 40, 8 + rand() * 18, 0, Math.PI * 2);
+    c.fill();
+    strip.appendChild(thumb);
+  }
+  const current = document.createElement('canvas');
+  current.width = 80;
+  current.height = 80;
+  current.className = 'gallery-thumb active';
+  current.getContext('2d').drawImage(noteCanvas, 0, noteCanvas.height / 2 - noteCanvas.width / 2, noteCanvas.width, noteCanvas.width, 0, 0, 80, 80);
+  strip.appendChild(current);
+  strip.scrollLeft = isEnglishUi() ? strip.scrollWidth : -strip.scrollWidth;
+}
+
+function showGalleryReveal(code) {
+  const canvas = document.getElementById('galleryPhoto');
+  if (!canvas) return;
+  const value = code || '----';
+  const text = fillCodePlaceholder(config.galleryText || '{קוד}', value);
+  const rand = seededRandom(value + '|' + new Date().toDateString());
+  drawNotePhoto(canvas, text, rand);
+  buildGalleryStrip(rand, canvas);
+  // "צולם אתמול" בשעת ערב
+  const hh = String(19 + Math.floor(rand() * 4)).padStart(2, '0');
+  const mm = String(Math.floor(rand() * 60)).padStart(2, '0');
+  const dayEl = document.getElementById('galleryDay');
+  const timeEl = document.getElementById('galleryTime');
+  if (dayEl) dayEl.textContent = 'אתמול';
+  if (timeEl) timeEl.textContent = `${hh}:${mm}`;
+  trackEvent('gallery_reveal');
+}
+
+// ============================================================================
+// 35. חשיפה בשיחה נכנסת
+// ============================================================================
+var callRevealTimer = null;
+var callRingTimer = null;
+var callDurationTimer = null;
+var callAudioCtx = null;
+
+function playRingBurst() {
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+    if (!callAudioCtx) callAudioCtx = new AudioCtx();
+    if (callAudioCtx.state === 'suspended') callAudioCtx.resume().catch(() => {});
+    const t0 = callAudioCtx.currentTime;
+    // מנגינת צלצול קצרה (4 צלילים רכים)
+    [659, 784, 988, 784].forEach((freq, i) => {
+      const osc = callAudioCtx.createOscillator();
+      const gain = callAudioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      const start = t0 + i * 0.16;
+      gain.gain.setValueAtTime(0.0001, start);
+      gain.gain.exponentialRampToValueAtTime(0.12, start + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.15);
+      osc.connect(gain);
+      gain.connect(callAudioCtx.destination);
+      osc.start(start);
+      osc.stop(start + 0.16);
+    });
+  } catch (e) {}
+}
+
+function stopRinging() {
+  clearInterval(callRingTimer);
+  callRingTimer = null;
+  try {
+    if (navigator.vibrate) navigator.vibrate(0);
+  } catch (e) {}
+}
+
+function scheduleCallReveal(code, delayOverrideMs = null) {
+  clearTimeout(callRevealTimer);
+  const delay = delayOverrideMs !== null ? delayOverrideMs : Math.max(1, Number(config.callDelaySec) || 4) * 1000;
+  callRevealTimer = setTimeout(() => showFakeCall(code), delay);
+}
+
+function showFakeCall(code) {
+  const screen = document.getElementById('fakeCallScreen');
+  if (!screen) return;
+  clearTimeout(callRevealTimer);
+  const name = fillCodePlaceholder(config.callName || '{קוד}', code || '----');
+  document.getElementById('fakeCallName').textContent = name;
+  document.getElementById('fakeCallLabel').textContent = 'שיחה נכנסת';
+  paintAvatar(document.getElementById('fakeCallAvatar'), name, '');
+  document.getElementById('fakeCallActions').style.display = '';
+  document.getElementById('fakeCallInCall').style.display = 'none';
+  screen.classList.toggle('ios', config.osTheme === 'ios');
+  screen.style.display = 'flex';
+  void screen.offsetWidth;
+  screen.classList.add('show');
+  stopRinging();
+  const ring = () => {
+    playRingBurst();
+    triggerHaptic([500, 300, 500]);
+  };
+  ring();
+  callRingTimer = setInterval(ring, 2200);
+  trackEvent('call_reveal');
+}
+
+function answerFakeCall() {
+  stopRinging();
+  document.getElementById('fakeCallActions').style.display = 'none';
+  document.getElementById('fakeCallInCall').style.display = '';
+  document.getElementById('fakeCallLabel').textContent = '';
+  const timerEl = document.getElementById('fakeCallTimer');
+  const started = Date.now();
+  clearInterval(callDurationTimer);
+  const tick = () => {
+    const s = Math.floor((Date.now() - started) / 1000);
+    timerEl.textContent = `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+  };
+  tick();
+  callDurationTimer = setInterval(tick, 1000);
+}
+
+function endFakeCall() {
+  clearTimeout(callRevealTimer);
+  clearInterval(callDurationTimer);
+  stopRinging();
+  const screen = document.getElementById('fakeCallScreen');
+  if (!screen || screen.style.display === 'none') return;
+  screen.classList.remove('show');
+  setTimeout(() => {
+    if (!screen.classList.contains('show')) screen.style.display = 'none';
+  }, 250);
+}
+
+function initCallReveal() {
+  const bind = (id, fn) => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      fn();
+    });
+  };
+  bind('fakeCallAccept', answerFakeCall);
+  bind('fakeCallDecline', endFakeCall);
+  bind('fakeCallEnd', endFakeCall);
+}
+
+// ============================================================================
+// 36. הגדרות החשיפות החדשות + מצב תרגול
+// ============================================================================
+function syncNewRevealsUI() {
+  const galleryExtra = document.getElementById('galleryRevealExtra');
+  if (galleryExtra) galleryExtra.style.display = config.unlockTargetScreen === 'gallery' ? 'block' : 'none';
+  const galleryInput = document.getElementById('galleryTextInput');
+  if (galleryInput && document.activeElement !== galleryInput) galleryInput.value = config.galleryText || '{קוד}';
+
+  const callToggle = document.getElementById('toggleCallReveal');
+  if (callToggle) callToggle.checked = Boolean(config.callReveal);
+  const callExtra = document.getElementById('callRevealExtra');
+  if (callExtra) callExtra.style.display = config.callReveal ? 'block' : 'none';
+  const callInput = document.getElementById('callNameInput');
+  if (callInput && document.activeElement !== callInput) callInput.value = config.callName || '{קוד}';
+  document.querySelectorAll('#callDelaySelector .seg-pill').forEach((btn) => {
+    btn.classList.toggle('active', Number(btn.dataset.delay) === Number(config.callDelaySec || 4));
+  });
+
+  const practice = document.getElementById('togglePracticeMode');
+  if (practice) practice.checked = Boolean(config.practiceMode);
+  document.body.classList.toggle('practice-on', Boolean(config.practiceMode));
+}
+
+function initNewReveals() {
+  document.querySelectorAll('#unlockTargetSelector .seg-pill').forEach((btn) => btn.addEventListener('click', syncNewRevealsUI));
+  const galleryInput = document.getElementById('galleryTextInput');
+  if (galleryInput) {
+    galleryInput.addEventListener('input', () => {
+      config.galleryText = galleryInput.value.slice(0, 40);
+      saveConfig();
+    });
+  }
+  const callToggle = document.getElementById('toggleCallReveal');
+  if (callToggle) {
+    callToggle.addEventListener('change', () => {
+      config.callReveal = callToggle.checked;
+      saveConfig();
+      syncNewRevealsUI();
+    });
+  }
+  const callInput = document.getElementById('callNameInput');
+  if (callInput) {
+    callInput.addEventListener('input', () => {
+      config.callName = callInput.value.slice(0, 40);
+      saveConfig();
+    });
+  }
+  document.querySelectorAll('#callDelaySelector .seg-pill').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      config.callDelaySec = Number(btn.dataset.delay) || 4;
+      saveConfig();
+      syncNewRevealsUI();
+    });
+  });
+  const callTest = document.getElementById('callTestBtn');
+  if (callTest) callTest.addEventListener('click', () => showFakeCall('1234'));
+
+  const practice = document.getElementById('togglePracticeMode');
+  if (practice) {
+    practice.addEventListener('change', () => {
+      config.practiceMode = practice.checked;
+      saveConfig();
+      syncNewRevealsUI();
+    });
+  }
+  syncNewRevealsUI();
+}
+
+// ============================================================================
+// 37. שלט רחוק מהטלפון השני (peek.html): פקודות מגיעות בזמן אמת
+// ----------------------------------------------------------------------------
+// הטלפון ביד הצופה לא רוטט ולא מראה כלום כשמגיעה פקודה.
+// ============================================================================
+var remoteControlSource = null;
+var remoteControlPrimed = false;
+var lastRemoteCommandAt = 0;
+var liveStateTimer = null;
+var lastPublishedState = '';
+
+function publishLiveState() {
+  if (!config.remotePeek || !canUseRemotePeek() || !window.MagicCloud.device.pushLiveState) return;
+  const key = `${forceUnlockMode}|${getUnlockOnAttempt()}`;
+  if (key === lastPublishedState) return;
+  window.MagicCloud.device
+    .pushLiveState(getLiveChannel(), forceUnlockMode, getUnlockOnAttempt())
+    .then(() => {
+      lastPublishedState = key;
+    })
+    .catch(() => {});
+}
+
+function scheduleLiveStatePublish() {
+  clearTimeout(liveStateTimer);
+  liveStateTimer = setTimeout(publishLiveState, 600);
+}
+
+function handleRemoteCommand(cmd, val) {
+  const lastCode = localStorage.getItem(LAST_PIN_KEY) || '';
+  if (cmd === 'force') {
+    setForceModeState(Boolean(val));
+  } else if (cmd === 'attempt') {
+    const n = Math.min(5, Math.max(1, Number(val) || 1));
+    config.unlockOnAttempt = n;
+    config.unlockAttemptMode = n >= 2 ? 'second' : 'immediate';
+    saveConfig();
+  } else if (cmd === 'reset') {
+    resetForNextShow();
+  } else if (cmd === 'call') {
+    showFakeCall(lastCode);
+  } else if (cmd === 'reveal') {
+    scheduleCodeReveal(lastCode, true, 0);
+  }
+  trackEvent('remote_control');
+  lastPublishedState = '';
+  scheduleLiveStatePublish();
+}
+
+function stopRemoteControl() {
+  if (remoteControlSource) {
+    try {
+      remoteControlSource.close();
+    } catch (e) {}
+  }
+  remoteControlSource = null;
+}
+
+function startRemoteControl() {
+  if (!config.remotePeek || !canUseRemotePeek() || typeof EventSource === 'undefined') {
+    stopRemoteControl();
+    return;
+  }
+  if (remoteControlSource && remoteControlSource.readyState !== 2) return;
+  const base = window.MagicCloud.device.liveUrl();
+  remoteControlPrimed = false;
+  try {
+    remoteControlSource = new EventSource(`${base}/ctrl/${getLiveChannel()}.json`);
+  } catch (e) {
+    remoteControlSource = null;
+    return;
+  }
+  remoteControlSource.addEventListener('put', (e) => {
+    let data = null;
+    try {
+      data = JSON.parse(e.data).data;
+    } catch (err) {
+      return;
+    }
+    // ההודעה הראשונה היא הפקודה האחרונה ששמורה - לא מבצעים אותה שוב
+    if (!remoteControlPrimed) {
+      remoteControlPrimed = true;
+      lastRemoteCommandAt = data && data.at ? Number(data.at) : 0;
+      return;
+    }
+    if (!data || !data.cmd || Number(data.at) <= lastRemoteCommandAt) return;
+    lastRemoteCommandAt = Number(data.at);
+    handleRemoteCommand(data.cmd, data.val);
+  });
+  lastPublishedState = '';
+  scheduleLiveStatePublish();
+}
+
+function initRemoteControl() {
+  const toggle = document.getElementById('toggleRemotePeek');
+  if (toggle) toggle.addEventListener('change', () => setTimeout(startRemoteControl, 50));
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') startRemoteControl();
+  });
+  startRemoteControl();
+}
+
 // אתחול ראשוני
+initCallReveal();
+initNewReveals();
+initRemoteControl();
 initLanguage();
 initRemotePeek();
 initFeedbackBox();

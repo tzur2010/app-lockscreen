@@ -464,7 +464,40 @@
             <div class="segmented-row" id="unlockTargetSelector">
               <button type="button" class="seg-pill active" data-target="homescreen">מסך בית סמסונג</button>
               <button type="button" class="seg-pill" data-target="notes">דף פתקים מדומה (Notes)</button>
+              <button type="button" class="seg-pill" data-target="gallery">🖼️ גלריה (תחזית בתמונה)</button>
             </div>
+          </div>
+          <div class="oneui-field-block" id="galleryRevealExtra" style="display: none; padding-top: 0;">
+            <span class="toggle-sub-desc">אחרי הפתיחה נפתחת הגלריה, והתמונה האחרונה (מ"אתמול") היא פתק בכתב יד עם הקוד שהצופה בחר.</span>
+            <label class="config-label" for="galleryTextInput" style="margin-top: 8px;">מה כתוב על הפתק ({קוד} יוחלף בקוד)</label>
+            <input type="text" id="galleryTextInput" class="feedback-textarea gallery-text-input" maxlength="40" dir="rtl">
+          </div>
+
+          <div class="oneui-card-divider"></div>
+
+          <!-- חשיפה בשיחה נכנסת -->
+          <div class="clean-toggle-row oneui-row-with-sub">
+            <div class="toggle-text-stack">
+              <span class="toggle-main-title">📞 חשיפה בשיחה נכנסת</span>
+              <span class="toggle-sub-desc">כמה שניות אחרי שהטלפון נפתח הוא "מצלצל", ושם המתקשר על המסך הוא הקוד שהצופה בחר.</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="toggleCallReveal">
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="oneui-field-block" id="callRevealExtra" style="display: none; padding-top: 0;">
+            <label class="config-label" for="callNameInput">שם המתקשר ({קוד} יוחלף בקוד)</label>
+            <input type="text" id="callNameInput" class="feedback-textarea gallery-text-input" maxlength="40" dir="rtl">
+            <label class="config-label" style="margin-top: 8px;">אחרי כמה שניות הטלפון מצלצל</label>
+            <div class="segmented-row" id="callDelaySelector">
+              <button type="button" class="seg-pill" data-delay="2">2</button>
+              <button type="button" class="seg-pill" data-delay="4">4</button>
+              <button type="button" class="seg-pill" data-delay="8">8</button>
+              <button type="button" class="seg-pill" data-delay="15">15</button>
+            </div>
+            <button type="button" class="media-upload-btn" id="callTestBtn" style="width: 100%; margin-top: 10px;">נסה עכשיו (עם הקוד 1234)</button>
+            <div class="toggle-sub-desc" style="margin-top: 6px;">💡 עובד כשהטלפון נפתח בכל קוד. באנדרואיד האפליקציה נשארת פתוחה אחרי הפתיחה (במקום לצאת למסך הבית האמיתי) כדי שהשיחה תופיע.</div>
           </div>
 
           <div class="oneui-card-divider"></div>
@@ -629,6 +662,20 @@
             <strong id="settingsLastInput">---</strong>
           </div>
 
+          <!-- מצב תרגול -->
+          <div class="clean-toggle-row oneui-row-with-sub">
+            <div class="toggle-text-stack">
+              <span class="toggle-main-title">🎯 מצב תרגול</span>
+              <span class="toggle-sub-desc">מתרגלים את ההצצות (רטט, שעון, לחיצה ארוכה, שעון חכם, טלפון שני) בלי שהקודים נשמרים בהיסטוריה ובלי שזה נספר בסטטיסטיקה. זכור לכבות לפני הופעה.</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="togglePracticeMode">
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <div class="oneui-card-divider"></div>
+
           <!-- היסטוריית קודים: כל מה שהוקלד, מהחדש לישן -->
           <div class="history-head">
             <span class="toggle-main-title">היסטוריית קודים</span>
@@ -680,6 +727,7 @@
               <button type="button" class="media-clear-btn" id="remotePeekNewBtn">קישור חדש</button>
             </div>
             <div class="toggle-sub-desc" id="remotePeekStatus" style="margin-top: 6px; min-height: 16px;">פתח את הקישור בטלפון השני והשאר את המסך דולק. הקישור סודי - מי שיש לו אותו רואה את הקודים.</div>
+            <div class="toggle-sub-desc" style="margin-top: 6px;">🎛️ <b>שלט רחוק:</b> בטלפון השני יש גם כפתורים: להדליק/לכבות "פתיחה בכל קוד", לבחור באיזה ניסיון הטלפון ייפתח, לאפס לצופה הבא, ולהפעיל את החשיפה או את השיחה הנכנסת ברגע שתבחר.</div>
           </div>
 
           <div class="oneui-card-divider"></div>
@@ -1133,6 +1181,62 @@
 • קניות לסוף שבוע
 • לאסוף חבילה מהדואר
 • מספר מזל / קוד: 1234</textarea>
+      </div>
+
+      <!-- גלריה מדומה: התמונה האחרונה היא פתק בכתב יד עם הקוד שהצופה בחר -->
+      <div class="fake-gallery-app" id="fakeGalleryApp" style="display: none;">
+        <div class="gallery-topbar">
+          <span class="gallery-icon-btn" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><polyline points="15 5 8 12 15 19"></polyline></svg>
+          </span>
+          <div class="gallery-meta">
+            <div class="gallery-meta-day" id="galleryDay">אתמול</div>
+            <div class="gallery-meta-time" id="galleryTime">21:14</div>
+          </div>
+          <span class="gallery-icon-btn" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.6"></circle><circle cx="12" cy="12" r="1.6"></circle><circle cx="12" cy="19" r="1.6"></circle></svg>
+          </span>
+        </div>
+        <div class="gallery-photo-wrap">
+          <canvas class="gallery-photo" id="galleryPhoto" width="900" height="1200"></canvas>
+        </div>
+        <div class="gallery-strip" id="galleryStrip"></div>
+        <div class="gallery-actions" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"></path></svg>
+          <svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16z"></path></svg>
+          <svg viewBox="0 0 24 24"><path d="M12 4v11"></path><polyline points="7 9 12 4 17 9"></polyline><path d="M5 14v5h14v-5"></path></svg>
+          <svg viewBox="0 0 24 24"><path d="M5 7h14"></path><path d="M9 7V4h6v3"></path><path d="M7 7l1 13h8l1-13"></path></svg>
+        </div>
+      </div>
+    </div>
+
+    <!-- שיחה נכנסת מדומה: שם המתקשר הוא הקוד שהצופה בחר -->
+    <div class="fake-call" id="fakeCallScreen" style="display: none;">
+      <div class="fake-call-top">
+        <div class="fake-call-label" id="fakeCallLabel">שיחה נכנסת</div>
+        <div class="fake-call-avatar" id="fakeCallAvatar"></div>
+        <div class="fake-call-name" id="fakeCallName"></div>
+        <div class="fake-call-sub" id="fakeCallSub">נייד</div>
+      </div>
+      <div class="fake-call-actions" id="fakeCallActions">
+        <div class="fake-call-action">
+          <button type="button" class="fake-call-btn decline" id="fakeCallDecline" aria-label="דחה">
+            <svg viewBox="0 0 24 24"><path d="M3 15.5c5-4.7 13-4.7 18 0l-2.4 2.4-3.4-1.6v-2.5c-2.4-.8-4.9-.8-7.3 0v2.5l-3.4 1.6z"></path></svg>
+          </button>
+          <span>דחה</span>
+        </div>
+        <div class="fake-call-action">
+          <button type="button" class="fake-call-btn accept" id="fakeCallAccept" aria-label="ענה">
+            <svg viewBox="0 0 24 24"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1A17 17 0 0 1 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1z"></path></svg>
+          </button>
+          <span>ענה</span>
+        </div>
+      </div>
+      <div class="fake-call-incall" id="fakeCallInCall" style="display: none;">
+        <div class="fake-call-timer" id="fakeCallTimer">00:00</div>
+        <button type="button" class="fake-call-btn decline" id="fakeCallEnd" aria-label="נתק">
+          <svg viewBox="0 0 24 24"><path d="M3 15.5c5-4.7 13-4.7 18 0l-2.4 2.4-3.4-1.6v-2.5c-2.4-.8-4.9-.8-7.3 0v2.5l-3.4 1.6z"></path></svg>
+        </button>
       </div>
     </div>
 

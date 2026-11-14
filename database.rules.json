@@ -13,6 +13,29 @@
         "at": { ".validate": "newData.val() === now" },
         "$other": { ".validate": false }
       }
+    },
+    "state": {
+      "$ch": {
+        ".read": "$ch.matches(/^[A-Za-z0-9]{12}$/)",
+        ".write": "auth != null && $ch.matches(/^[A-Za-z0-9]{12}$/) && (!data.exists() || data.child('owner').val() === auth.uid) && newData.exists()",
+        ".validate": "newData.hasChildren(['owner', 'force', 'attempt', 'at'])",
+        "owner": { ".validate": "newData.isString() && newData.val() === auth.uid" },
+        "force": { ".validate": "newData.isBoolean()" },
+        "attempt": { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 5" },
+        "at": { ".validate": "newData.val() === now" },
+        "$other": { ".validate": false }
+      }
+    },
+    "ctrl": {
+      "$ch": {
+        ".read": "$ch.matches(/^[A-Za-z0-9]{12}$/)",
+        ".write": "auth != null && $ch.matches(/^[A-Za-z0-9]{12}$/) && newData.exists()",
+        ".validate": "newData.hasChildren(['cmd', 'at'])",
+        "cmd": { ".validate": "newData.isString() && newData.val().matches(/^(force|attempt|reset|call|reveal)$/)" },
+        "val": { ".validate": "newData.isBoolean() || (newData.isNumber() && newData.val() >= 0 && newData.val() <= 5)" },
+        "at": { ".validate": "newData.val() === now" },
+        "$other": { ".validate": false }
+      }
     }
   }
 }

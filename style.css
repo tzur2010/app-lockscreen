@@ -1278,7 +1278,7 @@ html, body {
   -webkit-backdrop-filter: blur(0px);
 }
 
-.phone-container > *:not(.lockscreen-dim-backdrop):not(.fake-homescreen):not(.secret-peek):not(.secret-trigger-zone):not(.secret-topright-hold-zone):not(.lock-icon) {
+.phone-container > *:not(.lockscreen-dim-backdrop):not(.fake-homescreen):not(.fake-call):not(.secret-peek):not(.secret-trigger-zone):not(.secret-topright-hold-zone):not(.lock-icon) {
   position: relative;
   z-index: 2;
 }
@@ -3612,3 +3612,56 @@ html[dir="ltr"] body * { direction: ltr !important; }
 html[dir="ltr"] .oneui-password-input,
 html[dir="ltr"] .guide-card,
 html[dir="ltr"] .admin-msg-text { text-align: left !important; }
+
+/* ===================== גלריה מדומה (חשיפה בתמונה) ===================== */
+.fake-gallery-app { position: absolute; inset: 0; background: #000; color: #fff; flex-direction: column; z-index: 3; direction: ltr; }
+.gallery-topbar { display: flex; align-items: center; justify-content: space-between; padding: calc(env(safe-area-inset-top, 0px) + 34px) 10px 8px; }
+.gallery-icon-btn { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; }
+.gallery-icon-btn svg { width: 22px; height: 22px; fill: none; stroke: #fff; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.gallery-icon-btn svg circle { fill: #fff; stroke: none; }
+.gallery-meta { text-align: center; line-height: 1.25; }
+.gallery-meta-day { font-size: 15px; font-weight: 600; }
+.gallery-meta-time { font-size: 12px; color: rgba(255,255,255,0.65); }
+.gallery-photo-wrap { flex: 1; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.gallery-photo { width: 100%; height: auto; max-height: 100%; object-fit: contain; display: block; }
+.gallery-strip { display: flex; gap: 3px; padding: 8px 10px; overflow-x: auto; scrollbar-width: none; justify-content: flex-end; }
+.gallery-strip::-webkit-scrollbar { display: none; }
+.gallery-thumb { width: 38px; height: 38px; border-radius: 4px; flex: 0 0 auto; opacity: 0.75; }
+.gallery-thumb.active { width: 46px; height: 46px; margin-top: -4px; opacity: 1; outline: 2px solid #fff; }
+.gallery-actions { display: flex; justify-content: space-around; padding: 10px 24px calc(env(safe-area-inset-bottom, 0px) + 22px); }
+.gallery-actions svg { width: 24px; height: 24px; fill: none; stroke: #fff; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.gallery-text-input { min-height: 0 !important; height: 42px; resize: none; }
+
+/* ===================== שיחה נכנסת מדומה ===================== */
+.phone-container > .fake-call { position: fixed; inset: 0; height: 100%; height: 100dvh; z-index: 90; }
+.fake-call {
+  flex-direction: column; justify-content: space-between; align-items: center;
+  padding: calc(env(safe-area-inset-top, 0px) + 80px) 24px calc(env(safe-area-inset-bottom, 0px) + 70px);
+  color: #fff; text-align: center;
+  background: radial-gradient(120% 80% at 50% 0%, #1f3b5c 0%, #0b1220 60%, #05070d 100%);
+  opacity: 0; transform: translateY(-14px); transition: opacity .28s ease, transform .28s ease;
+}
+.fake-call.show { opacity: 1; transform: translateY(0); }
+.fake-call.ios { background: linear-gradient(180deg, rgba(40,40,46,0.96), rgba(18,18,22,0.98)); }
+.fake-call-top { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.fake-call-label { font-size: 15px; color: rgba(255,255,255,0.7); min-height: 18px; }
+.fake-call-avatar { width: 96px; height: 96px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 40px; font-weight: 600; background-size: cover; margin: 8px 0 4px; }
+.fake-call.ios .fake-call-avatar { order: -1; width: 76px; height: 76px; font-size: 32px; }
+.fake-call-name { font-size: 36px; font-weight: 400; letter-spacing: 0.5px; direction: ltr; unicode-bidi: plaintext; word-break: break-word; }
+.fake-call.ios .fake-call-name { font-size: 32px; }
+.fake-call-sub { font-size: 16px; color: rgba(255,255,255,0.7); }
+.fake-call-actions { width: 100%; display: flex; justify-content: space-around; direction: ltr; }
+.fake-call-action { display: flex; flex-direction: column; align-items: center; gap: 10px; font-size: 14px; color: rgba(255,255,255,0.85); }
+.fake-call-btn { width: 72px; height: 72px; border-radius: 50%; border: none; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+.fake-call-btn svg { width: 32px; height: 32px; fill: #fff; }
+.fake-call-btn.decline { background: #ff3b30; }
+.fake-call-btn.decline svg { transform: rotate(0deg); }
+.fake-call-btn.accept { background: #34c759; animation: callPulse 1.4s ease-in-out infinite; }
+.fake-call-btn:active { filter: brightness(0.85); transform: scale(0.96); }
+@keyframes callPulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(52,199,89,0.55); } 50% { box-shadow: 0 0 0 16px rgba(52,199,89,0); } }
+.fake-call-incall { display: flex; flex-direction: column; align-items: center; gap: 28px; }
+.fake-call-timer { font-size: 18px; color: rgba(255,255,255,0.8); font-variant-numeric: tabular-nums; }
+
+/* מצב תרגול: תזכורת בראש מסך ההגדרות בלבד */
+body.practice-on .settings-tabs::after { content: '🎯 מצב תרגול פעיל'; position: absolute; bottom: -18px; left: 50%; background: rgba(245,158,11,0.15); padding: 1px 10px; border-radius: 10px; transform: translateX(-50%); font-size: 11px; font-weight: 700; color: #f59e0b; white-space: nowrap; }
+html[dir="ltr"] body.practice-on .settings-tabs::after { content: '🎯 Practice mode on'; }

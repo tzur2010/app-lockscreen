@@ -369,7 +369,9 @@ const DEFAULT_CONFIG = {
   fingerprintZoneX: 0.5,        // מיקום X מכויל על החיישן (0..1)
   fingerprintZoneY: 0.5,        // מיקום Y מכויל על החיישן (0..1)
   faceIdEnrolled: false,        // האם Face ID נרשם ב-Setup
-  faceSignature: null,          // חתימת תווי פנים ממצלמת הסלפי
+  faceSignature: null,          // ישן (לפני זיהוי הפנים החכם)
+  faceDescriptor: null,         // טביעת פנים (128 מספרים) - נשמרת רק בטלפון
+  fingerprintProfile: null,     // פרופיל טביעת אצבע (מיקום, משך, גודל מגע)
   stealthPattern: false,
   showStatusBar: true,
   showPunchHole: true,
@@ -903,6 +905,180 @@ function computeFaceSimilarity(sigA, sigB) {
   return Math.max(0, 1 - meanAbsDiff * 2.2);
 }
 
+// ---------------------------------------------------------------------------
+// פרופיל טביעת אצבע: מיקום על החיישן, משך לחיצה וגודל מגע של האצבע.
+// גודל המגע (רוחב/גובה המגע שהמסך מדווח) שונה בין אצבעות ובין אנשים,
+// ולכן אצבע אחרת נדחית גם אם לוחצים באותה נקודה.
+// ---------------------------------------------------------------------------
+const FP_SAMPLES_NEEDED = 4;
+
+function fpContactSize(e) {
+  const w = Number(e && e.width) || 0;
+  const h = Number(e && e.height) || 0;
+  // רק מגע אמיתי מדווח גודל. בעכבר הערך תמיד 1 ולכן לא נלקח בחשבון.
+  if (!e || e.pointerType !== 'touch' || w <= 1 || h <= 1) return 0;
+  return Math.sqrt(w * h);
+}
+
+function fpMean(arr) {
+  return arr.reduce((a, b) => a + b, 0) / (arr.length || 1);
+}
+
+function fpStd(arr) {
+  const m = fpMean(arr);
+  return Math.sqrt(fpMean(arr.map((v) => (v - m) * (v - m))));
+}
+
+function fpClamp(v, lo, hi) {
+  return Math.min(Math.max(v, lo), hi);
+}
+
+function buildFingerprintProfile(samples) {
+  const xs = samples.map((s) => s.x);
+  const ys = samples.map((s) => s.y);
+  const ms = samples.map((s) => s.ms);
+  const sizes = samples.map((s) => s.size || 0);
+  const hasSize = sizes.every((s) => s > 0);
+  const sizeMean = hasSize ? fpMean(sizes) : 0;
+  return {
+    x: Number(fpMean(xs).toFixed(3)),
+    y: Number(fpMean(ys).toFixed(3)),
+    ms: Math.round(fpMean(ms)),
+    posTol: Number(fpClamp(2.2 * Math.max(fpStd(xs), fpStd(ys)) + 0.08, 0.12, 0.26).toFixed(3)),
+    msTol: Math.round(fpClamp(2.5 * fpStd(ms) + 90, 120, 320)),
+    size: hasSize ? Number(sizeMean.toFixed(2)) : 0,
+    sizeTol: hasSize ? Number(fpClamp((2.5 * fpStd(sizes)) / sizeMean + 0.1, 0.12, 0.3).toFixed(3)) : 0,
+    n: samples.length
+  };
+}
+
+function getFingerprintProfile() {
+  if (!config.fingerprintEnrolled) return null;
+  const p = config.fingerprintProfile;
+  if (p && typeof p.x === 'number') return p;
+  // טביעה שנרשמה בגרסה ישנה (בלי פרופיל מלא)
+  return {
+    x: typeof config.fingerprintZoneX === 'number' ? config.fingerprintZoneX : 0.5,
+    y: typeof config.fingerprintZoneY === 'number' ? config.fingerprintZoneY : 0.5,
+    ms: Math.max(config.fingerprintHoldMs || 550, 300),
+    posTol: 0.24,
+    msTol: 170,
+    size: 0,
+    sizeTol: 0
+  };
+}
+
+function matchFingerprint(profile, sample) {
+  if (!profile) return false;
+  const posOk = Math.hypot(sample.x - profile.x, sample.y - profile.y) <= profile.posTol;
+  const timeOk = Math.abs(sample.ms - profile.ms) <= profile.msTol;
+  let sizeOk = true;
+  if (profile.size && sample.size) {
+    sizeOk = Math.abs(sample.size - profile.size) / profile.size <= profile.sizeTol;
+  } else if (profile.size && !sample.size) {
+    // נרשם עם גודל מגע אבל עכשיו לא דווח (למשל עכבר) -> לא מאשרים
+    sizeOk = false;
+  }
+  return posOk && timeOk && sizeOk;
+}
+
+// ---------------------------------------------------------------------------
+// זיהוי פנים אמיתי (מודל AI שרץ בתוך הטלפון, בלי אינטרנט ובלי חלונית מערכת).
+// כל פנים הופכות ל"טביעת פנים" של 128 מספרים. פנים של אותו אדם קרובות זו לזו,
+// ופנים של אדם אחר רחוקות. נפתח רק כשהמרחק מהפנים שנרשמו קטן מהסף.
+// ---------------------------------------------------------------------------
+const FACE_MATCH_THRESHOLD = 0.48;
+let faceApiPromise = null;
+
+function xhrLoad(url, type) {
+  return new Promise((resolve, reject) => {
+    const x = new XMLHttpRequest();
+    x.open('GET', url, true);
+    x.responseType = type;
+    x.onload = () => (x.status === 200 || (x.status === 0 && x.response) ? resolve(x.response) : reject(new Error('load ' + url)));
+    x.onerror = () => reject(new Error('load ' + url));
+    x.send();
+  });
+}
+
+function loadScriptOnce(src) {
+  return new Promise((resolve, reject) => {
+    if (window.faceapi) return resolve();
+    const s = document.createElement('script');
+    s.src = src;
+    s.onload = resolve;
+    s.onerror = () => reject(new Error('script ' + src));
+    document.head.appendChild(s);
+  });
+}
+
+// טעינת משקלי מודל ישירות מהקבצים (עובד גם מתוך ה-APK וגם באתר)
+async function loadFaceNet(faceapi, net, name) {
+  const manifest = JSON.parse(await xhrLoad(`models/${name}-weights_manifest.json`, 'text'));
+  const specs = [];
+  const buffers = [];
+  for (const group of manifest) {
+    specs.push(...group.weights);
+    for (const p of group.paths) buffers.push(new Uint8Array(await xhrLoad(`models/${p}`, 'arraybuffer')));
+  }
+  const total = buffers.reduce((a, b) => a + b.length, 0);
+  const merged = new Uint8Array(total);
+  let offset = 0;
+  buffers.forEach((b) => {
+    merged.set(b, offset);
+    offset += b.length;
+  });
+  net.loadFromWeightMap(faceapi.tf.io.decodeWeights(merged.buffer, specs));
+}
+
+function loadFaceEngine() {
+  if (faceApiPromise) return faceApiPromise;
+  faceApiPromise = (async () => {
+    await loadScriptOnce('vendor/face-api.js');
+    const faceapi = window.faceapi;
+    await faceapi.tf.ready();
+    await loadFaceNet(faceapi, faceapi.nets.tinyFaceDetector, 'tiny_face_detector_model');
+    await loadFaceNet(faceapi, faceapi.nets.faceLandmark68TinyNet, 'face_landmark_68_tiny_model');
+    await loadFaceNet(faceapi, faceapi.nets.faceRecognitionNet, 'face_recognition_model');
+    // "חימום": הריצה הראשונה של המודל איטית (כמה שניות), אז מריצים אותה מראש על תמונה ריקה
+    try {
+      const warm = document.createElement('canvas');
+      warm.width = 160;
+      warm.height = 160;
+      warm.getContext('2d').fillRect(0, 0, 160, 160);
+      await faceapi.detectSingleFace(warm, new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 }));
+      await faceapi.computeFaceDescriptor(warm);
+    } catch (e) {}
+    return faceapi;
+  })().catch((err) => {
+    faceApiPromise = null;
+    throw err;
+  });
+  return faceApiPromise;
+}
+
+// טביעת פנים מפריים אחד של המצלמה (או null אם לא זוהו פנים)
+async function captureFaceDescriptor(videoEl) {
+  if (!videoEl || videoEl.readyState < 2 || !videoEl.videoWidth) return null;
+  const faceapi = await loadFaceEngine();
+  const result = await faceapi
+    .detectSingleFace(videoEl, new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 }))
+    .withFaceLandmarks(true)
+    .withFaceDescriptor();
+  return result ? Array.from(result.descriptor) : null;
+}
+
+function faceDistance(a, b) {
+  if (!a || !b || a.length !== b.length) return Infinity;
+  let sum = 0;
+  for (let i = 0; i < a.length; i++) sum += (a[i] - b[i]) * (a[i] - b[i]);
+  return Math.sqrt(sum);
+}
+
+function hasEnrolledFace() {
+  return Boolean(config.faceIdEnrolled && Array.isArray(config.faceDescriptor) && config.faceDescriptor.length === 128);
+}
+
 function renderSavedSetupPattern() {
   if (!setupPatternLine || !setupPatternNodes.length) return;
   const saved = String(config.registeredPattern || '12369')
@@ -1038,20 +1214,23 @@ function initBiometricsEnrollment() {
     renderSavedSetupPattern();
   }
 
-  // ג. רישום טביעת אצבע מכוילת (3 לחיצות לכיול מיקום מדויק על החיישן + משך לחיצה)
+  // ג. רישום טביעת אצבע: 4 לחיצות -> פרופיל של מיקום, משך לחיצה וגודל מגע של האצבע
   let fpEnrollStep = 0;
   let fpSamples = [];
   let fpHoldStart = 0;
   let fpTouchNormX = 0.5;
   let fpTouchNormY = 0.5;
+  let fpEnrollMaxSize = 0;
 
   function updateFpEnrollUI() {
     if (!fpEnrollStatusText) return;
     if (config.fingerprintEnrolled) {
-      fpEnrollStatusText.textContent = `טביעת אצבע מותאמת אישית שמורה (זמן לחיצה: ~${config.fingerprintHoldMs}ms) ✓`;
+      const p = getFingerprintProfile();
+      const sizeNote = p && p.size ? ' + גודל מגע' : '';
+      fpEnrollStatusText.textContent = `טביעת אצבע שמורה (מיקום + משך ~${config.fingerprintHoldMs}ms${sizeNote}) ✓`;
       fpEnrollStatusText.classList.add('enrolled');
     } else {
-      fpEnrollStatusText.textContent = `טרם נרשמה טביעת אצבע — כייל 3 לחיצות (${fpEnrollStep}/3)`;
+      fpEnrollStatusText.textContent = `טרם נרשמה טביעת אצבע — ${FP_SAMPLES_NEEDED} לחיצות (${fpEnrollStep}/${FP_SAMPLES_NEEDED})`;
       fpEnrollStatusText.classList.remove('enrolled');
     }
   }
@@ -1067,7 +1246,7 @@ function initBiometricsEnrollment() {
         const dots = fpEnrollSteps ? fpEnrollSteps.querySelectorAll('.fp-step-dot') : [];
         dots.forEach((d) => d.classList.remove('done'));
         if (fpEnrollHint) {
-          fpEnrollHint.textContent = 'לחיצה 1 מתוך 3: הנח את האצבע על החיישן, החזק ושחרר';
+          fpEnrollHint.textContent = `לחיצה 1 מתוך ${FP_SAMPLES_NEEDED}: הנח את האצבע שתפתח את הטלפון, החזק כחצי שנייה ושחרר`;
         }
       }
     });
@@ -1080,13 +1259,20 @@ function initBiometricsEnrollment() {
       fpTouchNormX = Math.min(Math.max((e.clientX - rect.left) / rect.width, 0), 1);
       fpTouchNormY = Math.min(Math.max((e.clientY - rect.top) / rect.height, 0), 1);
       fpHoldStart = performance.now();
+      fpEnrollMaxSize = fpContactSize(e);
       fpEnrollSensor.classList.add('holding');
       if (navigator.vibrate) navigator.vibrate(25);
+    };
+
+    const trackEnrollSize = (e) => {
+      if (!fpHoldStart) return;
+      fpEnrollMaxSize = Math.max(fpEnrollMaxSize, fpContactSize(e));
     };
 
     const endEnrollHold = () => {
       if (!fpHoldStart) return;
       const duration = Math.round(performance.now() - fpHoldStart);
+      const size = fpEnrollMaxSize;
       fpHoldStart = 0;
       fpEnrollSensor.classList.remove('holding');
 
@@ -1101,21 +1287,25 @@ function initBiometricsEnrollment() {
         return;
       }
 
-      // בדיקת עקביות בין הלחיצות של אותו משתמש
+      // בדיקת עקביות: כל הלחיצות חייבות להיות של אותה אצבע (מיקום, משך וגודל מגע דומים)
       if (fpSamples.length > 0) {
-        const prev = fpSamples[fpSamples.length - 1];
-        const dist = Math.hypot(fpTouchNormX - prev.x, fpTouchNormY - prev.y);
-        const timeDiff = Math.abs(duration - prev.ms);
-        if (dist > 0.36 || timeDiff > 320) {
+        const first = fpSamples[0];
+        const dist = Math.hypot(fpTouchNormX - first.x, fpTouchNormY - first.y);
+        const timeDiff = Math.abs(duration - first.ms);
+        const sizeDiff = first.size && size ? Math.abs(size - first.size) / first.size : 0;
+        if (dist > 0.3 || timeDiff > 350 || sizeDiff > 0.35) {
           if (fpEnrollHint) {
-            fpEnrollHint.textContent = 'הנח את אותה אצבע באותו אזור ובאותו משך לחיצה כפי שעשית בלחיצה הקודמת';
+            fpEnrollHint.textContent =
+              sizeDiff > 0.35
+                ? 'נראה כמו אצבע אחרת. השתמש באותה אצבע בכל הלחיצות.'
+                : 'הנח את אותה אצבע באותה נקודה ובאותו משך לחיצה כמו בלחיצה הראשונה';
           }
           if (navigator.vibrate) navigator.vibrate([50, 60, 50]);
           return;
         }
       }
 
-      fpSamples.push({ ms: duration, x: fpTouchNormX, y: fpTouchNormY });
+      fpSamples.push({ ms: duration, x: fpTouchNormX, y: fpTouchNormY, size });
       fpEnrollStep += 1;
 
       const dots = fpEnrollSteps ? fpEnrollSteps.querySelectorAll('.fp-step-dot') : [];
@@ -1125,23 +1315,23 @@ function initBiometricsEnrollment() {
 
       if (navigator.vibrate) navigator.vibrate(45);
 
-      if (fpEnrollStep < 3) {
+      if (fpEnrollStep < FP_SAMPLES_NEEDED) {
         if (fpEnrollHint) {
-          fpEnrollHint.textContent = `מעולה (${fpEnrollStep}/3)! חזור על אותה לחיצה בדיוק ללחיצה ${fpEnrollStep + 1} מתוך 3`;
+          fpEnrollHint.textContent = `מעולה (${fpEnrollStep}/${FP_SAMPLES_NEEDED})! אותה אצבע, אותה לחיצה, עוד פעם`;
         }
       } else {
-        const avgMs = Math.round(fpSamples.reduce((a, b) => a + b.ms, 0) / fpSamples.length);
-        const avgX = Number((fpSamples.reduce((a, b) => a + b.x, 0) / fpSamples.length).toFixed(3));
-        const avgY = Number((fpSamples.reduce((a, b) => a + b.y, 0) / fpSamples.length).toFixed(3));
-
-        config.fingerprintHoldMs = avgMs;
-        config.fingerprintZoneX = avgX;
-        config.fingerprintZoneY = avgY;
+        const profile = buildFingerprintProfile(fpSamples);
+        config.fingerprintProfile = profile;
+        config.fingerprintHoldMs = profile.ms;
+        config.fingerprintZoneX = profile.x;
+        config.fingerprintZoneY = profile.y;
         config.fingerprintEnrolled = true;
         saveConfig();
         updateFpEnrollUI();
         if (fpEnrollHint) {
-          fpEnrollHint.textContent = `טביעת האצבע האישית נשמרה! (תפתח רק בלחיצה של ~${avgMs}ms באותו אזור) ✓`;
+          fpEnrollHint.textContent = profile.size
+            ? `טביעת האצבע נשמרה ✓ רק האצבע הזו (גודל מגע, מיקום ומשך ~${profile.ms}ms) תפתח`
+            : `טביעת האצבע נשמרה ✓ תפתח רק בלחיצה של ~${profile.ms}ms באותה נקודה`;
         }
         setTimeout(() => {
           if (fpEnrollPadWrap) fpEnrollPadWrap.style.display = 'none';
@@ -1150,6 +1340,7 @@ function initBiometricsEnrollment() {
     };
 
     fpEnrollSensor.addEventListener('pointerdown', startEnrollHold);
+    fpEnrollSensor.addEventListener('pointermove', trackEnrollSize);
     fpEnrollSensor.addEventListener('pointerup', endEnrollHold);
     fpEnrollSensor.addEventListener('pointercancel', endEnrollHold);
     fpEnrollSensor.addEventListener('pointerleave', endEnrollHold);
@@ -1158,9 +1349,12 @@ function initBiometricsEnrollment() {
   // ד. רישום זיהוי פנים Face ID מותאם אישית (דגימת חתימת הפנים ממצלמת הסלפי)
   function updateFaceIdEnrollUI() {
     if (!faceIdEnrollStatusText) return;
-    if (config.faceIdEnrolled && Array.isArray(config.faceSignature) && config.faceSignature.length > 0) {
-      faceIdEnrollStatusText.textContent = 'תווי הפנים שלך שמורים ומורשים ל-Face ID ✓';
+    if (hasEnrolledFace()) {
+      faceIdEnrollStatusText.textContent = 'הפנים שלך שמורות (זיהוי פנים חכם). רק הן יפתחו ✓';
       faceIdEnrollStatusText.classList.add('enrolled');
+    } else if (config.faceIdEnrolled) {
+      faceIdEnrollStatusText.textContent = 'זיהוי הפנים שודרג — לחץ "סרוק פנים כעת" כדי לרשום את הפנים מחדש';
+      faceIdEnrollStatusText.classList.remove('enrolled');
     } else {
       faceIdEnrollStatusText.textContent = 'טרם נרשמו פנים — לחץ "סרוק פנים כעת" לרישום הפנים שלך';
       faceIdEnrollStatusText.classList.remove('enrolled');
@@ -1194,31 +1388,66 @@ function initBiometricsEnrollment() {
         return;
       }
 
-      setTimeout(() => {
-        const sig = captureVideoSignature(setupFaceVideo);
-        if (!sig) {
-          if (faceIdScanCaption) {
-            faceIdScanCaption.textContent = 'המצלמה חשוכה או שלא זוהו פנים ברורות. נסה שוב באור תקין.';
-          }
-          if (navigator.vibrate) navigator.vibrate([60, 70, 60]);
-          stopAllCameraStreams();
-          return;
+      // טעינת מודל הזיהוי (בפעם הראשונה לוקח כמה שניות)
+      if (faceIdScanCaption) faceIdScanCaption.textContent = 'טוען את מנוע זיהוי הפנים...';
+      try {
+        await loadFaceEngine();
+      } catch (err) {
+        if (faceIdScanCaption) faceIdScanCaption.textContent = 'לא הצלחנו לטעון את מנוע זיהוי הפנים. נסה שוב.';
+        stopAllCameraStreams();
+        return;
+      }
+
+      // 5 דגימות לאורך כ-3 שניות: מזיזים קצת את הראש כדי שהזיהוי יעבוד מכל זווית
+      const samples = [];
+      const SAMPLES_WANTED = 5;
+      const deadline = performance.now() + 9000;
+      if (faceIdScanCaption) faceIdScanCaption.textContent = 'הבט למצלמה והזז מעט את הראש מצד לצד...';
+      while (samples.length < SAMPLES_WANTED && performance.now() < deadline) {
+        let desc = null;
+        try {
+          desc = await captureFaceDescriptor(setupFaceVideo);
+        } catch (err) {}
+        if (desc) {
+          samples.push(desc);
+          if (faceIdScanCaption) faceIdScanCaption.textContent = `סורק... (${samples.length}/${SAMPLES_WANTED})`;
+          if (navigator.vibrate) navigator.vibrate(15);
         }
+        await new Promise((r) => setTimeout(r, 350));
+      }
 
-        config.faceSignature = sig;
-        config.faceIdEnrolled = true;
-        saveConfig();
-        updateFaceIdEnrollUI();
+      // כל הדגימות חייבות להיות של אותו אדם
+      const consistent =
+        samples.length >= 3 &&
+        samples.every((s) => samples.every((t) => faceDistance(s, t) < 0.55));
+      if (!consistent) {
+        if (faceIdScanCaption) {
+          faceIdScanCaption.textContent =
+            samples.length < 3
+              ? 'לא זוהו פנים ברורות. נסה שוב באור טוב, עם הפנים במרכז העיגול.'
+              : 'הסריקה לא הייתה יציבה. נסה שוב, רק אדם אחד מול המצלמה.';
+        }
+        if (navigator.vibrate) navigator.vibrate([60, 70, 60]);
+        stopAllCameraStreams();
+        return;
+      }
 
-        if (faceIdVideoCircle) faceIdVideoCircle.classList.add('scan-complete');
-        if (faceIdScanCaption) faceIdScanCaption.textContent = 'תווי הפנים שלך נשמרו בהצלחה! רק הפנים שלך יפתחו את ה-Face ID ✓';
-        if (navigator.vibrate) navigator.vibrate([40, 60, 80]);
+      const avg = new Array(128).fill(0);
+      samples.forEach((s) => s.forEach((v, i) => (avg[i] += v / samples.length)));
+      config.faceDescriptor = avg.map((v) => Number(v.toFixed(5)));
+      config.faceSignature = null;
+      config.faceIdEnrolled = true;
+      saveConfig();
+      updateFaceIdEnrollUI();
 
-        setTimeout(() => {
-          stopAllCameraStreams();
-          faceIdCameraBox.style.display = 'none';
-        }, 1300);
-      }, 1700);
+      if (faceIdVideoCircle) faceIdVideoCircle.classList.add('scan-complete');
+      if (faceIdScanCaption) faceIdScanCaption.textContent = 'הפנים שלך נשמרו! רק הפנים שלך יפתחו ✓';
+      if (navigator.vibrate) navigator.vibrate([40, 60, 80]);
+
+      setTimeout(() => {
+        stopAllCameraStreams();
+        faceIdCameraBox.style.display = 'none';
+      }, 1300);
     });
   }
 }
@@ -2238,6 +2467,7 @@ let fpOverholdTimer = null;
 let fpReadyPulseTimer = null;
 let fpPressStartTime = 0;
 let fpSpotMatches = false;
+let fpPressSample = null;
 
 function startFingerprintHold(e) {
   if (e && e.cancelable) e.preventDefault();
@@ -2246,43 +2476,35 @@ function startFingerprintHold(e) {
   fpPressStartTime = performance.now();
   fingerprintContainer.classList.add('pressing', 'fp-holding');
 
-  // בדיקת קואורדינטת המגע על החיישן מול הקואורדינטה שנרשמה ב-Setup
   const rect = fingerprintContainer.getBoundingClientRect();
-  const normX = Math.min(Math.max((e.clientX - rect.left) / rect.width, 0), 1);
-  const normY = Math.min(Math.max((e.clientY - rect.top) / rect.height, 0), 1);
-  const targetX = typeof config.fingerprintZoneX === 'number' ? config.fingerprintZoneX : 0.5;
-  const targetY = typeof config.fingerprintZoneY === 'number' ? config.fingerprintZoneY : 0.5;
-  const spotDist = Math.hypot(normX - targetX, normY - targetY);
+  fpPressSample = {
+    x: Math.min(Math.max((e.clientX - rect.left) / rect.width, 0), 1),
+    y: Math.min(Math.max((e.clientY - rect.top) / rect.height, 0), 1),
+    size: fpContactSize(e),
+    ms: 0
+  };
 
-  fpSpotMatches = Boolean(config.fingerprintEnrolled) && spotDist <= 0.28;
-
-  const calibratedMs = Math.max(config.fingerprintHoldMs || 550, 300);
+  const profile = getFingerprintProfile();
+  fpSpotMatches = Boolean(profile) && Math.hypot(fpPressSample.x - profile.x, fpPressSample.y - profile.y) <= profile.posTol;
 
   clearTimeout(fpReadyPulseTimer);
   clearTimeout(fpOverholdTimer);
 
-  // חיווי רטט עדין ברגע שמגיעים למשך הנגיעה המוגדר (אם האצבע במיקום הנכון)
-  if (fpSpotMatches) {
-    fpReadyPulseTimer = setTimeout(() => {
-      if (navigator.vibrate) {
-        try {
-          navigator.vibrate(25);
-        } catch (err) {}
-      }
-    }, calibratedMs);
-  }
-
-  // אם המשתמש מחזיק ארוך מדי מעבר למשך הנגיעה שנרשם -> נכשל מיד ("טביעת אצבע לא תואמת") אלא אם כן מופעלת החלקת אצבע סודית
+  // מחזיקים הרבה יותר מהמשך שנרשם -> "טביעת אצבע לא תואמת" (כמו חיישן אמיתי)
+  const maxHold = profile ? profile.ms + profile.msTol + 60 : 1200;
   fpOverholdTimer = setTimeout(() => {
     if (!fpPressStartTime) return;
-    if (config.secretFpBypass !== false) {
-      endFingerprintHold();
-      return;
-    }
     fpPressStartTime = 0;
+    fpPressSample = null;
     fingerprintContainer.classList.remove('pressing', 'fp-holding');
     triggerErrorFeedback('טביעת אצבע לא תואמת');
-  }, calibratedMs + 195);
+  }, maxHold);
+}
+
+// גודל המגע גדל בזמן הלחיצה, לכן לוקחים את המקסימום
+function trackFingerprintSize(e) {
+  if (!fpPressStartTime || !fpPressSample) return;
+  fpPressSample.size = Math.max(fpPressSample.size, fpContactSize(e));
 }
 
 function endFingerprintHold() {
@@ -2294,12 +2516,13 @@ function endFingerprintHold() {
   fpPressStartTime = 0;
   fingerprintContainer.classList.remove('pressing', 'fp-holding');
 
-  const calibratedMs = Math.max(config.fingerprintHoldMs || 550, 300);
-  const timeDiff = Math.abs(heldMs - calibratedMs);
-  const bypassActive = config.secretFpBypass !== false;
+  const sample = fpPressSample ? { ...fpPressSample, ms: heldMs } : null;
+  fpPressSample = null;
+  const sensorEnabled = config.secretFpBypass !== false;
+  const matched = sensorEnabled && sample && matchFingerprint(getFingerprintProfile(), sample);
 
-  // לחיצה על חיישן טביעת האצבע הווירטואלי מבצעת Fail-Safe Unlock מיידי (כשמעקף מופעל או בכיול מדויק)
-  if (bypassActive || (fpSpotMatches && timeDiff <= 170)) {
+  // רק האצבע שנרשמה (מיקום + משך + גודל מגע) פותחת
+  if (matched) {
     fingerprintContainer.classList.add('fp-success');
     triggerHaptic(50);
     triggerUnlockHomescreen();
@@ -2314,6 +2537,7 @@ function endFingerprintHold() {
 
 if (fingerprintContainer) {
   fingerprintContainer.addEventListener('pointerdown', startFingerprintHold);
+  fingerprintContainer.addEventListener('pointermove', trackFingerprintSize);
   fingerprintContainer.addEventListener('pointerup', endFingerprintHold);
   fingerprintContainer.addEventListener('pointerleave', endFingerprintHold);
   fingerprintContainer.addEventListener('pointercancel', endFingerprintHold);
@@ -2335,9 +2559,11 @@ async function triggerIosFaceIdSequence() {
   }
 
   // אם המשתמש עדיין לא רשם את הפנים שלו ב-Setup -> המנעול נשאר נעול!
-  if (!config.faceIdEnrolled || !Array.isArray(config.faceSignature) || config.faceSignature.length === 0) {
+  if (!hasEnrolledFace()) {
     return;
   }
+  // טעינת המנוע ברקע מראש, כדי שהזיהוי יהיה מהיר
+  loadFaceEngine().catch(() => {});
 
   stopAllCameraStreams();
   try {
@@ -2358,17 +2584,31 @@ async function triggerIosFaceIdSequence() {
     cameraPunchHole.classList.add('faceid-animating');
   }
 
-  faceIdTimer = setTimeout(() => {
-    const liveSig = captureVideoSignature(islandLiveCam);
-    const similarity = liveSig ? computeFaceSimilarity(config.faceSignature, liveSig) : 0;
+  const attemptId = Symbol('faceAttempt');
+  triggerIosFaceIdSequence.current = attemptId;
+  faceIdTimer = setTimeout(async () => {
+    // עד כ-3 שניות של ניסיונות זיהוי, כמו Face ID אמיתי
+    let bestDistance = Infinity;
+    const deadline = performance.now() + 3000;
+    while (performance.now() < deadline && triggerIosFaceIdSequence.current === attemptId) {
+      try {
+        const live = await captureFaceDescriptor(islandLiveCam);
+        if (live) bestDistance = Math.min(bestDistance, faceDistance(config.faceDescriptor, live));
+      } catch (err) {
+        break;
+      }
+      if (bestDistance <= FACE_MATCH_THRESHOLD) break;
+      await new Promise((r) => setTimeout(r, 120));
+    }
+    if (triggerIosFaceIdSequence.current !== attemptId) return; // ניסיון חדש התחיל בינתיים
 
     stopAllCameraStreams();
     if (cameraPunchHole) {
       cameraPunchHole.classList.remove('faceid-animating');
     }
 
-    // רק כשמצלמת הסלפי מזהה מחדש את הפנים של המשתמש שהוגדר -> המנעול נפתח
-    if (similarity >= 0.80) {
+    // רק הפנים שנרשמו (מרחק קטן מהסף) פותחות את המנעול
+    if (bestDistance <= FACE_MATCH_THRESHOLD) {
       faceIdUnlocked = true;
       if (cameraPunchHole) {
         cameraPunchHole.classList.add('faceid-unlocked');
@@ -2393,7 +2633,7 @@ async function triggerIosFaceIdSequence() {
       // כל ניסיון אחר משאיר את המנעול נעול
       faceIdUnlocked = false;
     }
-  }, 850);
+  }, 250);
 }
 
 // נעילת מחוות ומסך בית (Exit Protection): אנימציית מנעול קלה במקום סגירה בטעות בעת החלקה או לחיצה מחוץ למקלדת
@@ -3142,7 +3382,7 @@ function initDeviceLicenseGate() {
 // החלון מוצג רק כשמסך ההגדרות פתוח (בפתיחת האפליקציה / בתפריט הסודי),
 // ולעולם לא מעל מסך הנעילה הפעיל מול קהל.
 // ============================================================================
-const APP_VERSION = '4.8';
+const APP_VERSION = '4.9';
 const DEFAULT_APK_URL = 'https://github.com/tzur2010/app-lockscreen/raw/main/Lockscreen.apk';
 const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 const UPDATE_DISMISS_KEY = 'magic_update_dismissed_version';
@@ -3634,7 +3874,7 @@ function initMagicFeatures() {
 const ROUTINES_KEY = 'magic_routines_v1';
 const ACTIVE_ROUTINE_KEY = 'magic_active_routine_v1';
 // הגדרות שלא שייכות לרוטינה (אישיות למכשיר / למראה תפריט ההגדרות)
-const ROUTINE_EXCLUDED_KEYS = ['settingsColorScheme', 'faceSignature', 'faceIdEnrolled', 'fingerprintEnrolled', 'fingerprintHoldMs', 'fingerprintZoneX', 'fingerprintZoneY'];
+const ROUTINE_EXCLUDED_KEYS = ['settingsColorScheme', 'faceSignature', 'faceDescriptor', 'faceIdEnrolled', 'fingerprintEnrolled', 'fingerprintHoldMs', 'fingerprintZoneX', 'fingerprintZoneY', 'fingerprintProfile'];
 
 function getRoutines() {
   try {
@@ -3790,7 +4030,9 @@ function normalizeBackupCode(input) {
 
 function buildBackupPayload() {
   const cfg = { ...config };
+  // נתונים ביומטריים (פנים) נשארים רק בטלפון ולא עולים לענן
   delete cfg.faceSignature;
+  delete cfg.faceDescriptor;
   delete cfg.faceIdEnrolled;
   let avatar = '';
   try {
@@ -3861,7 +4103,7 @@ function scheduleCloudBackup() {
 function applyBackupPayload(payload) {
   const data = JSON.parse(payload);
   if (!data || !data.config) throw new Error('bad backup');
-  const keep = { faceSignature: config.faceSignature, faceIdEnrolled: config.faceIdEnrolled };
+  const keep = { faceSignature: config.faceSignature, faceDescriptor: config.faceDescriptor, faceIdEnrolled: config.faceIdEnrolled };
   config = { ...DEFAULT_CONFIG, ...data.config, ...keep };
   localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(config));
   setForceModeState(data.force !== false);
@@ -3981,9 +4223,45 @@ function maybeShowGuideFirstTime() {
 
 function initGuide() {
   const openBtn = document.getElementById('openGuideBtn');
+  const headerBtn = document.getElementById('headerGuideBtn');
   const closeBtn = document.getElementById('guideCloseBtn');
   if (openBtn) openBtn.addEventListener('click', openGuide);
+  if (headerBtn) headerBtn.addEventListener('click', openGuide);
   if (closeBtn) closeBtn.addEventListener('click', closeGuide);
+}
+
+// ============================================================================
+// 27. לשוניות ההגדרות: טריק / הצצה / מראה / אבטחה / עוד
+// ============================================================================
+var SETTINGS_TAB_KEY = 'magic_settings_tab_v1';
+
+function showSettingsTab(tab) {
+  const tabs = document.querySelectorAll('#settingsTabs .settings-tab');
+  const panels = document.querySelectorAll('.settings-panel');
+  if (!tabs.length) return;
+  const exists = Array.from(panels).some((p) => p.dataset.tab === tab);
+  const target = exists ? tab : 'trick';
+  tabs.forEach((t) => t.classList.toggle('active', t.dataset.tab === target));
+  panels.forEach((p) => p.classList.toggle('active', p.dataset.tab === target));
+  const body = document.querySelector('.config-body');
+  if (body) body.scrollTop = 0;
+  try {
+    localStorage.setItem(SETTINGS_TAB_KEY, target);
+  } catch (e) {}
+}
+
+function initSettingsTabs() {
+  document.querySelectorAll('#settingsTabs .settings-tab').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      triggerHaptic(10);
+      showSettingsTab(btn.dataset.tab);
+    });
+  });
+  let saved = 'trick';
+  try {
+    saved = localStorage.getItem(SETTINGS_TAB_KEY) || 'trick';
+  } catch (e) {}
+  showSettingsTab(saved);
 }
 
 // ============================================================================
@@ -4049,6 +4327,9 @@ initMagicFeatures();
 initRoutines();
 initCloudBackup();
 initGuide();
+initSettingsTabs();
+// אם נרשמו פנים: טוענים ומחממים את מנוע הזיהוי ברקע, כדי שהזיהוי מול הקהל יהיה מיידי
+if (hasEnrolledFace()) setTimeout(() => loadFaceEngine().catch(() => {}), 2500);
 initDeviceLicenseGate();
 initSplashScreen();
 initBiometricsEnrollment();

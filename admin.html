@@ -76,6 +76,23 @@
     .feedback-item { background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.07); border-radius: 14px; padding: 12px 14px; }
     .feedback-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
     .feedback-head .btn { margin-inline-start: auto; }
+    /* שיחות */
+    .thread { border: 1px solid rgba(255,255,255,.08); border-radius: 18px; padding: 14px; margin-bottom: 14px; background: rgba(255,255,255,.02); }
+    .thread.waiting { border-color: rgba(250,204,21,.35); }
+    .thread-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 10px; }
+    .thread-name { font-size: 16px; font-weight: 800; }
+    .bubbles { display: flex; flex-direction: column; gap: 6px; max-height: 340px; overflow-y: auto; padding: 2px; }
+    .bubble { max-width: 82%; padding: 8px 12px; border-radius: 16px; font-size: 14px; line-height: 1.5; }
+    .bubble.them { align-self: flex-start; background: rgba(255,255,255,.07); border-start-start-radius: 4px; }
+    .bubble.me { align-self: flex-end; background: rgba(34,197,94,.16); color: #dcfce7; border-start-end-radius: 4px; }
+    .bubble-text { white-space: pre-wrap; word-break: break-word; }
+    .bubble-meta { font-size: 11px; opacity: .6; margin-top: 3px; display: flex; gap: 6px; align-items: center; }
+    .bubble-del { background: none; border: none; color: #fb7185; cursor: pointer; font-size: 11px; padding: 0 2px; margin-inline-start: auto; opacity: .7; }
+    .bubble-del:hover { opacity: 1; }
+    .thread-reply { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+    .thread-input { width: 100%; box-sizing: border-box; background: rgba(0,0,0,.3); border: 1px solid rgba(255,255,255,.14); border-radius: 12px; color: #fff; padding: 9px 11px; font: inherit; font-size: 14px; resize: vertical; }
+    .thread-actions { display: flex; gap: 8px; }
+    .thread-actions .btn { flex: 1; justify-content: center; }
     .list-tools { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
     .sort-select { width: auto !important; padding: 9px 10px !important; }
     .pill-count { font-size: 11px; opacity: .75; }
@@ -221,7 +238,7 @@
       <!-- לשוניות ניהול -->
       <nav class="admin-tabs" id="adminTabs">
         <button type="button" class="admin-tab active" data-tab="users">👥 לקוחות <span class="tab-badge" id="badgePending" style="display:none;">0</span></button>
-        <button type="button" class="admin-tab" data-tab="feedback">💬 משובים <span class="tab-badge tab-badge-blue" id="badgeFeedback" style="display:none;">0</span></button>
+        <button type="button" class="admin-tab" data-tab="feedback">💬 שיחות <span class="tab-badge tab-badge-blue" id="badgeFeedback" style="display:none;">0</span></button>
         <button type="button" class="admin-tab" data-tab="update">📢 עדכון <span class="tab-badge tab-badge-green" id="badgeUpdate" style="display:none;">!</span></button>
         <button type="button" class="admin-tab" data-tab="stats">📊 נתונים <span class="tab-badge" id="badgeErrors" style="display:none;">0</span></button>
         <button type="button" class="admin-tab" data-tab="invite">✉️ הזמנה</button>
@@ -313,7 +330,7 @@
       <!-- ===================== לשונית: משובים ===================== -->
       <section class="admin-panel" data-tab="feedback">
         <div class="card panel">
-          <h2>💬 משובים מהקוסמים (<span id="feedbackCount">0</span>)</h2>
+          <h2>💬 שיחות עם הקוסמים (<span id="feedbackCount">0</span>)</h2>
           <div id="feedbackList" class="feedback-list"></div>
         </div>
       </section>
@@ -394,16 +411,13 @@
           </div>
 
           <div class="card panel">
-            <h2>✅ הודעת אישור (נשלחת כשמאשרים)</h2>
-            <div>
-              <label class="field-label" for="waTemplate">{שם} יוחלף בשם של הקוסם</label>
-              <textarea class="input-field" id="waTemplate"></textarea>
-            </div>
+            <h2>✅ הודעת אישור - מדריך מלא לאפליקציה</h2>
+            <div class="hint" id="guideVersionHint">טוען...</div>
+            <textarea class="input-field" id="waTemplate" readonly style="min-height: 260px;"></textarea>
             <div class="actions-cell">
-              <button type="button" class="btn btn-ghost" id="saveTemplateBtn">שמור</button>
-              <button type="button" class="btn btn-ghost" id="resetTemplateBtn">ברירת מחדל</button>
+              <button type="button" class="btn btn-ghost" id="copyGuideBtn">העתק</button>
             </div>
-            <div class="hint">ההודעות נשמרות בדפדפן הזה.</div>
+            <div class="hint">ההודעה נשלחת אוטומטית כשמאשרים קוסם, ומתעדכנת לבד עם כל גרסה חדשה. כדי לשלוח את המדריך המעודכן לקוסם קיים: בלשונית לקוחות ← "שלח וואטסאפ שוב".</div>
           </div>
         </div>
       </section>
@@ -502,8 +516,24 @@
     }
 
     // ---------------- וואטסאפ ----------------
+    // המדריך המלא נטען מהקובץ wa-guide.json באתר, שמתעדכן עם כל גרסה
+    let waGuide = null; // { version, text }
+
+    async function loadWaGuide() {
+      try {
+        const res = await fetch(`wa-guide.json?t=${Date.now()}`, { cache: 'no-store' });
+        const data = await res.json();
+        if (data && data.text) waGuide = data;
+      } catch (e) {}
+      const ver = (waGuide && waGuide.version) || publishedVersion || '';
+      $('waTemplate').value = getTemplate().split('{שם}').join('(שם הקוסם)');
+      $('guideVersionHint').textContent = waGuide ? `המדריך מעודכן לגרסה ${ver} ✓` : 'לא הצלחתי לטעון את המדריך - נשלחת הודעה קצרה';
+    }
+
     function getTemplate() {
-      return localStorage.getItem(TEMPLATE_KEY) || DEFAULT_TEMPLATE;
+      const text = waGuide ? waGuide.text : DEFAULT_TEMPLATE;
+      const ver = (waGuide && waGuide.version) || publishedVersion || '';
+      return text.split('{גרסה}').join(ver);
     }
 
     function formatPhoneForWhatsapp(phone) {
@@ -702,43 +732,134 @@
       toast('נמחק');
     });
 
+    // ---------------- שיחות: כל קוסם בקוביה אחת, הודעות לפי הסדר ----------------
+    let allMessages = [];
+    const threadDrafts = {};
+
+    function buildThreads() {
+      const map = {};
+      const get = (uid) => (map[uid] = map[uid] || { uid, items: [] });
+      allFeedback.forEach((f) => {
+        get(f.uid).items.push({ from: 'them', text: f.text, at: f.createdAt, fb: f });
+        if (f.reply) get(f.uid).items.push({ from: 'me', text: f.reply, at: f.repliedAt || f.createdAt, via: 'reply' });
+      });
+      allMessages.forEach((m) => get(m.uid).items.push({ from: 'me', text: m.text, at: m.createdAt, via: m.via || 'app' }));
+      const time = (iso) => (iso ? new Date(iso).getTime() : 0);
+      return Object.values(map)
+        .map((th) => {
+          th.items.sort((a, b) => time(a.at) - time(b.at));
+          const last = th.items[th.items.length - 1];
+          th.lastAt = last ? last.at : '';
+          th.waiting = Boolean(last && last.from === 'them');
+          th.user = allUsers.find((u) => u.id === th.uid) || null;
+          return th;
+        })
+        .sort((a, b) => (b.waiting - a.waiting) || time(b.lastAt) - time(a.lastAt));
+    }
+
+    function renderBubbles(th) {
+      return th.items
+        .map((it) => {
+          const meta = [formatDate(it.at)];
+          if (it.from === 'them' && it.fb && it.fb.appVersion) meta.push('v' + escapeHtml(it.fb.appVersion));
+          if (it.from === 'me') meta.push(it.via === 'wa' ? '🟢 וואטסאפ' : it.via === 'reply' ? '↩️ תשובה' : '📱 באפליקציה');
+          const del = it.from === 'them' && it.fb ? `<button type="button" class="bubble-del" data-fb-delete="${escapeHtml(it.fb.id)}" title="מחק">✕</button>` : '';
+          return `<div class="bubble ${it.from}"><div class="bubble-text">${escapeHtml(it.text)}</div><div class="bubble-meta">${meta.join(' · ')}${del}</div></div>`;
+        })
+        .join('');
+    }
+
     function renderFeedback() {
       const list = $('feedbackList');
-      $('feedbackCount').textContent = allFeedback.length;
-      // על הלשונית: כמה משובים עוד מחכים לתשובה
-      const unanswered = allFeedback.filter((f) => !f.reply).length;
-      $('badgeFeedback').textContent = unanswered;
-      $('badgeFeedback').style.display = unanswered ? '' : 'none';
+      const threads = buildThreads();
+      const waiting = threads.filter((th) => th.waiting).length;
+      $('feedbackCount').textContent = threads.length;
+      $('badgeFeedback').textContent = waiting;
+      $('badgeFeedback').style.display = waiting ? '' : 'none';
       list.innerHTML = '';
-      if (!allFeedback.length) {
-        list.innerHTML = '<div class="empty-state" style="padding:26px 10px;">עוד לא התקבל משוב. הקוסמים שולחים משוב מתוך תפריט ההגדרות באפליקציה.</div>';
+      if (!threads.length) {
+        list.innerHTML = '<div class="empty-state" style="padding:26px 10px;">עוד אין שיחות. הקוסמים שולחים משוב מתוך תפריט ההגדרות באפליקציה.</div>';
         return;
       }
-      allFeedback.forEach((f) => {
-        const user = allUsers.find((u) => u.id === f.uid);
-        const who = user ? escapeHtml(user.name) : 'משתמש שנמחק';
-        const meta = [formatDate(f.createdAt), f.appVersion ? 'v' + escapeHtml(f.appVersion) : '', escapeHtml(f.model || '')]
-          .filter(Boolean)
-          .join(' · ');
-        const item = document.createElement('div');
-        item.className = 'feedback-item';
-        item.innerHTML = `
-          <div class="feedback-head">
-            <span style="font-weight:800;">${who}</span>
-            <span class="muted">${meta}</span>
-            <button type="button" class="btn btn-delete" style="padding:4px 10px; font-size:12px;" data-fb-delete="${escapeHtml(f.id)}">מחק</button>
+      threads.forEach((th) => {
+        const u = th.user;
+        const uid = escapeHtml(th.uid);
+        const card = document.createElement('div');
+        card.className = 'thread' + (th.waiting ? ' waiting' : '');
+        card.innerHTML = `
+          <div class="thread-head">
+            <span class="thread-name ${u ? 'name-link' : ''}" ${u ? `data-thread-details="${uid}"` : ''}>${u ? escapeHtml(u.name) : 'משתמש שנמחק'}</span>
+            ${th.waiting ? '<span class="status-badge status-pending">מחכה לתשובה</span>' : '<span class="muted">✓ ענית</span>'}
           </div>
-          <div class="feedback-text">${escapeHtml(f.text)}</div>
-          ${f.reply
-            ? `<div class="feedback-reply"><b>↩️ ענית (${formatDate(f.repliedAt)}):</b> ${escapeHtml(f.reply)}</div>`
-            : ''}
-          ${user
-            ? `<button type="button" class="btn ${f.reply ? 'btn-ghost' : 'btn-whatsapp'} reply-btn" data-fb-reply="${escapeHtml(f.id)}">${f.reply ? 'ענה שוב' : '↩️ ענה לו'}</button>`
+          <div class="bubbles">${renderBubbles(th)}</div>
+          ${u
+            ? `<div class="thread-reply">
+                 <textarea class="thread-input" data-thread-input="${uid}" rows="2" maxlength="2000" placeholder="כתוב תשובה ל${escapeHtml(u.name)}...">${escapeHtml(threadDrafts[th.uid] || '')}</textarea>
+                 <div class="thread-actions">
+                   <button type="button" class="btn btn-whatsapp" data-thread-send="${uid}" data-via="app">📱 שלח באפליקציה</button>
+                   ${u.phone ? `<button type="button" class="btn btn-wa-outline" data-thread-send="${uid}" data-via="wa">🟢 וואטסאפ</button>` : ''}
+                 </div>
+               </div>`
             : ''}`;
-        list.appendChild(item);
+        list.appendChild(card);
+        const bubbles = card.querySelector('.bubbles');
+        bubbles.scrollTop = bubbles.scrollHeight;
       });
     }
 
+    // שליחת תשובה מתוך השיחה: אם יש משוב שמחכה - התשובה נשמרת עליו, אחרת כהודעה חדשה
+    async function sendThreadReply(uid, via, btn) {
+      const user = allUsers.find((u) => u.id === uid);
+      const input = document.querySelector(`[data-thread-input="${CSS.escape(uid)}"]`);
+      const text = (input ? input.value : '').trim();
+      if (!user || !text) return toast('כתוב משהו לפני השליחה', true);
+      if (via === 'wa') {
+        window.open(`https://wa.me/${formatPhoneForWhatsapp(user.phone)}?text=${encodeURIComponent(text)}`, '_blank', 'noopener');
+      }
+      const th = buildThreads().find((x) => x.uid === uid);
+      const lastThem = th && th.waiting ? [...th.items].reverse().find((it) => it.from === 'them' && it.fb) : null;
+      btn.disabled = true;
+      try {
+        if (lastThem) {
+          await Cloud.admin.replyFeedback(lastThem.fb.id, uid, text, { inApp: via === 'app' });
+          lastThem.fb.reply = text;
+          lastThem.fb.repliedAt = new Date().toISOString();
+        } else if (via === 'app') {
+          await Cloud.admin.sendMessage(uid, text);
+          allMessages.push({ uid, text, via: 'app', createdAt: new Date().toISOString() });
+        } else {
+          await Cloud.admin.logMessage(uid, text, 'wa');
+          allMessages.push({ uid, text, via: 'wa', createdAt: new Date().toISOString() });
+        }
+        delete threadDrafts[uid];
+        renderFeedback();
+        toast(via === 'app' ? `נשלח ל${user.name} ✓ יופיע לו באפליקציה` : 'נשמר בשיחה ✓');
+      } catch (err) {
+        toast('השליחה נכשלה: ' + err.message, true);
+        btn.disabled = false;
+      }
+    }
+
+    $('feedbackList').addEventListener('input', (e) => {
+      const uid = e.target.getAttribute && e.target.getAttribute('data-thread-input');
+      if (uid) threadDrafts[uid] = e.target.value;
+    });
+    $('feedbackList').addEventListener('click', (e) => {
+      const sendBtn = e.target.closest('[data-thread-send]');
+      if (sendBtn) return sendThreadReply(sendBtn.getAttribute('data-thread-send'), sendBtn.getAttribute('data-via'), sendBtn);
+      const nameEl = e.target.closest('[data-thread-details]');
+      if (nameEl) {
+        const u = allUsers.find((x) => x.id === nameEl.getAttribute('data-thread-details'));
+        if (u) openDetails(u);
+      }
+    });
+
+    async function loadMessages() {
+      try {
+        allMessages = await Cloud.admin.listMessages();
+        renderFeedback();
+      } catch (e) {}
+    }
     async function loadFeedback() {
       try {
         allFeedback = await Cloud.admin.listFeedback();
@@ -833,6 +954,7 @@
         loadFeedback();
         loadErrors();
         loadNotes();
+        loadMessages();
       } catch (err) {
         setLive(false);
         if (err.status === 401 || err.status === 403) {
@@ -1025,7 +1147,7 @@
     function openDetails(user) {
       detailsUserId = user.id;
       const st = parseStats(user);
-      const fbs = allFeedback.filter((f) => f.uid === user.id);
+      const thread = buildThreads().find((x) => x.uid === user.id);
       const errs = allErrors.filter((x) => x.uid === user.id);
       const statusText = { approved: 'מאושר ✓', blocked: 'גישה בוטלה', pending: 'ממתין לאישור' }[user.status] || user.status;
       const phoneDigits = formatPhoneForWhatsapp(user.phone);
@@ -1074,8 +1196,8 @@
           <button type="button" class="btn btn-whatsapp" id="noteSave" style="margin-top:8px; width:100%; justify-content:center;">שמור הערה</button>
         </div>
         <div class="drawer-sec">
-          <h3>💬 משובים (${fbs.length})</h3>
-          ${fbs.length ? fbs.map((f) => `<div class="mini-fb"><div class="muted">${formatDate(f.createdAt)}</div>${escapeHtml(f.text)}${f.reply ? `<div class="feedback-reply" style="margin-top:6px;">↩️ ${escapeHtml(f.reply)}</div>` : ''}</div>`).join('') : '<div class="muted">אין משובים</div>'}
+          <h3>💬 שיחה (${thread ? thread.items.length : 0})</h3>
+          ${thread ? `<div class="bubbles">${renderBubbles(thread)}</div>` : '<div class="muted">עוד אין הודעות</div>'}
         </div>
         ${errs.length ? `<div class="drawer-sec"><h3>🐞 תקלות (${errs.length})</h3>${errs.map((x) => `<div class="mini-fb" dir="ltr" style="text-align:left;">${escapeHtml(x.msg)}</div>`).join('')}</div>` : ''}`;
 
@@ -1181,6 +1303,7 @@
           bbtn.textContent = `שולח... ${ok}/${targets.length}`;
           try {
             await Cloud.admin.sendMessage(u.id, text);
+            allMessages.push({ uid: u.id, text, via: 'app', createdAt: new Date().toISOString() });
             ok += 1;
           } catch (e) {}
         }
@@ -1202,6 +1325,8 @@
           renderFeedback();
         } else {
           await Cloud.admin.sendMessage(user.id, text);
+          allMessages.push({ uid: user.id, text, via: 'app', createdAt: new Date().toISOString() });
+          renderFeedback();
         }
         closeMessageBox();
         toast(`נשלח ל${user.name} ✓ יופיע לו באפליקציה`);
@@ -1225,6 +1350,13 @@
           await Cloud.admin.replyFeedback(feedback.id, user.id, text, { inApp: false });
           feedback.reply = text;
           feedback.repliedAt = new Date().toISOString();
+          renderFeedback();
+        } catch (e) {}
+      } else {
+        // שומרים בשיחה שנשלחה הודעה בוואטסאפ
+        try {
+          await Cloud.admin.logMessage(user.id, text, 'wa');
+          allMessages.push({ uid: user.id, text, via: 'wa', createdAt: new Date().toISOString() });
           renderFeedback();
         } catch (e) {}
       }
@@ -1273,15 +1405,13 @@
     });
 
     // ---------------- תבנית וואטסאפ ----------------
-    $('waTemplate').value = getTemplate();
-    $('saveTemplateBtn').addEventListener('click', () => {
-      localStorage.setItem(TEMPLATE_KEY, $('waTemplate').value);
-      toast('התבנית נשמרה');
-    });
-    $('resetTemplateBtn').addEventListener('click', () => {
-      localStorage.removeItem(TEMPLATE_KEY);
-      $('waTemplate').value = DEFAULT_TEMPLATE;
-      toast('הוחזר לברירת מחדל');
+    $('copyGuideBtn').addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(getTemplate());
+        toast('המדריך הועתק ✓');
+      } catch (e) {
+        toast('לא הצלחתי להעתיק', true);
+      }
     });
 
     // ---------------- סינון ----------------
@@ -1322,6 +1452,7 @@
       $('adminEmailLabel').textContent = Cloud.admin.email();
       loadUsers();
       loadPublishedVersion();
+      loadWaGuide();
       clearInterval(pollTimer);
       pollTimer = setInterval(() => {
         if (document.visibilityState === 'visible') {

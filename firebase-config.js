@@ -496,8 +496,32 @@ window.MagicCloud = (function () {
     return true;
   }
 
+  // היסטוריית ההודעות שהמנהל שלח (כדי להציג שיחה מלאה עם כל קוסם). רק המנהל רואה.
+  async function adminLogMessage(uid, text, via) {
+    const res = await authedRequest(adminAuth, `${DB_BASE}/admin_messages`, {
+      method: 'POST',
+      body: JSON.stringify({ fields: toFields({ uid, text: String(text || '').trim().slice(0, 2000), via: via || 'app', createdAt: new Date() }) })
+    });
+    if (!res.ok) throw makeError(res, 'Message log failed');
+    return true;
+  }
+
+  async function adminListMessages() {
+    const items = [];
+    let pageToken = '';
+    do {
+      const url = `${DB_BASE}/admin_messages?pageSize=300${pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : ''}`;
+      const res = await authedRequest(adminAuth, url);
+      if (!res.ok) throw makeError(res, 'Messages list failed');
+      const data = JSON.parse(res.text || '{}');
+      (data.documents || []).forEach((doc) => items.push(fromDoc(doc)));
+      pageToken = data.nextPageToken || '';
+    } while (pageToken);
+    return items;
+  }
+
   // הודעה אישית מהמנהל לקוסם מסוים (מופיעה אצלו באפליקציה כשהוא נכנס להגדרות)
-  async function adminSendMessage(uid, text) {
+  async function adminSendMessage(uid, text, { log = true } = {}) {
     const url =
       `${DB_BASE}/users/${encodeURIComponent(uid)}` +
       '?updateMask.fieldPaths=adminMessage&updateMask.fieldPaths=adminMessageAt&currentDocument.exists=true';
@@ -506,12 +530,15 @@ window.MagicCloud = (function () {
       body: JSON.stringify({ fields: toFields({ adminMessage: String(text || '').trim().slice(0, 2000), adminMessageAt: new Date() }) })
     });
     if (!res.ok) throw makeError(res, 'Message failed');
+    // שמירה בהיסטוריה (לא מפילה את השליחה אם נכשלה)
+    if (log) await adminLogMessage(uid, text, 'app').catch(() => {});
     return true;
   }
 
   // תשובה למשוב: נשלחת לקוסם כהודעה, ונשמרת על המשוב כדי שתראה שכבר ענית
   async function adminReplyFeedback(feedbackId, uid, text, { inApp = true } = {}) {
-    if (inApp) await adminSendMessage(uid, text);
+    // התשובה נשמרת על המשוב עצמו, אז לא צריך גם היסטוריה נפרדת
+    if (inApp) await adminSendMessage(uid, text, { log: false });
     const url =
       `${DB_BASE}/feedback/${encodeURIComponent(feedbackId)}` +
       '?updateMask.fieldPaths=reply&updateMask.fieldPaths=repliedAt&currentDocument.exists=true';
@@ -604,6 +631,8 @@ window.MagicCloud = (function () {
       listFeedback: adminListFeedback,
       deleteFeedback: adminDeleteFeedback,
       sendMessage: adminSendMessage,
+      logMessage: adminLogMessage,
+      listMessages: adminListMessages,
       listErrors: adminListErrors,
       listNotes: adminListNotes,
       saveNote: adminSaveNote,

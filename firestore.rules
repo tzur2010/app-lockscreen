@@ -20,6 +20,13 @@ service cloud.firestore {
       return signedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
     }
 
+    // קוסם שהמנהל אישר (רק הוא יכול לשלוח משוב/תקלות ולהשתמש בגיבוי)
+    function isApproved() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.status == 'approved';
+    }
+
     function validStr(v, minLen, maxLen) {
       return v is string && v.size() >= minLen && v.size() <= maxLen;
     }
@@ -65,8 +72,7 @@ service cloud.firestore {
 
     // משוב: מכשיר רשום יכול רק לשלוח משוב בשמו. רק המנהל קורא ומוחק.
     match /feedback/{feedbackId} {
-      allow create: if signedIn()
-        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+      allow create: if isApproved()
         && request.resource.data.keys().hasOnly(['uid', 'text', 'appVersion', 'os', 'model', 'createdAt'])
         && request.resource.data.keys().hasAll(['uid', 'text', 'createdAt'])
         && request.resource.data.uid == request.auth.uid
@@ -84,8 +90,7 @@ service cloud.firestore {
 
     // דיווח תקלות אוטומטי: מכשיר רשום שולח תקלה בשמו. רק המנהל קורא ומוחק.
     match /errors/{errorId} {
-      allow create: if signedIn()
-        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+      allow create: if isApproved()
         && request.resource.data.keys().hasOnly(['uid', 'msg', 'src', 'appVersion', 'model', 'createdAt'])
         && request.resource.data.uid == request.auth.uid
         && validStr(request.resource.data.msg, 1, 500)
@@ -100,11 +105,9 @@ service cloud.firestore {
     // גיבוי הגדרות: לפי קוד גיבוי אישי בן 12 תווים (הקוד הוא הסוד).
     // רק מכשיר רשום יכול לקרוא/לכתוב גיבוי, ואי אפשר לרשום את כל הגיבויים.
     match /backups/{code} {
-      allow get: if signedIn()
-        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+      allow get: if isApproved()
         && code.size() == 12;
-      allow create, update: if signedIn()
-        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+      allow create, update: if isApproved()
         && code.size() == 12
         && request.resource.data.keys().hasOnly(['data', 'owner', 'updatedAt'])
         && request.resource.data.data is string

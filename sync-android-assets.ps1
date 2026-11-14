@@ -10,6 +10,16 @@ foreach ($f in $files) {
     Copy-Item (Join-Path $root $f) (Join-Path $assets $f) -Force
     Write-Host "copied $f"
 }
+# ספריית זיהוי הפנים והמודלים שלה
+foreach ($dir in @('vendor', 'models')) {
+    $src = Join-Path $root $dir
+    if (Test-Path $src) {
+        $dst = Join-Path $assets $dir
+        New-Item -ItemType Directory -Force $dst | Out-Null
+        Copy-Item (Join-Path $src '*') $dst -Recurse -Force
+        Write-Host "copied $dir/"
+    }
+}
 # admin.html וקבצים ישנים לא צריכים להיות בתוך ה-APK
 foreach ($old in @('admin.html', 'version.json')) {
     $p = Join-Path $assets $old

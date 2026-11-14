@@ -98,7 +98,7 @@
         </details>
         <details>
           <summary>🚪 יציאת חירום</summary>
-          <p>• <b>3 הקשות מהירות</b> על סמל הסוללה/Wi-Fi פותחות את הטלפון מיד.<br>• לחיצה על <b>חיישן טביעת האצבע</b> בתחתית (כש"החלקת אצבע סודית" דולק).</p>
+          <p>• <b>3 הקשות מהירות</b> על סמל הסוללה/Wi-Fi פותחות את הטלפון מיד.<br>• לחיצה על <b>חיישן טביעת האצבע</b> בתחתית, עם האצבע שרשמת בהגדרות. אצבע אחרת תקבל "טביעת אצבע לא תואמת".</p>
         </details>
         <details>
           <summary>⭐ רוטינות וגיבוי</summary>
@@ -222,6 +222,7 @@
           <div class="selected-device-pill" id="selectedDevicePill">Samsung Galaxy</div>
         </div>
         <div class="config-header-end">
+          <button type="button" class="theme-mode-toggle-btn header-guide-btn" id="headerGuideBtn" aria-label="מדריך" title="מדריך">?</button>
           <button type="button" class="theme-mode-toggle-btn" id="settingsThemeToggleBtn" aria-label="החלף ערכת נושא" title="החלף בין מצב כהה לבהיר">
             <!-- אייקון שמש (מוצג במצב כהה למעבר לבהיר) -->
             <svg class="theme-icon-sun" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -258,8 +259,17 @@
           <div class="in-app-update-status" id="inAppUpdateStatus"></div>
         </div>
 
-        <!-- מדריך + רוטינות שמורות (גישה מהירה בראש ההגדרות) -->
-        <button type="button" class="guide-open-btn" id="openGuideBtn">📖 מדריך: איך משתמשים באפליקציה</button>
+        <!-- לשוניות ההגדרות: כל לשונית מציגה רק את מה ששייך אליה (פחות גלילה) -->
+        <nav class="settings-tabs" id="settingsTabs" role="tablist">
+          <button type="button" class="settings-tab active" data-tab="trick" role="tab"><span class="tab-ico">🎯</span><span>טריק</span></button>
+          <button type="button" class="settings-tab" data-tab="peek" role="tab"><span class="tab-ico">👁️</span><span>הצצה</span></button>
+          <button type="button" class="settings-tab" data-tab="look" role="tab"><span class="tab-ico">🎨</span><span>מראה</span></button>
+          <button type="button" class="settings-tab" data-tab="security" role="tab"><span class="tab-ico">🔐</span><span>אבטחה</span></button>
+          <button type="button" class="settings-tab" data-tab="more" role="tab"><span class="tab-ico">⚙️</span><span>עוד</span></button>
+        </nav>
+
+        <!-- ===================== לשונית: טריק ===================== -->
+        <section class="settings-panel active" data-tab="trick">
 
         <div class="oneui-section-header">רוטינות שמורות</div>
         <div class="config-group oneui-card">
@@ -308,26 +318,6 @@
 
           <div class="oneui-card-divider"></div>
 
-          <!-- הצצה לשעון החכם -->
-          <div class="clean-toggle-row oneui-row-with-sub">
-            <div class="toggle-text-stack">
-              <span class="toggle-main-title">⌚ שלח את הקוד לשעון החכם</span>
-              <span class="toggle-sub-desc" id="watchPeekDesc">כל קוד או דפוס שהצופה מקליד מופיע מיד על השעון שמחובר לטלפון, בלי לגעת בטלפון. בטלפון עצמו לא רואים ולא שומעים כלום.</span>
-            </div>
-            <label class="switch">
-              <input type="checkbox" id="toggleWatchPeek">
-              <span class="slider"></span>
-            </label>
-          </div>
-          <div class="oneui-field-block" id="watchPeekExtra" style="display: none; padding-top: 0;">
-            <button type="button" class="media-upload-btn" id="watchPeekTestBtn" style="width: 100%;">שלח בדיקה לשעון</button>
-            <div class="toggle-sub-desc" id="watchPeekStatus" style="margin-top: 6px;">
-              בשעון Galaxy: באפליקציית Galaxy Wearable ← התראות ← יש להדליק "הצג התראות בשעון גם כשהטלפון בשימוש", ולוודא שההתראות של Lockscreen מופעלות.
-            </div>
-          </div>
-
-          <div class="oneui-card-divider"></div>
-
           <!-- חשיפה בהתראה -->
           <div class="clean-toggle-row oneui-row-with-sub">
             <div class="toggle-text-stack">
@@ -364,32 +354,12 @@
             <button type="button" class="media-upload-btn" id="revealTestBtn" style="width: 100%; margin-top: 10px;">נסה עכשיו (עם הקוד 1234)</button>
             <div class="toggle-sub-desc" id="revealStatus" style="margin-top: 6px; min-height: 16px;"></div>
           </div>
-
-          <div class="oneui-card-divider"></div>
-
-          <div class="clean-toggle-row oneui-row-with-sub">
-            <div class="toggle-text-stack">
-              <span class="toggle-main-title">החלקת אצבע סודית (יציאת חירום)</span>
-              <span class="toggle-sub-desc">לחיצה על חיישן טביעת האצבע הווירטואלי פותחת את המכשיר מיידית בכל מצב</span>
-            </div>
-            <label class="switch">
-              <input type="checkbox" id="toggleSecretFpBypass" checked>
-              <span class="slider"></span>
-            </label>
-          </div>
-
-          <div class="oneui-card-divider"></div>
-
-          <div class="oneui-field-block">
-            <div class="toggle-text-stack" style="margin-bottom: 8px;">
-              <span class="toggle-main-title">הפעלה מהירה וסמויה (Quick Trigger)</span>
-              <span class="toggle-sub-desc">הפעל את מסך הנעילה בלחיצה אחת מבלי לחפש ברשימת האפליקציות: ווידג'ט שקוף 1×1 למסך הבית או כפתור צד סמסונג (לחיצה כפולה → פתיחת אפליקציה → Lockscreen).</span>
-            </div>
-            <button type="button" class="media-upload-btn" id="pinQuickWidgetBtn" style="width: 100%; border-style: solid; border-color: rgba(44, 117, 255, 0.45); color: #6aa2ff;">
-              + הוסף ווידג'ט שקוף למסך הבית
-            </button>
-          </div>
         </div>
+
+        </section>
+
+        <!-- ===================== לשונית: מראה ===================== -->
+        <section class="settings-panel" data-tab="look">
 
         <!-- ================================================================
              קטגוריה 2: התאמה חזותית של מסך הנעילה (Lockscreen Appearance)
@@ -487,15 +457,25 @@
           </div>
         </div>
 
+        </section>
+
+        <!-- ===================== לשונית: אבטחה ===================== -->
+        <section class="settings-panel" data-tab="security">
+
         <!-- ================================================================
-             קטגוריה 4: הצצה סודית, קוד אישי וביומטריה מתקדמת
+             קטגוריה 4: קוד אישי וביומטריה (טביעת אצבע + זיהוי פנים)
              ================================================================ -->
-        <div class="oneui-section-header">קוד ספציפי, ביומטריה והצצה (Peek)</div>
+        <div class="oneui-section-header">קוד אישי, טביעת אצבע וזיהוי פנים</div>
         <div class="config-group oneui-card">
-          <!-- תצוגה נקייה של הקוד האחרון שנקלט -->
-          <div class="last-captured-pill">
-            <span>קוד אחרון שנקלט:</span>
-            <strong id="settingsLastInput">---</strong>
+          <div class="clean-toggle-row oneui-row-with-sub">
+            <div class="toggle-text-stack">
+              <span class="toggle-main-title">פתיחה בטביעת אצבע</span>
+              <span class="toggle-sub-desc">החיישן בתחתית פותח את המכשיר רק עם האצבע שנרשמה (מיקום, משך לחיצה וגודל מגע). אצבע אחרת = "טביעת אצבע לא תואמת".</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="toggleSecretFpBypass" checked>
+              <span class="slider"></span>
+            </label>
           </div>
 
           <div class="oneui-card-divider"></div>
@@ -558,12 +538,13 @@
                 <span class="fp-step-dot" data-step="1">1</span>
                 <span class="fp-step-dot" data-step="2">2</span>
                 <span class="fp-step-dot" data-step="3">3</span>
+                <span class="fp-step-dot" data-step="4">4</span>
               </div>
               <div class="fp-enroll-sensor" id="fpEnrollSensor">
                 <div class="fp-enroll-ripple"></div>
                 <img src="./p1.png" alt="חיישן" class="fp-enroll-img" />
               </div>
-              <p class="fp-enroll-hint" id="fpEnrollHint">הנח את האצבע באותה נקודה ובאותו משך לחיצה 3 פעמים</p>
+              <p class="fp-enroll-hint" id="fpEnrollHint">הנח את האצבע שתפתח את הטלפון, באותה נקודה ובאותו משך, 4 פעמים</p>
             </div>
           </div>
 
@@ -584,6 +565,41 @@
                 <div class="faceid-ring-overlay" id="faceIdRingOverlay"></div>
               </div>
               <p class="faceid-scan-caption" id="faceIdScanCaption">מקם את הפנים במסגרת לסריקה...</p>
+            </div>
+          </div>
+
+        </div>
+
+        </section>
+
+        <!-- ===================== לשונית: הצצה ===================== -->
+        <section class="settings-panel" data-tab="peek">
+
+        <div class="oneui-section-header">הצצה ותצוגה</div>
+        <div class="config-group oneui-card">
+          <!-- תצוגה נקייה של הקוד האחרון שנקלט -->
+          <div class="last-captured-pill">
+            <span>קוד אחרון שנקלט:</span>
+            <strong id="settingsLastInput">---</strong>
+          </div>
+
+          <div class="oneui-card-divider"></div>
+
+          <!-- הצצה לשעון החכם -->
+          <div class="clean-toggle-row oneui-row-with-sub">
+            <div class="toggle-text-stack">
+              <span class="toggle-main-title">⌚ שלח את הקוד לשעון החכם</span>
+              <span class="toggle-sub-desc" id="watchPeekDesc">כל קוד או דפוס שהצופה מקליד מופיע מיד על השעון שמחובר לטלפון, בלי לגעת בטלפון. בטלפון עצמו לא רואים ולא שומעים כלום.</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="toggleWatchPeek">
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="oneui-field-block" id="watchPeekExtra" style="display: none; padding-top: 0;">
+            <button type="button" class="media-upload-btn" id="watchPeekTestBtn" style="width: 100%;">שלח בדיקה לשעון</button>
+            <div class="toggle-sub-desc" id="watchPeekStatus" style="margin-top: 6px;">
+              בשעון Galaxy: באפליקציית Galaxy Wearable ← התראות ← יש להדליק "הצג התראות בשעון גם כשהטלפון בשימוש", ולוודא שההתראות של Lockscreen מופעלות.
             </div>
           </div>
 
@@ -647,6 +663,26 @@
           </div>
         </div>
 
+        </section>
+
+        <!-- ===================== לשונית: עוד ===================== -->
+        <section class="settings-panel" data-tab="more">
+
+        <button type="button" class="guide-open-btn" id="openGuideBtn">📖 מדריך: איך משתמשים באפליקציה</button>
+
+        <div class="oneui-section-header">הפעלה מהירה</div>
+        <div class="config-group oneui-card">
+          <div class="oneui-field-block">
+            <div class="toggle-text-stack" style="margin-bottom: 8px;">
+              <span class="toggle-main-title">הפעלה מהירה וסמויה (Quick Trigger)</span>
+              <span class="toggle-sub-desc">הפעל את מסך הנעילה בלחיצה אחת מבלי לחפש ברשימת האפליקציות: ווידג'ט שקוף 1×1 למסך הבית או כפתור צד סמסונג (לחיצה כפולה → פתיחת אפליקציה → Lockscreen).</span>
+            </div>
+            <button type="button" class="media-upload-btn" id="pinQuickWidgetBtn" style="width: 100%; border-style: solid; border-color: rgba(44, 117, 255, 0.45); color: #6aa2ff;">
+              + הוסף ווידג'ט שקוף למסך הבית
+            </button>
+          </div>
+        </div>
+
         <!-- ================================================================
              גיבוי הגדרות בענן (קוד גיבוי אישי)
              ================================================================ -->
@@ -701,6 +737,8 @@
             <button type="button" class="bio-enroll-toggle-btn" id="checkUpdateNowBtn">בדוק עדכון</button>
           </div>
         </div>
+
+        </section>
       </div>
 
       <div class="config-footer">

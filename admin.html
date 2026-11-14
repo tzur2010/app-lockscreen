@@ -74,6 +74,59 @@
     .feedback-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
     .feedback-head .btn { margin-inline-start: auto; }
     .feedback-text { font-size: 14.5px; line-height: 1.6; white-space: pre-wrap; word-break: break-word; color: #e2e8f0; }
+    /* לשוניות */
+    .admin-tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 18px; padding: 6px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 18px; position: sticky; top: 8px; z-index: 10; backdrop-filter: blur(16px); }
+    .admin-tab { border: none; background: transparent; color: #cbd5e1; border-radius: 13px; padding: 11px 6px; font-size: 14.5px; font-weight: 800; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; transition: background .2s, color .2s; }
+    .admin-tab.active { background: #3888ff; color: #fff; box-shadow: 0 6px 16px rgba(56,136,255,.35); }
+    .tab-badge { min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; background: #f59e0b; color: #111; font-size: 12px; font-weight: 900; display: inline-flex; align-items: center; justify-content: center; }
+    .tab-badge-blue { background: #38bdf8; }
+    .tab-badge-green { background: #4ade80; }
+    .admin-panel { display: none; }
+    .admin-panel.active { display: block; animation: panelIn .25s ease; }
+    @keyframes panelIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+    /* פרסום עדכון */
+    .version-row { display: flex; align-items: center; gap: 12px; }
+    .version-box { flex: 1; padding: 14px; border-radius: 16px; background: rgba(0,0,0,.25); border: 1px solid rgba(255,255,255,.08); text-align: center; }
+    .version-box-ready { border-color: rgba(74,222,128,.45); }
+    .version-value { font-size: 28px; font-weight: 900; direction: ltr; }
+    .version-arrow { font-size: 22px; color: #64748b; }
+    .big-btn { justify-content: center; height: 50px; font-size: 16px; }
+    .btn:disabled { opacity: .45; cursor: not-allowed; box-shadow: none; }
+    .advanced-box { font-size: 13px; color: #94a3b8; }
+    .advanced-box summary { cursor: pointer; font-weight: 700; }
+
+    /* הזמנה */
+    .link-row { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 12px; background: rgba(0,0,0,.25); }
+    .link-label { font-weight: 800; white-space: nowrap; }
+    .link-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; }
+    #inviteTemplate { min-height: 230px; }
+
+    td.name-cell > .status-badge { display: none; }
+    /* בטלפון: טבלת הלקוחות הופכת לכרטיסים */
+    @media (max-width: 760px) {
+      body { padding: 12px 10px 50px; }
+      .top-bar { padding: 14px 16px; }
+      .brand-title { font-size: 18px; }
+      .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+      .stat-card { padding: 12px 14px; }
+      .stat-value { font-size: 24px; }
+      .admin-tab { font-size: 12.5px; padding: 10px 2px; flex-direction: column; gap: 2px; }
+      .table-header-bar { padding: 12px; }
+      #searchInput { width: 100% !important; }
+      table, thead, tbody, tr, td { display: block; width: 100%; }
+      thead { display: none; }
+      tr { border-bottom: 1px solid rgba(255,255,255,.08); padding: 12px 14px; }
+      td { border: none; padding: 4px 0; font-size: 14px; }
+      td[data-label]::before { content: attr(data-label) ': '; color: #64748b; font-size: 12px; font-weight: 600; }
+      td.name-cell { font-size: 17px; }
+      td.name-cell::before { content: none; }
+      td.name-cell > .status-badge { display: inline-flex !important; margin-inline-start: 6px; font-size: 11px; vertical-align: middle; }
+      td.status-col { display: none; }
+      .actions-cell .btn { flex: 1; justify-content: center; padding: 10px 8px; }
+      .version-value { font-size: 22px; }
+    }
+
     .toast { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%); background: #1e293b; border: 1px solid rgba(255,255,255,.15); color: #fff; padding: 12px 18px; border-radius: 14px; font-size: 14px; font-weight: 600; box-shadow: 0 10px 30px rgba(0,0,0,.4); display: none; z-index: 50; max-width: 90vw; }
     .toast.error { border-color: rgba(244,63,94,.5); color: #fecdd3; }
     .config-warning { padding: 18px 22px; margin-bottom: 20px; border-color: rgba(245,158,11,.4); color: #fde68a; font-size: 14px; line-height: 1.6; }
@@ -112,10 +165,6 @@
             <span>ניהול לקוחות - Magic Lock</span>
             <span class="live-badge" id="liveBadge"><span class="live-dot"></span><span id="liveText">מחובר</span></span>
           </div>
-          <div class="sub">
-            כל מי שפותח את האפליקציה חייב לשלוח בקשה. <b>"אשר ושלח וואטסאפ"</b> פותח לו את האפליקציה ופותח וואטסאפ עם ההוראות.
-            <b>"בטל גישה"</b> נועל לו את האפליקציה בטלפון (תוך דקה, או בפעם הבאה שהוא מחובר לאינטרנט).
-          </div>
         </div>
         <div class="actions-cell">
           <span class="muted" id="adminEmailLabel"></span>
@@ -124,57 +173,21 @@
         </div>
       </div>
 
+      <!-- לשוניות ניהול -->
+      <nav class="admin-tabs" id="adminTabs">
+        <button type="button" class="admin-tab active" data-tab="users">👥 לקוחות <span class="tab-badge" id="badgePending" style="display:none;">0</span></button>
+        <button type="button" class="admin-tab" data-tab="feedback">💬 משובים <span class="tab-badge tab-badge-blue" id="badgeFeedback" style="display:none;">0</span></button>
+        <button type="button" class="admin-tab" data-tab="update">📢 עדכון <span class="tab-badge tab-badge-green" id="badgeUpdate" style="display:none;">!</span></button>
+        <button type="button" class="admin-tab" data-tab="invite">✉️ הזמנה</button>
+      </nav>
+
+      <!-- ===================== לשונית: לקוחות ===================== -->
+      <section class="admin-panel active" data-tab="users">
       <div class="stats-grid">
         <div class="card stat-card"><div class="stat-label">סה"כ</div><div class="stat-value" id="statTotal">0</div></div>
         <div class="card stat-card"><div class="stat-label">ממתינים לאישור</div><div class="stat-value" id="statPending" style="color:#facc15;">0</div></div>
         <div class="card stat-card"><div class="stat-label">מאושרים</div><div class="stat-value" id="statApproved" style="color:#4ade80;">0</div></div>
         <div class="card stat-card"><div class="stat-label">גישה בוטלה</div><div class="stat-value" id="statBlocked" style="color:#fb7185;">0</div></div>
-      </div>
-
-      <div class="panels">
-        <!-- פרסום עדכון -->
-        <div class="card panel">
-          <h2>📢 פרסום עדכון לכל המשתמשים</h2>
-          <div class="sub">גרסה שמפורסמת כרגע: <span class="pill-info" id="currentPublished">—</span></div>
-          <div class="row">
-            <div style="max-width:130px;">
-              <label class="field-label" for="updVersion">מספר גרסה</label>
-              <input class="input-field" id="updVersion" dir="ltr" placeholder="4.3">
-            </div>
-            <div>
-              <label class="field-label" for="updApkUrl">קישור ל-APK</label>
-              <input class="input-field" id="updApkUrl" dir="ltr">
-            </div>
-          </div>
-          <div>
-            <label class="field-label" for="updMessage">מה חדש (יוצג למשתמשים, לא חובה)</label>
-            <input class="input-field" id="updMessage" placeholder="למשל: שיפורי מהירות ותיקוני באגים">
-          </div>
-          <button type="button" class="btn btn-primary" id="publishBtn" style="align-self:flex-start;">פרסם עדכון לכולם</button>
-          <div class="hint">
-            לפני הפרסום: מעלים ל-GitHub את ה-APK החדש ואת קבצי האתר. אחרי הפרסום, כל מי שהגרסה שלו ישנה יותר יראה חלון "יש עדכון חדש" עם כפתור עדכון,
-            בפעם הבאה שהוא פותח את האפליקציה או את תפריט ההגדרות (לא באמצע מסך הנעילה מול קהל).
-          </div>
-        </div>
-
-        <!-- תבנית וואטסאפ -->
-        <div class="card panel">
-          <h2>💬 הודעת וואטסאפ עם ההוראות</h2>
-          <div>
-            <label class="field-label" for="waTemplate">התבנית שתישלח ללקוח ({שם} יוחלף בשם שלו)</label>
-            <textarea class="input-field" id="waTemplate"></textarea>
-          </div>
-          <div class="actions-cell">
-            <button type="button" class="btn btn-ghost" id="saveTemplateBtn">שמור תבנית</button>
-            <button type="button" class="btn btn-ghost" id="resetTemplateBtn">החזר לברירת מחדל</button>
-          </div>
-          <div class="hint">התבנית נשמרת בדפדפן הזה בלבד.</div>
-        </div>
-      </div>
-
-      <div class="card panel" style="margin-bottom: 20px;">
-        <h2>💬 משובים מהקוסמים (<span id="feedbackCount">0</span>)</h2>
-        <div id="feedbackList" class="feedback-list"></div>
       </div>
 
       <div class="card">
@@ -204,6 +217,105 @@
           <div class="empty-state" id="emptyState">אין בקשות להצגה.</div>
         </div>
       </div>
+      </section>
+
+      <!-- ===================== לשונית: משובים ===================== -->
+      <section class="admin-panel" data-tab="feedback">
+        <div class="card panel">
+          <h2>💬 משובים מהקוסמים (<span id="feedbackCount">0</span>)</h2>
+          <div id="feedbackList" class="feedback-list"></div>
+        </div>
+      </section>
+
+      <!-- ===================== לשונית: עדכון ===================== -->
+      <section class="admin-panel" data-tab="update">
+        <div class="card panel">
+          <h2>📢 פרסום עדכון</h2>
+          <div class="version-row">
+            <div class="version-box">
+              <div class="stat-label">אצל הקוסמים עכשיו</div>
+              <div class="version-value" id="currentPublished">—</div>
+            </div>
+            <div class="version-arrow">←</div>
+            <div class="version-box version-box-ready">
+              <div class="stat-label">מוכנה לפרסום</div>
+              <div class="version-value" id="readyVersion">—</div>
+            </div>
+          </div>
+          <div class="hint" id="readyHint">בודק איזו גרסה הועלתה...</div>
+          <div>
+            <label class="field-label" for="updMessage">מה חדש (יוצג לקוסמים בחלון העדכון, לא חובה)</label>
+            <input class="input-field" id="updMessage" placeholder="למשל: היסטוריית קודים וחשיפה בפתקים">
+          </div>
+          <button type="button" class="btn btn-whatsapp big-btn" id="publishReadyBtn" disabled>פרסם לכולם</button>
+          <details class="advanced-box">
+            <summary>הגדרות מתקדמות (מספר גרסה ידני)</summary>
+            <div class="row" style="margin-top:10px;">
+              <div style="max-width:130px;">
+                <label class="field-label" for="updVersion">מספר גרסה</label>
+                <input class="input-field" id="updVersion" dir="ltr" placeholder="5.0">
+              </div>
+              <div>
+                <label class="field-label" for="updApkUrl">קישור ל-APK</label>
+                <input class="input-field" id="updApkUrl" dir="ltr">
+              </div>
+            </div>
+            <button type="button" class="btn btn-ghost" id="publishBtn" style="margin-top:10px;">פרסם את המספר הזה</button>
+          </details>
+          <div class="hint">
+            אחרי הפרסום, כל מי שהגרסה שלו ישנה יותר יראה חלון "יש עדכון חדש" בפעם הבאה שהוא פותח את האפליקציה או את ההגדרות (לא באמצע מסך הנעילה מול קהל).
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================== לשונית: הזמנה ===================== -->
+      <section class="admin-panel" data-tab="invite">
+        <div class="panels">
+          <div class="card panel">
+            <h2>✉️ הזמנת קוסם חדש</h2>
+            <div class="link-row">
+              <span class="link-label">🤖 אנדרואיד</span>
+              <span class="mono link-text" id="androidLink"></span>
+              <button type="button" class="btn btn-ghost" data-copy="androidLink">העתק</button>
+            </div>
+            <div class="link-row">
+              <span class="link-label">🍎 אייפון</span>
+              <span class="mono link-text" id="iosLink"></span>
+              <button type="button" class="btn btn-ghost" data-copy="iosLink">העתק</button>
+            </div>
+            <div>
+              <label class="field-label" for="inviteTemplate">הודעת ההזמנה</label>
+              <textarea class="input-field" id="inviteTemplate"></textarea>
+            </div>
+            <div class="row">
+              <div>
+                <label class="field-label" for="invitePhone">מספר טלפון (לא חובה)</label>
+                <input class="input-field" id="invitePhone" type="tel" dir="ltr" placeholder="050-0000000">
+              </div>
+            </div>
+            <div class="actions-cell">
+              <button type="button" class="btn btn-whatsapp" id="inviteSendBtn">שלח בוואטסאפ</button>
+              <button type="button" class="btn btn-ghost" id="inviteCopyBtn">העתק הודעה</button>
+              <button type="button" class="btn btn-ghost" id="inviteSaveBtn">שמור</button>
+              <button type="button" class="btn btn-ghost" id="inviteResetBtn">ברירת מחדל</button>
+            </div>
+            <div class="hint">בלי מספר טלפון: וואטסאפ נפתח ואתה בוחר למי לשלוח.</div>
+          </div>
+
+          <div class="card panel">
+            <h2>✅ הודעת אישור (נשלחת כשמאשרים)</h2>
+            <div>
+              <label class="field-label" for="waTemplate">{שם} יוחלף בשם של הקוסם</label>
+              <textarea class="input-field" id="waTemplate"></textarea>
+            </div>
+            <div class="actions-cell">
+              <button type="button" class="btn btn-ghost" id="saveTemplateBtn">שמור</button>
+              <button type="button" class="btn btn-ghost" id="resetTemplateBtn">ברירת מחדל</button>
+            </div>
+            <div class="hint">ההודעות נשמרות בדפדפן הזה.</div>
+          </div>
+        </div>
+      </section>
     </div>
   </div>
 
@@ -213,16 +325,28 @@
   <script>
     const Cloud = window.MagicCloud;
     const DEFAULT_APK_URL = 'https://github.com/tzur2010/app-lockscreen/raw/main/Lockscreen.apk';
-    const TEMPLATE_KEY = 'magic_admin_wa_template_v1';
+    const TEMPLATE_KEY = 'magic_admin_wa_template_v2';
     const DEFAULT_TEMPLATE =
       'היי {שם}! 🎉\n' +
-      'הבקשה שלך אושרה והאפליקציה פתוחה ומוכנה לפעולה במכשיר שלך!\n\n' +
-      '🪄 *מדריך הפעלה קצר:*\n' +
-      '1. *תפריט הגדרות סודי והצצה (Peek):* לחיצה רצופה של 3 שניות על השעון פותחת את ההגדרות ומציגה את הקוד האחרון שהוקש.\n' +
-      '2. *קוד 4 או 6 ספרות:* בהגדרות ניתן לבחור בין 4 ל-6 ספרות – המסך נפתח אוטומטית בהקשת הספרה האחרונה.\n' +
-      '3. *יציאת חירום סודית:* לחיצה על חיישן טביעת האצבע בתחתית המסך פותחת את המכשיר מיידית.\n' +
-      '4. *רקע והפעלה מהירה:* מתוך ההגדרות ניתן לבחור תמונת רקע מהגלריה ולהוסיף ווידג\'ט שקוף למסך הבית.\n\n' +
+      'הבקשה שלך אושרה והאפליקציה פתוחה ומוכנה לפעולה!\n\n' +
+      '🪄 *איך מתחילים:*\n' +
+      '1. בוחרים Samsung או iPhone ואת הדגם.\n' +
+      '2. בהגדרות יש 5 לשוניות: טריק, הצצה, מראה, אבטחה ועוד.\n' +
+      '3. לוחצים "שמור וסגור", בוחרים סוג נעילה ונותנים את הטלפון לצופה.\n' +
+      '4. *חזרה להגדרות בסתר:* לחיצה ארוכה של 3 שניות על השעון.\n\n' +
+      '📖 בהגדרות יש כפתור *?* עם מדריך מלא לכל הטריקים.\n' +
+      '💬 אשמח לשמוע מה דעתך דרך "שלח משוב" (לשונית עוד).\n\n' +
       'בהצלחה! ✨';
+    const INVITE_KEY = 'magic_admin_invite_template_v1';
+    const ANDROID_LINK = 'https://github.com/tzur2010/app-lockscreen/raw/main/Lockscreen.apk';
+    const IOS_LINK = 'https://tzur2010.github.io/app-lockscreen/';
+    const DEFAULT_INVITE =
+      'היי! 🪄 מזמין אותך לנסות את Magic Lock - אפליקציית מסך נעילה לקוסמים (גרסת ניסיון).\n\n' +
+      '*אנדרואיד* - להורדה:\n' + ANDROID_LINK + '\n' +
+      'פותחים את הקובץ שירד ומאשרים "התקן" (אם הטלפון שואל - לאשר התקנה ממקור לא ידוע).\n\n' +
+      '*אייפון* - פותחים ב-Safari:\n' + IOS_LINK + '\n' +
+      'ואז שיתוף ← "הוסף למסך הבית".\n\n' +
+      'אחרי ההתקנה ממלאים שם וטלפון ושולחים בקשה, ואני מאשר אותך 🙂';
 
     let allUsers = [];
     let allFeedback = [];
@@ -300,6 +424,8 @@
     function renderFeedback() {
       const list = $('feedbackList');
       $('feedbackCount').textContent = allFeedback.length;
+      $('badgeFeedback').textContent = allFeedback.length;
+      $('badgeFeedback').style.display = allFeedback.length ? '' : 'none';
       list.innerHTML = '';
       if (!allFeedback.length) {
         list.innerHTML = '<div class="empty-state" style="padding:26px 10px;">עוד לא התקבל משוב. הקוסמים שולחים משוב מתוך תפריט ההגדרות באפליקציה.</div>';
@@ -331,18 +457,35 @@
       } catch (e) {}
     }
 
+    let knownPendingIds = null;
+
     function renderUsers() {
+      const pending = allUsers.filter((u) => u.status === 'pending');
       $('statTotal').textContent = allUsers.length;
-      $('statPending').textContent = allUsers.filter((u) => u.status === 'pending').length;
+      $('statPending').textContent = pending.length;
       $('statApproved').textContent = allUsers.filter((u) => u.status === 'approved').length;
       $('statBlocked').textContent = allUsers.filter((u) => u.status === 'blocked').length;
 
+      // ממתינים: מספר על הלשונית ובכותרת הדפדפן, והתראה כשמגיעה בקשה חדשה
+      $('badgePending').textContent = pending.length;
+      $('badgePending').style.display = pending.length ? '' : 'none';
+      document.title = (pending.length ? `(${pending.length}) ` : '') + 'ניהול לקוחות - Magic Lock';
+      if (knownPendingIds) {
+        const fresh = pending.filter((u) => !knownPendingIds.has(u.id));
+        if (fresh.length) toast(`🔔 בקשה חדשה מ${fresh.map((u) => u.name).join(', ')}`);
+      }
+      knownPendingIds = new Set(pending.map((u) => u.id));
+
       const q = searchQuery.toLowerCase();
-      const filtered = allUsers.filter((u) => {
-        if (currentFilter !== 'all' && u.status !== currentFilter) return false;
-        if (!q) return true;
-        return [u.name, u.phone, u.deviceId].some((v) => String(v || '').toLowerCase().includes(q));
-      });
+      const order = { pending: 0, approved: 1, blocked: 2 };
+      const filtered = allUsers
+        .filter((u) => {
+          if (currentFilter !== 'all' && u.status !== currentFilter) return false;
+          if (!q) return true;
+          return [u.name, u.phone, u.deviceId].some((v) => String(v || '').toLowerCase().includes(q));
+        })
+        // ממתינים לאישור תמיד למעלה
+        .sort((a, b) => (order[a.status] ?? 3) - (order[b.status] ?? 3));
 
       const tbody = $('usersTableBody');
       tbody.innerHTML = '';
@@ -369,11 +512,11 @@
 
         const tr = document.createElement('tr');
         tr.innerHTML = `
-          <td style="font-weight:700;">${escapeHtml(u.name) || '—'}${u.deviceId ? `<div class="muted">מכשיר <span class="mono">${escapeHtml(u.deviceId)}</span></div>` : ''}</td>
-          <td><span class="mono" style="color:#e2e8f0;">${escapeHtml(u.phone) || '—'}</span></td>
-          <td class="muted">${formatDate(u.createdAt)}</td>
-          <td>${usageHtml(u)}</td>
-          <td>${statusHtml}</td>
+          <td class="name-cell" style="font-weight:700;">${escapeHtml(u.name) || '—'} ${statusHtml}${u.deviceId ? `<div class="muted">מכשיר <span class="mono">${escapeHtml(u.deviceId)}</span></div>` : ''}</td>
+          <td data-label="טלפון"><span class="mono" style="color:#e2e8f0;">${escapeHtml(u.phone) || '—'}</span></td>
+          <td data-label="בקשה" class="muted">${formatDate(u.createdAt)}</td>
+          <td data-label="שימוש">${usageHtml(u)}</td>
+          <td class="status-col">${statusHtml}</td>
           <td><div class="actions-cell">${actions}</div></td>`;
         tbody.appendChild(tr);
       });
@@ -394,15 +537,112 @@
       }
     }
 
+    function compareVersions(a, b) {
+      const pa = String(a || '0').split('.').map((n) => parseInt(n, 10) || 0);
+      const pb = String(b || '0').split('.').map((n) => parseInt(n, 10) || 0);
+      for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+        if ((pa[i] || 0) !== (pb[i] || 0)) return (pa[i] || 0) > (pb[i] || 0) ? 1 : -1;
+      }
+      return 0;
+    }
+
+    let publishedVersion = '';
+    let readyVersion = '';
+
     async function loadPublishedVersion() {
       try {
         const cfg = await Cloud.getAppConfig();
-        $('currentPublished').textContent = cfg && cfg.latest_version ? 'v' + cfg.latest_version : 'עדיין לא פורסם';
+        publishedVersion = cfg && cfg.latest_version ? String(cfg.latest_version) : '';
+        $('currentPublished').textContent = publishedVersion ? 'v' + publishedVersion : '—';
         $('updApkUrl').value = (cfg && cfg.apk_url) || DEFAULT_APK_URL;
       } catch (e) {
         $('updApkUrl').value = DEFAULT_APK_URL;
       }
+      // הגרסה האחרונה שהועלתה (version.json באתר) = מה שמוכן לפרסום
+      try {
+        const res = await fetch(`version.json?t=${Date.now()}`, { cache: 'no-store' });
+        const data = await res.json();
+        readyVersion = String(data.latest_version || '');
+      } catch (e) {
+        readyVersion = '';
+      }
+      $('readyVersion').textContent = readyVersion ? 'v' + readyVersion : '—';
+      const btn = $('publishReadyBtn');
+      const hasNew = readyVersion && compareVersions(readyVersion, publishedVersion) > 0;
+      btn.disabled = !hasNew;
+      btn.textContent = hasNew ? `פרסם את v${readyVersion} לכולם` : 'אין גרסה חדשה לפרסום';
+      $('readyHint').textContent = hasNew
+        ? 'יש גרסה חדשה שהועלתה ועוד לא פורסמה לקוסמים.'
+        : readyVersion
+        ? 'כל הקוסמים כבר מקבלים את הגרסה האחרונה ✓'
+        : 'לא הצלחתי לבדוק איזו גרסה הועלתה.';
+      $('badgeUpdate').style.display = hasNew ? '' : 'none';
+      if (readyVersion && !$('updVersion').value) $('updVersion').value = readyVersion;
     }
+
+    async function publishVersion(version, apkUrl, message, btn) {
+      if (!confirm(`לפרסם את גרסה ${version} לכל הקוסמים?\nמי שיש לו גרסה ישנה יותר יראה חלון "יש עדכון חדש".`)) return;
+      const original = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = 'מפרסם...';
+      try {
+        await Cloud.admin.publishUpdate({ latest_version: version, apk_url: apkUrl, message });
+        toast(`גרסה ${version} פורסמה ✓`);
+        await loadPublishedVersion();
+      } catch (err) {
+        toast('הפרסום נכשל: ' + err.message, true);
+        btn.disabled = false;
+        btn.textContent = original;
+      }
+    }
+
+    $('publishReadyBtn').addEventListener('click', () => {
+      if (!readyVersion) return;
+      publishVersion(readyVersion, DEFAULT_APK_URL, $('updMessage').value.trim(), $('publishReadyBtn'));
+    });
+
+    // ---------------- לשוניות ----------------
+    const ADMIN_TAB_KEY = 'magic_admin_tab_v1';
+    function showAdminTab(tab) {
+      document.querySelectorAll('.admin-tab').forEach((b) => b.classList.toggle('active', b.dataset.tab === tab));
+      document.querySelectorAll('.admin-panel').forEach((p) => p.classList.toggle('active', p.dataset.tab === tab));
+      localStorage.setItem(ADMIN_TAB_KEY, tab);
+    }
+    document.querySelectorAll('.admin-tab').forEach((b) => b.addEventListener('click', () => showAdminTab(b.dataset.tab)));
+    showAdminTab(localStorage.getItem(ADMIN_TAB_KEY) || 'users');
+
+    // ---------------- הזמנה ----------------
+    $('androidLink').textContent = ANDROID_LINK;
+    $('iosLink').textContent = IOS_LINK;
+    const getInvite = () => localStorage.getItem(INVITE_KEY) || DEFAULT_INVITE;
+    $('inviteTemplate').value = getInvite();
+
+    async function copyText(text, okMsg) {
+      try {
+        await navigator.clipboard.writeText(text);
+        toast(okMsg);
+      } catch (e) {
+        toast('לא הצלחתי להעתיק - סמן והעתק ידנית', true);
+      }
+    }
+    document.querySelectorAll('[data-copy]').forEach((b) =>
+      b.addEventListener('click', () => copyText($(b.dataset.copy).textContent, 'הקישור הועתק ✓'))
+    );
+    $('inviteCopyBtn').addEventListener('click', () => copyText($('inviteTemplate').value, 'ההודעה הועתקה ✓'));
+    $('inviteSaveBtn').addEventListener('click', () => {
+      localStorage.setItem(INVITE_KEY, $('inviteTemplate').value);
+      toast('נשמר ✓');
+    });
+    $('inviteResetBtn').addEventListener('click', () => {
+      localStorage.removeItem(INVITE_KEY);
+      $('inviteTemplate').value = DEFAULT_INVITE;
+      toast('הוחזר לברירת מחדל');
+    });
+    $('inviteSendBtn').addEventListener('click', () => {
+      const text = encodeURIComponent($('inviteTemplate').value);
+      const phone = formatPhoneForWhatsapp($('invitePhone').value);
+      window.open(phone.length >= 11 ? `https://wa.me/${phone}?text=${text}` : `https://wa.me/?text=${text}`, '_blank', 'noopener');
+    });
 
     // ---------------- פעולות על לקוחות ----------------
     async function setStatus(id, status, successMsg) {
@@ -489,20 +729,9 @@
         toast('קישור ה-APK חייב להתחיל ב-https://', true);
         return;
       }
-      if (!confirm(`לפרסם את גרסה ${latest_version} לכל המשתמשים?\nכל מי שיש לו גרסה ישנה יותר יראה כפתור עדכון.`)) return;
-      const btn = $('publishBtn');
-      btn.disabled = true;
-      btn.textContent = 'מפרסם...';
-      try {
-        await Cloud.admin.publishUpdate({ latest_version, apk_url, message });
-        $('currentPublished').textContent = 'v' + latest_version;
-        toast(`גרסה ${latest_version} פורסמה ✓`);
-      } catch (err) {
-        toast('הפרסום נכשל: ' + err.message, true);
-      } finally {
-        btn.disabled = false;
-        btn.textContent = 'פרסם עדכון לכולם';
-      }
+      await publishVersion(latest_version, apk_url, message, $('publishBtn'));
+      $('publishBtn').disabled = false;
+      $('publishBtn').textContent = 'פרסם את המספר הזה';
     });
 
     // ---------------- תבנית וואטסאפ ----------------

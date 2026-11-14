@@ -58,7 +58,7 @@ import java.util.Random;
 public class MainActivity extends Activity {
 
     public static final String LOCAL_ASSET_URL = "file:///android_asset/index.html";
-    public static final String APP_VERSION_NAME = "4.8";
+    public static final String APP_VERSION_NAME = "4.9";
     private static final int FILE_CHOOSER_RESULT_CODE = 1001;
 
     private WebView webView;
@@ -89,6 +89,8 @@ public class MainActivity extends Activity {
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
         settings.setAllowFileAccess(true);
+        // מאפשר לקוד האפליקציה לטעון את קבצי מודל זיהוי הפנים מתוך ה-APK
+        settings.setAllowFileAccessFromFileURLs(true);
         settings.setAllowContentAccess(true);
         settings.setDomStorageEnabled(true);
         settings.setDatabaseEnabled(true);

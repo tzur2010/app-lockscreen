@@ -58,7 +58,7 @@ import java.util.Random;
 public class MainActivity extends Activity {
 
     public static final String LOCAL_ASSET_URL = "file:///android_asset/index.html";
-    public static final String APP_VERSION_NAME = "4.9";
+    public static final String APP_VERSION_NAME = "5.0";
     private static final int FILE_CHOOSER_RESULT_CODE = 1001;
 
     private WebView webView;

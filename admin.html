@@ -76,6 +76,30 @@
     .feedback-item { background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.07); border-radius: 14px; padding: 12px 14px; }
     .feedback-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
     .feedback-head .btn { margin-inline-start: auto; }
+    .list-tools { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .sort-select { width: auto !important; padding: 9px 10px !important; }
+    .pill-count { font-size: 11px; opacity: .75; }
+    .pill-count:empty { display: none; }
+    .name-link { cursor: pointer; border-bottom: 1px dashed rgba(255,255,255,.25); }
+    .name-link:hover { color: #93c5fd; }
+    .note-dot { font-size: 12px; margin-inline-start: 4px; }
+    .ver-old { color: #fbbf24; font-weight: 700; }
+    /* חלון פרטי לקוח */
+    .drawer-overlay { position: fixed; inset: 0; background: rgba(2,6,23,.6); backdrop-filter: blur(4px); z-index: 55; display: flex; justify-content: flex-start; }
+    .drawer { width: min(440px, 100%); height: 100%; overflow-y: auto; background: #0f1320; border-inline-end: 1px solid rgba(255,255,255,.08); padding: 20px 18px 40px; animation: drawerIn .22s ease; }
+    @keyframes drawerIn { from { transform: translateX(30px); opacity: 0; } to { transform: none; opacity: 1; } }
+    .drawer-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 14px; }
+    .drawer-name { font-size: 22px; font-weight: 800; }
+    .drawer-sec { margin-top: 18px; }
+    .drawer-sec h3 { font-size: 13px; color: #64748b; font-weight: 800; margin-bottom: 8px; }
+    .kv { display: grid; grid-template-columns: 110px 1fr; gap: 6px 10px; font-size: 14px; }
+    .kv span:nth-child(odd) { color: #64748b; }
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .chip { font-size: 12.5px; padding: 4px 9px; border-radius: 999px; background: rgba(99,102,241,.15); color: #c7d2fe; }
+    .drawer-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+    .drawer-actions .btn { flex: 1; justify-content: center; }
+    #noteText { width: 100%; box-sizing: border-box; min-height: 90px; background: rgba(0,0,0,.3); border: 1px solid rgba(255,255,255,.14); border-radius: 12px; color: #fff; padding: 10px; font: inherit; font-size: 14px; resize: vertical; }
+    .mini-fb { font-size: 13px; padding: 8px 10px; border-radius: 10px; background: rgba(255,255,255,.04); margin-bottom: 6px; white-space: pre-wrap; word-break: break-word; }
     .bars { display: flex; flex-direction: column; gap: 7px; }
     .bar-row { display: grid; grid-template-columns: 150px 1fr 54px; align-items: center; gap: 10px; font-size: 13.5px; }
     .bar-track { height: 10px; border-radius: 6px; background: rgba(255,255,255,.06); overflow: hidden; }
@@ -219,8 +243,19 @@
             <button type="button" class="tab-pill" data-filter="pending">ממתינים</button>
             <button type="button" class="tab-pill" data-filter="approved">מאושרים</button>
             <button type="button" class="tab-pill" data-filter="blocked">גישה בוטלה</button>
+            <button type="button" class="tab-pill" data-filter="outdated">⬆️ לא עודכנו <span class="pill-count" id="countOutdated"></span></button>
+            <button type="button" class="tab-pill" data-filter="inactive">💤 לא פעילים <span class="pill-count" id="countInactive"></span></button>
           </div>
-          <input type="text" id="searchInput" class="input-field" placeholder="חיפוש לפי שם או טלפון..." style="width: 240px;">
+          <div class="list-tools">
+            <input type="text" id="searchInput" class="input-field" placeholder="חיפוש לפי שם, טלפון או הערה..." style="width: 240px;">
+            <select id="sortSelect" class="input-field sort-select">
+              <option value="smart">ממתינים קודם</option>
+              <option value="active">פעילים לאחרונה</option>
+              <option value="newest">בקשות חדשות</option>
+              <option value="name">לפי שם</option>
+            </select>
+            <button type="button" class="btn btn-ghost" id="broadcastBtn">📣 הודעה לכולם</button>
+          </div>
         </div>
         <div class="table-wrap">
           <table>
@@ -377,6 +412,11 @@
 
   <div class="toast" id="toast"></div>
 
+  <!-- פרטי לקוח -->
+  <div class="drawer-overlay" id="drawerOverlay" style="display:none;">
+    <div class="drawer" id="drawer"></div>
+  </div>
+
   <!-- חלון כתיבת הודעה / תשובה לקוסם -->
   <div class="msg-overlay" id="msgOverlay" style="display:none;">
     <div class="msg-card glass">
@@ -425,6 +465,19 @@
     let allUsers = [];
     let allFeedback = [];
     let currentFilter = 'all';
+    let currentSort = 'smart';
+    let allNotes = {};
+    const INACTIVE_DAYS = 14;
+
+    function isInactive(u) {
+      if (u.status !== 'approved') return false;
+      if (!u.lastSeen) return true;
+      return Date.now() - new Date(u.lastSeen).getTime() > INACTIVE_DAYS * 24 * 3600 * 1000;
+    }
+
+    function isOutdated(u) {
+      return u.status === 'approved' && u.appVersion && publishedVersion && compareVersions(u.appVersion, publishedVersion) < 0;
+    }
     let searchQuery = '';
     let pollTimer = null;
 
@@ -490,7 +543,7 @@
     function usageHtml(u) {
       if (!u.lastSeen) return '<span class="muted">עוד לא השתמש</span>';
       const opens = Number(u.openCount) || 0;
-      const ver = u.appVersion ? ` · <span class="mono">v${escapeHtml(u.appVersion)}</span>` : '';
+      const ver = u.appVersion ? ` · <span class="mono${isOutdated(u) ? ' ver-old' : ''}" title="${isOutdated(u) ? 'גרסה ישנה' : ''}">v${escapeHtml(u.appVersion)}${isOutdated(u) ? ' ⬆️' : ''}</span>` : '';
       const st = parseStats(u);
       let tricks = '';
       if (st) {
@@ -714,14 +767,24 @@
 
       const q = searchQuery.toLowerCase();
       const order = { pending: 0, approved: 1, blocked: 2 };
+      $('countOutdated').textContent = allUsers.filter(isOutdated).length || '';
+      $('countInactive').textContent = allUsers.filter(isInactive).length || '';
+      const time = (iso) => (iso ? new Date(iso).getTime() : 0);
+      const sorters = {
+        smart: (a, b) => (order[a.status] ?? 3) - (order[b.status] ?? 3) || time(b.createdAt) - time(a.createdAt),
+        active: (a, b) => time(b.lastSeen) - time(a.lastSeen),
+        newest: (a, b) => time(b.createdAt) - time(a.createdAt),
+        name: (a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'he')
+      };
       const filtered = allUsers
         .filter((u) => {
-          if (currentFilter !== 'all' && u.status !== currentFilter) return false;
+          if (currentFilter === 'outdated') { if (!isOutdated(u)) return false; }
+          else if (currentFilter === 'inactive') { if (!isInactive(u)) return false; }
+          else if (currentFilter !== 'all' && u.status !== currentFilter) return false;
           if (!q) return true;
-          return [u.name, u.phone, u.deviceId].some((v) => String(v || '').toLowerCase().includes(q));
+          return [u.name, u.phone, u.deviceId, allNotes[u.id]].some((v) => String(v || '').toLowerCase().includes(q));
         })
-        // ממתינים לאישור תמיד למעלה
-        .sort((a, b) => (order[a.status] ?? 3) - (order[b.status] ?? 3));
+        .sort(sorters[currentSort] || sorters.smart);
 
       const tbody = $('usersTableBody');
       tbody.innerHTML = '';
@@ -751,7 +814,7 @@
 
         const tr = document.createElement('tr');
         tr.innerHTML = `
-          <td class="name-cell" style="font-weight:700;">${escapeHtml(u.name) || '—'} ${statusHtml}${u.deviceId ? `<div class="muted">מכשיר <span class="mono">${escapeHtml(u.deviceId)}</span></div>` : ''}</td>
+          <td class="name-cell" style="font-weight:700;"><span class="name-link" data-action="details" data-id="${id}">${escapeHtml(u.name) || '—'}</span>${allNotes[u.id] ? '<span class="note-dot" title="יש הערה">📝</span>' : ''} ${statusHtml}${u.deviceId ? `<div class="muted">מכשיר <span class="mono">${escapeHtml(u.deviceId)}</span></div>` : ''}</td>
           <td data-label="טלפון"><span class="mono" style="color:#e2e8f0;">${escapeHtml(u.phone) || '—'}</span></td>
           <td data-label="בקשה" class="muted">${formatDate(u.createdAt)}</td>
           <td data-label="שימוש">${usageHtml(u)}</td>
@@ -769,6 +832,7 @@
         renderStats();
         loadFeedback();
         loadErrors();
+        loadNotes();
       } catch (err) {
         setLive(false);
         if (err.status === 401 || err.status === 403) {
@@ -819,6 +883,7 @@
         : 'לא הצלחתי לבדוק איזו גרסה הועלתה.';
       $('badgeUpdate').style.display = hasNew ? '' : 'none';
       if (readyVersion && !$('updVersion').value) $('updVersion').value = readyVersion;
+      if (allUsers.length) renderUsers();
     }
 
     async function publishVersion(version, apkUrl, message, btn) {
@@ -919,6 +984,8 @@
         window.open(buildWhatsappUrl(user), '_blank', 'noopener');
       } else if (action === 'message') {
         openMessageBox(user, null);
+      } else if (action === 'details') {
+        openDetails(user);
       } else if (action === 'revoke') {
         if (!confirm(`לבטל את הגישה של ${user.name}?\nהאפליקציה תינעל אצלו בטלפון.`)) return;
         btn.disabled = true;
@@ -944,8 +1011,137 @@
       }
     });
 
+    // ---------------- הערות פרטיות ----------------
+    async function loadNotes() {
+      try {
+        allNotes = await Cloud.admin.listNotes();
+        renderUsers();
+      } catch (e) {}
+    }
+
+    // ---------------- פרטי לקוח ----------------
+    let detailsUserId = null;
+
+    function openDetails(user) {
+      detailsUserId = user.id;
+      const st = parseStats(user);
+      const fbs = allFeedback.filter((f) => f.uid === user.id);
+      const errs = allErrors.filter((x) => x.uid === user.id);
+      const statusText = { approved: 'מאושר ✓', blocked: 'גישה בוטלה', pending: 'ממתין לאישור' }[user.status] || user.status;
+      const phoneDigits = formatPhoneForWhatsapp(user.phone);
+      const used = st
+        ? Object.entries(st.e)
+            .filter(([k, v]) => !k.startsWith('show_') && k !== 'code_typed' && Number(v) > 0)
+            .sort((a, b) => b[1] - a[1])
+            .map(([k, v]) => `<span class="chip">${escapeHtml(EVENT_NAMES[k] || k)} · ${Number(v)}</span>`)
+            .join('')
+        : '';
+      const enabled = st && st.on ? st.on.map((k) => `<span class="chip">${escapeHtml(ON_NAMES[k] || k)}</span>`).join('') : '';
+      const ver = user.appVersion
+        ? `v${escapeHtml(user.appVersion)}${isOutdated(user) ? ` <span class="ver-old">(ישנה - הגרסה האחרונה v${escapeHtml(publishedVersion)})</span>` : ' ✓'}`
+        : '—';
+
+      $('drawer').innerHTML = `
+        <div class="drawer-head">
+          <div>
+            <div class="drawer-name">${escapeHtml(user.name) || '—'}</div>
+            <div class="muted">${statusText}</div>
+          </div>
+          <button type="button" class="btn btn-ghost" id="drawerClose">✕</button>
+        </div>
+        <div class="drawer-actions">
+          ${user.phone ? `<a class="btn btn-ghost" href="tel:${escapeHtml(phoneDigits ? '+' + phoneDigits : user.phone)}">📞 התקשר</a>` : ''}
+          ${user.phone ? `<a class="btn btn-wa-outline" href="https://wa.me/${escapeHtml(phoneDigits)}" target="_blank" rel="noopener">🟢 וואטסאפ</a>` : ''}
+          ${user.status !== 'pending' ? `<button type="button" class="btn btn-ghost" id="drawerMsg">💬 הודעה באפליקציה</button>` : ''}
+        </div>
+        <div class="drawer-sec">
+          <h3>פרטים</h3>
+          <div class="kv">
+            <span>טלפון</span><span class="mono">${escapeHtml(user.phone) || '—'}</span>
+            <span>ביקש גישה</span><span>${formatDate(user.createdAt)}</span>
+            <span>פעיל לאחרונה</span><span>${user.lastSeen ? timeAgo(user.lastSeen) : 'עוד לא השתמש'}</span>
+            <span>פתיחות</span><span>${Number(user.openCount) || 0}</span>
+            <span>גרסה</span><span>${ver}</span>
+            <span>מכשיר</span><span>${st ? (st.os === 'ios' ? '🍎 iPhone' : '🤖 Samsung') + ' · ' + escapeHtml(st.model || '') : '—'}</span>
+            <span>הופעות</span><span>${st ? sumShows(st.e) : 0} · ${st ? Number(st.e.code_typed) || 0 : 0} קודים</span>
+          </div>
+        </div>
+        ${used ? `<div class="drawer-sec"><h3>במה הוא משתמש</h3><div class="chips">${used}</div></div>` : ''}
+        ${enabled ? `<div class="drawer-sec"><h3>מופעל אצלו</h3><div class="chips">${enabled}</div></div>` : ''}
+        <div class="drawer-sec">
+          <h3>📝 הערה פרטית (רק אתה רואה)</h3>
+          <textarea id="noteText" maxlength="2000" placeholder="למשל: קוסם מתל אביב, הופיע עם זה בחתונה, ביקש מצב לילה...">${escapeHtml(allNotes[user.id] || '')}</textarea>
+          <button type="button" class="btn btn-whatsapp" id="noteSave" style="margin-top:8px; width:100%; justify-content:center;">שמור הערה</button>
+        </div>
+        <div class="drawer-sec">
+          <h3>💬 משובים (${fbs.length})</h3>
+          ${fbs.length ? fbs.map((f) => `<div class="mini-fb"><div class="muted">${formatDate(f.createdAt)}</div>${escapeHtml(f.text)}${f.reply ? `<div class="feedback-reply" style="margin-top:6px;">↩️ ${escapeHtml(f.reply)}</div>` : ''}</div>`).join('') : '<div class="muted">אין משובים</div>'}
+        </div>
+        ${errs.length ? `<div class="drawer-sec"><h3>🐞 תקלות (${errs.length})</h3>${errs.map((x) => `<div class="mini-fb" dir="ltr" style="text-align:left;">${escapeHtml(x.msg)}</div>`).join('')}</div>` : ''}`;
+
+      $('drawerOverlay').style.display = 'flex';
+      $('drawerClose').addEventListener('click', closeDetails);
+      const msgBtn = document.getElementById('drawerMsg');
+      if (msgBtn) msgBtn.addEventListener('click', () => {
+        closeDetails();
+        openMessageBox(user, null);
+      });
+      $('noteSave').addEventListener('click', async () => {
+        const btn = $('noteSave');
+        const text = $('noteText').value;
+        btn.disabled = true;
+        btn.textContent = 'שומר...';
+        try {
+          await Cloud.admin.saveNote(user.id, text);
+          if (text.trim()) allNotes[user.id] = text.trim();
+          else delete allNotes[user.id];
+          renderUsers();
+          toast('ההערה נשמרה ✓');
+        } catch (err) {
+          toast('השמירה נכשלה: ' + err.message, true);
+        } finally {
+          btn.disabled = false;
+          btn.textContent = 'שמור הערה';
+        }
+      });
+    }
+
+    function closeDetails() {
+      $('drawerOverlay').style.display = 'none';
+      detailsUserId = null;
+    }
+
+    $('drawerOverlay').addEventListener('click', (e) => {
+      if (e.target === $('drawerOverlay')) closeDetails();
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        if ($('drawerOverlay').style.display !== 'none') closeDetails();
+        else if ($('msgOverlay').style.display !== 'none') closeMessageBox();
+      }
+    });
+
+    // ---------------- מיון ----------------
+    $('sortSelect').addEventListener('change', (e) => {
+      currentSort = e.target.value;
+      renderUsers();
+    });
+
     // ---------------- הודעה / תשובה לקוסם ----------------
-    let msgTarget = null; // { user, feedback }
+    let msgTarget = null; // { user, feedback } או { broadcast: [users] }
+
+    // הודעה לכל הקוסמים המאושרים (מופיעה אצל כל אחד כשהוא נכנס להגדרות)
+    $('broadcastBtn').addEventListener('click', () => {
+      const targets = allUsers.filter((u) => u.status === 'approved');
+      if (!targets.length) return toast('אין קוסמים מאושרים', true);
+      msgTarget = { broadcast: targets };
+      $('msgTitle').textContent = `📣 הודעה לכל הקוסמים (${targets.length})`;
+      $('msgQuote').style.display = 'none';
+      $('msgText').value = '';
+      $('msgSendWa').style.display = 'none';
+      $('msgOverlay').style.display = 'flex';
+      setTimeout(() => $('msgText').focus(), 50);
+    });
 
     function openMessageBox(user, feedback) {
       msgTarget = { user, feedback };
@@ -975,6 +1171,25 @@
       if (!msgTarget) return;
       const text = $('msgText').value.trim();
       if (!text) return toast('כתוב משהו לפני השליחה', true);
+      if (msgTarget.broadcast) {
+        const targets = msgTarget.broadcast;
+        if (!confirm(`לשלוח את ההודעה ל-${targets.length} קוסמים?`)) return;
+        const bbtn = $('msgSendApp');
+        bbtn.disabled = true;
+        let ok = 0;
+        for (const u of targets) {
+          bbtn.textContent = `שולח... ${ok}/${targets.length}`;
+          try {
+            await Cloud.admin.sendMessage(u.id, text);
+            ok += 1;
+          } catch (e) {}
+        }
+        bbtn.disabled = false;
+        bbtn.textContent = '📱 שלח באפליקציה';
+        closeMessageBox();
+        toast(ok === targets.length ? `נשלח ל-${ok} קוסמים ✓` : `נשלח ל-${ok} מתוך ${targets.length}`, ok !== targets.length);
+        return;
+      }
       const { user, feedback } = msgTarget;
       const btn = $('msgSendApp');
       btn.disabled = true;

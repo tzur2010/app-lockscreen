@@ -117,6 +117,11 @@ service cloud.firestore {
       allow list, delete: if false;
     }
 
+    // הערות פרטיות של המנהל על לקוחות: רק המנהל קורא וכותב.
+    match /admin_notes/{uid} {
+      allow read, write: if isAdmin();
+    }
+
     // הגדרות עדכון: כולם קוראים, רק המנהל מפרסם.
     match /app_config/{docId} {
       allow read: if true;

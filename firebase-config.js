@@ -523,6 +523,26 @@ window.MagicCloud = (function () {
     return true;
   }
 
+  // הערות פרטיות של המנהל על לקוח (אוסף נפרד - הלקוח עצמו לא יכול לקרוא אותן)
+  async function adminListNotes() {
+    const res = await authedRequest(adminAuth, `${DB_BASE}/admin_notes?pageSize=300`);
+    if (!res.ok) throw makeError(res, 'Notes list failed');
+    const data = JSON.parse(res.text || '{}');
+    const map = {};
+    (data.documents || []).map(fromDoc).forEach((n) => (map[n.id] = n.note || ''));
+    return map;
+  }
+
+  async function adminSaveNote(uid, text) {
+    const clean = String(text || '').trim().slice(0, 2000);
+    const url = `${DB_BASE}/admin_notes/${encodeURIComponent(uid)}`;
+    const res = clean
+      ? await authedRequest(adminAuth, url, { method: 'PATCH', body: JSON.stringify({ fields: toFields({ note: clean, updatedAt: new Date() }) }) })
+      : await authedRequest(adminAuth, url, { method: 'DELETE' });
+    if (!res.ok && !(res.status === 404 && !clean)) throw makeError(res, 'Note save failed');
+    return true;
+  }
+
   async function adminListErrors() {
     const res = await authedRequest(adminAuth, `${DB_BASE}/errors?pageSize=300`);
     if (!res.ok) throw makeError(res, 'Errors list failed');
@@ -585,6 +605,8 @@ window.MagicCloud = (function () {
       deleteFeedback: adminDeleteFeedback,
       sendMessage: adminSendMessage,
       listErrors: adminListErrors,
+      listNotes: adminListNotes,
+      saveNote: adminSaveNote,
       deleteError: adminDeleteError,
       replyFeedback: adminReplyFeedback,
       publishUpdate: adminPublishUpdate

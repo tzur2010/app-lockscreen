@@ -9,8 +9,18 @@
   var CONFIG_KEY = 'magic_lockscreen_config_v6';
   var lang = 'he';
   try {
-    var cfg = JSON.parse(localStorage.getItem(CONFIG_KEY) || '{}');
+    var raw = localStorage.getItem(CONFIG_KEY);
+    var cfg = JSON.parse(raw || '{}');
     if (cfg && cfg.uiLang === 'en') lang = 'en';
+    // התקנה ראשונה (עוד אין הגדרות שמורות) בטלפון שהשפה שלו לא עברית -> מתחילים באנגלית
+    // (הרבה ישראלים מחזיקים טלפון באנגלית - לכן גם אזור זמן של ישראל = עברית)
+    else if (!raw) {
+      var langs = [].concat(navigator.languages || [], navigator.language || []);
+      var tz = '';
+      try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch (e2) {}
+      var israeli = /^(Asia\/Jerusalem|Asia\/Tel_Aviv)$/.test(tz) || langs.some(function (l) { return /^(he|iw)/i.test(l); });
+      if (!israeli && langs.length) lang = 'en';
+    }
   } catch (e) {}
 
   var isEn = lang === 'en';
@@ -37,6 +47,8 @@
     'אין חיבור לאינטרנט, מנסה שוב...': 'No internet connection, retrying...',
     'אין חיבור לאינטרנט, נסה שוב': 'No internet connection, try again',
     'אנא הזן שם מלא': 'Please enter your full name',
+    'אנא הזן את קוד ההזמנה': 'Please enter your invite code',
+    'קוד ההזמנה לא נכון - בדוק אותו ונסה שוב': 'This invite code is not valid - check it and try again',
     'אנא הזן מספר טלפון תקין': 'Please enter a valid phone number',
     'שליחת הבקשה נכשלה, נסה שוב': 'Sending failed, try again',
     'שם מלא': 'Full name',

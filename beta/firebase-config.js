@@ -753,12 +753,12 @@ window.MagicCloud = (function () {
     return (data.documents || []).map(fromDoc).sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
   }
 
-  async function adminCreateVipCode(code, label) {
+  async function adminCreateVipCode(code, label, lang = 'he') {
     const clean = normalizeVipCode(code);
     if (!/^[A-Z0-9-]{4,40}$/.test(clean)) throw new Error('הקוד יכול להכיל רק אותיות באנגלית, מספרים ומקף (4-40 תווים)');
     const res = await authedRequest(adminAuth, `${DB_BASE}/vip_codes/${encodeURIComponent(clean)}?currentDocument.exists=false`, {
       method: 'PATCH',
-      body: JSON.stringify({ fields: toFields({ label: String(label || '').trim().slice(0, 80), createdAt: new Date() }) })
+      body: JSON.stringify({ fields: toFields({ label: String(label || '').trim().slice(0, 80), lang: lang === 'en' ? 'en' : 'he', createdAt: new Date() }) })
     });
     if (res.status === 409 || (res.status === 400 && /exist/i.test(res.text || ''))) throw new Error('הקוד הזה כבר קיים');
     if (!res.ok) throw makeError(res, 'VIP create failed');

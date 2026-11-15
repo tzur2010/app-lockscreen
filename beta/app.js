@@ -423,6 +423,8 @@ const DEFAULT_CONFIG = {
 };
 
 let config = loadConfig();
+// התקנה ראשונה בטלפון שאינו בעברית: i18n.js כבר בחר אנגלית - שומרים את זה גם בהגדרות
+if (window.MagicI18n && window.MagicI18n.isEn && config.uiLang !== 'en') config.uiLang = 'en';
 
 function loadConfig() {
   try {
@@ -3568,7 +3570,7 @@ function initDeviceLicenseGate() {
 // החלון מוצג רק כשמסך ההגדרות פתוח (בפתיחת האפליקציה / בתפריט הסודי),
 // ולעולם לא מעל מסך הנעילה הפעיל מול קהל.
 // ============================================================================
-const APP_VERSION = '6.3';
+const APP_VERSION = '6.4';
 const DEFAULT_APK_URL = 'https://github.com/tzur2010/app-lockscreen/raw/main/Lockscreen.apk';
 const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 const UPDATE_DISMISS_KEY = 'magic_update_dismissed_version';

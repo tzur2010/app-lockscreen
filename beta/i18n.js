@@ -359,6 +359,7 @@
     'חיפוש': 'Search',
     'חיפושים אחרונים': 'Recent searches',
     '🧭 סיור היכרות בהגדרות': '🧭 Settings tour',
+    '🎉 מה חדש באפליקציה': "🎉 What's new",
     '🧪 גרסת בטא - רק לבודקים': '🧪 Beta version - testers only',
     // 6.0: מכירה
     'קראתי ואני מסכים ל': 'I have read and agree to the ',

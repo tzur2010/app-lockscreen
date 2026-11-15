@@ -3570,7 +3570,7 @@ function initDeviceLicenseGate() {
 // החלון מוצג רק כשמסך ההגדרות פתוח (בפתיחת האפליקציה / בתפריט הסודי),
 // ולעולם לא מעל מסך הנעילה הפעיל מול קהל.
 // ============================================================================
-const APP_VERSION = '6.0';
+const APP_VERSION = '6.1';
 const DEFAULT_APK_URL = 'https://github.com/tzur2010/app-lockscreen/raw/main/Lockscreen.apk';
 const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 const UPDATE_DISMISS_KEY = 'magic_update_dismissed_version';
@@ -5919,6 +5919,7 @@ function initTour() {
 const WHATS_NEW_SEEN_KEY = 'magic_whats_new_seen_v1';
 const WHATS_NEW_MAX_ITEMS = 6;
 const WHATS_NEW = [
+  { ver: '6.1', icon: '📋', target: '#openWhatsNewBtn', he: ['החידושים תמיד זמינים', 'פספסת משהו? בלשונית "עוד" יש כפתור "מה חדש" שמראה את כל החידושים האחרונים.'], en: ['What\'s new, any time', 'Missed something? The More tab has a "What\'s new" button with all the latest features.'] },
   { ver: '5.9', icon: '🎉', target: null, he: ['מסך "מה חדש"', 'מעכשיו אחרי כל עדכון תראה בדיוק מה התחדש - עם כפתור שלוקח אותך ישר לנסות.'], en: ['"What\'s new" screen', 'After every update you\'ll see exactly what\'s new - with a button that takes you straight to it.'] },
   { ver: '5.8', icon: '✨', target: '#unlockTargetSelector', he: ['אנימציית פתיחה אמיתית', 'כשהטלפון נפתח, מסך הנעילה מתקרב ונעלם (סמסונג) או מחליק למעלה (אייפון) - בדיוק כמו בטלפון אמיתי.'], en: ['Real unlock animation', 'When the phone unlocks, the lock screen zooms away (Samsung) or slides up (iPhone) - just like a real phone.'] },
   { ver: '5.6', icon: '🔍', target: '#unlockTargetSelector', he: ['חשיפה בחיפוש', 'אחרי הפתיחה נפתח מסך חיפוש, והחיפוש האחרון "מאתמול" הוא הקוד של הצופה.'], en: ['Search reveal', 'After unlocking, a search screen opens and the last search "from yesterday" is the spectator\'s code.'] },
@@ -5970,10 +5971,20 @@ function maybeShowWhatsNew() {
   overlay.style.display = 'flex';
 }
 
-function renderWhatsNew(items, version) {
+// פתיחה ידנית מלשונית "עוד": תמיד מראה את החידושים האחרונים, בלי קשר למה שכבר נראה
+function openWhatsNewManually() {
+  const overlay = document.getElementById('whatsNewOverlay');
+  if (!overlay) return;
+  renderWhatsNew(WHATS_NEW.slice(0, WHATS_NEW_MAX_ITEMS), getInstalledAppVersion(), true);
+  overlay.style.display = 'flex';
+}
+
+function renderWhatsNew(items, version, manual) {
   const en = isEnglishUi();
   document.getElementById('whatsNewTitle').textContent = en ? `What's new in v${version}` : `מה חדש בגרסה ${version}`;
-  document.getElementById('whatsNewSub').textContent = en ? `${items.length} new things since your last version` : `${items.length} דברים חדשים מאז הגרסה הקודמת שלך`;
+  document.getElementById('whatsNewSub').textContent = manual
+    ? en ? 'The latest features' : 'החידושים האחרונים באפליקציה'
+    : en ? `${items.length} new things since your last version` : `${items.length} דברים חדשים מאז הגרסה הקודמת שלך`;
   document.getElementById('whatsNewDoneBtn').textContent = en ? "Great, let's go" : 'מעולה, בוא נתחיל';
   const list = document.getElementById('whatsNewList');
   list.innerHTML = '';
@@ -6029,6 +6040,8 @@ function goToSetting(selector) {
 function initWhatsNew() {
   const done = document.getElementById('whatsNewDoneBtn');
   if (done) done.addEventListener('click', closeWhatsNew);
+  const open = document.getElementById('openWhatsNewBtn');
+  if (open) open.addEventListener('click', openWhatsNewManually);
 }
 
 // ============================================================================

@@ -3710,3 +3710,21 @@ html[dir="ltr"] body.practice-on .settings-tabs::after { content: '🎯 Practice
 .tip-patter { background: rgba(34,197,94,.1); border: 1px solid rgba(34,197,94,.3); border-radius: 14px; padding: 10px 12px; margin-bottom: 14px; }
 .tip-patter-label { font-size: 12px; font-weight: 800; color: #4ade80; margin-bottom: 4px; }
 .tip-patter-text { font-size: 15px; font-style: italic; line-height: 1.55; }
+
+/* ===================== אנימציית שחרור נעילה ===================== */
+/* סמסונג: מסך הנעילה מתקרב ונעלם, ומסך הבית "מתיישב" ממרחק קטן */
+.phone-container.unlocking > *:not(.lockscreen-dim-backdrop):not(.fake-homescreen):not(.fake-call):not(.secret-peek) {
+  transition: transform 0.26s cubic-bezier(0.2, 0.7, 0.3, 1), opacity 0.22s ease-out !important;
+  transform: scale(1.12) !important;
+  opacity: 0 !important;
+  pointer-events: none;
+}
+.theme-samsung .fake-homescreen { transform: scale(0.94); transition: opacity 0.26s ease, transform 0.32s cubic-bezier(0.2, 0.7, 0.3, 1); }
+.theme-samsung .fake-homescreen.unlocked { transform: scale(1); }
+/* אייפון: מסך הנעילה מחליק למעלה ומסך הבית נחשף מתחתיו */
+.phone-container.theme-ios.unlocking > *:not(.lockscreen-dim-backdrop):not(.fake-homescreen):not(.fake-call):not(.secret-peek) {
+  transition: transform 0.34s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.3s ease-in !important;
+  transform: translateY(-100vh) !important;
+  opacity: 0.4 !important;
+}
+.theme-ios .fake-homescreen { transform: none; transition: opacity 0.3s ease 0.06s; }

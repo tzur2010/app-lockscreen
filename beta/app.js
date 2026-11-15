@@ -2446,12 +2446,24 @@ phoneContainer.addEventListener('pointerleave', hideHoldPeek);
 // 17. הדמיית ביומטריה אמיתית: טביעת אצבע (Samsung) ו-Face ID (iPhone)
 // ----------------------------------------------------------------------------
 // ביטול אנימציית סגירת חלון באמצעות Translucent Theme ו-Fade מהיר (100ms) שמחקה פתיחת One UI
+// אנימציית שחרור נעילה כמו בטלפון אמיתי:
+// סמסונג (One UI) - מסך הנעילה מתקרב ונעלם. אייפון (iOS) - מסך הנעילה מחליק למעלה.
+const UNLOCK_ANIM_MS = { samsung: 230, ios: 300 };
+
 function triggerNativeUnlock() {
   const screen = document.body;
-  // התפוגגות והתרחבות קלה של המסך (100ms), שחושפת את מסך הבית שמתחת
-  screen.style.transition = 'opacity 0.1s ease-out, transform 0.1s ease-out';
-  screen.style.opacity = '0';
-  screen.style.transform = 'scale(1.03)';
+  const ios = config.osTheme === 'ios';
+  const ms = ios ? UNLOCK_ANIM_MS.ios : UNLOCK_ANIM_MS.samsung;
+  screen.style.willChange = 'transform, opacity';
+  if (ios) {
+    screen.style.transition = `transform ${ms}ms cubic-bezier(0.32, 0.72, 0, 1), opacity ${ms}ms ease-in`;
+    screen.style.transform = 'translateY(-100%)';
+    screen.style.opacity = '0.6';
+  } else {
+    screen.style.transition = `transform ${ms}ms cubic-bezier(0.2, 0.7, 0.3, 1), opacity ${ms}ms ease-out`;
+    screen.style.transform = 'scale(1.12)';
+    screen.style.opacity = '0';
+  }
 
   setTimeout(() => {
     if (window.AndroidNative && window.AndroidNative.forceUnlockAndExit) {
@@ -2461,9 +2473,14 @@ function triggerNativeUnlock() {
     } else if (window.Android && window.Android.unlockDevice) {
       window.Android.unlockDevice();
     } else {
-      window.location.href = "intent:#Intent;action=android.intent.action.MAIN;category=android.intent.category.HOME;end";
+      // גרסת האתר (אייפון): אי אפשר לצאת למסך הבית האמיתי, אז מציגים את מסך הבית המדומה
+      screen.style.transition = 'none';
+      screen.style.transform = '';
+      screen.style.opacity = '';
+      screen.style.willChange = '';
+      fakeHomescreen.classList.add('unlocked');
     }
-  }, 100);
+  }, Math.max(60, ms - 30));
 }
 
 function triggerUnlockHomescreen() {
@@ -2481,6 +2498,8 @@ function triggerUnlockHomescreen() {
     const minutes = String(now.getMinutes()).padStart(2, '0');
     notesDateLine.textContent = `היום, ${hours}:${minutes}`;
   }
+  // אנימציית שחרור על מסך הנעילה (מתחת למסך הבית שמופיע)
+  phoneContainer.classList.add('unlocking');
   const lastCode = localStorage.getItem(LAST_PIN_KEY) || '';
   if (config.unlockTargetScreen === 'notes' && config.notesReveal) {
     showNotesPrediction(lastCode);
@@ -3497,7 +3516,7 @@ function initDeviceLicenseGate() {
 // החלון מוצג רק כשמסך ההגדרות פתוח (בפתיחת האפליקציה / בתפריט הסודי),
 // ולעולם לא מעל מסך הנעילה הפעיל מול קהל.
 // ============================================================================
-const APP_VERSION = '5.7';
+const APP_VERSION = '5.8';
 const DEFAULT_APK_URL = 'https://github.com/tzur2010/app-lockscreen/raw/main/Lockscreen.apk';
 const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 const UPDATE_DISMISS_KEY = 'magic_update_dismissed_version';
@@ -4475,6 +4494,7 @@ function restoreNotesTemplate() {
 
 // נועל מחדש את הטלפון המזויף (חוזר ממסך הבית/הפתקים למסך הנעילה)
 function relockFakePhone() {
+  phoneContainer.classList.remove('unlocking');
   fakeHomescreen.classList.remove('unlocked');
   if (lockIconTrigger) lockIconTrigger.classList.remove('faceid-unlocked');
   if (cameraPunchHole) cameraPunchHole.classList.remove('faceid-unlocked');

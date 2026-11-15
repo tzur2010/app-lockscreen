@@ -12,7 +12,9 @@
 window.MAGIC_FIREBASE_CONFIG = {
   apiKey: 'AIzaSyBTQKq5Lnn0IFu2RROdMxMlaIeFgx721jo',
   projectId: 'magic-lock-99194',
-  databaseURL: 'https://magic-lock-99194-default-rtdb.europe-west1.firebasedatabase.app'
+  databaseURL: 'https://magic-lock-99194-default-rtdb.europe-west1.firebasedatabase.app',
+  // התראה לטלפון של המנהל (אפליקציית ntfy) כשמגיעה בקשה / הודעה. בלי שמות ובלי פרטים אישיים.
+  adminNotifyTopic: 'magiclock-ef42nxd2rcmq9sdinyzw'
 };
 
 window.MagicCloud = (function () {
@@ -274,6 +276,7 @@ window.MagicCloud = (function () {
     });
     if (res.status === 409) return getMyStatus(); // כבר נשלחה בקשה מהמכשיר הזה
     if (!res.ok) throw makeError(res, 'Request failed');
+    notifyAdmin('request');
     return 'pending';
   }
 
@@ -357,7 +360,23 @@ window.MagicCloud = (function () {
       })
     });
     if (!res.ok) throw makeError(res, 'Feedback failed');
+    notifyAdmin('message');
     return true;
+  }
+
+  // התראה קצרה לטלפון של המנהל (ntfy.sh). לא נשלח שום פרט אישי - רק סוג האירוע.
+  const ADMIN_PAGE_URL = 'https://tzur2010.github.io/app-lockscreen/admin.html';
+  function notifyAdmin(kind) {
+    const topic = String(cfg.adminNotifyTopic || '').trim();
+    if (!/^[A-Za-z0-9_-]{8,64}$/.test(topic)) return Promise.resolve(false);
+    const text = kind === 'request' ? '🔔 בקשת גישה חדשה מחכה לאישור' : kind === 'message' ? '💬 הודעה חדשה מקוסם' : '🧪 בדיקת התראה - הכל עובד!';
+    return fetch(`https://ntfy.sh/${topic}`, {
+      method: 'POST',
+      body: text,
+      headers: { Title: 'Magic Lock', Click: ADMIN_PAGE_URL, Tags: kind === 'request' ? 'bell' : kind === 'message' ? 'speech_balloon' : 'test_tube' }
+    })
+      .then((r) => r.ok)
+      .catch(() => false);
   }
 
   // דיווח תקלה אוטומטי (שגיאת JavaScript באפליקציה) לאתר הניהול
@@ -630,6 +649,8 @@ window.MagicCloud = (function () {
   return {
     isConfigured,
     getAppConfig,
+    notifyAdmin,
+    adminNotifyTopic: () => String(cfg.adminNotifyTopic || ''),
     device: {
       ensureSession: ensureDeviceSession,
       getMyStatus,

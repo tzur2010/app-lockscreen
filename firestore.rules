@@ -44,7 +44,12 @@ service cloud.firestore {
 
       // מכשיר יכול רק ליצור בקשה חדשה במצב "ממתין" - אף פעם לא לאשר את עצמו.
       allow create: if signedIn() && request.auth.uid == uid
-        && request.resource.data.keys().hasOnly(['name', 'phone', 'deviceId', 'status', 'createdAt', 'transfer'])
+        && request.resource.data.keys().hasOnly(['name', 'phone', 'deviceId', 'status', 'createdAt', 'transfer', 'vipCode'])
+        // קוד VIP: רק קוד שהמנהל יצר (קיים ב-vip_codes) - ואז הקוסם נכנס מאושר, בלי ניסיון ובלי תשלום
+        && (!('vipCode' in request.resource.data)
+          || (validStr(request.resource.data.vipCode, 4, 40)
+            && request.resource.data.status == 'approved'
+            && exists(/databases/$(database)/documents/vip_codes/$(request.resource.data.vipCode))))
         // בקשת העברה לטלפון חדש: רק סימון, תמיד במצב "ממתין" (המנהל מחליט)
         && (!('transfer' in request.resource.data) || (request.resource.data.transfer == true && request.resource.data.status == 'pending'))
         && request.resource.data.keys().hasAll(['name', 'phone', 'status', 'createdAt'])
@@ -54,6 +59,7 @@ service cloud.firestore {
         && request.resource.data.createdAt is timestamp
         // "ממתין" רגיל, או "ניסיון" - רק אם המנהל הפעיל תקופת ניסיון, ועם שעת הרשמה של השרת (אי אפשר לזייף)
         && (request.resource.data.status == 'pending'
+          || (request.resource.data.status == 'approved' && 'vipCode' in request.resource.data)
           || (request.resource.data.status == 'trial'
             && request.resource.data.createdAt == request.time
             && exists(/databases/$(database)/documents/app_config/main)
@@ -135,6 +141,13 @@ service cloud.firestore {
     // הערות פרטיות של המנהל על לקוחות: רק המנהל קורא וכותב.
     match /admin_notes/{uid} {
       allow read, write: if isAdmin();
+    }
+
+    // קודי VIP (גישה חינם לקוסמים שהמנהל מזמין): הקוד עצמו הוא הסוד.
+    // מכשיר יכול רק לבדוק קוד מסוים (לא לראות את הרשימה). רק המנהל יוצר ומוחק.
+    match /vip_codes/{code} {
+      allow get: if signedIn();
+      allow list, write: if isAdmin();
     }
 
     // היסטוריית ההודעות שהמנהל שלח לקוסמים: רק המנהל קורא וכותב.

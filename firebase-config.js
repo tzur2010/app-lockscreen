@@ -263,16 +263,33 @@ window.MagicCloud = (function () {
   // הרשמה: "ניסיון" (אם המנהל הפעיל תקופת ניסיון) או "ממתין לאישור".
   // שעת ההרשמה נקבעת בשרת - ממנה נספרת תקופת הניסיון, ואי אפשר לזייף אותה מהטלפון.
   // transfer = קוסם שכבר קנה ועבר לטלפון חדש: בקשה רגילה (בלי ניסיון) שמסומנת למנהל כהעברה
-  async function submitRequest({ name, phone, deviceId, trial = false, transfer = false }) {
+  // קוד VIP: בודקים שהקוד קיים לפני ההרשמה (השרת בודק שוב בעצמו)
+  function normalizeVipCode(code) {
+    return String(code || '').trim().toUpperCase().replace(/\s+/g, '');
+  }
+
+  async function checkVipCode(code) {
+    const clean = normalizeVipCode(code);
+    if (!/^[A-Z0-9-]{4,40}$/.test(clean)) return false;
+    await ensureDeviceSession();
+    const res = await authedRequest(deviceAuth, `${DB_BASE}/vip_codes/${encodeURIComponent(clean)}`);
+    if (res.ok) return true;
+    if (res.status === 404 || res.status === 403) return false;
+    throw makeError(res, 'VIP check failed');
+  }
+
+  async function submitRequest({ name, phone, deviceId, trial = false, transfer = false, vipCode = '' }) {
     const uid = await ensureDeviceSession();
-    const status = trial && !transfer ? 'trial' : 'pending';
+    const vip = normalizeVipCode(vipCode);
+    const status = vip ? 'approved' : trial && !transfer ? 'trial' : 'pending';
     const data = {
       name: String(name || '').trim(),
       phone: String(phone || '').trim(),
       deviceId: String(deviceId || '').trim(),
       status
     };
-    if (transfer) data.transfer = true;
+    if (vip) data.vipCode = vip;
+    else if (transfer) data.transfer = true;
     const res = await authedRequest(deviceAuth, `${DB_BASE}:commit`, {
       method: 'POST',
       body: JSON.stringify({
@@ -291,7 +308,7 @@ window.MagicCloud = (function () {
     // כבר נרשם מהמכשיר הזה
     if (res.status === 409 || (res.status === 400 && /exist/i.test(res.text || ''))) return getMyStatus();
     if (!res.ok) throw makeError(res, 'Request failed');
-    notifyAdmin(transfer ? 'transfer' : 'request');
+    notifyAdmin(vip ? 'vip' : transfer ? 'transfer' : 'request');
     return status;
   }
 
@@ -393,6 +410,7 @@ window.MagicCloud = (function () {
       message: ['💬 הודעה חדשה מקוסם', 'speech_balloon'],
       paid: ['💰 קוסם דיווח שהוא שילם - בדוק בביט ואשר', 'moneybag'],
       transfer: ['🔁 בקשה להעביר רישיון לטלפון חדש', 'arrows_counterclockwise'],
+      vip: ['⭐ קוסם VIP נכנס עם קוד הזמנה', 'star'],
       test: ['🧪 בדיקת התראה - הכל עובד!', 'test_tube']
     };
     const [text, tag] = kinds[kind] || kinds.test;
@@ -727,6 +745,32 @@ window.MagicCloud = (function () {
     return true;
   }
 
+  // קודי VIP: המנהל יוצר קוד לקוסם מסוים, והקוסם נכנס איתו בחינם לתמיד
+  async function adminListVipCodes() {
+    const res = await authedRequest(adminAuth, `${DB_BASE}/vip_codes?pageSize=300`);
+    if (!res.ok) throw makeError(res, 'VIP list failed');
+    const data = JSON.parse(res.text || '{}');
+    return (data.documents || []).map(fromDoc).sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
+  }
+
+  async function adminCreateVipCode(code, label) {
+    const clean = normalizeVipCode(code);
+    if (!/^[A-Z0-9-]{4,40}$/.test(clean)) throw new Error('הקוד יכול להכיל רק אותיות באנגלית, מספרים ומקף (4-40 תווים)');
+    const res = await authedRequest(adminAuth, `${DB_BASE}/vip_codes/${encodeURIComponent(clean)}?currentDocument.exists=false`, {
+      method: 'PATCH',
+      body: JSON.stringify({ fields: toFields({ label: String(label || '').trim().slice(0, 80), createdAt: new Date() }) })
+    });
+    if (res.status === 409 || (res.status === 400 && /exist/i.test(res.text || ''))) throw new Error('הקוד הזה כבר קיים');
+    if (!res.ok) throw makeError(res, 'VIP create failed');
+    return clean;
+  }
+
+  async function adminDeleteVipCode(code) {
+    const res = await authedRequest(adminAuth, `${DB_BASE}/vip_codes/${encodeURIComponent(code)}`, { method: 'DELETE' });
+    if (!res.ok && res.status !== 404) throw makeError(res, 'VIP delete failed');
+    return true;
+  }
+
   async function adminPublishUpdate({ latest_version, apk_url, message }) {
     // updateMask: מעדכנים רק את שדות העדכון, בלי למחוק את הגדרות המכירה (מחיר וכו')
     const mask = ['latest_version', 'apk_url', 'message', 'published_at'].map((f) => `updateMask.fieldPaths=${f}`).join('&');
@@ -757,6 +801,7 @@ window.MagicCloud = (function () {
       getMyRecord,
       isTester,
       submitRequest,
+      checkVipCode,
       reportUsage,
       sendFeedback,
       reportError,
@@ -780,6 +825,9 @@ window.MagicCloud = (function () {
       setReceipt: adminSetReceipt,
       refund: adminRefund,
       transferLicense: adminTransferLicense,
+      listVipCodes: adminListVipCodes,
+      createVipCode: adminCreateVipCode,
+      deleteVipCode: adminDeleteVipCode,
       saveSaleSettings: adminSaveSaleSettings,
       deleteUser: adminDeleteUser,
       listFeedback: adminListFeedback,

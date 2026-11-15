@@ -534,6 +534,26 @@
 
       <!-- ===================== לשונית: הזמנה ===================== -->
       <section class="admin-panel" data-tab="invite">
+        <div class="card panel">
+          <h2>⭐ קודי VIP - גישה חינם לקוסמים שאתה מזמין</h2>
+          <div class="hint" style="line-height:1.7;">יוצרים קוד לקוסם ושולחים לו. בהרשמה הוא לוחץ "⭐ יש לך קוד הזמנה?", מקליד את הקוד ונכנס מיד - בחינם לתמיד, בלי ניסיון ובלי מסך תשלום. כל קוד אישי: אם תמחק אותו, אף אחד חדש לא יוכל להיכנס איתו (מי שכבר נכנס נשאר).</div>
+          <div class="row" style="margin-top:10px; align-items:flex-end;">
+            <div>
+              <label class="field-label" for="vipLabel">למי הקוד (שם הקוסם)</label>
+              <input class="input-field" id="vipLabel" maxlength="80" placeholder="למשל: דני הקוסם">
+            </div>
+            <div>
+              <label class="field-label" for="vipPhone">הטלפון שלו (לא חובה - לשליחה בוואטסאפ)</label>
+              <input class="input-field" id="vipPhone" type="tel" dir="ltr" placeholder="050-0000000">
+            </div>
+          </div>
+          <div class="actions-cell" style="margin-top:10px;">
+            <button type="button" class="btn btn-whatsapp" id="vipCreateBtn">⭐ צור קוד ושלח בוואטסאפ</button>
+          </div>
+          <div class="hint" id="vipStatus"></div>
+          <div id="vipList" class="sale-list" style="margin-top:10px;"></div>
+          <div class="hint">⚠️ שדה הקוד בהרשמה קיים מגרסה 6.3 ומעלה. עד שתפרסם אותה, קוסם שמתקין יקבל את הגרסה הרגילה - פשוט אשר אותו ידנית (זה בחינם ממילא).</div>
+        </div>
         <div class="panels">
           <div class="card panel">
             <h2>✉️ הזמנת קוסם חדש</h2>
@@ -1247,6 +1267,7 @@
         loadErrors();
         loadNotes();
         loadMessages();
+        loadVip();
       } catch (err) {
         setLive(false);
         if (err.status === 401 || err.status === 403) {
@@ -1681,6 +1702,7 @@
 
     function userFlags(u) {
       let out = '';
+      if (u.vipCode) out += `<span class="flag flag-transfer" style="background:rgba(250,204,21,.16); color:#fde68a;" title="נכנס עם קוד ${escapeHtml(u.vipCode)}">⭐ VIP</span>`;
       if (u.transfer && u.status === 'pending') out += '<span class="flag flag-transfer">🔁 העברה</span>';
       if (phoneKey(u).length >= 9 && allUsers.some((x) => x.id !== u.id && phoneKey(x) === phoneKey(u))) out += '<span class="flag flag-dup" title="יש עוד רשומה עם אותו טלפון">⚠️ נרשם בעבר</span>';
       return out;
@@ -1702,6 +1724,106 @@
         .filter((l) => l !== null).join('\n');
       window.open(`https://wa.me/${formatPhoneForWhatsapp(user.phone)}?text=${encodeURIComponent(msg)}`, '_blank', 'noopener');
     }
+
+    // ---------------- קודי VIP ----------------
+    let allVip = [];
+    const VIP_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // בלי 0/O ו-1/I שמתבלבלים
+
+    function newVipCode() {
+      const rnd = crypto.getRandomValues(new Uint32Array(6));
+      return 'VIP-' + Array.from(rnd, (n) => VIP_CHARS[n % VIP_CHARS.length]).join('');
+    }
+
+    function vipMessage(label, code) {
+      return `היי ${label || ''} 🎩\n` +
+        'הזמנתי אותך לנסות את Magic Lock - בחינם לגמרי, לתמיד.\n\n' +
+        '*התקנה:*\n🤖 אנדרואיד: ' + ANDROID_LINK + '\n' +
+        '🍎 אייפון (פותחים ב-Safari, ואז שיתוף ← "הוסף למסך הבית"): ' + IOS_LINK + '\n\n' +
+        'בהרשמה לוחצים "⭐ יש לך קוד הזמנה?" ומקלידים:\n*' + code + '*\n\n' +
+        'אשמח לשמוע מה דעתך 🙏';
+    }
+
+    function vipUsers(code) {
+      return allUsers.filter((u) => u.vipCode === code);
+    }
+
+    function renderVip() {
+      const list = $('vipList');
+      if (!list) return;
+      if (!allVip.length) {
+        list.innerHTML = '<div class="muted">עוד אין קודים.</div>';
+        return;
+      }
+      list.innerHTML = allVip.map((v) => {
+        const used = vipUsers(v.id);
+        const who = used.length ? `✓ נכנס: ${used.map((u) => escapeHtml(u.name)).join(', ')}` : 'עוד לא נכנס';
+        return `<div class="sale-row">
+          <span><span class="mono" style="font-weight:800; color:#facc15;">${escapeHtml(v.id)}</span> <b>${escapeHtml(v.label || '')}</b><br><span class="meta">${formatDate(v.createdAt)} · ${who}</span></span>
+          <span class="actions-cell">
+            <button type="button" class="btn btn-ghost" data-vip-copy="${escapeHtml(v.id)}">העתק הודעה</button>
+            <button type="button" class="btn btn-delete" data-vip-del="${escapeHtml(v.id)}">מחק קוד</button>
+          </span></div>`;
+      }).join('');
+    }
+
+    async function loadVip() {
+      try {
+        allVip = await Cloud.admin.listVipCodes();
+      } catch (e) {}
+      renderVip();
+    }
+
+    $('vipCreateBtn').addEventListener('click', async () => {
+      const label = $('vipLabel').value.trim();
+      if (label.length < 2) {
+        toast('כתוב למי הקוד (שם הקוסם)', true);
+        return;
+      }
+      const phone = formatPhoneForWhatsapp($('vipPhone').value);
+      // פותחים חלון מיד (בתוך הלחיצה) כדי שהדפדפן לא יחסום אותו, וממלאים אותו אחרי שהקוד נשמר
+      const win = window.open('', '_blank');
+      const btn = $('vipCreateBtn');
+      btn.disabled = true;
+      $('vipStatus').textContent = 'יוצר קוד...';
+      try {
+        const code = await Cloud.admin.createVipCode(newVipCode(), label);
+        const text = encodeURIComponent(vipMessage(label, code));
+        const url = phone.length >= 11 ? `https://wa.me/${phone}?text=${text}` : `https://wa.me/?text=${text}`;
+        if (win) win.location.href = url;
+        else window.open(url, '_blank', 'noopener');
+        $('vipStatus').textContent = `✓ נוצר קוד ${code} ל${label}`;
+        $('vipLabel').value = '';
+        $('vipPhone').value = '';
+        await loadVip();
+      } catch (err) {
+        if (win) win.close();
+        $('vipStatus').textContent = 'יצירת הקוד נכשלה: ' + err.message;
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
+    $('vipList').addEventListener('click', async (e) => {
+      const copy = e.target.closest('[data-vip-copy]');
+      const del = e.target.closest('[data-vip-del]');
+      if (copy) {
+        const v = allVip.find((x) => x.id === copy.dataset.vipCopy);
+        if (v) copyText(vipMessage(v.label, v.id), 'ההודעה עם הקוד הועתקה ✓');
+      } else if (del) {
+        const code = del.dataset.vipDel;
+        if (!confirm(`למחוק את הקוד ${code}?\nאף אחד חדש לא יוכל להיכנס איתו. מי שכבר נכנס - נשאר.`)) return;
+        del.disabled = true;
+        try {
+          await Cloud.admin.deleteVipCode(code);
+          allVip = allVip.filter((x) => x.id !== code);
+          renderVip();
+          toast('הקוד נמחק');
+        } catch (err) {
+          toast('המחיקה נכשלה: ' + err.message, true);
+          del.disabled = false;
+        }
+      }
+    });
 
     // גישה חינם לתמיד (קוסם שהזמנת להתנסות): "מאושר" בלי תשלום = פתוח לתמיד, בלי מסך תשלום
     async function giveFree(user, btn) {

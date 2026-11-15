@@ -2698,6 +2698,7 @@ const BACK_CLOSABLE_POPUPS = [
   ['updatePopupOverlay', () => hideUpdatePopup()],
   ['preShowOverlay', () => (document.getElementById('preShowOverlay').style.display = 'none')],
   ['tipOverlay', () => (document.getElementById('tipOverlay').style.display = 'none')],
+  ['whatsNewOverlay', () => closeWhatsNew()],
   ['tourLayer', () => endTour()]
 ];
 
@@ -2868,6 +2869,9 @@ function openSettingsSheet() {
   forceAttemptCount = 0;
   refreshSettingsLastCaptured();
   setTimeout(maybeShowAdminMessage, 600);
+  setTimeout(() => {
+    if (typeof maybeShowWhatsNew === 'function') maybeShowWhatsNew();
+  }, 900);
   if (typeof checkCloudAppUpdate === 'function') {
     checkCloudAppUpdate(false);
   }
@@ -3516,7 +3520,7 @@ function initDeviceLicenseGate() {
 // החלון מוצג רק כשמסך ההגדרות פתוח (בפתיחת האפליקציה / בתפריט הסודי),
 // ולעולם לא מעל מסך הנעילה הפעיל מול קהל.
 // ============================================================================
-const APP_VERSION = '5.8';
+const APP_VERSION = '5.9';
 const DEFAULT_APK_URL = 'https://github.com/tzur2010/app-lockscreen/raw/main/Lockscreen.apk';
 const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 const UPDATE_DISMISS_KEY = 'magic_update_dismissed_version';
@@ -5798,6 +5802,8 @@ function endTour() {
   try {
     localStorage.setItem(TOUR_DONE_KEY, '1');
     localStorage.setItem(GUIDE_SEEN_KEY, '1');
+    // קוסם שעבר את הסיור כבר מכיר את כל מה שיש - לא מראים לו "מה חדש" על אותה גרסה
+    if (!localStorage.getItem(WHATS_NEW_SEEN_KEY)) localStorage.setItem(WHATS_NEW_SEEN_KEY, getInstalledAppVersion());
   } catch (e) {}
   if (typeof showSettingsTab === 'function') showSettingsTab('trick');
 }
@@ -5854,7 +5860,129 @@ function initTour() {
   });
 }
 
+// ============================================================================
+// 42. מסך "מה חדש": מופיע פעם אחת אחרי עדכון, עם כל מה שהתחדש מאז הגרסה הקודמת
+// ----------------------------------------------------------------------------
+// בכל גרסה מוסיפים כאן את החידושים (הכי חשובים קודם). target = האלמנט בהגדרות
+// שכפתור "נסה עכשיו" מוביל אליו.
+// ============================================================================
+const WHATS_NEW_SEEN_KEY = 'magic_whats_new_seen_v1';
+const WHATS_NEW_MAX_ITEMS = 6;
+const WHATS_NEW = [
+  { ver: '5.9', icon: '🎉', target: null, he: ['מסך "מה חדש"', 'מעכשיו אחרי כל עדכון תראה בדיוק מה התחדש - עם כפתור שלוקח אותך ישר לנסות.'], en: ['"What\'s new" screen', 'After every update you\'ll see exactly what\'s new - with a button that takes you straight to it.'] },
+  { ver: '5.8', icon: '✨', target: '#unlockTargetSelector', he: ['אנימציית פתיחה אמיתית', 'כשהטלפון נפתח, מסך הנעילה מתקרב ונעלם (סמסונג) או מחליק למעלה (אייפון) - בדיוק כמו בטלפון אמיתי.'], en: ['Real unlock animation', 'When the phone unlocks, the lock screen zooms away (Samsung) or slides up (iPhone) - just like a real phone.'] },
+  { ver: '5.6', icon: '🔍', target: '#unlockTargetSelector', he: ['חשיפה בחיפוש', 'אחרי הפתיחה נפתח מסך חיפוש, והחיפוש האחרון "מאתמול" הוא הקוד של הצופה.'], en: ['Search reveal', 'After unlocking, a search screen opens and the last search "from yesterday" is the spectator\'s code.'] },
+  { ver: '5.6', icon: '❓', target: '#toggleForceUnlockMode', he: ['הסבר ליד כל קסם', 'כפתור ? ליד כל קסם: איך עושים אותו, ומה אומרים לקהל.'], en: ['Help next to every trick', 'A ? button next to every trick: how to do it and what to say.'] },
+  { ver: '5.5', icon: '✅', target: '#preShowCheckBtn', he: ['בדיקה לפני הופעה', 'לחיצה אחת בודקת אינטרנט, התראות, סוללה, טלפון שני ועוד - עם כפתור תיקון.'], en: ['Pre-show check', 'One tap checks internet, notifications, battery, second phone and more - with a fix button.'] },
+  { ver: '5.4', icon: '📞', target: '#toggleCallReveal', he: ['חשיפה בשיחה נכנסת', 'אחרי הפתיחה הטלפון מצלצל, ושם המתקשר הוא הקוד שהצופה בחר.'], en: ['Incoming call reveal', 'After unlocking the phone rings, and the caller name is the spectator\'s code.'] },
+  { ver: '5.4', icon: '🎛️', target: '#toggleRemotePeek', he: ['שלט רחוק מהטלפון השני', 'מהטלפון השני אפשר להדליק/לכבות "פתיחה בכל קוד", לבחור ניסיון ולהפעיל חשיפה - בלי לגעת בטלפון של הצופה.'], en: ['Remote control from a second phone', 'From the second phone: turn "any code" on/off, pick the attempt and trigger a reveal - without touching the spectator\'s phone.'] },
+  { ver: '5.4', icon: '🖼️', target: '#unlockTargetSelector', he: ['חשיפה בגלריה', 'התמונה האחרונה בגלריה היא פתק בכתב יד עם הקוד של הצופה.'], en: ['Gallery reveal', 'The latest photo in the gallery is a handwritten note with the spectator\'s code.'] },
+  { ver: '5.4', icon: '🎯', target: '#togglePracticeMode', he: ['מצב תרגול', 'מתרגלים את כל ההצצות בלי שזה נשמר בהיסטוריה.'], en: ['Practice mode', 'Practice all the peeks without saving to history.'] },
+  { ver: '5.2', icon: '📲', target: '#toggleRemotePeek', he: ['הצצה מטלפון שני', 'הקוד שהצופה מקליד מופיע מיד בגדול בטלפון אחר.'], en: ['Second-phone peek', 'The code the spectator types appears instantly, big, on another phone.'] },
+  { ver: '5.2', icon: '🌐', target: '#uiLangSelector', he: ['אנגלית', 'אפשר להעביר את כל האפליקציה לאנגלית (לשונית עוד).'], en: ['English', 'Switch the whole app to English (More tab).'] }
+];
+
+function whatsNewSince(fromVersion, toVersion) {
+  return WHATS_NEW.filter((it) => compareSemver(it.ver, fromVersion) > 0 && compareSemver(it.ver, toVersion) <= 0).slice(0, WHATS_NEW_MAX_ITEMS);
+}
+
+function getWhatsNewSeenVersion() {
+  try {
+    const seen = localStorage.getItem(WHATS_NEW_SEEN_KEY);
+    if (seen) return seen;
+    // קוסם ותיק שמעדכן מגרסה ישנה (לפני שהיה מסך כזה): מראים לו את החידושים הכי חשובים מהחודש האחרון
+    if (localStorage.getItem(CONFIG_STORAGE_KEY) && localStorage.getItem(GUIDE_SEEN_KEY)) return '5.1';
+  } catch (e) {}
+  return null; // קוסם חדש - לא מראים (הוא מקבל את הסיור)
+}
+
+function markWhatsNewSeen() {
+  try {
+    localStorage.setItem(WHATS_NEW_SEEN_KEY, getInstalledAppVersion());
+  } catch (e) {}
+}
+
+function maybeShowWhatsNew() {
+  const overlay = document.getElementById('whatsNewOverlay');
+  if (!overlay || overlay.style.display === 'flex') return;
+  if (!setupOverlay || !setupOverlay.classList.contains('open') || isLicenseOverlayVisible()) return;
+  const updatePopup = document.getElementById('updatePopupOverlay');
+  if (updatePopup && updatePopup.style.display === 'flex') return;
+  const tour = document.getElementById('tourLayer');
+  if (tour && tour.style.display === 'block') return;
+  const current = getInstalledAppVersion();
+  const seen = getWhatsNewSeenVersion();
+  if (!seen) return markWhatsNewSeen();
+  if (compareSemver(current, seen) <= 0) return;
+  const items = whatsNewSince(seen, current);
+  if (!items.length) return markWhatsNewSeen();
+  renderWhatsNew(items, current);
+  overlay.style.display = 'flex';
+}
+
+function renderWhatsNew(items, version) {
+  const en = isEnglishUi();
+  document.getElementById('whatsNewTitle').textContent = en ? `What's new in v${version}` : `מה חדש בגרסה ${version}`;
+  document.getElementById('whatsNewSub').textContent = en ? `${items.length} new things since your last version` : `${items.length} דברים חדשים מאז הגרסה הקודמת שלך`;
+  document.getElementById('whatsNewDoneBtn').textContent = en ? "Great, let's go" : 'מעולה, בוא נתחיל';
+  const list = document.getElementById('whatsNewList');
+  list.innerHTML = '';
+  items.forEach((it) => {
+    const [title, text] = en ? it.en : it.he;
+    const row = document.createElement('div');
+    row.className = 'whats-new-item';
+    const icon = document.createElement('div');
+    icon.className = 'whats-new-icon';
+    icon.textContent = it.icon;
+    const body = document.createElement('div');
+    const t = document.createElement('div');
+    t.className = 'whats-new-item-title';
+    t.textContent = title;
+    const d = document.createElement('div');
+    d.className = 'whats-new-item-text';
+    d.textContent = text;
+    body.append(t, d);
+    if (it.target && document.querySelector(it.target)) {
+      const tryBtn = document.createElement('button');
+      tryBtn.type = 'button';
+      tryBtn.className = 'whats-new-try';
+      tryBtn.textContent = en ? 'Try it now →' : 'נסה עכשיו ←';
+      tryBtn.addEventListener('click', () => goToSetting(it.target));
+      body.appendChild(tryBtn);
+    }
+    row.append(icon, body);
+    list.appendChild(row);
+  });
+}
+
+function closeWhatsNew() {
+  document.getElementById('whatsNewOverlay').style.display = 'none';
+  markWhatsNewSeen();
+}
+
+// לוקח את הקוסם ישר להגדרה: פותח את הלשונית הנכונה, גולל אליה ומאיר אותה
+function goToSetting(selector) {
+  closeWhatsNew();
+  const el = document.querySelector(selector);
+  if (!el) return;
+  const panel = el.closest('.settings-panel');
+  if (panel && typeof showSettingsTab === 'function') showSettingsTab(panel.dataset.tab);
+  const row = el.closest('.clean-toggle-row, .oneui-field-block') || el;
+  setTimeout(() => {
+    row.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    row.classList.remove('whats-new-flash');
+    void row.offsetWidth;
+    row.classList.add('whats-new-flash');
+  }, 250);
+}
+
+function initWhatsNew() {
+  const done = document.getElementById('whatsNewDoneBtn');
+  if (done) done.addEventListener('click', closeWhatsNew);
+}
+
 // אתחול ראשוני
+initWhatsNew();
 initTrickTips();
 initTour();
 initPreShowCheck();

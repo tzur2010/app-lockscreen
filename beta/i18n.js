@@ -49,6 +49,7 @@
     'אנא הזן שם מלא': 'Please enter your full name',
     'אנא הזן את קוד ההזמנה': 'Please enter your invite code',
     'יש להזין קוד אימות': 'Enter your PIN',
+    'יש להזין את הסיסמה': 'Enter your password',
     'הזן את קוד מסך הנעילה': 'Enter lock screen password',
     'יש לצייר את קו ביטול הנעילה': 'Draw your unlock pattern',
     'צייר את הדפוס': 'Draw pattern',

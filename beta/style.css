@@ -3825,3 +3825,35 @@ html[dir="ltr"] body.practice-on .settings-tabs::after { content: '🎯 Practice
 .phone-container.theme-xiaomi .clock-lock-big-time { font-size: 92px; font-weight: 500; letter-spacing: -1px; }
 .phone-container.theme-xiaomi .clock-lock-date { font-size: 15px; margin-top: 6px; opacity: .85; }
 .phone-container.theme-xiaomi .clock-lock-swipe-prompt { background: transparent; }
+/* ==========================================================================
+   ליטוש פיקסל / שיאומי: טביעת אצבע, דפוס, סיסמה ושורת סטטוס
+   ========================================================================== */
+.fp-drawn { display: none; width: 44px; height: 44px; position: relative; z-index: 1; pointer-events: none; transition: transform .18s ease, color .18s ease; }
+.phone-container.theme-pixel .fingerprint-img,
+.phone-container.theme-xiaomi .fingerprint-img { display: none; }
+.phone-container.theme-pixel .fp-drawn,
+.phone-container.theme-xiaomi .fp-drawn { display: block; }
+.phone-container.theme-pixel .fp-drawn { color: #e6e1e5; }
+.phone-container.theme-pixel .fingerprint-halo { background: radial-gradient(circle, rgba(230,225,229,.18) 0%, transparent 70%); }
+.phone-container.theme-pixel .fingerprint-ripple { border-color: rgba(168,199,250,.8); box-shadow: none; }
+.phone-container.theme-pixel .fingerprint-container.pressing .fp-drawn { color: #a8c7fa; transform: scale(1.1); }
+.phone-container.theme-xiaomi .fp-drawn { color: rgba(255,255,255,.95); width: 46px; height: 46px; }
+.phone-container.theme-xiaomi .fingerprint-halo { background: radial-gradient(circle, rgba(255,255,255,.14) 0%, transparent 70%); animation: none; }
+.phone-container.theme-xiaomi .fingerprint-ripple { border-color: rgba(255,255,255,.7); box-shadow: none; }
+.phone-container.theme-xiaomi .fingerprint-container.pressing .fp-drawn { transform: scale(1.12); }
+
+/* דפוס בשיאומי: עיגולים חלולים וקו לבן דק */
+.phone-container.theme-xiaomi .pattern-node-dot { width: 14px; height: 14px; background: transparent; border: 1.5px solid rgba(255,255,255,.9); }
+.phone-container.theme-xiaomi .pattern-wrapper:not(.stealth-mode) .pattern-node.active .pattern-node-dot { background: #ffffff; transform: scale(1.15); box-shadow: none; }
+.phone-container.theme-xiaomi .pattern-line { stroke-width: 3; stroke: rgba(255,255,255,.85); }
+.phone-container.theme-pixel .pattern-wrapper:not(.stealth-mode) .pattern-node.active .pattern-node-dot { box-shadow: 0 0 0 12px rgba(168,199,250,.22); background: #a8c7fa; }
+
+/* שדה הסיסמה: בפיקסל מלבן מעוגל עם מסגרת, בשיאומי קפסולה שקופה יותר */
+.phone-container.theme-pixel .oneui-password-pill { border-radius: 14px; background: rgba(214,222,255,.12); border: 1.5px solid rgba(168,199,250,.6); height: 52px; backdrop-filter: none; -webkit-backdrop-filter: none; }
+.phone-container.theme-xiaomi .oneui-password-pill { border-radius: 26px; background: rgba(255,255,255,.12); border: none; }
+
+/* שורת סטטוס: בפיקסל בלי אחוזי סוללה ליד הסמל */
+.phone-container.theme-pixel .samsung-battery-text { display: none; }
+
+/* מסך השעון: בפיקסל ובשיאומי אין "קפסולה" סביב ההוראה למטה */
+.phone-container.theme-pixel .clock-lock-swipe-prompt { background: transparent; font-size: 13px; opacity: .75; }

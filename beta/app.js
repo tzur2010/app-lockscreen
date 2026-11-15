@@ -1753,8 +1753,10 @@ function applyConfigToUI() {
 function updateHeaderTitles() {
   if (config.unlockMode === 'words') {
     // עיצוב צילום המסך מיועד אך ורק לאפשרות של "סיסמת מילים"
-    mainTitle.textContent = 'הזן סיסמה';
-    subTitle.textContent = 'סיסמה חייבת להכיל לפחות 4 תווים, ביניהם אות אחת לפחות.';
+    const brand = config.osTheme === 'ios' ? 'ios' : currentAndroidBrand();
+    mainTitle.textContent = brand === 'pixel' ? 'יש להזין את הסיסמה' : 'הזן סיסמה';
+    // השורה השנייה היא של סמסונג בלבד
+    subTitle.textContent = brand === 'samsung' || brand === 'ios' ? 'סיסמה חייבת להכיל לפחות 4 תווים, ביניהם אות אחת לפחות.' : '';
   } else if (config.unlockMode === 'pattern') {
     const brand = config.osTheme === 'ios' ? 'ios' : currentAndroidBrand();
     mainTitle.textContent = { ios: 'צייר דפוס לשחרור', pixel: 'יש לצייר את קו ביטול הנעילה', xiaomi: 'צייר את הדפוס' }[brand] || 'צייר דפוס';
@@ -3689,7 +3691,7 @@ function initDeviceLicenseGate() {
 // החלון מוצג רק כשמסך ההגדרות פתוח (בפתיחת האפליקציה / בתפריט הסודי),
 // ולעולם לא מעל מסך הנעילה הפעיל מול קהל.
 // ============================================================================
-const APP_VERSION = '6.5';
+const APP_VERSION = '6.6';
 const DEFAULT_APK_URL = 'https://github.com/tzur2010/app-lockscreen/raw/main/Lockscreen.apk';
 const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 const UPDATE_DISMISS_KEY = 'magic_update_dismissed_version';

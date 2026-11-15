@@ -57,15 +57,13 @@
         </label>
         <div class="reg-trial-note" id="regTrialNote" style="display: none;"></div>
         <button type="button" class="license-reg-submit-btn" id="submitRegBtn">שלח בקשה</button>
+        <button type="button" class="reg-link-btn" id="regTransferToggle">קנית כבר ועברת לטלפון חדש?</button>
       </div>
 
       <!-- תקופת הניסיון הסתיימה: הוראות תשלום -->
       <div class="reg-waiting-box reg-pay-box" id="regTrialEndBox" style="display: none;">
-        <div class="reg-waiting-title">⏰ תקופת הניסיון הסתיימה</div>
-        <div class="reg-pay-price" id="regPayPrice"></div>
-        <div class="reg-pay-how" id="regPayHow"></div>
-        <button type="button" class="license-reg-submit-btn" id="regPaidBtn">שילמתי ✓ שלח הודעה</button>
-        <div class="reg-waiting-sub" id="regPaidStatus">אחרי שהתשלום יאושר - האפליקציה תיפתח לבד.</div>
+        <div class="reg-waiting-title" id="regTrialEndTitle">⏰ תקופת הניסיון הסתיימה</div>
+        <div class="pay-panel" id="regPayPanel"></div>
       </div>
 
       <!-- מצב המתנה לאישור מרחוק -->
@@ -212,6 +210,15 @@
   </div>
 
   <!-- הסבר קצר על קסם (כפתור ? ליד כל קסם) -->
+  <!-- רכישה מתוך תקופת הניסיון -->
+  <div class="update-popup-overlay" id="buyOverlay" style="display: none;">
+    <div class="update-popup-card tip-card">
+      <div class="update-popup-title" id="buyTitle">💰 רכישת Magic Lock</div>
+      <div class="pay-panel" id="buyPanel"></div>
+      <button type="button" class="update-popup-btn secondary-btn" id="buyCloseBtn">סגור</button>
+    </div>
+  </div>
+
   <div class="update-popup-overlay" id="tipOverlay" style="display: none;">
     <div class="update-popup-card tip-card">
       <div class="update-popup-title" id="tipTitle"></div>

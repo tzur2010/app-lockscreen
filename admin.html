@@ -547,6 +547,15 @@
               <input class="input-field" id="vipPhone" type="tel" dir="ltr" placeholder="050-0000000">
             </div>
           </div>
+          <details class="advanced-box" style="margin-top:10px;">
+            <summary>✏️ נוסח ההודעה ל-VIP (אפשר לערוך)</summary>
+            <div class="hint" style="margin:6px 0;">{שם} = השם הפרטי שלו · {קוד} = הקוד · {קישור} = עמוד ההתקנה (כבר עם הקוד בפנים)</div>
+            <textarea class="input-field" id="vipTemplate" style="min-height:220px; width:100%; box-sizing:border-box;"></textarea>
+            <div class="actions-cell" style="margin-top:8px;">
+              <button type="button" class="btn btn-ghost" id="vipTplSave">שמור נוסח</button>
+              <button type="button" class="btn btn-ghost" id="vipTplReset">נוסח מקורי</button>
+            </div>
+          </details>
           <div class="actions-cell" style="margin-top:10px;">
             <button type="button" class="btn btn-whatsapp" id="vipCreateBtn">⭐ צור קוד ושלח בוואטסאפ</button>
           </div>
@@ -557,6 +566,11 @@
         <div class="panels">
           <div class="card panel">
             <h2>✉️ הזמנת קוסם חדש</h2>
+            <div class="link-row">
+              <span class="link-label">📲 קישור התקנה (הכי קל)</span>
+              <span class="mono link-text" id="getLink"></span>
+              <button type="button" class="btn btn-ghost" data-copy="getLink">העתק</button>
+            </div>
             <div class="link-row">
               <span class="link-label">🤖 אנדרואיד</span>
               <span class="mono link-text" id="androidLink"></span>
@@ -673,13 +687,23 @@
     const INVITE_KEY = 'magic_admin_invite_template_v1';
     const ANDROID_LINK = 'https://github.com/tzur2010/app-lockscreen/raw/main/Lockscreen.apk';
     const IOS_LINK = 'https://tzur2010.github.io/app-lockscreen/';
+    // עמוד התקנה חכם: מזהה אנדרואיד/אייפון ומראה רק את מה שצריך, צעד אחרי צעד
+    const GET_LINK = 'https://tzur2010.github.io/app-lockscreen/get.html';
     const DEFAULT_INVITE =
-      'היי! 🪄 מזמין אותך לנסות את Magic Lock - אפליקציית מסך נעילה לקוסמים (גרסת ניסיון).\n\n' +
-      '*אנדרואיד* - להורדה:\n' + ANDROID_LINK + '\n' +
-      'פותחים את הקובץ שירד ומאשרים "התקן" (אם הטלפון שואל - לאשר התקנה ממקור לא ידוע).\n\n' +
-      '*אייפון* - פותחים ב-Safari:\n' + IOS_LINK + '\n' +
-      'ואז שיתוף ← "הוסף למסך הבית".\n\n' +
-      'אחרי ההתקנה ממלאים שם וטלפון ושולחים בקשה, ואני מאשר אותך 🙂';
+      'היי! 🪄 מזמין אותך לנסות את Magic Lock - אפליקציית מסך נעילה לקוסמים.\n\n' +
+      '📲 התקנה (אנדרואיד ואייפון) - פותחים את הקישור ועוקבים אחרי ההוראות:\n' + GET_LINK + '\n\n' +
+      'אחרי ההתקנה ממלאים שם וטלפון, ואני מאשר אותך 🙂';
+
+    const VIP_TPL_KEY = 'admin_vip_template_v1';
+    const DEFAULT_VIP_TPL =
+      'היי {שם}, מה שלומך? 🙂\n' +
+      'פיתחתי אפליקציה לקוסמים בשם *Magic Lock* - מסך נעילה מזויף שנראה בדיוק כמו של הטלפון שלך.\n' +
+      'הצופה מקליד קוד סודי לפתיחת הטלפון - ואתה יודע אותו (גם מטלפון שני בכיס), חושף אותו בדרכים מטורפות, או גורם לטלפון להיפתח בדיוק בקוד שהוא בחר.\n\n' +
+      'אשמח מאוד שתנסה אותה - *בחינם, לתמיד*, בלי שום התחייבות. דעה של קוסם ברמה שלך שווה לי הרבה 🙏\n\n' +
+      '📲 התקנה בלחיצה (אנדרואיד ואייפון):\n{קישור}\n\n' +
+      '⭐ קוד ההזמנה האישי שלך: *{קוד}*\n' +
+      '(בהרשמה לוחצים "יש לך קוד הזמנה?" - ונכנסים מיד)\n\n' +
+      'כל שאלה - אני פה.';
 
     let allUsers = [];
     let allFeedback = [];
@@ -1386,6 +1410,7 @@
 
     // ---------------- הזמנה ----------------
     $('androidLink').textContent = ANDROID_LINK;
+    $('getLink').textContent = GET_LINK;
     $('iosLink').textContent = IOS_LINK;
     const getInvite = () => localStorage.getItem(INVITE_KEY) || DEFAULT_INVITE;
     $('inviteTemplate').value = getInvite();
@@ -1734,14 +1759,18 @@
       return 'VIP-' + Array.from(rnd, (n) => VIP_CHARS[n % VIP_CHARS.length]).join('');
     }
 
+    // ההודעה לקוסם VIP: הקישור כולל את הקוד, כך שעמוד ההתקנה מציג לו אותו עם כפתור העתקה
+    const getVipTemplate = () => localStorage.getItem(VIP_TPL_KEY) || DEFAULT_VIP_TPL;
     function vipMessage(label, code) {
-      return `היי ${label || ''} 🎩\n` +
-        'הזמנתי אותך לנסות את Magic Lock - בחינם לגמרי, לתמיד.\n\n' +
-        '*התקנה:*\n🤖 אנדרואיד: ' + ANDROID_LINK + '\n' +
-        '🍎 אייפון (פותחים ב-Safari, ואז שיתוף ← "הוסף למסך הבית"): ' + IOS_LINK + '\n\n' +
-        'בהרשמה לוחצים "⭐ יש לך קוד הזמנה?" ומקלידים:\n*' + code + '*\n\n' +
-        'אשמח לשמוע מה דעתך 🙏';
+      const first = String(label || '').trim().split(/\s+/)[0] || '';
+      return getVipTemplate()
+        .split('{שם}').join(first)
+        .split('{קוד}').join(code)
+        .split('{קישור}').join(`${GET_LINK}?c=${encodeURIComponent(code)}`);
     }
+    $('vipTemplate').value = getVipTemplate();
+    $('vipTplSave').addEventListener('click', () => { localStorage.setItem(VIP_TPL_KEY, $('vipTemplate').value); toast('הנוסח נשמר ✓'); });
+    $('vipTplReset').addEventListener('click', () => { localStorage.removeItem(VIP_TPL_KEY); $('vipTemplate').value = DEFAULT_VIP_TPL; toast('הוחזר לנוסח המקורי'); });
 
     function vipUsers(code) {
       return allUsers.filter((u) => u.vipCode === code);

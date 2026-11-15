@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="robots" content="noindex">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:">
+  <meta name="theme-color" content="#0d0e14">
+  <title>Magic Lock - התקנה</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; background: radial-gradient(120% 60% at 50% 0%, #1e1b4b 0%, #0d0e14 60%); color: #e2e8f0; font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif; line-height: 1.6; }
+    main { max-width: 460px; margin: 0 auto; padding: 32px 18px 48px; }
+    .logo { width: 76px; height: 76px; margin: 0 auto 12px; border-radius: 22px; background: linear-gradient(135deg, #6366f1, #a855f7); display: grid; place-items: center; font-size: 40px; box-shadow: 0 12px 40px rgba(99,102,241,.4); }
+    h1 { text-align: center; font-size: 28px; margin: 0; letter-spacing: -.5px; }
+    .tag { text-align: center; color: #a5b4fc; margin: 4px 0 22px; font-size: 15px; }
+    .card { background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.09); border-radius: 20px; padding: 18px; margin-bottom: 14px; }
+    .vip { text-align: center; border-color: rgba(250,204,21,.45); background: rgba(250,204,21,.08); }
+    .vip-label { font-size: 13px; color: #fde68a; font-weight: 700; }
+    .vip-code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 26px; font-weight: 800; color: #facc15; letter-spacing: 1px; margin: 4px 0 10px; direction: ltr; }
+    .vip-sub { font-size: 13px; color: #cbd5e1; margin-top: 8px; }
+    .btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 54px; border: none; border-radius: 16px; font-size: 17px; font-weight: 800; font-family: inherit; text-decoration: none; cursor: pointer; }
+    .btn-main { background: linear-gradient(135deg, #22c55e, #16a34a); color: #fff; box-shadow: 0 8px 24px rgba(34,197,94,.3); }
+    .btn-soft { background: rgba(255,255,255,.1); color: #f8fafc; min-height: 44px; font-size: 15px; }
+    .btn + .btn { margin-top: 10px; }
+    h2 { font-size: 16px; margin: 0 0 10px; }
+    ol { margin: 0; padding-inline-start: 22px; }
+    li { margin-bottom: 9px; font-size: 15px; color: #cbd5e1; }
+    li b { color: #f8fafc; }
+    .note { font-size: 13px; color: #94a3b8; margin-top: 10px; }
+    .warn { background: rgba(251,146,60,.1); border-color: rgba(251,146,60,.4); }
+    .tabs { display: flex; gap: 8px; margin-bottom: 12px; }
+    .tab { flex: 1; padding: 10px; border-radius: 12px; border: 1px solid rgba(255,255,255,.12); background: transparent; color: #cbd5e1; font: inherit; font-weight: 700; cursor: pointer; }
+    .tab.on { background: rgba(99,102,241,.25); border-color: #6366f1; color: #fff; }
+    .hide { display: none !important; }
+    .foot { text-align: center; font-size: 12px; color: #64748b; margin-top: 18px; }
+    .foot a { color: #94a3b8; }
+    .lang { position: absolute; top: 14px; inset-inline-end: 14px; background: rgba(255,255,255,.08); border: none; color: #cbd5e1; border-radius: 10px; padding: 6px 10px; font: inherit; font-size: 13px; cursor: pointer; }
+    [dir="ltr"] ol { padding-inline-start: 22px; }
+  </style>
+</head>
+<body>
+<button type="button" class="lang" id="langBtn">English</button>
+<main>
+  <div class="logo">🔒</div>
+  <h1>Magic Lock</h1>
+  <div class="tag" data-t="tag"></div>
+
+  <div class="card vip hide" id="vipCard">
+    <div class="vip-label" data-t="vipLabel"></div>
+    <div class="vip-code" id="vipCode"></div>
+    <button type="button" class="btn btn-soft" id="copyCodeBtn" data-t="copyCode"></button>
+    <div class="vip-sub" data-t="vipSub"></div>
+  </div>
+
+  <div class="tabs" id="tabs">
+    <button type="button" class="tab" data-os="android">🤖 Android</button>
+    <button type="button" class="tab" data-os="ios">🍎 iPhone</button>
+  </div>
+
+  <!-- אנדרואיד -->
+  <section id="androidBox" class="hide">
+    <div class="card">
+      <a class="btn btn-main" id="apkBtn" href="Lockscreen.apk" download="MagicLock.apk" data-t="download"></a>
+      <div class="note" data-t="aNote"></div>
+    </div>
+    <div class="card">
+      <h2 data-t="aStepsTitle"></h2>
+      <ol>
+        <li data-t="a1"></li>
+        <li data-t="a2"></li>
+        <li data-t="a3"></li>
+        <li data-t="a4"></li>
+        <li data-t="a5"></li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- אייפון -->
+  <section id="iosBox" class="hide">
+    <div class="card warn hide" id="notSafari">
+      <h2 data-t="nsTitle"></h2>
+      <div style="font-size:14px; color:#cbd5e1;" data-t="nsText"></div>
+      <button type="button" class="btn btn-soft" id="copyLinkBtn" style="margin-top:10px;" data-t="copyLink"></button>
+    </div>
+    <div class="card">
+      <h2 data-t="iStepsTitle"></h2>
+      <ol>
+        <li data-t="i1"></li>
+        <li data-t="i2"></li>
+        <li data-t="i3"></li>
+        <li data-t="i4"></li>
+      </ol>
+      <a class="btn btn-main" id="openAppBtn" href="./" style="margin-top:12px;" data-t="openApp"></a>
+    </div>
+  </section>
+
+  <div class="foot"><a href="terms.html" data-t="terms"></a> · <a href="privacy.html" data-t="privacy"></a></div>
+</main>
+
+<script>
+  (function () {
+    const T = {
+      he: {
+        tag: 'מסך נעילה מזויף לקוסמים - נראה בדיוק כמו הטלפון שלך',
+        vipLabel: '⭐ קוד ההזמנה האישי שלך',
+        copyCode: '📋 העתק את הקוד',
+        copied: '✓ הועתק',
+        vipSub: 'בהרשמה באפליקציה לוחצים "⭐ יש לך קוד הזמנה?" ומדביקים - ונכנסים מיד, בחינם.',
+        download: '⬇️ הורד את האפליקציה',
+        aNote: 'האפליקציה לא בחנות - מתקינים אותה ישירות מכאן. זה בטוח ולוקח פחות מדקה.',
+        aStepsTitle: 'איך מתקינים (פעם אחת)',
+        a1: 'לוחצים <b>"הורד את האפליקציה"</b> למעלה. אם שואלים - <b>"הורד בכל זאת"</b>.',
+        a2: 'כשההורדה מסתיימת לוחצים <b>"פתח"</b> (או פותחים את הקובץ מההתראות / מ"הורדות").',
+        a3: 'אם מופיע "מטעמי אבטחה..." - לוחצים <b>"הגדרות"</b>, מדליקים <b>"אפשר ממקור זה"</b> וחוזרים אחורה.',
+        a4: 'לוחצים <b>"התקן"</b>. אם Play Protect שואל - <b>"פרטים נוספים" ← "התקן בכל זאת"</b>.',
+        a5: 'פותחים את <b>Magic Lock</b>, ממלאים שם וטלפון - וזהו 🎩',
+        nsTitle: '⚠️ צריך לפתוח את העמוד הזה ב-Safari',
+        nsText: 'באייפון מוסיפים את האפליקציה למסך הבית רק מ-Safari. מעתיקים את הקישור, פותחים את Safari ומדביקים בשורת הכתובת.',
+        copyLink: '📋 העתק קישור',
+        iStepsTitle: 'איך מתקינים באייפון (פעם אחת)',
+        i1: 'אם העמוד נפתח בתוך וואטסאפ - קודם לוחצים על סמל ה-<b>Safari</b> (מצפן) כדי לפתוח בספארי. ואז לוחצים <b>"פתח את Magic Lock"</b> למטה.',
+        i2: 'בעמוד שנפתח לוחצים על כפתור <b>השיתוף</b> (ריבוע עם חץ למעלה, בתחתית המסך).',
+        i3: 'גוללים ובוחרים <b>"הוסף למסך הבית"</b> ← <b>"הוסף"</b>.',
+        i4: 'פותחים את <b>Magic Lock</b> מהמסך הבית (לא מ-Safari), ממלאים שם וטלפון - וזהו 🎩',
+        openApp: '🍎 פתח את Magic Lock',
+        terms: 'תנאי שימוש',
+        privacy: 'פרטיות',
+        lang: 'English'
+      },
+      en: {
+        tag: 'A fake lock screen for magicians - looks exactly like your phone',
+        vipLabel: '⭐ Your personal invite code',
+        copyCode: '📋 Copy code',
+        copied: '✓ Copied',
+        vipSub: 'In the app\'s sign-up tap "⭐ Have an invite code?" and paste it - you\'re in right away, for free.',
+        download: '⬇️ Download the app',
+        aNote: 'The app isn\'t on the store - you install it directly from here. It\'s safe and takes under a minute.',
+        aStepsTitle: 'How to install (once)',
+        a1: 'Tap <b>"Download the app"</b> above. If asked - <b>"Download anyway"</b>.',
+        a2: 'When the download finishes tap <b>"Open"</b> (or open the file from notifications / Downloads).',
+        a3: 'If you see "For your security..." - tap <b>"Settings"</b>, turn on <b>"Allow from this source"</b> and go back.',
+        a4: 'Tap <b>"Install"</b>. If Play Protect asks - <b>"More details" → "Install anyway"</b>.',
+        a5: 'Open <b>Magic Lock</b>, enter your name and phone - done 🎩',
+        nsTitle: '⚠️ Open this page in Safari',
+        nsText: 'On iPhone you can add the app to the home screen only from Safari. Copy the link, open Safari and paste it in the address bar.',
+        copyLink: '📋 Copy link',
+        iStepsTitle: 'How to install on iPhone (once)',
+        i1: 'If this page opened inside WhatsApp - first tap the <b>Safari</b> (compass) icon to open it in Safari. Then tap <b>"Open Magic Lock"</b> below.',
+        i2: 'On the page that opens tap the <b>Share</b> button (square with an up arrow, at the bottom).',
+        i3: 'Scroll and choose <b>"Add to Home Screen"</b> → <b>"Add"</b>.',
+        i4: 'Open <b>Magic Lock</b> from the home screen (not from Safari), enter your name and phone - done 🎩',
+        openApp: '🍎 Open Magic Lock',
+        terms: 'Terms',
+        privacy: 'Privacy',
+        lang: 'עברית'
+      }
+    };
+
+    const params = new URLSearchParams(location.search);
+    const ua = navigator.userAgent || '';
+    const isIOS = /iPhone|iPad|iPod/i.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+    const isAndroid = /Android/i.test(ua);
+    // באייפון: דפדפן בתוך אפליקציה (וואטסאפ/אינסטגרם/פייסבוק) או דפדפן שאינו Safari
+    const notSafari = isIOS && (/CriOS|FxiOS|EdgiOS|OPiOS|FBAN|FBAV|Instagram|Line\//i.test(ua) || !/Safari/i.test(ua));
+    let lang = params.get('lang') === 'en' || (!params.get('lang') && !/^he|^iw/i.test(navigator.language || 'he')) ? 'en' : 'he';
+    const code = String(params.get('c') || '').trim().toUpperCase();
+    const validCode = /^[A-Z0-9-]{4,40}$/.test(code) ? code : '';
+
+    function render() {
+      const d = T[lang];
+      document.documentElement.lang = lang;
+      document.documentElement.dir = lang === 'he' ? 'rtl' : 'ltr';
+      document.querySelectorAll('[data-t]').forEach((el) => {
+        el.innerHTML = d[el.dataset.t];
+      });
+      document.getElementById('langBtn').textContent = d.lang;
+      document.title = 'Magic Lock';
+    }
+
+    function showOs(os) {
+      document.getElementById('androidBox').classList.toggle('hide', os !== 'android');
+      document.getElementById('iosBox').classList.toggle('hide', os !== 'ios');
+      document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('on', t.dataset.os === os));
+    }
+
+    async function copy(text, btn) {
+      try {
+        await navigator.clipboard.writeText(text);
+      } catch (e) {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        try { document.execCommand('copy'); } catch (e2) {}
+        ta.remove();
+      }
+      const old = btn.innerHTML;
+      btn.innerHTML = T[lang].copied;
+      setTimeout(() => (btn.innerHTML = old), 1600);
+    }
+
+    render();
+    if (validCode) {
+      document.getElementById('vipCard').classList.remove('hide');
+      document.getElementById('vipCode').textContent = validCode;
+    }
+    document.getElementById('notSafari').classList.toggle('hide', !notSafari);
+    // בטלפון מכירים את סוג המכשיר - לא צריך לשונית בחירה
+    if (isAndroid || isIOS) document.getElementById('tabs').classList.add('hide');
+    showOs(isIOS ? 'ios' : 'android');
+
+    document.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', () => showOs(t.dataset.os)));
+    document.getElementById('copyCodeBtn').addEventListener('click', (e) => copy(validCode, e.currentTarget));
+    document.getElementById('copyLinkBtn').addEventListener('click', (e) => copy(location.href, e.currentTarget));
+    document.getElementById('langBtn').addEventListener('click', () => {
+      lang = lang === 'he' ? 'en' : 'he';
+      render();
+    });
+  })();
+</script>
+</body>
+</html>

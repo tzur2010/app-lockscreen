@@ -1,0 +1,3712 @@
+/* ==========================================================================
+   Magic Lockscreen - Full Simulator (One UI 1:1, iOS Face ID, Biometrics & Clean Grid Keypad)
+   ========================================================================== */
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-drag: none;
+  outline: none;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+*::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+html, body {
+  width: 100%;
+  height: 100dvh;
+  min-height: 100dvh;
+  overflow: hidden;
+  overscroll-behavior: none;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+  background-color: transparent;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: fixed;
+  inset: 0;
+}
+
+/* ==========================================================================
+   1. Intro Splash Screen (1.1s Lock Opening Animation)
+   ========================================================================== */
+
+.splash-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  background: radial-gradient(circle at 50% 40%, #1e1b4b 0%, #0f1026 75%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.45s ease, visibility 0.45s ease;
+}
+
+.splash-screen.fade-out {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.splash-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  animation: splashPop 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.splash-lock-glow {
+  width: 88px;
+  height: 88px;
+  border-radius: 26px;
+  background: rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  box-shadow: 0 0 40px rgba(56, 189, 248, 0.45);
+}
+
+.splash-lock-svg {
+  width: 46px;
+  height: 46px;
+  overflow: visible;
+}
+
+.lock-shackle {
+  transform-origin: 44px 28px;
+  animation: unlockShackle 0.55s 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@keyframes unlockShackle {
+  0% { transform: translateY(0) rotate(0deg); }
+  100% { transform: translateY(-5px) rotate(18deg); }
+}
+
+@keyframes splashPop {
+  0% { opacity: 0; transform: scale(0.86); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+.splash-title {
+  color: #ffffff;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: 4px;
+}
+
+/* ==========================================================================
+   2. Setup / Onboarding & 50/50 Split Choice Screen
+   ========================================================================== */
+
+.setup-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  background: #f8fafc;
+  color: #0f172a;
+  display: none;
+  flex-direction: column;
+  overflow: hidden;
+  direction: rtl;
+}
+
+.setup-overlay.open {
+  display: flex;
+}
+
+.split-choice-screen {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  opacity: 1;
+  transform: scale(1);
+  transition: opacity 0.32s cubic-bezier(0.22, 1, 0.36, 1), transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.split-choice-screen.hidden {
+  opacity: 0;
+  transform: scale(0.96);
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+}
+
+.split-half {
+  flex: 1;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  transition: filter 0.2s ease;
+}
+
+.split-half:active {
+  filter: brightness(1.08);
+}
+
+.split-samsung {
+  background: linear-gradient(145deg, #1d4ed8 0%, #2563eb 55%, #38bdf8 100%);
+  color: #ffffff;
+}
+
+.split-ios {
+  background: linear-gradient(145deg, #0f172a 0%, #1e293b 50%, #334155 100%);
+  color: #ffffff;
+}
+
+.split-half-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 8px;
+  padding: 20px;
+  z-index: 2;
+}
+
+.split-badge {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  padding: 4px 12px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.split-icon {
+  width: 72px;
+  height: 72px;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 4px 0;
+}
+
+.split-title {
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.3px;
+}
+
+.split-subtitle {
+  font-size: 14px;
+  opacity: 0.88;
+}
+
+.split-divider {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 10;
+  background: #ffffff;
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 800;
+  padding: 6px 18px;
+  border-radius: 999px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+  pointer-events: none;
+}
+
+/* Post-Choice Device Config Sheet - Samsung One UI Luxury (Dark & Light Themes) */
+.device-config-sheet {
+  /* משתני צבע למצב כהה (Dark Mode - ברירת מחדל) */
+  --cfg-bg: #0F0F12;
+  --cfg-header-bg: rgba(15, 15, 18, 0.82);
+  --cfg-header-border: rgba(255, 255, 255, 0.08);
+  --cfg-card-bg: rgba(255, 255, 255, 0.05);
+  --cfg-card-border: rgba(255, 255, 255, 0.08);
+  --cfg-card-shadow: 0 12px 32px rgba(0, 0, 0, 0.34);
+  --cfg-subbox-bg: rgba(255, 255, 255, 0.04);
+  --cfg-subbox-border: rgba(255, 255, 255, 0.08);
+  --cfg-divider: rgba(255, 255, 255, 0.07);
+  --cfg-text-main: #FFFFFF;
+  --cfg-text-sub: #8E8E93;
+  --cfg-text-muted: #98989F;
+  --cfg-seg-track: rgba(0, 0, 0, 0.32);
+  --cfg-seg-border: rgba(255, 255, 255, 0.06);
+  --cfg-btn-surface: rgba(255, 255, 255, 0.08);
+  --cfg-btn-border: rgba(255, 255, 255, 0.11);
+  --cfg-switch-off: #3A3A3C;
+  --cfg-footer-grad: linear-gradient(180deg, rgba(15, 15, 18, 0) 0%, rgba(15, 15, 18, 0.92) 32%, #0F0F12 100%);
+
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  background: var(--cfg-bg);
+  color: var(--cfg-text-main);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(24px);
+  transition: opacity 0.36s cubic-bezier(0.22, 1, 0.36, 1), transform 0.36s cubic-bezier(0.22, 1, 0.36, 1), visibility 0.36s ease, background-color 0.28s ease, color 0.28s ease;
+  z-index: 20;
+  scrollbar-width: none;
+}
+
+/* מצב בהיר (Light Mode) */
+.device-config-sheet.light-mode {
+  --cfg-bg: #F2F4F7;
+  --cfg-header-bg: rgba(242, 244, 247, 0.86);
+  --cfg-header-border: rgba(15, 23, 42, 0.07);
+  --cfg-card-bg: rgba(255, 255, 255, 0.92);
+  --cfg-card-border: rgba(15, 23, 42, 0.06);
+  --cfg-card-shadow: 0 10px 30px rgba(0, 0, 0, 0.06);
+  --cfg-subbox-bg: #F8FAFC;
+  --cfg-subbox-border: rgba(15, 23, 42, 0.08);
+  --cfg-divider: rgba(15, 23, 42, 0.07);
+  --cfg-text-main: #111827;
+  --cfg-text-sub: #64748B;
+  --cfg-text-muted: #64748B;
+  --cfg-seg-track: #EEF2F6;
+  --cfg-seg-border: rgba(15, 23, 42, 0.06);
+  --cfg-btn-surface: rgba(15, 23, 42, 0.06);
+  --cfg-btn-border: rgba(15, 23, 42, 0.1);
+  --cfg-switch-off: #CBD5E1;
+  --cfg-footer-grad: linear-gradient(180deg, rgba(242, 244, 247, 0) 0%, rgba(242, 244, 247, 0.94) 32%, #F2F4F7 100%);
+}
+
+.device-config-sheet.active,
+.device-config-sheet.open {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.config-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: calc(env(safe-area-inset-top, 0px) + 16px) 20px 14px;
+  background: var(--cfg-header-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--cfg-header-border);
+  transition: background-color 0.28s ease, border-color 0.28s ease;
+}
+
+.config-header-start,
+.config-header-end {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.back-to-split-btn {
+  background: var(--cfg-btn-surface);
+  border: 1px solid var(--cfg-btn-border);
+  color: var(--cfg-text-main);
+  font-size: 13.5px;
+  font-weight: 500;
+  padding: 8px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.15s ease, color 0.2s ease;
+}
+
+.back-to-split-btn:active {
+  transform: scale(0.96);
+}
+
+.selected-device-pill {
+  font-size: 13px;
+  font-weight: 600;
+  color: #2C75FF;
+  background: rgba(44, 117, 255, 0.14);
+  border: 1px solid rgba(44, 117, 255, 0.28);
+  padding: 6px 14px;
+  border-radius: 999px;
+  letter-spacing: 0.2px;
+}
+
+.device-config-sheet:not(.light-mode) .selected-device-pill {
+  color: #6aa2ff;
+}
+
+/* כפתור מעבר מצב כהה/בהיר (שמש/ירח) וכפתור סגירה צף עגול */
+.theme-mode-toggle-btn,
+.floating-close-settings-btn {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: var(--cfg-btn-surface);
+  border: 1px solid var(--cfg-btn-border);
+  color: var(--cfg-text-main);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease, transform 0.15s ease, border-color 0.2s ease;
+}
+
+.theme-mode-toggle-btn:hover,
+.theme-mode-toggle-btn:active,
+.floating-close-settings-btn:hover,
+.floating-close-settings-btn:active {
+  transform: scale(0.94);
+  border-color: rgba(44, 117, 255, 0.45);
+}
+
+/* במצב כהה מוצגת השמש (למעבר לבהיר), במצב בהיר מוצג הירח (למעבר לכהה) */
+.device-config-sheet:not(.light-mode) .theme-icon-sun {
+  display: block;
+  color: #fbbf24;
+}
+.device-config-sheet:not(.light-mode) .theme-icon-moon {
+  display: none;
+}
+.device-config-sheet.light-mode .theme-icon-sun {
+  display: none;
+}
+.device-config-sheet.light-mode .theme-icon-moon {
+  display: block;
+  color: #2C75FF;
+}
+
+.config-body {
+  flex: 1;
+  overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  padding: 22px 18px 124px;
+  max-width: 480px;
+  width: 100%;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.config-body::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+/* כותרות קטגוריות בסגנון Samsung One UI */
+.oneui-section-header {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--cfg-text-muted);
+  letter-spacing: 0.55px;
+  padding: 6px 14px 10px;
+  margin-top: 4px;
+  user-select: none;
+}
+
+/* כרטיסיות צפות ומרווחות (Cards): border-radius: 24px עם backdrop-filter: blur(20px) */
+.config-group,
+.oneui-card {
+  background: var(--cfg-card-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--cfg-card-border);
+  border-radius: 24px;
+  margin-bottom: 20px;
+  padding: 10px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: var(--cfg-card-shadow);
+  transition: background-color 0.28s ease, border-color 0.28s ease, box-shadow 0.28s ease;
+}
+
+.oneui-card-divider {
+  height: 1px;
+  background: var(--cfg-divider);
+  margin: 2px 0;
+}
+
+.oneui-field-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 8px 0;
+}
+
+.config-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--cfg-text-sub);
+  letter-spacing: 0.3px;
+}
+
+.toggle-text-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-left: 8px;
+}
+
+.toggle-main-title {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--cfg-text-main);
+  line-height: 1.32;
+}
+
+.toggle-sub-desc {
+  font-size: 12.2px;
+  font-weight: 400;
+  color: var(--cfg-text-sub);
+  line-height: 1.4;
+}
+
+/* בחירת טפט עם תצוגה מקדימה עגולה וקטנה של הטפט הנוכחי */
+.oneui-wallpaper-picker-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0 6px;
+  flex-wrap: wrap;
+}
+
+.wallpaper-actions-inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.wallpaper-preview-pill-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  background: var(--cfg-btn-surface);
+  border: 1px solid var(--cfg-btn-border);
+  color: var(--cfg-text-main);
+  font-size: 13px;
+  font-weight: 500;
+  padding: 5px 12px 5px 7px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.wallpaper-preview-pill-btn:active {
+  background: rgba(44, 117, 255, 0.22);
+  border-color: #2C75FF;
+  transform: scale(0.95);
+}
+
+.wp-circle-preview {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background-size: cover;
+  background-position: center;
+  background-color: #1e1b4b;
+  border: 1.5px solid rgba(255, 255, 255, 0.5);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  flex-shrink: 0;
+}
+
+.wallpaper-upload-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(44, 117, 255, 0.14);
+  border: 1px solid rgba(44, 117, 255, 0.32);
+  color: #2C75FF;
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 7px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.device-config-sheet:not(.light-mode) .wallpaper-upload-icon-btn {
+  color: #6aa2ff;
+}
+
+.wallpaper-upload-icon-btn:active {
+  background: rgba(44, 117, 255, 0.26);
+  transform: scale(0.95);
+}
+
+/* Biometrics & Passcode Registration in Setup */
+.setup-passcode-box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--cfg-subbox-bg);
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid var(--cfg-subbox-border);
+  margin: 4px 0;
+}
+
+.setup-sub-label {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--cfg-text-sub);
+}
+
+.setup-passcode-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.setup-passcode-input {
+  flex: 1;
+  padding: 10px 14px;
+  border: 1px solid var(--cfg-btn-border);
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--cfg-text-main);
+  background: var(--cfg-seg-track);
+  user-select: text;
+  -webkit-user-select: text;
+  transition: border-color 0.2s ease;
+}
+
+.setup-passcode-input:focus {
+  border-color: #2C75FF;
+  outline: none;
+}
+
+.setup-passcode-saved {
+  font-size: 12px;
+  font-weight: 600;
+  color: #16a34a;
+  background: rgba(34, 197, 94, 0.14);
+  border: 1px solid rgba(34, 197, 94, 0.28);
+  padding: 6px 10px;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+
+.device-config-sheet:not(.light-mode) .setup-passcode-saved {
+  color: #4ade80;
+}
+
+/* לוח רישום דפוס אישי במסך ההגדרות (מוצג אך ורק באופציה של דפוס) */
+.setup-pattern-box {
+  background: var(--cfg-subbox-bg);
+  border: 1px solid var(--cfg-subbox-border);
+  border-radius: 16px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 4px 0;
+}
+
+.setup-pattern-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.setup-pattern-pad {
+  position: relative;
+  width: 196px;
+  height: 196px;
+  margin: 4px auto;
+  background: #0F0F12;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 18px;
+  touch-action: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.45);
+}
+
+.setup-pattern-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.setup-pattern-line {
+  fill: none;
+  stroke: #2C75FF;
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.setup-pattern-grid {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  place-items: center;
+  direction: ltr;
+}
+
+.setup-pattern-node {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.setup-pattern-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.55);
+  transition: all 0.15s ease;
+}
+
+.setup-pattern-node.active .setup-pattern-dot {
+  background: #2C75FF;
+  transform: scale(1.35);
+  box-shadow: 0 0 0 8px rgba(44, 117, 255, 0.25);
+}
+
+.biometric-enroll-card {
+  background: var(--cfg-subbox-bg);
+  border: 1px solid var(--cfg-subbox-border);
+  border-radius: 16px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 4px 0;
+}
+
+.bio-enroll-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.bio-enroll-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--cfg-text-main);
+}
+
+.bio-enroll-status {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--cfg-text-sub);
+  margin-top: 2px;
+}
+
+.bio-enroll-status.enrolled {
+  color: #16a34a;
+  font-weight: 500;
+}
+
+.device-config-sheet:not(.light-mode) .bio-enroll-status.enrolled {
+  color: #4ade80;
+}
+
+.bio-enroll-toggle-btn {
+  background: rgba(44, 117, 255, 0.14);
+  border: 1px solid rgba(44, 117, 255, 0.32);
+  color: #2C75FF;
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 7px 13px;
+  border-radius: 999px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+.device-config-sheet:not(.light-mode) .bio-enroll-toggle-btn {
+  color: #6aa2ff;
+}
+
+.bio-enroll-toggle-btn:active {
+  background: rgba(44, 117, 255, 0.28);
+  transform: scale(0.95);
+}
+
+.fp-enroll-pad-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 14px;
+  background: #0F0F12;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  color: #ffffff;
+}
+
+.fp-enroll-steps {
+  display: flex;
+  gap: 10px;
+  direction: ltr;
+}
+
+.fp-step-dot {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1.5px solid rgba(255, 255, 255, 0.24);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 500;
+  color: #8E8E93;
+  transition: all 0.2s ease;
+}
+
+.fp-step-dot.done {
+  background: #2C75FF;
+  border-color: #6aa2ff;
+  color: #ffffff;
+}
+
+.fp-enroll-sensor {
+  position: relative;
+  width: 82px;
+  height: 82px;
+  border-radius: 50%;
+  background: rgba(44, 117, 255, 0.14);
+  border: 2px solid rgba(44, 117, 255, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  touch-action: none;
+  transition: all 0.2s ease;
+}
+
+.fp-enroll-sensor.holding {
+  background: rgba(44, 117, 255, 0.32);
+  border-color: #2C75FF;
+  box-shadow: 0 0 22px rgba(44, 117, 255, 0.65);
+  transform: scale(1.06);
+}
+
+.fp-enroll-img {
+  width: 58px;
+  height: 58px;
+  object-fit: contain;
+  mix-blend-mode: screen;
+  filter: brightness(1.3);
+  pointer-events: none;
+}
+
+.fp-enroll-hint {
+  font-size: 12px;
+  font-weight: 400;
+  color: #98989F;
+  text-align: center;
+}
+
+/* Face ID Enrollment Camera Box */
+.faceid-camera-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 14px;
+  background: #0F0F12;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  color: #ffffff;
+}
+
+.faceid-video-circle {
+  position: relative;
+  width: 144px;
+  height: 144px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 3px solid #2C75FF;
+  box-shadow: 0 0 25px rgba(44, 117, 255, 0.4);
+  background: #1c1c1e;
+}
+
+.faceid-video-circle.scan-complete {
+  border-color: #22c55e;
+  box-shadow: 0 0 25px rgba(34, 197, 94, 0.6);
+}
+
+#setupFaceVideo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1);
+}
+
+.faceid-scan-laser {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, #4ade80, #2C75FF, transparent);
+  box-shadow: 0 0 12px #4ade80;
+  animation: laserScan 1.6s ease-in-out infinite;
+}
+
+@keyframes laserScan {
+  0%, 100% { top: 10%; }
+  50% { top: 88%; }
+}
+
+.faceid-scan-caption {
+  font-size: 12.5px;
+  color: #d1d1d6;
+  font-weight: 400;
+}
+
+/* כפתורי בחירה שטוחים ונקיים (PIN / סיסמה / דפוס / יעד פתיחה) */
+.segmented-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(84px, 1fr));
+  gap: 6px;
+  background: var(--cfg-seg-track);
+  padding: 5px;
+  border-radius: 16px;
+  border: 1px solid var(--cfg-seg-border);
+}
+
+.seg-pill {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  padding: 9px 8px;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--cfg-text-sub);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.seg-pill:active {
+  transform: scale(0.96);
+}
+
+.seg-pill.active {
+  background: #2C75FF;
+  border-color: rgba(255, 255, 255, 0.16);
+  color: #ffffff;
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(44, 117, 255, 0.32);
+}
+
+.model-presets-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(86px, 1fr));
+  gap: 8px;
+  direction: ltr;
+}
+
+.model-preset-chip,
+.model-preset-btn {
+  background: var(--cfg-subbox-bg);
+  border: 1px solid var(--cfg-subbox-border);
+  border-radius: 14px;
+  padding: 9px 6px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--cfg-text-main);
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.model-preset-chip:active,
+.model-preset-btn:active {
+  transform: scale(0.95);
+}
+
+.model-preset-sub {
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--cfg-text-sub);
+}
+
+.model-preset-chip.active,
+.model-preset-btn.active {
+  background: rgba(44, 117, 255, 0.16);
+  border-color: #2C75FF;
+  color: #2C75FF;
+  font-weight: 600;
+  box-shadow: 0 2px 10px rgba(44, 117, 255, 0.22);
+}
+
+.device-config-sheet:not(.light-mode) .model-preset-chip.active,
+.device-config-sheet:not(.light-mode) .model-preset-btn.active {
+  color: #ffffff;
+}
+
+.model-preset-chip.active .model-preset-sub,
+.model-preset-btn.active .model-preset-sub {
+  color: #2C75FF;
+}
+
+.device-config-sheet:not(.light-mode) .model-preset-chip.active .model-preset-sub,
+.device-config-sheet:not(.light-mode) .model-preset-btn.active .model-preset-sub {
+  color: #9ec5ff;
+}
+
+.config-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.cycle-wallpaper-btn {
+  background: rgba(44, 117, 255, 0.16);
+  border: 1px solid rgba(44, 117, 255, 0.32);
+  color: #6aa2ff;
+  font-size: 12.5px;
+  font-weight: 500;
+  padding: 6px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.18s ease;
+}
+
+/* תצוגת טפטים מודרנית: פינות עגולות חלקות (16px), מסגרת זוהרת ודקה (Active Ring), ואפקט לחיצה עדין (scale 0.95) */
+.wallpaper-gallery-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  padding: 6px 0 8px;
+}
+
+.wp-thumb-card {
+  position: relative;
+  height: 76px;
+  border-radius: 16px;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  border: 1.5px solid rgba(255, 255, 255, 0.12);
+  cursor: pointer;
+  overflow: hidden;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.22);
+  transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.device-config-sheet.light-mode .wp-thumb-card {
+  border-color: rgba(15, 23, 42, 0.1);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.1);
+}
+
+.wp-thumb-card:active {
+  transform: scale(0.95);
+}
+
+.wp-thumb-card.active {
+  border-color: #2C75FF;
+  box-shadow: 0 0 0 2px rgba(44, 117, 255, 0.55), 0 0 16px rgba(44, 117, 255, 0.45);
+}
+
+.wp-thumb-label {
+  width: 100%;
+  background: rgba(15, 15, 18, 0.72);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 500;
+  text-align: center;
+  padding: 4px 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.media-actions-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 6px 0;
+}
+
+.media-upload-btn {
+  flex: 1;
+  min-width: 125px;
+  background: var(--cfg-subbox-bg);
+  border: 1px dashed var(--cfg-btn-border);
+  border-radius: 16px;
+  padding: 11px 12px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--cfg-text-main);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.media-upload-btn:active {
+  transform: scale(0.97);
+}
+
+.media-clear-btn {
+  background: rgba(239, 68, 68, 0.14);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 999px;
+  padding: 7px 13px;
+  color: #ef4444;
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+.media-clear-btn:active {
+  transform: scale(0.95);
+}
+
+.clean-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  font-size: 14.5px;
+  font-weight: 500;
+  color: var(--cfg-text-main);
+}
+
+.clean-toggle-row.oneui-row-with-sub {
+  padding: 11px 0;
+}
+
+/* מתגים (Toggles): אנימציה חלקה מאפור לכחול סמסונג (#2C75FF) */
+.switch {
+  position: relative;
+  width: 48px;
+  height: 28px;
+  flex-shrink: 0;
+}
+
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  inset: 0;
+  background-color: var(--cfg-switch-off);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: background-color 0.26s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.26s ease;
+  border-radius: 999px;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 22px;
+  width: 22px;
+  left: 2px;
+  bottom: 2px;
+  background-color: #ffffff;
+  transition: transform 0.26s cubic-bezier(0.22, 1, 0.36, 1);
+  border-radius: 50%;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+}
+
+.switch input:checked + .slider {
+  background-color: #2C75FF;
+  border-color: #2C75FF;
+}
+
+.switch input:checked + .slider:before {
+  transform: translateX(20px);
+}
+
+.last-captured-pill {
+  background: var(--cfg-seg-track);
+  border: 1px solid var(--cfg-seg-border);
+  border-radius: 16px;
+  padding: 12px 16px;
+  margin: 4px 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--cfg-text-sub);
+}
+
+.last-captured-pill strong {
+  font-family: monospace;
+  font-size: 17px;
+  font-weight: 700;
+  color: #2C75FF;
+  letter-spacing: 1.5px;
+  direction: ltr;
+}
+
+.device-config-sheet:not(.light-mode) .last-captured-pill strong {
+  color: #6aa2ff;
+}
+
+.config-footer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 12px 20px calc(env(safe-area-inset-bottom, 0px) + 16px);
+  background: var(--cfg-footer-grad);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  display: flex;
+  justify-content: center;
+  z-index: 25;
+}
+
+/* כפתור "שמור וסגור" רחב ונקי בתחתית המסך עם רדיוס מלא וצבע אחיד */
+.launch-lockscreen-btn {
+  width: 100%;
+  max-width: 440px;
+  padding: 15px 24px;
+  border: none;
+  border-radius: 999px;
+  background: #2C75FF;
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(44, 117, 255, 0.36);
+  transition: background 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
+}
+
+.launch-lockscreen-btn:active {
+  background: #1f64eb;
+  transform: scale(0.98);
+}
+
+/* ==========================================================================
+   3. מסך נעילה של One UI (סמסונג) ו-iOS - עיצוב מדויק 1:1
+   ========================================================================== */
+
+.phone-container {
+  position: relative;
+  width: 100vw;
+  height: 100dvh;
+  max-width: 430px;
+  /* רקע כהה מעומעם בגוון כחלחל-סגול עמוק */
+  background-color: #12102b;
+  background-image: linear-gradient(165deg, #161438 0%, #23194f 48%, #111633 100%);
+  background-size: cover !important;
+  background-position: center !important;
+  background-repeat: no-repeat !important;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: calc(env(safe-area-inset-top, 0px) + 6px);
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 8px);
+  padding-left: 20px;
+  padding-right: 20px;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+/* שכבת עמעום כחלחלה-סגולה עמוקה מעל הטפט למראה One UI 1:1 */
+.lockscreen-dim-backdrop {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(17, 15, 42, 0.56) 0%, rgba(28, 18, 56, 0.64) 55%, rgba(14, 16, 38, 0.72) 100%);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  z-index: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+
+.phone-container.clock-mode-active .lockscreen-dim-backdrop {
+  background: rgba(12, 14, 32, 0.22);
+  backdrop-filter: blur(0px);
+  -webkit-backdrop-filter: blur(0px);
+}
+
+.phone-container > *:not(.lockscreen-dim-backdrop):not(.fake-homescreen):not(.fake-call):not(.secret-peek):not(.secret-trigger-zone):not(.secret-topright-hold-zone):not(.lock-icon) {
+  position: relative;
+  z-index: 2;
+}
+
+/* ==========================================================================
+   Status Bar & Top Hardware Elements (Punch-hole, Notch, Dynamic Island)
+   ========================================================================== */
+
+.secret-trigger-zone {
+  position: absolute;
+  top: 0;
+  left: 65px;
+  width: 70px;
+  height: 60px;
+  z-index: 60;
+}
+
+.status-bar {
+  width: calc(100% + 12px);
+  margin-left: -6px;
+  margin-right: -6px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  direction: ltr;
+  color: #ffffff;
+  z-index: 55 !important;
+  flex-shrink: 0;
+}
+
+.status-bar.hidden {
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.status-left {
+  display: flex;
+  align-items: center;
+  min-width: 76px;
+  padding-left: 6px;
+}
+
+.status-time {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #ffffff;
+  cursor: pointer;
+  padding: 4px 6px;
+}
+
+.phone-container.theme-ios .status-left {
+  padding-left: 10px;
+}
+
+.phone-container.theme-ios .status-time {
+  font-size: 15.5px;
+  font-weight: 600;
+  letter-spacing: -0.3px;
+}
+
+.camera-punch-hole {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 14px;
+  height: 14px;
+  background-color: #000000;
+  border-radius: 50%;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  overflow: hidden;
+  transition: width 0.42s cubic-bezier(0.22, 1, 0.36, 1), height 0.42s cubic-bezier(0.22, 1, 0.36, 1), border-radius 0.42s ease, box-shadow 0.35s ease;
+}
+
+.camera-punch-hole.hidden {
+  display: none;
+}
+
+.island-live-cam {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  pointer-events: none;
+  transform: scaleX(-1);
+  transition: opacity 0.3s ease;
+}
+
+.camera-punch-hole.faceid-animating .island-live-cam {
+  opacity: 0.38;
+}
+
+.island-faceid-content {
+  position: relative;
+  z-index: 2;
+  display: none;
+  width: 100%;
+  height: 100%;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 11px;
+  color: #ffffff;
+}
+
+/* iPhone 14-18 Dynamic Island */
+.phone-container.theme-ios .camera-punch-hole {
+  top: 4px;
+  width: 116px;
+  height: 32px;
+  border-radius: 20px;
+}
+
+/* iPhone 12-13 Classic Notch */
+.phone-container.theme-ios.ios-notch-model .camera-punch-hole {
+  top: -6px;
+  width: 156px;
+  height: 30px;
+  border-radius: 0 0 18px 18px;
+}
+
+.phone-container.theme-ios .island-faceid-content {
+  display: flex;
+}
+
+.phone-container.theme-ios .camera-punch-hole.faceid-animating {
+  width: 158px;
+  height: 36px;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.5);
+}
+
+.island-lock-svg {
+  width: 14px;
+  height: 14px;
+  color: #ffffff;
+  flex-shrink: 0;
+  overflow: visible;
+}
+
+.island-lock-shackle {
+  transition: transform 0.38s cubic-bezier(0.34, 1.56, 0.64, 1), stroke 0.3s ease;
+  transform-origin: 16px 10px;
+}
+
+.camera-punch-hole.faceid-unlocked .island-lock-shackle {
+  transform: translateY(-2.8px) rotate(22deg);
+  stroke: #4ade80;
+}
+
+.camera-punch-hole.faceid-unlocked .island-lock-body {
+  fill: #4ade80;
+}
+
+.island-faceid-glyph {
+  width: 15px;
+  height: 15px;
+  color: rgba(255, 255, 255, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.3s ease, transform 0.35s ease;
+}
+
+.camera-punch-hole.faceid-animating .island-faceid-glyph {
+  color: #4ade80;
+  transform: scale(1.14);
+}
+
+.island-faceid-glyph svg {
+  width: 100%;
+  height: 100%;
+}
+
+.status-right {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 90px;
+  padding-right: 4px;
+}
+
+.status-icons-samsung {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.phone-container.theme-ios .status-icons-samsung {
+  display: none;
+}
+
+.status-svg {
+  fill: #ffffff;
+}
+
+.wifi-svg, .signal-svg {
+  width: 13px;
+  height: 13px;
+}
+
+.samsung-battery-text {
+  font-size: 12px;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.samsung-battery-icon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.samsung-battery-cap {
+  width: 4.5px;
+  height: 1.6px;
+  background: #ffffff;
+  border-radius: 1px 1px 0 0;
+}
+
+.samsung-battery-body {
+  width: 9px;
+  height: 13.5px;
+  border: 1.3px solid #ffffff;
+  border-radius: 2.2px;
+  padding: 1px;
+  display: flex;
+  align-items: flex-end;
+}
+
+.samsung-battery-fill {
+  width: 100%;
+  background: #ffffff;
+  border-radius: 1px;
+}
+
+.status-icons-ios {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  padding-right: 4px;
+}
+
+.phone-container.theme-ios .status-icons-ios {
+  display: flex;
+}
+
+.ios-signal-svg {
+  width: 17px;
+  height: 12px;
+}
+
+.ios-wifi-svg {
+  width: 15.5px;
+  height: 12px;
+}
+
+.ios-battery-wrap {
+  display: flex;
+  align-items: center;
+  gap: 1.5px;
+}
+
+.ios-battery-body {
+  position: relative;
+  width: 25px;
+  height: 12.5px;
+  border: 1.2px solid rgba(255, 255, 255, 0.65);
+  border-radius: 4px;
+  padding: 1.2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.ios-battery-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  background: #ffffff;
+  border-radius: 2px;
+}
+
+.ios-battery-num {
+  position: relative;
+  z-index: 2;
+  font-size: 9.5px;
+  font-weight: 800;
+  color: #ffffff;
+  mix-blend-mode: difference;
+  letter-spacing: -0.4px;
+  line-height: 1;
+}
+
+.ios-battery-cap {
+  width: 1.6px;
+  height: 4.5px;
+  background: rgba(255, 255, 255, 0.65);
+  border-radius: 0 2px 2px 0;
+}
+
+/* ==========================================================================
+   מנעול עליון, מסך שעון ראשי, כותרת ושדה סיסמה קפסולה של One UI
+   ========================================================================== */
+
+.lock-icon {
+  position: absolute !important;
+  top: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  margin: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  transition: transform 0.38s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.phone-container.theme-ios .lock-icon {
+  top: 40px;
+}
+
+.lock-icon svg {
+  width: 19px;
+  height: 19px;
+  fill: #ffffff;
+  overflow: visible;
+}
+
+.top-lock-shackle {
+  transition: transform 0.42s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transform-origin: 15.1px 10px;
+}
+
+.lock-icon.faceid-unlocked {
+  transform: translateX(-50%) translateY(-2px) scale(1.06);
+}
+
+.lock-icon.faceid-unlocked .top-lock-shackle {
+  transform: translateY(-3px) rotate(24deg);
+}
+
+/* מסך השעון הראשי (כשלוחצים על חץ החזרה בפינה השמאלית התחתונה) */
+.clock-lock-screen {
+  display: none;
+  flex: 1;
+  width: 100%;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: 46px 0 40px;
+  color: #ffffff;
+  cursor: pointer;
+}
+
+.phone-container.clock-mode-active .clock-lock-screen {
+  display: flex;
+}
+
+.phone-container.clock-mode-active #lockHeaderArea,
+.phone-container.clock-mode-active #oneUiPasswordPillWrap,
+.phone-container.clock-mode-active #pinDots,
+.phone-container.clock-mode-active .unlock-mode-view,
+.phone-container.clock-mode-active #samsungEmergencyBtn,
+.phone-container.clock-mode-active .bottom-bar {
+  display: none !important;
+}
+
+.clock-lock-center {
+  text-align: center;
+}
+
+.clock-lock-big-time {
+  font-size: 74px;
+  font-weight: 300;
+  letter-spacing: -1px;
+  line-height: 1;
+}
+
+.clock-lock-date {
+  font-size: 16px;
+  opacity: 0.9;
+  margin-top: 8px;
+}
+
+.clock-lock-swipe-prompt {
+  font-size: 13.5px;
+  opacity: 0.82;
+  background: rgba(255, 255, 255, 0.14);
+  padding: 8px 20px;
+  border-radius: 999px;
+}
+
+/* כותרת עליונה וכיתוב משני באפור-בהיר */
+.header-area {
+  text-align: center;
+  color: #ffffff;
+  margin-top: 46px;
+  margin-bottom: 2px;
+  direction: rtl;
+  min-height: 46px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+}
+
+/* במצב קוד PIN בלבד (Samsung One UI): המנעול מקובע בראש המסך (top: 25px), והטקסטים יושבים ישירות מעל נקודות ה-PIN ולוח המקשים */
+.phone-container.mode-pin-active .lock-icon {
+  position: absolute !important;
+  top: 25px;
+  left: 50%;
+  transform: translateX(-50%);
+  margin: 0;
+  z-index: 10;
+}
+
+.phone-container.mode-pin-active .header-area {
+  margin-top: auto;
+  margin-bottom: 20px;
+  min-height: 48px;
+}
+
+.phone-container.mode-pin-active .pin-dots {
+  margin: 0 0 12px;
+}
+
+.phone-container.mode-pin-active .title-group {
+  gap: 6px;
+}
+
+.phone-container.mode-pin-active .title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: 0.1px;
+}
+
+.phone-container.mode-pin-active .subtitle {
+  font-size: 13px;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.72);
+  max-width: 310px;
+  line-height: 1.35;
+}
+
+.title-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.title-group.hidden {
+  display: none;
+}
+
+.title {
+  font-size: 19px;
+  font-weight: 700;
+  color: #ffffff;
+  text-align: center;
+}
+
+.phone-container.theme-ios .title {
+  font-size: 20px;
+  font-weight: 500;
+}
+
+.subtitle {
+  font-size: 12.5px;
+  font-weight: 400;
+  color: #cbd5e1;
+  max-width: 310px;
+  line-height: 1.35;
+  text-align: center;
+}
+
+.subtitle:empty {
+  display: none;
+}
+
+/* הודעת שגיאה באדום ("סיסמה שגויה" / "טביעת אצבע לא תואמת") */
+.error-msg {
+  display: none;
+  font-size: 16px;
+  font-weight: 700;
+  color: #ff4d4f;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.55);
+  text-align: center;
+}
+
+@keyframes textShake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-7px); }
+  40%, 80% { transform: translateX(7px); }
+}
+
+.text-shake {
+  animation: textShake 0.36s ease-in-out;
+}
+
+@keyframes iosDotsShake {
+  0%, 100% { transform: translateX(0); }
+  15%, 45%, 75% { transform: translateX(-11px); }
+  30%, 60%, 90% { transform: translateX(11px); }
+}
+
+.ios-dots-shake {
+  animation: iosDotsShake 0.42s cubic-bezier(0.36, 0.07, 0.19, 0.97);
+}
+
+/* ==========================================================================
+   שדה הסיסמה של One UI (קפסולה מעוגלת border-radius: 25px, רקע כהה שקוף rgba(255,255,255,0.08), סמן כחול #2c75ff, עין דקה משמאל)
+   + אנימציית החלקה דינמית בעת פתיחת המקלדת במצב סיסמה (mode-words-active)
+   ========================================================================== */
+
+/* במצב סיסמה (mode-words-active):
+   בלוק ההזנה (הכיתובים, השדה ושיחת החירום) יושב בחצי התחתון של המסך (סביב 58% מגובה המסך) */
+.phone-container.mode-words-active .lock-icon {
+  position: absolute !important;
+  top: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.phone-container.mode-words-active .header-area {
+  margin-top: auto;
+  margin-bottom: 14px;
+  transition: transform 0.25s ease-out;
+}
+
+.phone-container.mode-words-active .title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.phone-container.mode-words-active .subtitle {
+  font-size: 13px;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.72);
+  max-width: 315px;
+  line-height: 1.38;
+}
+
+.oneui-password-pill-wrap {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  margin: 4px 0 12px;
+  transition: transform 0.25s ease-out;
+}
+
+.oneui-password-form {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+.phone-container.theme-ios .oneui-password-pill-wrap.hide-on-ios-pin {
+  display: none;
+}
+
+.oneui-password-pill {
+  width: 100%;
+  max-width: 360px;
+  height: 46px;
+  border-radius: 25px;
+  /* רקע כהה שקוף של Samsung One UI */
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  display: flex;
+  flex-direction: row-reverse; /* כפתור עין משמאל, שדה הקלדה מימין */
+  align-items: center;
+  padding: 0 18px 0 12px;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.phone-container.words-keyboard-open .oneui-password-pill {
+  background: rgba(255, 255, 255, 0.11);
+  border-color: rgba(255, 255, 255, 0.26);
+}
+
+.oneui-eye-btn {
+  width: 30px;
+  height: 30px;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.78);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.oneui-eye-btn:active {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.oneui-eye-btn svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+}
+
+.oneui-password-input {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  border: none;
+  color: #ffffff;
+  font-size: 18px;
+  font-weight: 500;
+  direction: rtl;
+  text-align: right;
+  /* סמן כתיבה כחול מהבהב של סמסונג */
+  caret-color: #2c75ff;
+  padding: 0 6px;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.oneui-password-input::placeholder {
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 14px;
+}
+
+/* בעת לחיצה על שדה הסיסמה (פתיחת מקלדת):
+   כל הבלוק (הכיתובים + שדה הסיסמה) מחליק באנימציה חלקה כלפי מעלה בצורה מתונה (לא גבוה מדי),
+   ואייקון טביעת האצבע וכפתור שיחת החירום מוסתרים בצורה חלקה */
+.phone-container.mode-words-active.words-keyboard-open .header-area,
+.phone-container.mode-words-active.words-keyboard-open .oneui-password-pill-wrap {
+  transform: translateY(-95px);
+}
+
+.phone-container.mode-words-active .emergency-btn {
+  margin-top: 6px;
+  background: rgba(88, 36, 68, 0.48);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  transition: opacity 0.22s ease, transform 0.25s ease-out, visibility 0.22s ease;
+}
+
+.phone-container.mode-words-active .footer-area {
+  transition: opacity 0.22s ease, transform 0.25s ease-out, visibility 0.22s ease;
+}
+
+.phone-container.mode-words-active.words-keyboard-open .emergency-btn,
+.phone-container.mode-words-active.words-keyboard-open .fingerprint-container {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(20px);
+}
+
+/* נקודות קוד PIN דינמיות (השטח מתחיל ריק לחלוטין, וכל הקשה יוצרת נקודה חדשה באנימציית pop/fade-in) */
+.pin-dots {
+  display: none;
+  justify-content: center;
+  align-items: center;
+  gap: 14px;
+  min-height: 24px;
+  height: 24px;
+  margin: 8px 0 12px;
+  direction: ltr;
+}
+
+.phone-container.theme-ios .pin-dots {
+  gap: 16px;
+}
+
+@keyframes pinDotPop {
+  0% {
+    opacity: 0;
+    transform: scale(0.25);
+  }
+  70% {
+    opacity: 1;
+    transform: scale(1.22);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.pin-dynamic-dot {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: transparent;
+  border: 1.5px solid rgba(255, 255, 255, 0.55);
+  transition: background-color 0.14s ease, border-color 0.14s ease, transform 0.16s ease, box-shadow 0.14s ease;
+}
+
+.pin-dynamic-dot.filled {
+  background: #ffffff;
+  border-color: #ffffff;
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.35);
+}
+
+.pin-dynamic-dot.pin-dot-pop {
+  animation: pinDotPop 0.18s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.secret-topright-hold-zone {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 76px;
+  height: 76px;
+  z-index: 35;
+  background: transparent;
+}
+
+.swipe-unlock-area {
+  width: 100%;
+  height: 220px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: rgba(255, 255, 255, 0.9);
+  cursor: pointer;
+  touch-action: none;
+}
+
+.swipe-chevron-anim {
+  font-size: 28px;
+  line-height: 1;
+  animation: iosSwipeFloat 1.8s ease-in-out infinite;
+}
+
+.swipe-unlock-label {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+
+/* ==========================================================================
+   4. תיקון לוח המקשים הנומרי (CSS Grid repeat(3, 1fr) נקי וללא הסטת Hitbox)
+   ========================================================================== */
+
+.unlock-mode-view {
+  display: none;
+  width: 100%;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.unlock-mode-view.active {
+  display: flex;
+}
+
+.keypad {
+  direction: ltr;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  justify-items: center;
+  align-items: center;
+  gap: 11px 16px;
+  width: 100%;
+  max-width: 290px;
+  margin: 0 auto;
+}
+
+.phone-container.theme-ios .keypad {
+  gap: 14px 20px;
+  max-width: 304px;
+}
+
+/* כפתורי המקלדת - ללא שום position: absolute או translateY */
+.key-btn {
+  width: 62px;
+  height: 62px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  color: #ffffff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: background-color 0.06s ease;
+}
+
+/* רק הכפתור שעליו לחצו מקבל את אפקט ההארה */
+.key-btn.is-pressed {
+  background: rgba(255, 255, 255, 0.48) !important;
+}
+
+.phone-container.theme-ios .key-btn {
+  width: 74px;
+  height: 74px;
+  background: rgba(255, 255, 255, 0.22);
+  border: none;
+}
+
+.phone-container.theme-ios .key-btn.is-pressed {
+  background: rgba(255, 255, 255, 0.62) !important;
+}
+
+.key-number {
+  font-size: 25px;
+  font-weight: 400;
+  line-height: 1;
+  color: #ffffff;
+  pointer-events: none;
+}
+
+.phone-container.theme-ios .key-number {
+  font-size: 34px;
+  font-weight: 300;
+}
+
+.key-letters {
+  font-size: 8.5px;
+  font-weight: 600;
+  letter-spacing: 1.2px;
+  margin-top: 2px;
+  color: rgba(255, 255, 255, 0.85);
+  text-transform: uppercase;
+  pointer-events: none;
+}
+
+.key-action {
+  font-size: 15px;
+  font-weight: 700;
+  color: #ffffff;
+  pointer-events: none;
+}
+
+.backspace-icon svg {
+  width: 20px;
+  height: 20px;
+  fill: #ffffff;
+  display: block;
+  pointer-events: none;
+}
+
+.phone-container.theme-ios .samsung-only-key {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* ==========================================================================
+   Mode 2: Pattern Lock (3x3 Grid)
+   ========================================================================== */
+
+.pattern-wrapper {
+  position: relative;
+  width: 260px;
+  height: 260px;
+  margin: 4px auto;
+  touch-action: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pattern-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.pattern-line {
+  fill: none;
+  stroke: #ffffff;
+  stroke-width: 4.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.pattern-wrapper.pattern-error .pattern-line {
+  stroke: #ff4d4f;
+}
+
+.pattern-wrapper.stealth-mode .pattern-line {
+  opacity: 0 !important;
+}
+
+.pattern-grid {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  place-items: center;
+  direction: ltr;
+}
+
+.pattern-node {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pattern-node-dot {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: #ffffff;
+  transition: transform 0.15s ease;
+}
+
+.pattern-wrapper:not(.stealth-mode) .pattern-node.active .pattern-node-dot {
+  transform: scale(1.4);
+  box-shadow: 0 0 0 10px rgba(255, 255, 255, 0.25);
+}
+
+/* ==========================================================================
+   Mode 3: Full Native Keyboard View
+   ========================================================================== */
+
+.words-native-container {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  margin: 14px 0 36px;
+}
+
+.word-submit-btn {
+  padding: 9px 26px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.22);
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.word-tap-hint {
+  font-size: 12.5px;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+/* ==========================================================================
+   כפתור "שיחת חירום", אייקון טביעת אצבע וחץ חזרה בפינה השמאלית התחתונה
+   ========================================================================== */
+
+.emergency-btn {
+  margin-top: 10px;
+  padding: 8px 28px;
+  background: rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 999px;
+  color: #ffffff;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  direction: rtl;
+}
+
+/* מרווח טבעי ועדין של 24px מעל כפתור "שיחת חירום" במצב PIN */
+.phone-container.mode-pin-active .emergency-btn {
+  margin-top: 24px;
+}
+
+.emergency-btn:active {
+  background: rgba(255, 255, 255, 0.42);
+}
+
+.phone-container.theme-ios .emergency-btn {
+  display: none;
+}
+
+.footer-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  margin-top: 2px;
+}
+
+.phone-container.theme-ios .footer-area {
+  display: none;
+}
+
+/* אייקון טביעת אצבע מעוצב (הסמל הלבן/תכלת של סמסונג) ממורכז בתחתית */
+.fingerprint-container {
+  width: 96px;
+  height: 96px;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  position: relative;
+  touch-action: none;
+}
+
+.fingerprint-container.hidden {
+  visibility: hidden;
+  pointer-events: none;
+  height: 44px;
+}
+
+.fingerprint-halo {
+  position: absolute;
+  width: 62px;
+  height: 62px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(56, 189, 248, 0.34) 0%, rgba(56, 189, 248, 0.12) 55%, transparent 75%);
+  opacity: 0.8;
+  pointer-events: none;
+  animation: fpIdleBreathe 2.6s ease-in-out infinite;
+}
+
+.fingerprint-ripple {
+  position: absolute;
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  border: 2px solid rgba(125, 211, 252, 0.75);
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.5);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.fingerprint-container.pressing .fingerprint-halo {
+  opacity: 1;
+  transform: scale(1.38);
+  background: radial-gradient(circle, rgba(186, 230, 253, 0.9) 0%, rgba(56, 189, 248, 0.52) 52%, transparent 76%);
+}
+
+.fingerprint-container.pressing .fingerprint-ripple {
+  animation: fpRippleExpand 0.62s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+}
+
+.fingerprint-container.pressing .fingerprint-ripple.delay-1 {
+  animation-delay: 0.2s;
+}
+
+@keyframes fpIdleBreathe {
+  0%, 100% { transform: scale(0.94); opacity: 0.55; }
+  50% { transform: scale(1.08); opacity: 0.9; }
+}
+
+@keyframes fpRippleExpand {
+  0% { transform: scale(0.75); opacity: 0.95; }
+  100% { transform: scale(1.85); opacity: 0; }
+}
+
+.fingerprint-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  transform: scale(1.28);
+  mix-blend-mode: screen;
+  filter: contrast(1.3) brightness(1.18) drop-shadow(0 0 4px rgba(56, 189, 248, 0.45));
+  pointer-events: none;
+  transition: transform 0.18s ease, filter 0.18s ease;
+  -webkit-mask-image: radial-gradient(circle, rgba(0,0,0,1) 48%, rgba(0,0,0,0) 80%);
+  mask-image: radial-gradient(circle, rgba(0,0,0,1) 48%, rgba(0,0,0,0) 80%);
+}
+
+.fingerprint-container.pressing .fingerprint-img {
+  transform: scale(1.42);
+  filter: contrast(1.4) brightness(1.75) drop-shadow(0 0 14px rgba(56, 189, 248, 0.98));
+}
+
+.words-mode-spacer {
+  display: none;
+}
+
+.phone-container.mode-words-active .words-mode-spacer {
+  display: none;
+}
+
+/* חץ חזרה ממוקם בצד ההפוך (בפינה הימנית התחתונה של המסך) ופונה לכיוון הנכון */
+.bottom-bar {
+  width: 100%;
+  direction: ltr !important;
+  display: flex;
+  flex-direction: row !important;
+  align-items: center;
+  justify-content: flex-end !important;
+  padding: 0 8px 2px;
+}
+
+.samsung-back-btn {
+  width: 44px;
+  height: 44px;
+  margin-left: auto !important;
+  margin-right: 0 !important;
+  background: transparent;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border-radius: 50%;
+}
+
+.samsung-back-btn:active {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.samsung-back-btn svg {
+  width: 24px;
+  height: 24px;
+  fill: none;
+  stroke: #ffffff;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* iOS Footer */
+.ios-footer {
+  display: none;
+  width: 100%;
+  flex-direction: column;
+  align-items: center;
+  margin-top: auto;
+  padding-top: 8px;
+}
+
+.phone-container.theme-ios .ios-footer {
+  display: flex;
+}
+
+.ios-Bottom-swipe-hint {
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.92);
+  margin-bottom: 8px;
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.35s ease, transform 0.35s ease;
+  pointer-events: none;
+}
+
+.ios-Bottom-swipe-hint.visible {
+  opacity: 1;
+  transform: translateY(0);
+  animation: iosSwipeFloat 2.2s ease-in-out infinite;
+}
+
+@keyframes iosSwipeFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+.ios-bottom-actions {
+  width: 100%;
+  max-width: 275px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 18px;
+  direction: ltr;
+}
+
+.ios-text-btn {
+  background: none;
+  border: none;
+  color: #ffffff;
+  font-size: 16.5px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 8px 12px;
+}
+
+.ios-home-indicator {
+  width: 134px;
+  height: 5px;
+  border-radius: 100px;
+  background: #ffffff;
+  margin-bottom: 2px;
+}
+
+/* ==========================================================================
+   Fake Home Screen & Secret Peek
+   ========================================================================== */
+
+.fake-homescreen {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  background: linear-gradient(165deg, #2563eb 0%, #1d4ed8 55%, #1e3a8a 100%);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(1.05);
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.fake-homescreen.unlocked {
+  opacity: 1;
+  pointer-events: auto;
+  transform: scale(1);
+}
+
+.default-homescreen-ui {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 64px 24px 36px;
+  color: #ffffff;
+}
+
+.fake-homescreen.has-custom-home .default-homescreen-ui {
+  display: none;
+}
+
+.home-weather-widget {
+  text-align: center;
+}
+
+.home-clock {
+  font-size: 56px;
+  font-weight: 300;
+}
+
+.home-date {
+  font-size: 15px;
+  opacity: 0.9;
+  margin-top: 4px;
+}
+
+.secret-relock-zone {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 85px;
+  height: 85px;
+  z-index: 45;
+}
+
+.secret-peek {
+  position: absolute;
+  bottom: 54px;
+  left: 20px;
+  color: #ffffff;
+  background: rgba(0, 0, 0, 0.88);
+  padding: 14px 22px;
+  border-radius: 18px;
+  font-size: 34px;
+  font-weight: 700;
+  font-family: monospace;
+  letter-spacing: 4px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.14s ease, transform 0.14s ease;
+  transform: translateY(6px);
+  z-index: 999;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  direction: ltr;
+  max-width: calc(100% - 40px);
+  word-break: break-all;
+}
+
+.secret-peek.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.peek-pattern-mini {
+  width: 110px;
+  height: 110px;
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 4px;
+  display: none;
+}
+
+.peek-pattern-mini.active {
+  display: block;
+}
+
+/* אפליקציית פתקים מדומה (Fake Notes App) */
+.fake-notes-app {
+  width: 100%;
+  height: 100%;
+  background: #fffdf7;
+  color: #1e293b;
+  display: flex;
+  flex-direction: column;
+  padding: 48px 20px 28px;
+  direction: rtl;
+  z-index: 42;
+}
+
+.notes-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.notes-back-link {
+  color: #eab308;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.notes-header-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.notes-done-btn {
+  color: #eab308;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.notes-date-line {
+  text-align: center;
+  font-size: 12px;
+  color: #94a3b8;
+  margin: 10px 0 8px;
+}
+
+.notes-title-input {
+  width: 100%;
+  border: none;
+  background: transparent;
+  font-size: 22px;
+  font-weight: 800;
+  color: #0f172a;
+  margin-bottom: 10px;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.notes-body-textarea {
+  flex: 1;
+  width: 100%;
+  border: none;
+  background: transparent;
+  font-size: 16.5px;
+  line-height: 1.6;
+  color: #334155;
+  resize: none;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+/* ==========================================================================
+   מסך רישוי נעול למכשיר (Device-Locked Activation Overlay)
+   ========================================================================== */
+.license-lock-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  background: radial-gradient(circle at top, #1b1c29 0%, #0e0e12 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  direction: rtl;
+}
+
+.license-lock-card {
+  width: 100%;
+  max-width: 360px;
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 26px;
+  padding: 28px 22px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.65);
+}
+
+.license-lock-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: rgba(56, 136, 255, 0.14);
+  border: 1px solid rgba(56, 136, 255, 0.35);
+  color: #3888ff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+
+.license-lock-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #ffffff;
+  margin-bottom: 10px;
+}
+
+.license-lock-desc {
+  font-size: 14px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.72);
+  margin-bottom: 14px;
+}
+
+.license-device-id-box {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: rgba(0, 0, 0, 0.38);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  direction: ltr;
+}
+
+.license-device-id-val {
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 14.5px;
+  font-weight: 700;
+  color: #38bdf8;
+  letter-spacing: 0.6px;
+  user-select: all;
+  -webkit-user-select: all;
+  word-break: break-all;
+}
+
+.license-copy-btn {
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 11px;
+  border-radius: 9px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.license-key-input {
+  width: 100%;
+  height: 48px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.07);
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 700;
+  text-align: center;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  padding: 0 16px;
+  margin-bottom: 10px;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.license-key-input:focus {
+  border-color: #3888ff;
+  box-shadow: 0 0 0 3px rgba(56, 136, 255, 0.22);
+}
+
+.license-error-msg {
+  min-height: 20px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #fb7185;
+  margin-bottom: 8px;
+}
+
+.license-activate-btn {
+  width: 100%;
+  height: 48px;
+  border: none;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #3888ff 0%, #2563eb 100%);
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 8px 22px rgba(37, 99, 235, 0.38);
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
+.license-activate-btn:active {
+  transform: scale(0.97);
+}
+
+.reg-form-section {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.license-reg-input {
+  width: 100%;
+  height: 44px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  color: #ffffff;
+  font-size: 14.5px;
+  padding: 0 14px;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.license-reg-input:focus {
+  border-color: #38bdf8;
+}
+
+.license-reg-submit-btn {
+  width: 100%;
+  height: 44px;
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  border-radius: 14px;
+  background: rgba(56, 189, 248, 0.16);
+  color: #38bdf8;
+  font-size: 14.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.reg-waiting-box {
+  width: 100%;
+  padding: 14px;
+  border-radius: 16px;
+  background: rgba(234, 179, 8, 0.1);
+  border: 1px solid rgba(234, 179, 8, 0.3);
+  margin-bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.reg-spinner {
+  width: 22px;
+  height: 22px;
+  border: 2.5px solid rgba(250, 204, 21, 0.25);
+  border-top-color: #facc15;
+  border-radius: 50%;
+  animation: regSpin 0.9s linear infinite;
+}
+
+@keyframes regSpin {
+  to { transform: rotate(360deg); }
+}
+
+.reg-waiting-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #fde047;
+}
+
+.reg-waiting-sub {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.68);
+  line-height: 1.4;
+}
+
+.reg-divider {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 6px 0 12px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+/* ==========================================================================
+   שדרוגי UX, הגנת יציאה (Exit Protection) וכפתור עדכון גרסה עצמי (In-App Updater)
+   ========================================================================== */
+
+html, body, .phone-container {
+  overscroll-behavior: none !important;
+  touch-action: manipulation;
+}
+
+.phone-container {
+  touch-action: none;
+}
+
+@keyframes samsungLockProtectBounce {
+  0% { transform: translateY(0) scale(1); }
+  25% { transform: translateY(-6px) scale(1.06); }
+  50% { transform: translateY(2px) scale(0.98); }
+  75% { transform: translateY(-3px) scale(1.02); }
+  100% { transform: translateY(0) scale(1); }
+}
+
+.lock-bounce-protect {
+  animation: samsungLockProtectBounce 0.36s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.in-app-update-banner {
+  width: 100%;
+  margin-bottom: 14px;
+  padding: 12px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.18), rgba(37, 99, 235, 0.22));
+  border: 1px solid rgba(52, 211, 153, 0.45);
+  box-shadow: 0 10px 26px rgba(16, 185, 129, 0.2);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.in-app-update-btn {
+  width: 100%;
+  min-height: 46px;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(16, 185, 129, 0.38);
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
+.in-app-update-btn:active {
+  transform: scale(0.98);
+}
+
+.in-app-update-btn:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+.in-app-update-status {
+  font-size: 12.5px;
+  color: #a7f3d0;
+  font-weight: 600;
+  text-align: center;
+}
+
+/* הודעה מדומה שקופצת מלמעלה (חשיפה בהתראה) */
+.fake-msg-banner {
+  position: fixed;
+  top: 10px;
+  left: 10px;
+  right: 10px;
+  z-index: 100001;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 22px;
+  background: rgba(30, 30, 34, 0.92);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  color: #fff;
+  direction: rtl;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+  transform: translateY(-140%);
+  transition: transform 0.38s cubic-bezier(0.22, 1, 0.36, 1);
+  font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+.fake-msg-banner.show {
+  transform: translateY(0);
+}
+
+.fake-msg-banner.light {
+  background: rgba(245, 245, 247, 0.94);
+  color: #111;
+}
+
+.fake-msg-icon {
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #34d399, #16a34a);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.fake-msg-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.fake-msg-top {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  opacity: 0.65;
+  margin-bottom: 2px;
+}
+
+.fake-msg-sender {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.fake-msg-text {
+  font-size: 14.5px;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+/* בורר "באיזה ניסיון הטלפון ייפתח" - חמשת הכפתורים בשורה אחת */
+#unlockAttemptModeSelector {
+  grid-template-columns: repeat(5, 1fr);
+}
+
+#unlockAttemptModeSelector .seg-pill {
+  flex: 1 1 0;
+  min-width: 0;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+/* תמונת השולח (חשיפה בהתראה) */
+.reveal-avatar-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.reveal-avatar-preview,
+.fake-msg-avatar {
+  width: 46px;
+  height: 46px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-weight: 800;
+  font-size: 21px;
+  background-size: cover;
+  background-position: center;
+}
+
+.fake-msg-avatar {
+  width: 40px;
+  height: 40px;
+  font-size: 18px;
+}
+
+.reveal-avatar-pick {
+  flex: 1;
+  text-align: center;
+  cursor: pointer;
+}
+
+/* רוטינות שמורות */
+.routine-save-row {
+  display: flex;
+  gap: 8px;
+}
+
+.routine-save-row {
+  align-items: center;
+}
+
+.feedback-textarea.routine-name-input {
+  min-height: 0;
+  height: 44px;
+  flex: 1;
+  resize: none;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.routine-save-row .routine-save-btn {
+  flex-shrink: 0;
+  height: 44px;
+  min-height: 0;
+  padding: 0 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.routine-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.routine-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.routine-item.active {
+  border-color: #3888ff;
+  background: rgba(56, 136, 255, 0.14);
+}
+
+.routine-item-name {
+  flex: 1;
+  font-weight: 700;
+  font-size: 14.5px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.routine-item button {
+  border: none;
+  border-radius: 10px;
+  padding: 7px 12px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.routine-load-btn {
+  background: #3888ff;
+  color: #fff;
+}
+
+.routine-del-btn {
+  background: rgba(244, 63, 94, 0.15);
+  color: #fb7185;
+}
+
+.routine-empty {
+  font-size: 13px;
+  opacity: 0.6;
+  text-align: center;
+  padding: 6px 0;
+}
+
+/* קוד גיבוי */
+.backup-code-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.backup-code-row .media-upload-btn {
+  flex: 0 0 auto;
+  width: auto;
+  height: 44px;
+  min-height: 0;
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+}
+
+.backup-code {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  text-align: center;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  direction: ltr;
+  padding: 10px;
+  border-radius: 12px;
+  background: rgba(56, 189, 248, 0.12);
+  color: #38bdf8;
+  user-select: all;
+}
+
+/* היסטוריית קודים */
+.history-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 4px;
+}
+
+.history-clear-btn {
+  border: none;
+  border-radius: 10px;
+  padding: 6px 12px;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.code-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 230px;
+  overflow-y: auto;
+}
+
+.code-history-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: var(--cfg-subbox-bg);
+  border: 1px solid var(--cfg-subbox-border);
+}
+
+.code-history-item:first-child {
+  border-color: rgba(44, 117, 255, 0.55);
+}
+
+.code-history-code {
+  flex: 1;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  direction: ltr;
+  text-align: left;
+  color: var(--cfg-text-main);
+}
+
+.code-history-meta {
+  font-size: 12px;
+  color: var(--cfg-text-sub);
+  white-space: nowrap;
+}
+
+.code-history-empty {
+  font-size: 13px;
+  color: var(--cfg-text-sub);
+  text-align: center;
+  padding: 6px 0;
+}
+
+.notes-age-row {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+/* כפתור "מוכן לצופה הבא" */
+.reset-show-btn {
+  width: 100%;
+  min-height: 52px;
+  margin-bottom: 16px;
+  border-radius: 18px;
+  border: none;
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+  color: #fff;
+  font-size: 16px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 8px 20px rgba(34, 197, 94, 0.3);
+  transition: transform 0.12s ease;
+}
+
+.reset-show-btn:active {
+  transform: scale(0.97);
+}
+
+/* לשוניות ההגדרות */
+.settings-tabs {
+  position: sticky;
+  top: -22px;
+  z-index: 20;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 4px;
+  margin: -6px -4px 16px;
+  padding: 6px;
+  border-radius: 20px;
+  background: var(--cfg-header-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--cfg-card-border);
+  box-shadow: var(--cfg-card-shadow);
+}
+
+.settings-tab {
+  border: none;
+  background: transparent;
+  color: var(--cfg-text-sub);
+  border-radius: 14px;
+  padding: 7px 2px 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease, transform 0.15s ease;
+}
+
+.settings-tab .tab-ico {
+  font-size: 19px;
+  line-height: 1.1;
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.settings-tab:active {
+  transform: scale(0.94);
+}
+
+.settings-tab.active {
+  background: #2C75FF;
+  color: #fff;
+  box-shadow: 0 6px 16px rgba(44, 117, 255, 0.35);
+}
+
+.settings-tab.active .tab-ico {
+  transform: scale(1.18) translateY(-1px);
+}
+
+.settings-panel {
+  display: none;
+}
+
+.settings-panel.active {
+  display: block;
+  animation: settingsPanelIn 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes settingsPanelIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.header-guide-btn {
+  font-size: 17px;
+  font-weight: 800;
+  color: #2C75FF;
+}
+
+/* חלון המדריך */
+.guide-card {
+  max-width: 420px;
+  max-height: 86vh;
+  text-align: right;
+  align-items: stretch;
+  border-color: rgba(56, 136, 255, 0.45);
+}
+
+.guide-card .update-popup-title {
+  text-align: center;
+}
+
+.guide-body {
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-inline-end: 2px;
+}
+
+.guide-body details {
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 10px 12px;
+}
+
+.guide-body summary {
+  cursor: pointer;
+  font-weight: 800;
+  font-size: 15px;
+  color: #fff;
+  list-style-position: inside;
+}
+
+.guide-body p {
+  margin: 8px 0 2px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #cbd5e1;
+}
+
+.guide-body b {
+  color: #fff;
+}
+
+/* כפתור פתיחת המדריך */
+.guide-open-btn {
+  width: 100%;
+  min-height: 48px;
+  margin-bottom: 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(56, 136, 255, 0.45);
+  background: rgba(56, 136, 255, 0.12);
+  color: #6aa2ff;
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+/* תיבת משוב בהגדרות */
+.feedback-textarea {
+  width: 100%;
+  min-height: 96px;
+  resize: vertical;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(0, 0, 0, 0.25);
+  color: inherit;
+  padding: 10px 12px;
+  font-size: 14px;
+  line-height: 1.5;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+.feedback-send-btn {
+  width: 100%;
+  margin-top: 8px;
+  border-style: solid;
+  border-color: rgba(34, 197, 94, 0.5);
+  color: #22c55e;
+}
+
+/* חלון בחירת סוג הנעילה (אחרי "שמור וסגור") */
+.lock-type-card {
+  border-color: rgba(56, 136, 255, 0.45);
+  gap: 14px;
+}
+
+.lock-type-grid {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.lock-type-btn {
+  min-height: 72px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  font-size: 17px;
+  font-weight: 800;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  cursor: pointer;
+  transition: transform 0.12s ease, background 0.12s ease;
+}
+
+.lock-type-btn span {
+  font-size: 12px;
+  font-weight: 500;
+  color: #94a3b8;
+}
+
+.lock-type-btn:active {
+  transform: scale(0.96);
+}
+
+.lock-type-btn.active {
+  background: rgba(56, 136, 255, 0.22);
+  border-color: #3888ff;
+}
+
+.lock-type-wide {
+  grid-column: 1 / -1;
+  min-height: 58px;
+}
+
+/* חלון "יש עדכון חדש" */
+.update-popup-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100000;
+  background: rgba(3, 6, 15, 0.72);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  direction: rtl;
+}
+
+.update-popup-card {
+  width: 100%;
+  max-width: 340px;
+  background: #151826;
+  border: 1px solid rgba(52, 211, 153, 0.4);
+  border-radius: 24px;
+  padding: 26px 22px 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+  animation: updatePopupIn 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes updatePopupIn {
+  from { transform: scale(0.92); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+.update-popup-icon {
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: #fff;
+  font-size: 26px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.update-popup-title {
+  font-size: 19px;
+  font-weight: 800;
+  color: #fff;
+}
+
+.update-popup-text {
+  font-size: 14px;
+  color: #cbd5e1;
+  line-height: 1.5;
+  white-space: pre-line;
+}
+
+.update-popup-btn {
+  width: 100%;
+  min-height: 48px;
+  margin-top: 6px;
+  border: none;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: #fff;
+  font-size: 16px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.update-popup-btn:disabled {
+  opacity: 0.7;
+}
+
+.update-popup-later {
+  background: none;
+  border: none;
+  color: #94a3b8;
+  font-size: 13.5px;
+  padding: 8px;
+  cursor: pointer;
+}
+
+
+/* הודעה אישית מהמפתח */
+.admin-msg-text { white-space: pre-wrap; word-break: break-word; text-align: right; max-height: 45vh; overflow-y: auto; }
+.admin-msg-last { margin: 8px 0 10px; padding: 10px 12px; border-radius: 12px; background: rgba(34,197,94,.1); border: 1px solid rgba(34,197,94,.28); color: #dcfce7; font-size: 13px; line-height: 1.55; white-space: pre-wrap; word-break: break-word; }
+.admin-msg-last b { color: #86efac; }
+
+/* הצצה מטלפון שני */
+.remote-peek-link { font-family: ui-monospace, monospace; font-size: 11.5px; padding: 8px 10px; border-radius: 10px; background: rgba(0,0,0,.25); border: 1px solid rgba(255,255,255,.12); word-break: break-all; margin-bottom: 8px; user-select: all; }
+.remote-peek-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+.remote-peek-actions > * { width: 100%; margin: 0; }
+
+/* iOS 26 - Liquid Glass (iPhone 17 / 18) */
+.theme-ios.ios-liquid-glass .key-btn {
+  background: linear-gradient(160deg, rgba(255,255,255,.26), rgba(255,255,255,.08) 55%, rgba(255,255,255,.14)) !important;
+  -webkit-backdrop-filter: blur(18px) saturate(1.8);
+  backdrop-filter: blur(18px) saturate(1.8);
+  border: 0.5px solid rgba(255,255,255,.32) !important;
+  box-shadow: inset 0 1.5px 1px rgba(255,255,255,.55), inset 0 -1px 2px rgba(255,255,255,.18), 0 6px 22px rgba(0,0,0,.14) !important;
+}
+.theme-ios.ios-liquid-glass .key-btn:active {
+  background: linear-gradient(160deg, rgba(255,255,255,.55), rgba(255,255,255,.3)) !important;
+}
+
+/* English (LTR): כל הממשק משמאל לימין */
+html[dir="ltr"] body,
+html[dir="ltr"] body * { direction: ltr !important; }
+html[dir="ltr"] .oneui-password-input,
+html[dir="ltr"] .guide-card,
+html[dir="ltr"] .admin-msg-text { text-align: left !important; }
+
+/* ===================== גלריה מדומה (חשיפה בתמונה) ===================== */
+.fake-gallery-app { position: absolute; inset: 0; background: #000; color: #fff; flex-direction: column; z-index: 3; direction: ltr; }
+.gallery-topbar { display: flex; align-items: center; justify-content: space-between; padding: calc(env(safe-area-inset-top, 0px) + 34px) 10px 8px; }
+.gallery-icon-btn { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; }
+.gallery-icon-btn svg { width: 22px; height: 22px; fill: none; stroke: #fff; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.gallery-icon-btn svg circle { fill: #fff; stroke: none; }
+.gallery-meta { text-align: center; line-height: 1.25; }
+.gallery-meta-day { font-size: 15px; font-weight: 600; }
+.gallery-meta-time { font-size: 12px; color: rgba(255,255,255,0.65); }
+.gallery-photo-wrap { flex: 1; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.gallery-photo { width: 100%; height: auto; max-height: 100%; object-fit: contain; display: block; }
+.gallery-strip { display: flex; gap: 3px; padding: 8px 10px; overflow-x: auto; scrollbar-width: none; justify-content: flex-end; }
+.gallery-strip::-webkit-scrollbar { display: none; }
+.gallery-thumb { width: 38px; height: 38px; border-radius: 4px; flex: 0 0 auto; opacity: 0.75; }
+.gallery-thumb.active { width: 46px; height: 46px; margin-top: -4px; opacity: 1; outline: 2px solid #fff; }
+.gallery-actions { display: flex; justify-content: space-around; padding: 10px 24px calc(env(safe-area-inset-bottom, 0px) + 22px); }
+.gallery-actions svg { width: 24px; height: 24px; fill: none; stroke: #fff; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.gallery-text-input { min-height: 0 !important; height: 42px; resize: none; }
+
+/* ===================== שיחה נכנסת מדומה ===================== */
+.phone-container > .fake-call { position: fixed; inset: 0; height: 100%; height: 100dvh; z-index: 90; }
+.fake-call {
+  flex-direction: column; justify-content: space-between; align-items: center;
+  padding: calc(env(safe-area-inset-top, 0px) + 80px) 24px calc(env(safe-area-inset-bottom, 0px) + 70px);
+  color: #fff; text-align: center;
+  background: radial-gradient(120% 80% at 50% 0%, #1f3b5c 0%, #0b1220 60%, #05070d 100%);
+  opacity: 0; transform: translateY(-14px); transition: opacity .28s ease, transform .28s ease;
+}
+.fake-call.show { opacity: 1; transform: translateY(0); }
+.fake-call.ios { background: linear-gradient(180deg, rgba(40,40,46,0.96), rgba(18,18,22,0.98)); }
+.fake-call-top { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.fake-call-label { font-size: 15px; color: rgba(255,255,255,0.7); min-height: 18px; }
+.fake-call-avatar { width: 96px; height: 96px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 40px; font-weight: 600; background-size: cover; margin: 8px 0 4px; }
+.fake-call.ios .fake-call-avatar { order: -1; width: 76px; height: 76px; font-size: 32px; }
+.fake-call-name { font-size: 36px; font-weight: 400; letter-spacing: 0.5px; direction: ltr; unicode-bidi: plaintext; word-break: break-word; }
+.fake-call.ios .fake-call-name { font-size: 32px; }
+.fake-call-sub { font-size: 16px; color: rgba(255,255,255,0.7); }
+.fake-call-actions { width: 100%; display: flex; justify-content: space-around; direction: ltr; }
+.fake-call-action { display: flex; flex-direction: column; align-items: center; gap: 10px; font-size: 14px; color: rgba(255,255,255,0.85); }
+.fake-call-btn { width: 72px; height: 72px; border-radius: 50%; border: none; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+.fake-call-btn svg { width: 32px; height: 32px; fill: #fff; }
+.fake-call-btn.decline { background: #ff3b30; }
+.fake-call-btn.decline svg { transform: rotate(0deg); }
+.fake-call-btn.accept { background: #34c759; animation: callPulse 1.4s ease-in-out infinite; }
+.fake-call-btn:active { filter: brightness(0.85); transform: scale(0.96); }
+@keyframes callPulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(52,199,89,0.55); } 50% { box-shadow: 0 0 0 16px rgba(52,199,89,0); } }
+.fake-call-incall { display: flex; flex-direction: column; align-items: center; gap: 28px; }
+.fake-call-timer { font-size: 18px; color: rgba(255,255,255,0.8); font-variant-numeric: tabular-nums; }
+
+/* מצב תרגול: תזכורת בראש מסך ההגדרות בלבד */
+body.practice-on .settings-tabs::after { content: '🎯 מצב תרגול פעיל'; position: absolute; bottom: -18px; left: 50%; background: rgba(245,158,11,0.15); padding: 1px 10px; border-radius: 10px; transform: translateX(-50%); font-size: 11px; font-weight: 700; color: #f59e0b; white-space: nowrap; }
+html[dir="ltr"] body.practice-on .settings-tabs::after { content: '🎯 Practice mode on'; }
+
+/* ===================== בדיקה לפני הופעה ===================== */
+.preshow-btn { width: 100%; margin-top: 8px; padding: 12px; border-radius: 16px; border: 1px solid rgba(34,197,94,0.35); background: rgba(34,197,94,0.1); color: #22c55e; font-size: 15px; font-weight: 800; font-family: inherit; cursor: pointer; }
+.preshow-card { max-width: 420px; max-height: 86vh; overflow-y: auto; text-align: start; color: #f1f5f9; }
+.preshow-summary { text-align: center; font-size: 15px; font-weight: 700; margin: 4px 0 12px; }
+.preshow-summary.ok { color: #22c55e; }
+.preshow-summary.warn { color: #f59e0b; }
+.preshow-summary.bad { color: #f87171; }
+.preshow-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+.preshow-item { display: grid; grid-template-columns: 26px 1fr auto; align-items: center; gap: 8px; padding: 9px 10px; border-radius: 12px; background: rgba(255,255,255,0.05); }
+.preshow-icon { font-size: 16px; text-align: center; }
+.preshow-title { font-size: 14px; font-weight: 700; }
+.preshow-detail { font-size: 12px; opacity: 0.7; margin-top: 2px; line-height: 1.4; }
+.preshow-fix { border: none; border-radius: 10px; padding: 7px 10px; font-size: 12.5px; font-weight: 700; background: #2563eb; color: #fff; font-family: inherit; cursor: pointer; white-space: nowrap; }
+
+/* ===================== חיפוש מדומה (חשיפה בחיפוש) ===================== */
+.fake-search-app { position: absolute; inset: 0; z-index: 3; background: #ffffff; color: #202124; flex-direction: column; padding: calc(env(safe-area-inset-top, 0px) + 44px) 16px 20px; }
+.search-bar { display: flex; align-items: center; gap: 10px; height: 48px; padding: 0 16px; border-radius: 24px; background: #f1f3f4; }
+.search-bar svg { width: 20px; height: 20px; fill: none; stroke: #5f6368; stroke-width: 2; stroke-linecap: round; }
+.search-placeholder { flex: 1; font-size: 16px; color: #5f6368; }
+.search-recent-title { margin: 22px 4px 8px; font-size: 14px; font-weight: 600; color: #5f6368; }
+.search-recent-list { display: flex; flex-direction: column; }
+.search-recent-item { display: flex; align-items: center; gap: 14px; padding: 12px 4px; border-bottom: 1px solid #f1f3f4; }
+.search-recent-item svg { width: 20px; height: 20px; flex: 0 0 auto; fill: none; stroke: #9aa0a6; stroke-width: 2; stroke-linecap: round; }
+.search-recent-text { flex: 1; font-size: 16px; color: #202124; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.search-recent-when { font-size: 12px; color: #9aa0a6; flex: 0 0 auto; }
+
+/* ===================== סיור היכרות ===================== */
+.tour-layer { position: fixed; inset: 0; z-index: 10050; }
+.tour-spot { position: fixed; border-radius: 16px; box-shadow: 0 0 0 9999px rgba(2, 6, 23, 0.72); transition: all .3s ease; pointer-events: none; outline: 2px solid rgba(96,165,250,.9); outline-offset: 2px; }
+.tour-spot.center { width: 0 !important; height: 0 !important; left: 50% !important; top: 40% !important; outline: none; }
+.tour-card { position: fixed; left: 16px; right: 16px; max-width: 420px; margin: 0 auto; background: #1e293b; color: #f1f5f9; border: 1px solid rgba(255,255,255,.12); border-radius: 18px; padding: 16px; box-shadow: 0 14px 40px rgba(0,0,0,.5); transition: top .3s ease; }
+.tour-text { font-size: 15px; line-height: 1.6; white-space: pre-line; }
+.tour-foot { display: flex; align-items: center; gap: 8px; margin-top: 14px; }
+.tour-dots { flex: 1; font-size: 10px; letter-spacing: 3px; color: #64748b; }
+.tour-skip { background: none; border: none; color: #94a3b8; font-size: 14px; font-family: inherit; cursor: pointer; padding: 8px; }
+.tour-next { background: #2563eb; color: #fff; border: none; border-radius: 12px; padding: 10px 18px; font-size: 15px; font-weight: 700; font-family: inherit; cursor: pointer; }
+
+/* ===================== כפתור ? ליד כל קסם ===================== */
+.trick-tip-btn { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; margin-inline-start: 6px; border-radius: 50%; border: 1px solid rgba(96,165,250,.55); background: rgba(37,99,235,.12); color: #60a5fa; font-size: 12px; font-weight: 800; font-family: inherit; cursor: pointer; vertical-align: middle; padding: 0; flex: 0 0 auto; }
+.tip-card { max-width: 400px; text-align: start; color: #f1f5f9; }
+.tip-how { font-size: 15px; line-height: 1.65; margin: 6px 0 12px; white-space: pre-line; }
+.tip-patter { background: rgba(34,197,94,.1); border: 1px solid rgba(34,197,94,.3); border-radius: 14px; padding: 10px 12px; margin-bottom: 14px; }
+.tip-patter-label { font-size: 12px; font-weight: 800; color: #4ade80; margin-bottom: 4px; }
+.tip-patter-text { font-size: 15px; font-style: italic; line-height: 1.55; }

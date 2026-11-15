@@ -1,0 +1,5870 @@
+// ============================================================================
+// MAGIC LOCKSCREEN SIMULATOR (ONE UI 1:1 & iOS + BIOMETRICS + FULLSCREEN)
+// ============================================================================
+
+const CONFIG_STORAGE_KEY = 'magic_lockscreen_config_v6';
+const WALLPAPER_STORAGE_KEY = 'magic_custom_wallpaper';
+const SELECTED_WALLPAPER_ID_KEY = 'magic_selected_wallpaper_id_v1';
+const HOMESCREEN_STORAGE_KEY = 'magic_custom_homescreen';
+const LAST_PIN_KEY = 'last_entered_pin';
+const HISTORY_KEY = 'pin_history';
+const FORCE_MODE_STORAGE_KEY = 'forceUnlockMode';
+const NOTES_TITLE_STORAGE_KEY = 'magic_notes_title_v1';
+const NOTES_BODY_STORAGE_KEY = 'magic_notes_body_v1';
+
+// ביטול contextmenu לחלוטין (מניעת תפריטי דפדפן בלחיצה ארוכה)
+window.addEventListener(
+  'contextmenu',
+  (e) => {
+    e.preventDefault();
+    return false;
+  },
+  { capture: true }
+);
+
+// רוטינת "כפיית פתיחה" (Any PIN Unlocks / Force Routine) - ברירת מחדל: true
+let forceUnlockMode = (() => {
+  const saved = localStorage.getItem(FORCE_MODE_STORAGE_KEY);
+  if (saved === null) {
+    localStorage.setItem(FORCE_MODE_STORAGE_KEY, 'true');
+    return true;
+  }
+  return saved === 'true';
+})();
+let isForceMode = forceUnlockMode;
+
+function setForceModeState(nextState) {
+  forceUnlockMode = Boolean(nextState);
+  isForceMode = forceUnlockMode;
+  try {
+    localStorage.setItem(FORCE_MODE_STORAGE_KEY, String(forceUnlockMode));
+  } catch (e) {}
+  const toggleEl = document.getElementById('toggleForceUnlockMode');
+  if (toggleEl) toggleEl.checked = forceUnlockMode;
+  const selectorEl = document.getElementById('forceModeSelector');
+  if (selectorEl) {
+    selectorEl.querySelectorAll('.seg-pill').forEach((btn) => {
+      btn.classList.toggle('active', (btn.dataset.forcemode === 'true') === forceUnlockMode);
+    });
+  }
+  // מעדכן את השלט בטלפון השני (אם מחובר)
+  if (typeof scheduleLiveStatePublish === 'function') {
+    try {
+      scheduleLiveStatePublish();
+    } catch (e) {}
+  }
+}
+
+function triggerHaptic(msOrPattern) {
+  if (navigator.vibrate) {
+    try {
+      navigator.vibrate(msOrPattern);
+    } catch (e) {}
+  }
+  if (window.AndroidBridge && typeof window.AndroidBridge.vibrate === 'function') {
+    try {
+      const arr = Array.isArray(msOrPattern) ? msOrPattern : [msOrPattern];
+      window.AndroidBridge.vibrate(JSON.stringify(arr));
+    } catch (e) {}
+  }
+}
+
+let pinAudioCtx = null;
+function playKeyClickSound() {
+  if (typeof config !== 'undefined' && config && config.keySound === false) return;
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+    if (!pinAudioCtx) pinAudioCtx = new AudioCtx();
+    if (pinAudioCtx.state === 'suspended') {
+      pinAudioCtx.resume().catch(() => {});
+    }
+    const now = pinAudioCtx.currentTime;
+    // צליל הקשה מקורי ועדין של סמסונג (One UI Key Tap)
+    const osc = pinAudioCtx.createOscillator();
+    const subOsc = pinAudioCtx.createOscillator();
+    const gain = pinAudioCtx.createGain();
+    osc.type = 'sine';
+    subOsc.type = 'triangle';
+    osc.frequency.setValueAtTime(640, now);
+    osc.frequency.exponentialRampToValueAtTime(195, now + 0.022);
+    subOsc.frequency.setValueAtTime(1180, now);
+    subOsc.frequency.exponentialRampToValueAtTime(320, now + 0.014);
+    gain.gain.setValueAtTime(0.055, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.024);
+    osc.connect(gain);
+    subOsc.connect(gain);
+    gain.connect(pinAudioCtx.destination);
+    osc.start(now);
+    subOsc.start(now);
+    osc.stop(now + 0.025);
+    subOsc.stop(now + 0.016);
+  } catch (e) {}
+}
+
+function toggleForceModeSecretly() {
+  trackEvent('secret_toggle');
+  setForceModeState(!forceUnlockMode);
+  // חיווי רטט עדין של 40ms כחיווי סודי למבצע בלבד
+  triggerHaptic(40);
+}
+
+// ----------------------------------------------------------------------------
+// 1. מחולל טפטים רשמיים מובנים (SVG Data-URI מהירים, חדים וללא תלות ברשת)
+// ----------------------------------------------------------------------------
+function createSvgWallpaper(stops, shapesSvg = '', angle = 145) {
+  const rad = (angle * Math.PI) / 180;
+  const x2 = Math.round(50 + Math.sin(rad) * 50);
+  const y2 = Math.round(50 + Math.cos(rad) * 50);
+  const stopsXml = stops
+    .map(([offset, color]) => `<stop offset="${offset}%" stop-color="${color}"/>`)
+    .join('');
+
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 2400" preserveAspectRatio="xMidYMid slice">
+    <defs>
+      <linearGradient id="bg" x1="0%" y1="0%" x2="${x2}%" y2="${y2}%">${stopsXml}</linearGradient>
+      <radialGradient id="glow1" cx="30%" cy="25%" r="55%">
+        <stop offset="0%" stop-color="rgba(255,255,255,0.28)"/>
+        <stop offset="100%" stop-color="rgba(255,255,255,0)"/>
+      </radialGradient>
+      <radialGradient id="glow2" cx="75%" cy="72%" r="50%">
+        <stop offset="0%" stop-color="rgba(56,189,248,0.22)"/>
+        <stop offset="100%" stop-color="rgba(0,0,0,0)"/>
+      </radialGradient>
+    </defs>
+    <rect width="1080" height="2400" fill="url(#bg)"/>
+    <rect width="1080" height="2400" fill="url(#glow1)"/>
+    <rect width="1080" height="2400" fill="url(#glow2)"/>
+    ${shapesSvg}
+  </svg>`;
+
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}
+
+// ----------------------------------------------------------------------------
+// 2. מאגר דגמים מלא (Presets: Samsung S20-S26 & Apple iPhone 12-18)
+// ----------------------------------------------------------------------------
+const MODEL_PRESETS = {
+  samsung: [
+    {
+      id: 's20',
+      name: 'Galaxy S20',
+      year: '2020',
+      cutout: 'punch',
+      defaultWallpaper: createSvgWallpaper(
+        [[0, '#0f172a'], [38, '#1e3a8a'], [74, '#ec4899'], [100, '#fbcfe8']],
+        `<path d="M-100 1700 C320 1350, 760 1980, 1200 1550 L1200 2400 L-100 2400 Z" fill="rgba(255,255,255,0.14)"/>
+         <circle cx="540" cy="880" r="420" fill="rgba(244,114,182,0.18)"/>`
+      )
+    },
+    {
+      id: 's21',
+      name: 'Galaxy S21',
+      year: '2021',
+      cutout: 'punch',
+      defaultWallpaper: createSvgWallpaper(
+        [[0, '#1e1b4b'], [42, '#5b21b6'], [78, '#c084fc'], [100, '#f5d0fe']],
+        `<path d="M0 400 Q540 950 1080 350 L1080 1450 Q540 1000 0 1550 Z" fill="rgba(255,255,255,0.12)"/>`
+      )
+    },
+    {
+      id: 's22',
+      name: 'Galaxy S22',
+      year: '2022',
+      cutout: 'punch',
+      defaultWallpaper: createSvgWallpaper(
+        [[0, '#042f2e'], [40, '#0f766e'], [78, '#fb7185'], [100, '#fde68a']],
+        `<circle cx="380" cy="980" r="460" fill="rgba(45,212,191,0.2)"/>
+         <circle cx="720" cy="1360" r="390" fill="rgba(251,113,133,0.22)"/>`
+      )
+    },
+    {
+      id: 's23',
+      name: 'Galaxy S23',
+      year: '2023',
+      cutout: 'punch',
+      defaultWallpaper: createSvgWallpaper(
+        [[0, '#052e16'], [45, '#14532d'], [80, '#3f6212'], [100, '#bef264']],
+        `<circle cx="540" cy="1120" r="480" fill="rgba(163,230,53,0.16)"/>
+         <circle cx="540" cy="1120" r="290" fill="rgba(255,255,255,0.1)"/>`
+      )
+    },
+    {
+      id: 's24',
+      name: 'Galaxy S24',
+      year: '2024',
+      cutout: 'punch',
+      defaultWallpaper: createSvgWallpaper(
+        [[0, '#1c1917'], [38, '#57534e'], [74, '#d97706'], [100, '#fef08a']],
+        `<polygon points="540,360 960,1150 540,1920 120,1150" fill="rgba(251,191,36,0.16)"/>
+         <polygon points="540,560 820,1150 540,1720 260,1150" fill="rgba(255,255,255,0.12)"/>`
+      )
+    },
+    {
+      id: 's25',
+      name: 'Galaxy S25',
+      year: '2025',
+      cutout: 'punch',
+      defaultWallpaper: createSvgWallpaper(
+        [[0, '#090d1e'], [38, '#1e1b4b'], [72, '#3b0764'], [100, '#581c87']],
+        `<circle cx="540" cy="960" r="500" fill="rgba(56,189,248,0.15)"/>
+         <path d="M-80 1650 Q540 1220 1160 1650 L1160 2400 L-80 2400 Z" fill="rgba(192,38,211,0.16)"/>`
+      )
+    },
+    {
+      id: 's26',
+      name: 'Galaxy S26',
+      year: '2026',
+      cutout: 'punch',
+      defaultWallpaper: createSvgWallpaper(
+        [[0, '#0c0a24'], [35, '#1e1b4b'], [72, '#4c1d95'], [100, '#701a75']],
+        `<ellipse cx="540" cy="1080" rx="460" ry="620" fill="rgba(56,189,248,0.14)"/>
+         <ellipse cx="540" cy="1080" rx="280" ry="420" fill="rgba(244,114,182,0.15)"/>`
+      )
+    }
+  ],
+  ios: [
+    {
+      id: 'iphone12',
+      name: 'iPhone 12',
+      year: 'Notch',
+      cutout: 'notch',
+      defaultWallpaper: createSvgWallpaper(
+        [[0, '#0f172a'], [36, '#1d4ed8'], [72, '#ec4899'], [100, '#fda4af']],
+        `<circle cx="540" cy="1200" r="560" fill="rgba(59,130,246,0.22)"/>
+         <circle cx="540" cy="1200" r="360" fill="rgba(244,114,182,0.25)"/>`
+      )
+    },
+    {
+      id: 'iphone13',
+      name: 'iPhone 13',
+      year: 'Notch',
+      cutout: 'notch',
+      defaultWallpaper: createSvgWallpaper(
+        [[0, '#0c4a6e'], [42, '#0284c7'], [76, '#7dd3fc'], [100, '#f0f9ff']],
+        `<path d="M0 700 C400 1050, 680 450, 1080 850 L1080 1850 C680 1450, 400 2050, 0 1700 Z" fill="rgba(255,255,255,0.22)"/>`
+      )
+    },
+    {
+      id: 'iphone14',
+      name: 'iPhone 14',
+      year: 'Dynamic Island',
+      cutout: 'island',
+      defaultWallpaper: createSvgWallpaper(
+        [[0, '#2e1065'], [44, '#6d28d9'], [80, '#c084fc'], [100, '#f3e8ff']],
+        `<ellipse cx="540" cy="1160" rx="480" ry="680" fill="rgba(255,255,255,0.15)"/>`
+      )
+    },
+    {
+      id: 'iphone15',
+      name: 'iPhone 15',
+      year: 'Dynamic Island',
+      cutout: 'island',
+      defaultWallpaper: createSvgWallpaper(
+        [[0, '#18181b'], [40, '#3f3f46'], [76, '#60a5fa'], [100, '#dbeafe']],
+        `<path d="M-60 1100 Q540 650 1140 1100 L1140 1700 Q540 1250 -60 1700 Z" fill="rgba(147,197,253,0.2)"/>`
+      )
+    },
+    {
+      id: 'iphone16',
+      name: 'iPhone 16',
+      year: 'Dynamic Island',
+      cutout: 'island',
+      defaultWallpaper: createSvgWallpaper(
+        [[0, '#1e1b4b'], [38, '#4338ca'], [74, '#818cf8'], [100, '#fde68a']],
+        `<circle cx="340" cy="950" r="420" fill="rgba(129,140,248,0.25)"/>
+         <circle cx="740" cy="1380" r="420" fill="rgba(251,191,36,0.22)"/>`
+      )
+    },
+    {
+      id: 'iphone17',
+      name: 'iPhone 17',
+      year: 'Dynamic Island',
+      cutout: 'island',
+      defaultWallpaper: createSvgWallpaper(
+        [[0, '#042f2e'], [38, '#0f766e'], [76, '#38bdf8'], [100, '#f0fdfa']],
+        `<ellipse cx="540" cy="1050" rx="520" ry="440" fill="rgba(255,255,255,0.16)"/>`
+      )
+    },
+    {
+      id: 'iphone18',
+      name: 'iPhone 18',
+      year: 'Dynamic Island',
+      cutout: 'island',
+      defaultWallpaper: createSvgWallpaper(
+        [[0, '#090d16'], [32, '#311042'], [68, '#0284c7'], [100, '#a5f3fc']],
+        `<circle cx="540" cy="1040" r="480" fill="rgba(56,189,248,0.2)"/>
+         <circle cx="540" cy="1380" r="350" fill="rgba(244,114,182,0.2)"/>`
+      )
+    }
+  ]
+};
+
+// גלריית טפטים נוספים לכל מערכת הפעלה
+const BUILTIN_GALLERY_WALLPAPERS = {
+  samsung: [
+    {
+      id: 'sam_aurora',
+      label: 'One UI Violet',
+      dataUrl: createSvgWallpaper(
+        [[0, '#0c0d24'], [45, '#1e1b4b'], [82, '#581c87'], [100, '#831843']],
+        `<circle cx="540" cy="920" r="450" fill="rgba(56,189,248,0.16)"/>`
+      )
+    },
+    {
+      id: 'sam_titanium',
+      label: 'Titanium Gold',
+      dataUrl: createSvgWallpaper(
+        [[0, '#1c1917'], [48, '#78350f'], [82, '#f59e0b'], [100, '#fef3c7']],
+        `<polygon points="540,340 940,1200 540,2040 140,1200" fill="rgba(255,255,255,0.14)"/>`
+      )
+    },
+    {
+      id: 'sam_crystal',
+      label: 'Emerald Wave',
+      dataUrl: createSvgWallpaper(
+        [[0, '#064e3b'], [46, '#059669'], [82, '#34d399'], [100, '#d1fae5']],
+        `<path d="M-80 1550 Q540 1100 1160 1550 L1160 2400 L-80 2400 Z" fill="rgba(255,255,255,0.16)"/>`
+      )
+    }
+  ],
+  ios: [
+    {
+      id: 'ios_bloom',
+      label: 'iOS Glow',
+      dataUrl: createSvgWallpaper(
+        [[0, '#1e1b4b'], [40, '#6d28d9'], [76, '#ec4899'], [100, '#fbcfe8']],
+        `<circle cx="540" cy="1100" r="460" fill="rgba(255,255,255,0.18)"/>`
+      )
+    },
+    {
+      id: 'ios_ocean',
+      label: 'Pacific Blue',
+      dataUrl: createSvgWallpaper(
+        [[0, '#082f49'], [44, '#0284c7'], [80, '#38bdf8'], [100, '#e0f2fe']],
+        `<ellipse cx="540" cy="1240" rx="520" ry="380" fill="rgba(255,255,255,0.18)"/>`
+      )
+    },
+    {
+      id: 'ios_sunset',
+      label: 'Desert Gold',
+      dataUrl: createSvgWallpaper(
+        [[0, '#3b0764'], [42, '#be185d'], [78, '#fb923c'], [100, '#fef08a']],
+        `<circle cx="540" cy="960" r="440" fill="rgba(254,240,138,0.2)"/>`
+      )
+    }
+  ]
+};
+
+// ----------------------------------------------------------------------------
+// 3. קונפיגורציה ושמירה ב-localStorage
+// ----------------------------------------------------------------------------
+// שפת הממשק (עברית / אנגלית) - נקבעת ב-i18n.js שנטען לפני הקובץ הזה
+function isEnglishUi() {
+  return Boolean(window.MagicI18n && window.MagicI18n.isEn);
+}
+const REVEAL_TEXT_DEFAULT_HE = 'אל תשכח, הקוד של השער הוא {קוד} 😊';
+const REVEAL_TEXT_DEFAULT_EN = "Don't forget, the gate code is {code} 😊";
+
+// באנדרואיד, אחרי "פתיחה בכל קוד" האפליקציה יוצאת למסך הבית האמיתי -
+// חוץ מכשיש חשיפה שקורית בתוך האפליקציה (פתקים, גלריה, שיחה נכנסת).
+function staysInAppAfterUnlock() {
+  return ['notes', 'gallery', 'search'].includes(config.unlockTargetScreen) || Boolean(config.callReveal);
+}
+
+// מחליף את {קוד} / {code} בקוד שהוקלד
+function fillCodePlaceholder(template, code) {
+  return String(template || '').replace(/\{(קוד|code)\}/gi, String(code));
+}
+
+const DEFAULT_CONFIG = {
+  osTheme: 'samsung',           // 'samsung' | 'ios'
+  deviceModel: 's26',           // 's20'..'s26' | 'iphone12'..'iphone18'
+  unlockMode: 'pin',            // 'pin' | 'pattern' | 'words' | 'swipe'
+  pinLength: 4,                 // 4 | 6 (אורך קוד PIN: 4 או 6 ספרות)
+  unlockAttemptMode: 'immediate', // ישן - נשמר רק לתאימות להגדרות קודמות
+  unlockOnAttempt: null,        // 1..5 - באיזה ניסיון הטלפון ייפתח (בכפיית פתיחה)
+  keySound: true,               // צליל מקשים מקורי של סמסונג
+  unlockTargetScreen: 'homescreen', // 'homescreen' | 'notes'
+  registeredPasscode: '1234',   // הסיסמה האישית שנרשמה ב-Setup (עבור PIN / מקלדת)
+  registeredPattern: '12369',   // הדפוס האישי שנרשם ב-Setup (עבור Pattern בלבד)
+  fingerprintEnrolled: false,   // האם טביעת אצבע כוילה ונרשמה ב-Setup
+  secretFpBypass: true,         // החלקת אצבע סודית (מעקף מהיר על חיישן טביעת האצבע)
+  fingerprintHoldMs: 480,       // משך לחיצה מכויל במילישניות
+  fingerprintZoneX: 0.5,        // מיקום X מכויל על החיישן (0..1)
+  fingerprintZoneY: 0.5,        // מיקום Y מכויל על החיישן (0..1)
+  faceIdEnrolled: false,        // האם Face ID נרשם ב-Setup
+  faceSignature: null,          // ישן (לפני זיהוי הפנים החכם)
+  faceDescriptor: null,         // טביעת פנים (128 מספרים) - נשמרת רק בטלפון
+  fingerprintProfile: null,     // פרופיל טביעת אצבע (מיקום, משך, גודל מגע)
+  stealthPattern: false,
+  showStatusBar: true,
+  showPunchHole: true,
+  hapticPeek: true,
+  chameleonClock: true,
+  holdPeek: true,
+  watchPeek: false,             // שליחת הקוד שהוקלד לשעון החכם (התראה שקטה)
+  remotePeek: false,            // שליחת הקוד בזמן אמת לטלפון שני (קישור סודי)
+  uiLang: 'he',                 // שפת האפליקציה: 'he' | 'en'
+  revealEnabled: false,         // חשיפה בהתראה אחרי הפתיחה
+  revealDelaySec: 5,
+  revealSender: isEnglishUi() ? 'Mom' : 'אמא',
+  revealText: isEnglishUi() ? REVEAL_TEXT_DEFAULT_EN : REVEAL_TEXT_DEFAULT_HE,
+  notesReveal: false,           // חשיפה בפתקים: הקוד מופיע בפתק שכאילו נכתב מראש
+  notesAge: '60',               // לפני כמה דקות "נכתב" הפתק ('yesterday' = אתמול)
+  galleryText: isEnglishUi() ? '{code}' : '{קוד}', // מה כתוב על הפתק בתמונה בגלריה
+  searchText: isEnglishUi() ? '{code}' : '{קוד}', // החיפוש האחרון בחשיפה בחיפוש
+  callReveal: false,            // חשיפה בשיחה נכנסת אחרי הפתיחה
+  callName: isEnglishUi() ? '{code}' : '{קוד}',    // שם המתקשר שמופיע על המסך
+  callDelaySec: 4,
+  practiceMode: false,          // מצב תרגול: בלי היסטוריה ובלי סטטיסטיקה
+  showFingerprint: true,
+  settingsColorScheme: 'dark'   // 'dark' | 'light' עבור ערכת הנושא של מסך ההגדרות
+};
+
+let config = loadConfig();
+
+function loadConfig() {
+  try {
+    const raw = localStorage.getItem(CONFIG_STORAGE_KEY);
+    if (!raw) return { ...DEFAULT_CONFIG };
+    const parsed = JSON.parse(raw);
+    return { ...DEFAULT_CONFIG, ...parsed };
+  } catch (e) {
+    return { ...DEFAULT_CONFIG };
+  }
+}
+
+// באיזה ניסיון הטלפון נפתח (1-5). הגדרות ישנות: "ניסיון שני" = 2, "פתיחה מידית" = 1
+function getUnlockOnAttempt() {
+  const n = Number(config.unlockOnAttempt);
+  if (Number.isInteger(n) && n >= 1 && n <= 5) return n;
+  return config.unlockAttemptMode === 'second' ? 2 : 1;
+}
+
+function saveConfig() {
+  try {
+    localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(config));
+  } catch (e) {
+    console.warn('Could not save config', e);
+  }
+  if (typeof scheduleCloudBackup === 'function') scheduleCloudBackup();
+  if (typeof scheduleLiveStatePublish === 'function') scheduleLiveStatePublish();
+}
+
+// ----------------------------------------------------------------------------
+// 4. הפניית אלמנטים ב-DOM
+// ----------------------------------------------------------------------------
+const splashScreen = document.getElementById('splashScreen');
+const setupOverlay = document.getElementById('setupOverlay');
+const splitChoiceScreen = document.getElementById('splitChoiceScreen');
+const chooseSamsungBtn = document.getElementById('chooseSamsungBtn');
+const chooseIosBtn = document.getElementById('chooseIosBtn');
+const deviceConfigSheet = document.getElementById('deviceConfigSheet');
+const backToSplitBtn = document.getElementById('backToSplitBtn');
+const selectedDevicePill = document.getElementById('selectedDevicePill');
+const modelPresetsGrid = document.getElementById('modelPresetsGrid');
+const launchLockscreenBtn = document.getElementById('launchLockscreenBtn');
+
+// Setup Biometrics, Passcode & Pattern DOM
+const setupPasscodeBox = document.getElementById('setupPasscodeBox');
+const setupPasscodeInput = document.getElementById('setupPasscodeInput');
+const setupPasscodeSavedBadge = document.getElementById('setupPasscodeSavedBadge');
+
+const setupPatternBox = document.getElementById('setupPatternBox');
+const setupPatternStatusText = document.getElementById('setupPatternStatusText');
+const setupPatternSavedBadge = document.getElementById('setupPatternSavedBadge');
+const setupPatternWrapper = document.getElementById('setupPatternWrapper');
+const setupPatternSvg = document.getElementById('setupPatternSvg');
+const setupPatternLine = document.getElementById('setupPatternLine');
+const setupPatternNodes = Array.from(document.querySelectorAll('.setup-pattern-node'));
+
+const fpEnrollSection = document.getElementById('fpEnrollSection');
+const fpEnrollStatusText = document.getElementById('fpEnrollStatusText');
+const openFpEnrollBtn = document.getElementById('openFpEnrollBtn');
+const fpEnrollPadWrap = document.getElementById('fpEnrollPadWrap');
+const fpEnrollSteps = document.getElementById('fpEnrollSteps');
+const fpEnrollSensor = document.getElementById('fpEnrollSensor');
+const fpEnrollHint = document.getElementById('fpEnrollHint');
+
+const faceIdEnrollSection = document.getElementById('faceIdEnrollSection');
+const faceIdEnrollStatusText = document.getElementById('faceIdEnrollStatusText');
+const startFaceIdEnrollBtn = document.getElementById('startFaceIdEnrollBtn');
+const faceIdCameraBox = document.getElementById('faceIdCameraBox');
+const faceIdVideoCircle = document.getElementById('faceIdVideoCircle');
+const setupFaceVideo = document.getElementById('setupFaceVideo');
+const faceIdRingOverlay = document.getElementById('faceIdRingOverlay');
+const faceIdScanCaption = document.getElementById('faceIdScanCaption');
+
+// Lockscreen DOM
+const phoneContainer = document.getElementById('phoneContainer');
+const statusBar = document.getElementById('statusBar');
+const cameraPunchHole = document.getElementById('cameraPunchHole');
+const islandLiveCam = document.getElementById('islandLiveCam');
+const statusTime = document.getElementById('statusTime');
+const statusRightIcons = document.getElementById('statusRightIcons');
+const lockIconTrigger = document.getElementById('lockIconTrigger');
+const secretCornerTrigger = document.getElementById('secretCornerTrigger');
+const secretTopRightHoldZone = document.getElementById('secretTopRightHoldZone');
+
+const clockLockScreen = document.getElementById('clockLockScreen');
+const clockLockBigTime = document.getElementById('clockLockBigTime');
+const clockLockDate = document.getElementById('clockLockDate');
+
+const titleGroup = document.getElementById('titleGroup');
+const mainTitle = document.getElementById('mainTitle');
+const subTitle = document.getElementById('subTitle');
+const errorMsg = document.getElementById('errorMsg');
+
+const oneUiPasswordPillWrap = document.getElementById('oneUiPasswordPillWrap');
+const oneUiPasswordForm = document.getElementById('oneUiPasswordForm');
+const wordGlassField = document.getElementById('wordGlassField');
+const passwordInput = document.getElementById('passwordInput');
+const togglePasswordEyeBtn = document.getElementById('togglePasswordEyeBtn');
+const pinDotsContainer = document.getElementById('pinDots');
+
+const viewPin = document.getElementById('viewPin');
+const viewPattern = document.getElementById('viewPattern');
+const viewWords = document.getElementById('viewWords');
+const viewSwipe = document.getElementById('viewSwipe');
+const swipeUnlockArea = document.getElementById('swipeUnlockArea');
+
+const numericKeypad = document.getElementById('numericKeypad');
+const keypadBackspaceBtn = document.getElementById('keypadBackspaceBtn');
+const keypadOkBtn = document.getElementById('keypadOkBtn');
+const wordSubmitInlineBtn = document.getElementById('wordSubmitInlineBtn');
+
+const patternWrapper = document.getElementById('patternWrapper');
+const patternSvg = document.getElementById('patternSvg');
+const patternLine = document.getElementById('patternLine');
+const patternNodes = Array.from(document.querySelectorAll('.pattern-node'));
+
+const fingerprintContainer = document.getElementById('fingerprintContainer');
+const samsungBackBtn = document.getElementById('samsungBackBtn');
+const iosFooter = document.getElementById('iosFooter');
+const iosSwipeHint = document.getElementById('iosSwipeHint');
+const iosRightActionBtn = document.getElementById('iosRightActionBtn');
+
+const fakeHomescreen = document.getElementById('fakeHomescreen');
+const defaultHomescreenUi = document.getElementById('defaultHomescreenUi');
+const fakeNotesApp = document.getElementById('fakeNotesApp');
+const notesDateLine = document.getElementById('notesDateLine');
+const notesTitleInput = document.getElementById('notesTitleInput');
+const notesBodyTextarea = document.getElementById('notesBodyTextarea');
+const notesDoneBtn = document.getElementById('notesDoneBtn');
+const secretRelockZone = document.getElementById('secretRelockZone');
+const homeClock = document.getElementById('homeClock');
+const homeDate = document.getElementById('homeDate');
+
+const secretPeek = document.getElementById('secretPeek');
+const peekText = document.getElementById('peekText');
+const peekPatternMini = document.getElementById('peekPatternMini');
+
+// Settings Controls
+const modeSelector = document.getElementById('modeSelector');
+const pinLengthGroup = document.getElementById('pinLengthGroup');
+const pinLengthSelector = document.getElementById('pinLengthSelector');
+const unlockAttemptModeSelector = document.getElementById('unlockAttemptModeSelector');
+const toggleKeySound = document.getElementById('toggleKeySound');
+const inAppUpdateBanner = document.getElementById('inAppUpdateBanner');
+const inAppUpdateBtn = document.getElementById('inAppUpdateBtn');
+const inAppUpdateStatus = document.getElementById('inAppUpdateStatus');
+const installedVersionLabel = document.getElementById('installedVersionLabel');
+const cloudVersionStatusText = document.getElementById('cloudVersionStatusText');
+const checkUpdateNowBtn = document.getElementById('checkUpdateNowBtn');
+const pinQuickWidgetBtn = document.getElementById('pinQuickWidgetBtn');
+const forceModeSelector = document.getElementById('forceModeSelector');
+const unlockTargetSelector = document.getElementById('unlockTargetSelector');
+const toggleForceUnlockMode = document.getElementById('toggleForceUnlockMode');
+const toggleSecretFpBypass = document.getElementById('toggleSecretFpBypass');
+const floatingCloseSettingsBtn = document.getElementById('floatingCloseSettingsBtn');
+const settingsThemeToggleBtn = document.getElementById('settingsThemeToggleBtn');
+const currentWallpaperCirclePreview = document.getElementById('currentWallpaperCirclePreview');
+const statusBarSelector = document.getElementById('statusBarSelector');
+const stealthPatternGroup = document.getElementById('stealthPatternGroup');
+const toggleStealthPattern = document.getElementById('toggleStealthPattern');
+const toggleStatusBar = document.getElementById('toggleStatusBar');
+const togglePunchHole = document.getElementById('togglePunchHole');
+const toggleHapticPeek = document.getElementById('toggleHapticPeek');
+const toggleChameleonClock = document.getElementById('toggleChameleonClock');
+const toggleHoldPeek = document.getElementById('toggleHoldPeek');
+const toggleFingerprint = document.getElementById('toggleFingerprint');
+const fingerprintSettingRow = document.getElementById('fingerprintSettingRow');
+
+const wallpaperGalleryRow = document.getElementById('wallpaperGalleryRow');
+const cycleWallpaperBtn = document.getElementById('cycleWallpaperBtn');
+const wallpaperFileInput = document.getElementById('wallpaperFileInput');
+const clearWallpaperBtn = document.getElementById('clearWallpaperBtn');
+const homescreenFileInput = document.getElementById('homescreenFileInput');
+const clearHomescreenBtn = document.getElementById('clearHomescreenBtn');
+const settingsLastInput = document.getElementById('settingsLastInput');
+
+// State Variables
+let isLockedOut = false;
+let isPasswordVisible = false;
+let activePatternNodes = [];
+let isDrawingPattern = false;
+let isClockPeekActive = false;
+let clockPeekTimeout = null;
+let holdPeekTimer = null;
+let faceIdUnlocked = false;
+let faceIdTimer = null;
+let activeCameraStream = null;
+let forceAttemptCount = 0;
+
+// ----------------------------------------------------------------------------
+// 5. פתיח (Splash Screen) - 1.1 שניות
+// ----------------------------------------------------------------------------
+function initSplashScreen() {
+  if (!splashScreen) return;
+  setTimeout(() => {
+    splashScreen.classList.add('fade-out');
+    setTimeout(() => {
+      splashScreen.style.display = 'none';
+    }, 450);
+  }, 1050);
+}
+
+// ----------------------------------------------------------------------------
+// 6. מסך הגדרות מקדים (Setup / Onboarding) עם מעבר חלק וללא קפיצת מסך
+// ----------------------------------------------------------------------------
+function getModelsForCurrentOs() {
+  return MODEL_PRESETS[config.osTheme] || MODEL_PRESETS.samsung;
+}
+
+function getCurrentModelObject() {
+  const list = getModelsForCurrentOs();
+  return list.find((m) => m.id === config.deviceModel) || list[list.length - 1];
+}
+
+function openDeviceConfigFor(osTheme) {
+  setTimeout(() => {
+    if (typeof maybeStartTour === 'function') maybeStartTour();
+  }, 700);
+  config.osTheme = osTheme;
+  const models = MODEL_PRESETS[osTheme] || MODEL_PRESETS.samsung;
+  if (!models.some((m) => m.id === config.deviceModel)) {
+    config.deviceModel = models[models.length - 1].id;
+  }
+  saveConfig();
+  applyConfigToUI();
+
+  // מעבר אנימטיבי חלק ונקי ממסך הבחירה 50/50 למסך ההגדרות (ללא הגדלת מסך פתאומית)
+  if (splitChoiceScreen) {
+    splitChoiceScreen.classList.add('hidden');
+  }
+  if (deviceConfigSheet) {
+    deviceConfigSheet.classList.add('active', 'open');
+  }
+}
+
+if (chooseSamsungBtn) {
+  chooseSamsungBtn.addEventListener('click', () => openDeviceConfigFor('samsung'));
+}
+if (chooseIosBtn) {
+  chooseIosBtn.addEventListener('click', () => openDeviceConfigFor('ios'));
+}
+if (backToSplitBtn) {
+  backToSplitBtn.addEventListener('click', () => {
+    stopAllCameraStreams();
+    if (deviceConfigSheet) {
+      deviceConfigSheet.classList.remove('active', 'open');
+    }
+    if (splitChoiceScreen) {
+      splitChoiceScreen.classList.remove('hidden');
+    }
+  });
+}
+// "שמור וסגור" -> קופץ חלון "איזו נעילה להציג?" -> הבחירה פותחת את מסך הנעילה
+const lockTypeChooser = document.getElementById('lockTypeChooser');
+
+function getCurrentLockChoice() {
+  if (config.unlockMode === 'pin') return Number(config.pinLength) === 6 ? 'pin6' : 'pin4';
+  return config.unlockMode;
+}
+
+function openLockTypeChooser() {
+  if (!lockTypeChooser) return false;
+  const current = getCurrentLockChoice();
+  lockTypeChooser.querySelectorAll('.lock-type-btn').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.choice === current);
+  });
+  lockTypeChooser.style.display = 'flex';
+  return true;
+}
+
+function closeLockTypeChooser() {
+  if (lockTypeChooser) lockTypeChooser.style.display = 'none';
+}
+
+function launchLockscreenNow() {
+  trackEvent('show_' + (config.unlockMode === 'pin' ? 'pin' + (config.pinLength || 4) : config.unlockMode));
+  stopAllCameraStreams();
+  phoneContainer.classList.remove('clock-mode-active');
+  closeSettingsSheet();
+}
+
+if (lockTypeChooser) {
+  lockTypeChooser.querySelectorAll('.lock-type-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const choice = btn.dataset.choice;
+      if (choice === 'pin4' || choice === 'pin6') {
+        config.unlockMode = 'pin';
+        config.pinLength = choice === 'pin6' ? 6 : 4;
+      } else if (['words', 'pattern', 'swipe'].includes(choice)) {
+        config.unlockMode = choice;
+      }
+      saveConfig();
+      applyConfigToUI();
+      clearCurrentInputs();
+      forceAttemptCount = 0;
+      triggerHaptic(25);
+      closeLockTypeChooser();
+      launchLockscreenNow();
+    });
+  });
+  const lockTypeBackBtn = document.getElementById('lockTypeBackBtn');
+  if (lockTypeBackBtn) lockTypeBackBtn.addEventListener('click', closeLockTypeChooser);
+}
+
+if (launchLockscreenBtn) {
+  launchLockscreenBtn.addEventListener('click', () => {
+    if (!openLockTypeChooser()) launchLockscreenNow();
+  });
+}
+if (floatingCloseSettingsBtn) {
+  floatingCloseSettingsBtn.addEventListener('click', () => {
+    stopAllCameraStreams();
+    phoneContainer.classList.remove('clock-mode-active');
+    closeSettingsSheet();
+  });
+}
+
+function applySettingsColorScheme() {
+  if (!deviceConfigSheet) return;
+  const savedScheme = localStorage.getItem('magic_lockscreen_settings_theme') || config.settingsColorScheme || 'dark';
+  config.settingsColorScheme = savedScheme === 'light' ? 'light' : 'dark';
+  deviceConfigSheet.classList.toggle('light-mode', config.settingsColorScheme === 'light');
+}
+
+if (settingsThemeToggleBtn) {
+  settingsThemeToggleBtn.addEventListener('click', () => {
+    const nextScheme = config.settingsColorScheme === 'light' ? 'dark' : 'light';
+    config.settingsColorScheme = nextScheme;
+    try {
+      localStorage.setItem('magic_lockscreen_settings_theme', nextScheme);
+    } catch (e) {}
+    saveConfig();
+    applySettingsColorScheme();
+  });
+}
+
+function renderModelPresetsGrid() {
+  if (!modelPresetsGrid) return;
+  const models = getModelsForCurrentOs();
+  modelPresetsGrid.innerHTML = '';
+
+  models.forEach((model) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'model-preset-chip model-preset-btn' + (model.id === config.deviceModel ? ' active' : '');
+    btn.innerHTML = `
+      <span class="model-preset-name">${model.name}</span>
+      <span class="model-preset-sub">${model.year}</span>
+    `;
+    btn.addEventListener('click', () => {
+      config.deviceModel = model.id;
+      const savedWallpaperId = localStorage.getItem(SELECTED_WALLPAPER_ID_KEY) || 'model_default';
+      if (savedWallpaperId !== 'custom') {
+        localStorage.setItem(SELECTED_WALLPAPER_ID_KEY, 'model_default');
+      }
+      saveConfig();
+      applyConfigToUI();
+    });
+    modelPresetsGrid.appendChild(btn);
+  });
+}
+
+function getWallpaperCatalogForCurrentModel() {
+  const model = getCurrentModelObject();
+  const osGallery = BUILTIN_GALLERY_WALLPAPERS[config.osTheme] || BUILTIN_GALLERY_WALLPAPERS.samsung;
+  return [
+    {
+      id: 'model_default',
+      label: `רשמי (${model.name})`,
+      dataUrl: model.defaultWallpaper
+    },
+    ...osGallery
+  ];
+}
+
+function renderWallpaperGallery() {
+  if (!wallpaperGalleryRow) return;
+  const catalog = getWallpaperCatalogForCurrentModel();
+  const customDataUrl = localStorage.getItem(WALLPAPER_STORAGE_KEY);
+  const selectedId = localStorage.getItem(SELECTED_WALLPAPER_ID_KEY) || 'model_default';
+
+  wallpaperGalleryRow.innerHTML = '';
+
+  catalog.forEach((item) => {
+    const card = document.createElement('button');
+    card.type = 'button';
+    card.className = 'wp-thumb-card' + (selectedId === item.id ? ' active' : '');
+    card.style.backgroundImage = `url("${item.dataUrl}")`;
+    card.innerHTML = `<span class="wp-thumb-label">${item.label}</span>`;
+    card.addEventListener('click', () => {
+      localStorage.setItem(SELECTED_WALLPAPER_ID_KEY, item.id);
+      applyWallpaperToContainer();
+      renderWallpaperGallery();
+    });
+    wallpaperGalleryRow.appendChild(card);
+  });
+
+  if (customDataUrl) {
+    const customCard = document.createElement('button');
+    customCard.type = 'button';
+    customCard.className = 'wp-thumb-card' + (selectedId === 'custom' ? ' active' : '');
+    customCard.style.backgroundImage = `url("${customDataUrl}")`;
+    customCard.innerHTML = `<span class="wp-thumb-label">טפט אישי</span>`;
+    customCard.addEventListener('click', () => {
+      localStorage.setItem(SELECTED_WALLPAPER_ID_KEY, 'custom');
+      applyWallpaperToContainer();
+      renderWallpaperGallery();
+    });
+    wallpaperGalleryRow.appendChild(customCard);
+  }
+}
+
+function applyWallpaperToContainer() {
+  const catalog = getWallpaperCatalogForCurrentModel();
+  const customDataUrl = localStorage.getItem(WALLPAPER_STORAGE_KEY);
+  const selectedId = localStorage.getItem(SELECTED_WALLPAPER_ID_KEY) || 'model_default';
+
+  let chosenUrl = catalog[0].dataUrl;
+  if (selectedId === 'custom' && customDataUrl) {
+    chosenUrl = customDataUrl;
+    if (clearWallpaperBtn) clearWallpaperBtn.style.display = 'inline-flex';
+  } else {
+    const found = catalog.find((item) => item.id === selectedId);
+    if (found) chosenUrl = found.dataUrl;
+    if (clearWallpaperBtn) {
+      clearWallpaperBtn.style.display = customDataUrl ? 'inline-flex' : 'none';
+    }
+  }
+
+  phoneContainer.style.backgroundImage = `url("${chosenUrl}")`;
+  phoneContainer.style.backgroundSize = 'cover';
+  phoneContainer.style.backgroundPosition = 'center';
+
+  if (currentWallpaperCirclePreview) {
+    currentWallpaperCirclePreview.style.backgroundImage = `url("${chosenUrl}")`;
+  }
+}
+
+if (cycleWallpaperBtn) {
+  cycleWallpaperBtn.addEventListener('click', () => {
+    const catalog = getWallpaperCatalogForCurrentModel();
+    const customDataUrl = localStorage.getItem(WALLPAPER_STORAGE_KEY);
+    const ids = catalog.map((c) => c.id);
+    if (customDataUrl) ids.push('custom');
+
+    const currentId = localStorage.getItem(SELECTED_WALLPAPER_ID_KEY) || 'model_default';
+    const nextIndex = (ids.indexOf(currentId) + 1) % ids.length;
+    localStorage.setItem(SELECTED_WALLPAPER_ID_KEY, ids[nextIndex]);
+    applyWallpaperToContainer();
+    renderWallpaperGallery();
+  });
+}
+
+// ----------------------------------------------------------------------------
+// 8. רישום קוד אישי, דפוס אישי, טביעת אצבע מכוילת ו-Face ID מותאם
+// ----------------------------------------------------------------------------
+const SETUP_PATTERN_COORDS = {
+  1: [35, 35],   2: [105, 35],  3: [175, 35],
+  4: [35, 105],  5: [105, 105], 6: [175, 105],
+  7: [35, 175],  8: [105, 175], 9: [175, 175]
+};
+
+// ---------------------------------------------------------------------------
+// פרופיל טביעת אצבע: מיקום על החיישן, משך לחיצה וגודל מגע של האצבע.
+// גודל המגע (רוחב/גובה המגע שהמסך מדווח) שונה בין אצבעות ובין אנשים,
+// ולכן אצבע אחרת נדחית גם אם לוחצים באותה נקודה.
+// ---------------------------------------------------------------------------
+const FP_SAMPLES_NEEDED = 4;
+
+function fpContactSize(e) {
+  const w = Number(e && e.width) || 0;
+  const h = Number(e && e.height) || 0;
+  // רק מגע אמיתי מדווח גודל. בעכבר הערך תמיד 1 ולכן לא נלקח בחשבון.
+  if (!e || e.pointerType !== 'touch' || w <= 1 || h <= 1) return 0;
+  return Math.sqrt(w * h);
+}
+
+function fpMean(arr) {
+  return arr.reduce((a, b) => a + b, 0) / (arr.length || 1);
+}
+
+function fpStd(arr) {
+  const m = fpMean(arr);
+  return Math.sqrt(fpMean(arr.map((v) => (v - m) * (v - m))));
+}
+
+function fpClamp(v, lo, hi) {
+  return Math.min(Math.max(v, lo), hi);
+}
+
+function buildFingerprintProfile(samples) {
+  const xs = samples.map((s) => s.x);
+  const ys = samples.map((s) => s.y);
+  const ms = samples.map((s) => s.ms);
+  const sizes = samples.map((s) => s.size || 0);
+  const hasSize = sizes.every((s) => s > 0);
+  const sizeMean = hasSize ? fpMean(sizes) : 0;
+  return {
+    x: Number(fpMean(xs).toFixed(3)),
+    y: Number(fpMean(ys).toFixed(3)),
+    ms: Math.round(fpMean(ms)),
+    posTol: Number(fpClamp(2.2 * Math.max(fpStd(xs), fpStd(ys)) + 0.08, 0.12, 0.26).toFixed(3)),
+    msTol: Math.round(fpClamp(2.5 * fpStd(ms) + 90, 120, 320)),
+    size: hasSize ? Number(sizeMean.toFixed(2)) : 0,
+    sizeTol: hasSize ? Number(fpClamp((2.5 * fpStd(sizes)) / sizeMean + 0.1, 0.12, 0.3).toFixed(3)) : 0,
+    n: samples.length
+  };
+}
+
+function getFingerprintProfile() {
+  if (!config.fingerprintEnrolled) return null;
+  const p = config.fingerprintProfile;
+  if (p && typeof p.x === 'number') return p;
+  // טביעה שנרשמה בגרסה ישנה (בלי פרופיל מלא)
+  return {
+    x: typeof config.fingerprintZoneX === 'number' ? config.fingerprintZoneX : 0.5,
+    y: typeof config.fingerprintZoneY === 'number' ? config.fingerprintZoneY : 0.5,
+    ms: Math.max(config.fingerprintHoldMs || 550, 300),
+    posTol: 0.24,
+    msTol: 170,
+    size: 0,
+    sizeTol: 0
+  };
+}
+
+function matchFingerprint(profile, sample) {
+  if (!profile) return false;
+  const posOk = Math.hypot(sample.x - profile.x, sample.y - profile.y) <= profile.posTol;
+  const timeOk = Math.abs(sample.ms - profile.ms) <= profile.msTol;
+  let sizeOk = true;
+  if (profile.size && sample.size) {
+    sizeOk = Math.abs(sample.size - profile.size) / profile.size <= profile.sizeTol;
+  } else if (profile.size && !sample.size) {
+    // נרשם עם גודל מגע אבל עכשיו לא דווח (למשל עכבר) -> לא מאשרים
+    sizeOk = false;
+  }
+  return posOk && timeOk && sizeOk;
+}
+
+// ---------------------------------------------------------------------------
+// זיהוי פנים אמיתי (מודל AI שרץ בתוך הטלפון, בלי אינטרנט ובלי חלונית מערכת).
+// כל פנים הופכות ל"טביעת פנים" של 128 מספרים. פנים של אותו אדם קרובות זו לזו,
+// ופנים של אדם אחר רחוקות. נפתח רק כשהמרחק מהפנים שנרשמו קטן מהסף.
+// ---------------------------------------------------------------------------
+const FACE_MATCH_THRESHOLD = 0.48;
+let faceApiPromise = null;
+
+function xhrLoad(url, type) {
+  return new Promise((resolve, reject) => {
+    const x = new XMLHttpRequest();
+    x.open('GET', url, true);
+    x.responseType = type;
+    x.onload = () => (x.status === 200 || (x.status === 0 && x.response) ? resolve(x.response) : reject(new Error('load ' + url)));
+    x.onerror = () => reject(new Error('load ' + url));
+    x.send();
+  });
+}
+
+function loadScriptOnce(src) {
+  return new Promise((resolve, reject) => {
+    if (window.faceapi) return resolve();
+    const s = document.createElement('script');
+    s.src = src;
+    s.onload = resolve;
+    s.onerror = () => {
+      s.remove();
+      reject(new Error('script ' + src));
+    };
+    document.head.appendChild(s);
+  });
+}
+
+// הספרייה נמצאת בתוך האפליקציה. אם היא חסרה (למשל באתר), טוענים אותה מהמקור הרשמי.
+const FACE_API_CDN = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.15/dist/face-api.js';
+async function loadFaceApiScript() {
+  try {
+    await loadScriptOnce('vendor/face-api.js');
+  } catch (e) {
+    if (window.location.protocol === 'file:') throw e;
+    await loadScriptOnce(FACE_API_CDN);
+  }
+}
+
+// טעינת משקלי מודל ישירות מהקבצים (עובד גם מתוך ה-APK וגם באתר)
+async function loadFaceNet(faceapi, net, name) {
+  const manifest = JSON.parse(await xhrLoad(`models/${name}-weights_manifest.json`, 'text'));
+  const specs = [];
+  const buffers = [];
+  for (const group of manifest) {
+    specs.push(...group.weights);
+    for (const p of group.paths) buffers.push(new Uint8Array(await xhrLoad(`models/${p}`, 'arraybuffer')));
+  }
+  const total = buffers.reduce((a, b) => a + b.length, 0);
+  const merged = new Uint8Array(total);
+  let offset = 0;
+  buffers.forEach((b) => {
+    merged.set(b, offset);
+    offset += b.length;
+  });
+  net.loadFromWeightMap(faceapi.tf.io.decodeWeights(merged.buffer, specs));
+}
+
+function loadFaceEngine() {
+  if (faceApiPromise) return faceApiPromise;
+  faceApiPromise = (async () => {
+    await loadFaceApiScript();
+    const faceapi = window.faceapi;
+    await faceapi.tf.ready();
+    await loadFaceNet(faceapi, faceapi.nets.tinyFaceDetector, 'tiny_face_detector_model');
+    await loadFaceNet(faceapi, faceapi.nets.faceLandmark68TinyNet, 'face_landmark_68_tiny_model');
+    await loadFaceNet(faceapi, faceapi.nets.faceRecognitionNet, 'face_recognition_model');
+    // "חימום": הריצה הראשונה של המודל איטית (כמה שניות), אז מריצים אותה מראש על תמונה ריקה
+    try {
+      const warm = document.createElement('canvas');
+      warm.width = 160;
+      warm.height = 160;
+      warm.getContext('2d').fillRect(0, 0, 160, 160);
+      await faceapi.detectSingleFace(warm, new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 }));
+      await faceapi.computeFaceDescriptor(warm);
+    } catch (e) {}
+    return faceapi;
+  })().catch((err) => {
+    faceApiPromise = null;
+    throw err;
+  });
+  return faceApiPromise;
+}
+
+// טביעת פנים מפריים אחד של המצלמה (או null אם לא זוהו פנים)
+async function captureFaceDescriptor(videoEl) {
+  if (!videoEl || videoEl.readyState < 2 || !videoEl.videoWidth) return null;
+  const faceapi = await loadFaceEngine();
+  const result = await faceapi
+    .detectSingleFace(videoEl, new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 }))
+    .withFaceLandmarks(true)
+    .withFaceDescriptor();
+  return result ? Array.from(result.descriptor) : null;
+}
+
+function faceDistance(a, b) {
+  if (!a || !b || a.length !== b.length) return Infinity;
+  let sum = 0;
+  for (let i = 0; i < a.length; i++) sum += (a[i] - b[i]) * (a[i] - b[i]);
+  return Math.sqrt(sum);
+}
+
+function hasEnrolledFace() {
+  return Boolean(config.faceIdEnrolled && Array.isArray(config.faceDescriptor) && config.faceDescriptor.length === 128);
+}
+
+function renderSavedSetupPattern() {
+  if (!setupPatternLine || !setupPatternNodes.length) return;
+  const saved = String(config.registeredPattern || '12369')
+    .split('')
+    .map((n) => Number(n))
+    .filter((n) => n >= 1 && n <= 9);
+
+  setupPatternNodes.forEach((nodeEl) => {
+    const id = Number(nodeEl.dataset.node);
+    nodeEl.classList.toggle('active', saved.includes(id));
+  });
+
+  const pts = saved.map((n) => SETUP_PATTERN_COORDS[n].join(',')).join(' ');
+  setupPatternLine.setAttribute('points', pts);
+
+  if (setupPatternStatusText) {
+    setupPatternStatusText.textContent = `דפוס אישי מוגדר (${saved.join(' → ')}) - צייר דפוס חדש לשינוי`;
+  }
+}
+
+function initBiometricsEnrollment() {
+  // א. רישום סיסמה אישית (מוצג רק במצב PIN או מקלדת מלאה)
+  if (setupPasscodeInput) {
+    setupPasscodeInput.value = config.registeredPasscode || '1234';
+    setupPasscodeInput.addEventListener('input', () => {
+      const val = setupPasscodeInput.value.trim();
+      config.registeredPasscode = val.length > 0 ? val : '1234';
+      saveConfig();
+      if (setupPasscodeSavedBadge) {
+        setupPasscodeSavedBadge.textContent = 'נשמר ✓';
+        setupPasscodeSavedBadge.style.opacity = '1';
+      }
+    });
+  }
+
+  // ב. רישום דפוס אישי ב-Setup (מוצג אך ורק כשנבחרת האופציה של דפוס - Pattern)
+  if (setupPatternWrapper && setupPatternSvg && setupPatternLine) {
+    let setupNodesActive = [];
+    let isDrawingSetupPattern = false;
+
+    const getSetupMidNode = (a, b) => {
+      const pairs = {
+        '1-3': 2, '3-1': 2, '4-6': 5, '6-4': 5, '7-9': 8, '9-7': 8,
+        '1-7': 4, '7-1': 4, '2-8': 5, '8-2': 5, '3-9': 6, '9-3': 6,
+        '1-9': 5, '9-1': 5, '3-7': 5, '7-3': 5
+      };
+      return pairs[`${a}-${b}`] || null;
+    };
+
+    const addSetupNode = (nodeId) => {
+      const num = Number(nodeId);
+      if (setupNodesActive.includes(num)) return;
+      if (setupNodesActive.length > 0) {
+        const last = setupNodesActive[setupNodesActive.length - 1];
+        const mid = getSetupMidNode(last, num);
+        if (mid && !setupNodesActive.includes(mid)) {
+          setupNodesActive.push(mid);
+        }
+      }
+      setupNodesActive.push(num);
+      setupPatternNodes.forEach((el) => {
+        el.classList.toggle('active', setupNodesActive.includes(Number(el.dataset.node)));
+      });
+      if (navigator.vibrate) navigator.vibrate(15);
+    };
+
+    const hitSetupNode = (clientX, clientY) => {
+      for (const el of setupPatternNodes) {
+        const rect = el.getBoundingClientRect();
+        const cx = rect.left + rect.width / 2;
+        const cy = rect.top + rect.height / 2;
+        if (Math.hypot(clientX - cx, clientY - cy) <= rect.width * 0.48) {
+          return Number(el.dataset.node);
+        }
+      }
+      return null;
+    };
+
+    const renderSetupLine = (clientX = null, clientY = null) => {
+      const pts = setupNodesActive.map((n) => SETUP_PATTERN_COORDS[n].join(','));
+      if (clientX !== null && clientY !== null && setupNodesActive.length > 0) {
+        const rect = setupPatternSvg.getBoundingClientRect();
+        const x = Math.round(((clientX - rect.left) * 210) / rect.width);
+        const y = Math.round(((clientY - rect.top) * 210) / rect.height);
+        pts.push(`${x},${y}`);
+      }
+      setupPatternLine.setAttribute('points', pts.join(' '));
+    };
+
+    setupPatternWrapper.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      setupPatternWrapper.setPointerCapture(e.pointerId);
+      setupNodesActive = [];
+      isDrawingSetupPattern = true;
+      const hit = hitSetupNode(e.clientX, e.clientY);
+      if (hit) addSetupNode(hit);
+      renderSetupLine(e.clientX, e.clientY);
+    });
+
+    setupPatternWrapper.addEventListener('pointermove', (e) => {
+      if (!isDrawingSetupPattern) return;
+      e.preventDefault();
+      const hit = hitSetupNode(e.clientX, e.clientY);
+      if (hit) addSetupNode(hit);
+      renderSetupLine(e.clientX, e.clientY);
+    });
+
+    const finishSetupPattern = () => {
+      if (!isDrawingSetupPattern) return;
+      isDrawingSetupPattern = false;
+
+      if (setupNodesActive.length < 4) {
+        if (setupPatternStatusText) {
+          setupPatternStatusText.textContent = 'חבר לפחות 4 נקודות כדי לשמור דפוס אישי!';
+        }
+        if (navigator.vibrate) navigator.vibrate([50, 60, 50]);
+        renderSavedSetupPattern();
+        return;
+      }
+
+      config.registeredPattern = setupNodesActive.join('');
+      saveConfig();
+      renderSavedSetupPattern();
+      if (setupPatternSavedBadge) {
+        setupPatternSavedBadge.textContent = 'נשמר ✓';
+      }
+      if (navigator.vibrate) navigator.vibrate(45);
+    };
+
+    setupPatternWrapper.addEventListener('pointerup', finishSetupPattern);
+    setupPatternWrapper.addEventListener('pointercancel', finishSetupPattern);
+
+    renderSavedSetupPattern();
+  }
+
+  // ג. רישום טביעת אצבע: 4 לחיצות -> פרופיל של מיקום, משך לחיצה וגודל מגע של האצבע
+  let fpEnrollStep = 0;
+  let fpSamples = [];
+  let fpHoldStart = 0;
+  let fpTouchNormX = 0.5;
+  let fpTouchNormY = 0.5;
+  let fpEnrollMaxSize = 0;
+
+  function updateFpEnrollUI() {
+    if (!fpEnrollStatusText) return;
+    if (config.fingerprintEnrolled) {
+      const p = getFingerprintProfile();
+      const sizeNote = p && p.size ? ' + גודל מגע' : '';
+      fpEnrollStatusText.textContent = `טביעת אצבע שמורה (מיקום + משך ~${config.fingerprintHoldMs}ms${sizeNote}) ✓`;
+      fpEnrollStatusText.classList.add('enrolled');
+    } else {
+      fpEnrollStatusText.textContent = `טרם נרשמה טביעת אצבע — ${FP_SAMPLES_NEEDED} לחיצות (${fpEnrollStep}/${FP_SAMPLES_NEEDED})`;
+      fpEnrollStatusText.classList.remove('enrolled');
+    }
+  }
+  updateFpEnrollUI();
+
+  if (openFpEnrollBtn && fpEnrollPadWrap) {
+    openFpEnrollBtn.addEventListener('click', () => {
+      const isHidden = fpEnrollPadWrap.style.display === 'none';
+      fpEnrollPadWrap.style.display = isHidden ? 'flex' : 'none';
+      if (isHidden) {
+        fpEnrollStep = 0;
+        fpSamples = [];
+        const dots = fpEnrollSteps ? fpEnrollSteps.querySelectorAll('.fp-step-dot') : [];
+        dots.forEach((d) => d.classList.remove('done'));
+        if (fpEnrollHint) {
+          fpEnrollHint.textContent = `לחיצה 1 מתוך ${FP_SAMPLES_NEEDED}: הנח את האצבע שתפתח את הטלפון, החזק כחצי שנייה ושחרר`;
+        }
+      }
+    });
+  }
+
+  if (fpEnrollSensor) {
+    const startEnrollHold = (e) => {
+      if (e.cancelable) e.preventDefault();
+      const rect = fpEnrollSensor.getBoundingClientRect();
+      fpTouchNormX = Math.min(Math.max((e.clientX - rect.left) / rect.width, 0), 1);
+      fpTouchNormY = Math.min(Math.max((e.clientY - rect.top) / rect.height, 0), 1);
+      fpHoldStart = performance.now();
+      fpEnrollMaxSize = fpContactSize(e);
+      fpEnrollSensor.classList.add('holding');
+      if (navigator.vibrate) navigator.vibrate(25);
+    };
+
+    const trackEnrollSize = (e) => {
+      if (!fpHoldStart) return;
+      fpEnrollMaxSize = Math.max(fpEnrollMaxSize, fpContactSize(e));
+    };
+
+    const endEnrollHold = () => {
+      if (!fpHoldStart) return;
+      const duration = Math.round(performance.now() - fpHoldStart);
+      const size = fpEnrollMaxSize;
+      fpHoldStart = 0;
+      fpEnrollSensor.classList.remove('holding');
+
+      if (duration < 250 || duration > 1600) {
+        if (fpEnrollHint) {
+          fpEnrollHint.textContent =
+            duration < 250
+              ? 'לחיצה קצרה מדי! החזק את האצבע כחצי שנייה ושחרר'
+              : 'לחיצה ארוכה מדי! החזק כחצי שנייה ושחרר';
+        }
+        if (navigator.vibrate) navigator.vibrate([50, 60, 50]);
+        return;
+      }
+
+      // בדיקת עקביות: כל הלחיצות חייבות להיות של אותה אצבע (מיקום, משך וגודל מגע דומים)
+      if (fpSamples.length > 0) {
+        const first = fpSamples[0];
+        const dist = Math.hypot(fpTouchNormX - first.x, fpTouchNormY - first.y);
+        const timeDiff = Math.abs(duration - first.ms);
+        const sizeDiff = first.size && size ? Math.abs(size - first.size) / first.size : 0;
+        if (dist > 0.3 || timeDiff > 350 || sizeDiff > 0.35) {
+          if (fpEnrollHint) {
+            fpEnrollHint.textContent =
+              sizeDiff > 0.35
+                ? 'נראה כמו אצבע אחרת. השתמש באותה אצבע בכל הלחיצות.'
+                : 'הנח את אותה אצבע באותה נקודה ובאותו משך לחיצה כמו בלחיצה הראשונה';
+          }
+          if (navigator.vibrate) navigator.vibrate([50, 60, 50]);
+          return;
+        }
+      }
+
+      fpSamples.push({ ms: duration, x: fpTouchNormX, y: fpTouchNormY, size });
+      fpEnrollStep += 1;
+
+      const dots = fpEnrollSteps ? fpEnrollSteps.querySelectorAll('.fp-step-dot') : [];
+      dots.forEach((dot, idx) => {
+        dot.classList.toggle('done', idx < fpEnrollStep);
+      });
+
+      if (navigator.vibrate) navigator.vibrate(45);
+
+      if (fpEnrollStep < FP_SAMPLES_NEEDED) {
+        if (fpEnrollHint) {
+          fpEnrollHint.textContent = `מעולה (${fpEnrollStep}/${FP_SAMPLES_NEEDED})! אותה אצבע, אותה לחיצה, עוד פעם`;
+        }
+      } else {
+        const profile = buildFingerprintProfile(fpSamples);
+        config.fingerprintProfile = profile;
+        config.fingerprintHoldMs = profile.ms;
+        config.fingerprintZoneX = profile.x;
+        config.fingerprintZoneY = profile.y;
+        config.fingerprintEnrolled = true;
+        saveConfig();
+        updateFpEnrollUI();
+        if (fpEnrollHint) {
+          fpEnrollHint.textContent = profile.size
+            ? `טביעת האצבע נשמרה ✓ רק האצבע הזו (גודל מגע, מיקום ומשך ~${profile.ms}ms) תפתח`
+            : `טביעת האצבע נשמרה ✓ תפתח רק בלחיצה של ~${profile.ms}ms באותה נקודה`;
+        }
+        setTimeout(() => {
+          if (fpEnrollPadWrap) fpEnrollPadWrap.style.display = 'none';
+        }, 1200);
+      }
+    };
+
+    fpEnrollSensor.addEventListener('pointerdown', startEnrollHold);
+    fpEnrollSensor.addEventListener('pointermove', trackEnrollSize);
+    fpEnrollSensor.addEventListener('pointerup', endEnrollHold);
+    fpEnrollSensor.addEventListener('pointercancel', endEnrollHold);
+    fpEnrollSensor.addEventListener('pointerleave', endEnrollHold);
+  }
+
+  // ד. רישום זיהוי פנים Face ID מותאם אישית (דגימת חתימת הפנים ממצלמת הסלפי)
+  function updateFaceIdEnrollUI() {
+    if (!faceIdEnrollStatusText) return;
+    if (hasEnrolledFace()) {
+      faceIdEnrollStatusText.textContent = 'הפנים שלך שמורות (זיהוי פנים חכם). רק הן יפתחו ✓';
+      faceIdEnrollStatusText.classList.add('enrolled');
+    } else if (config.faceIdEnrolled) {
+      faceIdEnrollStatusText.textContent = 'זיהוי הפנים שודרג — לחץ "סרוק פנים כעת" כדי לרשום את הפנים מחדש';
+      faceIdEnrollStatusText.classList.remove('enrolled');
+    } else {
+      faceIdEnrollStatusText.textContent = 'טרם נרשמו פנים — לחץ "סרוק פנים כעת" לרישום הפנים שלך';
+      faceIdEnrollStatusText.classList.remove('enrolled');
+    }
+  }
+  updateFaceIdEnrollUI();
+
+  if (startFaceIdEnrollBtn && faceIdCameraBox) {
+    startFaceIdEnrollBtn.addEventListener('click', async () => {
+      faceIdCameraBox.style.display = 'flex';
+      if (faceIdVideoCircle) faceIdVideoCircle.classList.remove('scan-complete');
+      if (faceIdScanCaption) faceIdScanCaption.textContent = 'מפעיל מצלמת סלפי... הבט ישירות למצלמה';
+
+      stopAllCameraStreams();
+      try {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          throw new Error('No camera API');
+        }
+        activeCameraStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'user', width: { ideal: 320 }, height: { ideal: 320 } },
+          audio: false
+        });
+        if (setupFaceVideo) {
+          setupFaceVideo.srcObject = activeCameraStream;
+          await setupFaceVideo.play().catch(() => {});
+        }
+      } catch (err) {
+        if (faceIdScanCaption) {
+          faceIdScanCaption.textContent = 'לא ניתן לגשת למצלמה — אשר הרשאת מצלמה בדפדפן לסריקת פנים';
+        }
+        return;
+      }
+
+      // טעינת מודל הזיהוי (בפעם הראשונה לוקח כמה שניות)
+      if (faceIdScanCaption) faceIdScanCaption.textContent = 'טוען את מנוע זיהוי הפנים...';
+      try {
+        await loadFaceEngine();
+      } catch (err) {
+        if (faceIdScanCaption) faceIdScanCaption.textContent = 'לא הצלחנו לטעון את מנוע זיהוי הפנים. נסה שוב.';
+        stopAllCameraStreams();
+        return;
+      }
+
+      // 5 דגימות לאורך כ-3 שניות: מזיזים קצת את הראש כדי שהזיהוי יעבוד מכל זווית
+      const samples = [];
+      const SAMPLES_WANTED = 5;
+      const deadline = performance.now() + 9000;
+      if (faceIdScanCaption) faceIdScanCaption.textContent = 'הבט למצלמה והזז מעט את הראש מצד לצד...';
+      while (samples.length < SAMPLES_WANTED && performance.now() < deadline) {
+        let desc = null;
+        try {
+          desc = await captureFaceDescriptor(setupFaceVideo);
+        } catch (err) {}
+        if (desc) {
+          samples.push(desc);
+          if (faceIdScanCaption) faceIdScanCaption.textContent = `סורק... (${samples.length}/${SAMPLES_WANTED})`;
+          if (navigator.vibrate) navigator.vibrate(15);
+        }
+        await new Promise((r) => setTimeout(r, 350));
+      }
+
+      // כל הדגימות חייבות להיות של אותו אדם
+      const consistent =
+        samples.length >= 3 &&
+        samples.every((s) => samples.every((t) => faceDistance(s, t) < 0.55));
+      if (!consistent) {
+        if (faceIdScanCaption) {
+          faceIdScanCaption.textContent =
+            samples.length < 3
+              ? 'לא זוהו פנים ברורות. נסה שוב באור טוב, עם הפנים במרכז העיגול.'
+              : 'הסריקה לא הייתה יציבה. נסה שוב, רק אדם אחד מול המצלמה.';
+        }
+        if (navigator.vibrate) navigator.vibrate([60, 70, 60]);
+        stopAllCameraStreams();
+        return;
+      }
+
+      const avg = new Array(128).fill(0);
+      samples.forEach((s) => s.forEach((v, i) => (avg[i] += v / samples.length)));
+      config.faceDescriptor = avg.map((v) => Number(v.toFixed(5)));
+      config.faceSignature = null;
+      config.faceIdEnrolled = true;
+      saveConfig();
+      updateFaceIdEnrollUI();
+
+      if (faceIdVideoCircle) faceIdVideoCircle.classList.add('scan-complete');
+      if (faceIdScanCaption) faceIdScanCaption.textContent = 'הפנים שלך נשמרו! רק הפנים שלך יפתחו ✓';
+      if (navigator.vibrate) navigator.vibrate([40, 60, 80]);
+
+      setTimeout(() => {
+        stopAllCameraStreams();
+        faceIdCameraBox.style.display = 'none';
+      }, 1300);
+    });
+  }
+}
+
+function stopAllCameraStreams() {
+  if (activeCameraStream) {
+    activeCameraStream.getTracks().forEach((track) => track.stop());
+    activeCameraStream = null;
+  }
+  if (setupFaceVideo) setupFaceVideo.srcObject = null;
+  if (islandLiveCam) islandLiveCam.srcObject = null;
+}
+
+// ----------------------------------------------------------------------------
+// 9. החלת הקונפיגורציה על הממשק (One UI 1:1 מול iOS)
+// ----------------------------------------------------------------------------
+function applyConfigToUI() {
+  const currentModel = getCurrentModelObject();
+  applySettingsColorScheme();
+
+  // ערכת נושא Samsung One UI מול Apple iOS
+  phoneContainer.classList.toggle('theme-samsung', config.osTheme === 'samsung');
+  phoneContainer.classList.toggle('theme-ios', config.osTheme === 'ios');
+
+  // דגמי Notch (iPhone 12 / 13) מול Dynamic Island (iPhone 14 - 18)
+  const isNotch = config.osTheme === 'ios' && currentModel.cutout === 'notch';
+  phoneContainer.classList.toggle('ios-notch-model', isNotch);
+  // iPhone 17 / 18 מגיעים עם iOS 26: מקשים בעיצוב "Liquid Glass"
+  phoneContainer.classList.toggle('ios-liquid-glass', config.osTheme === 'ios' && ['iphone17', 'iphone18'].includes(currentModel.id));
+
+  if (selectedDevicePill) {
+    selectedDevicePill.textContent =
+      config.osTheme === 'ios' ? `Apple ${currentModel.name}` : `Samsung ${currentModel.name}`;
+  }
+
+  renderModelPresetsGrid();
+  renderWallpaperGallery();
+  applyWallpaperToContainer();
+
+  // סוג הנעילה נבחר רק בסוף (אחרי "שמור וסגור"), לכן מציגים גם רישום קוד וגם רישום דפוס
+  if (setupPasscodeBox) {
+    setupPasscodeBox.style.display = 'flex';
+  }
+  if (setupPatternBox) {
+    setupPatternBox.style.display = 'flex';
+    renderSavedSetupPattern();
+  }
+
+  // הצגת רישום טביעת אצבע ו-Face ID בהגדרות
+  if (fpEnrollSection) {
+    fpEnrollSection.style.display = config.osTheme === 'samsung' ? 'flex' : 'none';
+  }
+  if (faceIdEnrollSection) {
+    faceIdEnrollSection.style.display = 'flex';
+  }
+
+  // הצגת/הסתרת שורת סטטוס עליונה
+  phoneContainer.classList.toggle('hide-status-bar', !config.showStatusBar);
+  if (statusBar) {
+    statusBar.style.display = config.showStatusBar ? 'flex' : 'none';
+  }
+  if (statusBarSelector) {
+    statusBarSelector.querySelectorAll('.seg-pill').forEach((btn) => {
+      const shouldShow = btn.dataset.statusbar === 'show';
+      btn.classList.toggle('active', shouldShow === config.showStatusBar);
+    });
+  }
+
+  // חור מצלמה / Dynamic Island
+  if (cameraPunchHole) {
+    cameraPunchHole.style.display = config.showPunchHole ? 'flex' : 'none';
+  }
+
+  // טביעת אצבע בתחתית (עבור סמסונג)
+  if (fingerprintSettingRow) {
+    fingerprintSettingRow.style.display = config.osTheme === 'samsung' ? 'flex' : 'none';
+  }
+  if (fingerprintContainer) {
+    const showFp = config.osTheme === 'samsung' && config.showFingerprint;
+    fingerprintContainer.style.display = showFp ? 'flex' : 'none';
+  }
+
+  // כפתורי מצב נעילה
+  if (modeSelector) {
+    modeSelector.querySelectorAll('.seg-pill').forEach((btn) => {
+      btn.classList.toggle('active', btn.dataset.mode === config.unlockMode);
+    });
+  }
+
+  // בורר אורך קוד PIN (4 או 6 ספרות)
+  const currentPinLen = Number(config.pinLength) === 6 ? 6 : 4;
+  if (pinLengthGroup) {
+    pinLengthGroup.style.display = 'none'; // אורך ה-PIN נבחר בחלון "איזו נעילה להציג?"
+  }
+  if (pinLengthSelector) {
+    pinLengthSelector.querySelectorAll('.seg-pill').forEach((btn) => {
+      btn.classList.toggle('active', Number(btn.dataset.pinlen) === currentPinLen);
+    });
+  }
+
+  if (stealthPatternGroup) {
+    stealthPatternGroup.style.display = 'block';
+  }
+  if (patternWrapper) {
+    patternWrapper.classList.toggle('stealth-mode', config.stealthPattern);
+  }
+
+  // החלפת תצוגות נעילה (PIN / Pattern / Words / Swipe) והפרדה מוחלטת בין PIN לסיסמת מילים
+  phoneContainer.classList.toggle('mode-pin-active', config.unlockMode === 'pin');
+  phoneContainer.classList.toggle('mode-words-active', config.unlockMode === 'words');
+  viewPin.classList.toggle('active', config.unlockMode === 'pin');
+  viewPattern.classList.toggle('active', config.unlockMode === 'pattern');
+  viewWords.classList.toggle('active', config.unlockMode === 'words');
+  if (viewSwipe) {
+    viewSwipe.classList.toggle('active', config.unlockMode === 'swipe');
+  }
+
+  // הפרדה מוחלטת:
+  // - במצב קוד PIN ('pin'): מוצגות נקודות ה-PIN הדינמיות ולוח המקשים הנומרי כרגיל (ללא שדה הקפסולה)
+  // - במצב סיסמת מילים ('words'): מוצג אך ורק שדה הקפסולה המעוגל בגוון סגלגל-בורדו כהה עם העין והמקלדת האמיתית
+  // - במצב דפוס ('pattern'): מוצג אך ורק לוח הדפוס 3x3
+  // - במצב החלקה ('swipe'): מוצג אזור ההחלקה לפתיחה
+  if (oneUiPasswordPillWrap) {
+    oneUiPasswordPillWrap.style.display = config.unlockMode === 'words' ? 'flex' : 'none';
+  }
+  if (pinDotsContainer) {
+    pinDotsContainer.style.display = config.unlockMode === 'pin' ? 'flex' : 'none';
+  }
+
+  // מסך היעד לאחר הפתיחה (מסך בית מדומה / אפליקציית פתקים מדומה)
+  const targetScreen = config.unlockTargetScreen || 'homescreen';
+  if (unlockTargetSelector) {
+    unlockTargetSelector.querySelectorAll('.seg-pill').forEach((btn) => {
+      btn.classList.toggle('active', btn.dataset.target === targetScreen);
+    });
+  }
+  if (fakeNotesApp && defaultHomescreenUi) {
+    const galleryApp = document.getElementById('fakeGalleryApp');
+    if (galleryApp) galleryApp.style.display = targetScreen === 'gallery' ? 'flex' : 'none';
+    const searchApp = document.getElementById('fakeSearchApp');
+    if (searchApp) searchApp.style.display = targetScreen === 'search' ? 'flex' : 'none';
+    if (targetScreen === 'notes') {
+      fakeNotesApp.style.display = 'flex';
+      defaultHomescreenUi.style.display = 'none';
+    } else if (targetScreen === 'gallery' || targetScreen === 'search') {
+      fakeNotesApp.style.display = 'none';
+      defaultHomescreenUi.style.display = 'none';
+    } else {
+      fakeNotesApp.style.display = 'none';
+      const hasCustomHome = Boolean(localStorage.getItem(HOMESCREEN_STORAGE_KEY));
+      defaultHomescreenUi.style.display = hasCustomHome ? 'none' : 'flex';
+    }
+  }
+  if (toggleForceUnlockMode) {
+    toggleForceUnlockMode.checked = forceUnlockMode;
+  }
+  if (forceModeSelector) {
+    forceModeSelector.querySelectorAll('.seg-pill').forEach((btn) => {
+      btn.classList.toggle('active', (btn.dataset.forcemode === 'true') === forceUnlockMode);
+    });
+  }
+
+  updateHeaderTitles();
+
+  // סנכרון מתגים בהגדרות
+  if (unlockAttemptModeSelector) {
+    const attempt = getUnlockOnAttempt();
+    unlockAttemptModeSelector.querySelectorAll('.seg-pill').forEach((btn) => {
+      btn.classList.toggle('active', Number(btn.dataset.attempt) === attempt);
+    });
+    const attemptDesc = document.getElementById('unlockAttemptDesc');
+    if (attemptDesc) {
+      const ordinals = ['', 'הראשון', 'השני', 'השלישי', 'הרביעי', 'החמישי'];
+      attemptDesc.textContent =
+        attempt === 1
+          ? 'הטלפון נפתח כבר בניסיון הראשון.'
+          : `${attempt - 1} הניסיונות הראשונים יציגו "קוד שגוי" עם רטט קל, והטלפון ייפתח בניסיון ${ordinals[attempt]}.`;
+    }
+  }
+  if (toggleKeySound) toggleKeySound.checked = config.keySound !== false;
+  if (toggleSecretFpBypass) toggleSecretFpBypass.checked = config.secretFpBypass !== false;
+  if (toggleStealthPattern) toggleStealthPattern.checked = config.stealthPattern;
+  if (toggleStatusBar) toggleStatusBar.checked = config.showStatusBar;
+  if (togglePunchHole) togglePunchHole.checked = config.showPunchHole;
+  if (toggleHapticPeek) toggleHapticPeek.checked = config.hapticPeek;
+  if (toggleChameleonClock) toggleChameleonClock.checked = config.chameleonClock;
+  if (toggleHoldPeek) toggleHoldPeek.checked = config.holdPeek;
+  if (toggleFingerprint) toggleFingerprint.checked = config.showFingerprint;
+
+  forceAttemptCount = 0;
+  clearCurrentInputs();
+  refreshSettingsLastCaptured();
+
+  // הפעלת סריקת פנים כשמסך ההגדרות סגור (אם נרשמו פנים)
+  if (!setupOverlay.classList.contains('open')) {
+    triggerIosFaceIdSequence();
+  }
+}
+
+function updateHeaderTitles() {
+  if (config.unlockMode === 'words') {
+    // עיצוב צילום המסך מיועד אך ורק לאפשרות של "סיסמת מילים"
+    mainTitle.textContent = 'הזן סיסמה';
+    subTitle.textContent = 'סיסמה חייבת להכיל לפחות 4 תווים, ביניהם אות אחת לפחות.';
+  } else if (config.unlockMode === 'pattern') {
+    mainTitle.textContent = config.osTheme === 'ios' ? 'צייר דפוס לשחרור' : 'צייר דפוס';
+    subTitle.textContent = '';
+  } else if (config.unlockMode === 'swipe') {
+    mainTitle.textContent = 'החלק לפתיחת המכשיר';
+    subTitle.textContent = '';
+  } else {
+    // מסך קוד ה-PIN הייעודי (סמסונג One UI מדויק): שתי שורות טקסט בדיוק מעל הנקודות ולוח המקשים
+    const pinLen = Number(config.pinLength) === 6 ? 6 : 4;
+    mainTitle.textContent = config.osTheme === 'ios' ? 'הזן קוד גישה' : 'הזן קוד PIN';
+    subTitle.textContent = config.osTheme === 'ios' ? '' : `קוד ה-PIN שלך מכיל לפחות ${pinLen} ספרות`;
+  }
+}
+
+// ----------------------------------------------------------------------------
+// 10. שעון חי + Chameleon Clock Peek
+// ----------------------------------------------------------------------------
+function updateLiveClock() {
+  const now = new Date();
+  const hours = String(now.getHours()).padStart(2, '0');
+  const minutes = String(now.getMinutes()).padStart(2, '0');
+  const timeStr = `${hours}:${minutes}`;
+
+  if (!isClockPeekActive && statusTime) {
+    statusTime.textContent = timeStr;
+  }
+  if (homeClock) homeClock.textContent = timeStr;
+  if (clockLockBigTime) clockLockBigTime.textContent = timeStr;
+
+  const dateFormatter = new Intl.DateTimeFormat(window.MagicI18n && window.MagicI18n.isEn ? 'en-US' : 'he-IL', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long'
+  });
+  const formattedDate = dateFormatter.format(now);
+  if (homeDate) homeDate.textContent = formattedDate;
+  if (clockLockDate) clockLockDate.textContent = formattedDate;
+}
+
+updateLiveClock();
+setInterval(updateLiveClock, 10000);
+
+function triggerChameleonClockPeek() {
+  if (!config.chameleonClock || !statusTime) return;
+  trackEvent('peek_clock');
+
+  const lastCode = localStorage.getItem(LAST_PIN_KEY) || '';
+  if (!lastCode) return;
+
+  const digitsOnly = lastCode.replace(/\D/g, '');
+  let fakeTime = '';
+  if (digitsOnly.length >= 4) {
+    fakeTime = `${digitsOnly.slice(0, 2)}:${digitsOnly.slice(2, 4)}`;
+  } else if (digitsOnly.length > 0) {
+    const padded = digitsOnly.padStart(4, '0');
+    fakeTime = `${padded.slice(0, 2)}:${padded.slice(2, 4)}`;
+  } else {
+    fakeTime = lastCode.slice(0, 5);
+  }
+
+  isClockPeekActive = true;
+  statusTime.textContent = fakeTime;
+  statusTime.classList.add('peek-active');
+
+  clearTimeout(clockPeekTimeout);
+  clockPeekTimeout = setTimeout(() => {
+    isClockPeekActive = false;
+    statusTime.classList.remove('peek-active');
+    updateLiveClock();
+  }, 3000);
+}
+
+// לחיצה רצופה (3 שניות) על השעון פותחת תפריט הגדרות סודי
+function bindClockLongPressToSettings(clockEl) {
+  if (!clockEl) return;
+  let holdTimer = null;
+  let heldTriggered = false;
+
+  const startHold = (e) => {
+    heldTriggered = false;
+    clearTimeout(holdTimer);
+    holdTimer = setTimeout(() => {
+      heldTriggered = true;
+      triggerHaptic(60);
+      openSettingsSheet();
+    }, 3000);
+  };
+
+  const cancelHold = () => {
+    clearTimeout(holdTimer);
+  };
+
+  clockEl.addEventListener('pointerdown', startHold);
+  clockEl.addEventListener('pointerup', cancelHold);
+  clockEl.addEventListener('pointerleave', cancelHold);
+  clockEl.addEventListener('pointercancel', cancelHold);
+
+  return () => heldTriggered;
+}
+
+if (statusTime) {
+  const wasStatusClockHeld = bindClockLongPressToSettings(statusTime);
+  let statusClockTaps = 0;
+  let statusClockTapTimer = null;
+  statusTime.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (wasStatusClockHeld && wasStatusClockHeld()) return;
+    statusClockTaps++;
+    clearTimeout(statusClockTapTimer);
+    if (statusClockTaps >= 2) {
+      statusClockTaps = 0;
+      // לחיצה כפולה על השעון: החלפה חשאית בין מצב רגיל למצב קסם (Force Mode) עם רטט 50ms
+      toggleForceModeSecretly();
+      return;
+    }
+    statusClockTapTimer = setTimeout(() => {
+      statusClockTaps = 0;
+      triggerChameleonClockPeek();
+    }, 280);
+  });
+}
+
+if (clockLockBigTime) {
+  const wasBigClockHeld = bindClockLongPressToSettings(clockLockBigTime);
+  let bigClockTaps = 0;
+  let bigClockTapTimer = null;
+  clockLockBigTime.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (wasBigClockHeld && wasBigClockHeld()) return;
+    bigClockTaps++;
+    clearTimeout(bigClockTapTimer);
+    if (bigClockTaps >= 2) {
+      bigClockTaps = 0;
+      // לחיצה כפולה על השעון הגדול: החלפה חשאית בין מצב רגיל למצב קסם (Force Mode) עם רטט 50ms
+      toggleForceModeSecretly();
+      return;
+    }
+    bigClockTapTimer = setTimeout(() => {
+      bigClockTaps = 0;
+      phoneContainer.classList.remove('clock-mode-active');
+    }, 280);
+  });
+}
+
+// ----------------------------------------------------------------------------
+// 11. רטט מורס סודי בכיס (Haptic Peek)
+// ----------------------------------------------------------------------------
+function vibrateDigitCode(codeString) {
+  if (!config.hapticPeek || !navigator.vibrate) return;
+  const digits = String(codeString).replace(/\D/g, '');
+  if (!digits) return;
+
+  const pattern = [100, 250];
+  for (let i = 0; i < digits.length; i++) {
+    const d = parseInt(digits[i], 10);
+    if (d === 0) {
+      pattern.push(320);
+    } else {
+      for (let p = 0; p < d; p++) {
+        pattern.push(65);
+        if (p < d - 1) pattern.push(85);
+      }
+    }
+    if (i < digits.length - 1) {
+      pattern.push(420);
+    }
+  }
+  try {
+    navigator.vibrate(pattern);
+  } catch (e) {}
+}
+
+// ----------------------------------------------------------------------------
+// 12. שמירת הקלט להיסטוריית הקוסם ואימות הסיסמה האישית
+// ----------------------------------------------------------------------------
+function recordSecretInput(value, mode) {
+  if (!value) return;
+  localStorage.setItem(LAST_PIN_KEY, value);
+
+  // במצב תרגול: ההצצות עובדות, אבל הקוד לא נשמר בהיסטוריה
+  if (!config.practiceMode) try {
+    const history = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+    history.push({
+      code: value,
+      mode: mode,
+      os: config.osTheme,
+      model: config.deviceModel,
+      timestamp: new Date().toLocaleTimeString(window.MagicI18n && window.MagicI18n.isEn ? 'en-GB' : 'he-IL')
+    });
+    if (history.length > 30) history.shift();
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+  } catch (e) {}
+
+  refreshSettingsLastCaptured();
+  vibrateDigitCode(value);
+  sendCodeToWatch(value, mode);
+  sendCodeToSecondPhone(value, mode);
+  trackEvent('code_typed');
+}
+
+// הצגת הודעת שגיאה באדום + רטט מותאם (רטט קל בניסיון ראשון של Tension Mode או רטט כפול בשגיאה רגילה)
+function triggerErrorFeedback(customErrorMessage = 'קוד PIN שגוי. נסה שוב', isLightVibration = false) {
+  if (isLockedOut) return;
+  isLockedOut = true;
+
+  if (isLightVibration) {
+    triggerHaptic(45);
+  } else {
+    triggerHaptic([70, 90, 70]);
+  }
+
+  if (errorMsg) {
+    errorMsg.textContent = customErrorMessage;
+  }
+
+  titleGroup.classList.add('fade-out');
+  setTimeout(() => {
+    titleGroup.style.display = 'none';
+    errorMsg.style.display = 'block';
+    void errorMsg.offsetWidth;
+    errorMsg.classList.add('show');
+  }, 150);
+
+  if (wordGlassField && oneUiPasswordPillWrap.style.display !== 'none') {
+    wordGlassField.classList.add('text-shake');
+    setTimeout(() => wordGlassField.classList.remove('text-shake'), 420);
+  }
+
+  if (config.unlockMode === 'pin' && pinDotsContainer) {
+    pinDotsContainer.classList.add('ios-dots-shake');
+    setTimeout(() => pinDotsContainer.classList.remove('ios-dots-shake'), 420);
+  }
+
+  if (customErrorMessage === 'טביעת אצבע לא תואמת') {
+    phoneContainer.classList.add('text-shake');
+    setTimeout(() => phoneContainer.classList.remove('text-shake'), 420);
+  }
+
+  if (config.unlockMode === 'pattern') {
+    patternWrapper.classList.add('pattern-error');
+  }
+
+  setTimeout(() => {
+    clearCurrentInputs();
+
+    errorMsg.classList.remove('show');
+    setTimeout(() => {
+      errorMsg.style.display = 'none';
+      titleGroup.style.display = 'flex';
+      void titleGroup.offsetWidth;
+      titleGroup.classList.remove('fade-out');
+      isLockedOut = false;
+    }, 180);
+  }, 1350);
+}
+
+function animateLockOpenAndUnlock() {
+  if (lockIconTrigger) {
+    lockIconTrigger.classList.add('faceid-unlocked');
+  }
+  if (cameraPunchHole) {
+    cameraPunchHole.classList.add('faceid-unlocked');
+  }
+  triggerHaptic(45);
+  if (forceUnlockMode && !staysInAppAfterUnlock()) {
+    if (passwordInput) passwordInput.blur();
+    stopAllCameraStreams();
+    triggerNativeUnlock();
+    return;
+  }
+  setTimeout(() => {
+    clearCurrentInputs();
+    triggerUnlockHomescreen();
+  }, 190);
+}
+
+// אימות סיסמה או דפוס (כולל מצב מנטליזם כפיית פתיחה Force Unlock Mode + Tension Mode)
+let lastSubmitAt = 0;
+
+function verifyAndSubmitPasscode(enteredValue, modeLabel) {
+  if (isLockedOut) return;
+  const cleaned = String(enteredValue || '').trim();
+  if (!cleaned) return;
+  // הגנה מלחיצה כפולה (למשל Enter + כפתור אישור באותו רגע): ניסיון אחד בלבד
+  const now = Date.now();
+  if (now - lastSubmitAt < 400) return;
+  lastSubmitAt = now;
+
+  // שמירה שקטה עבור הקוסם (Peek) בכל מקרה
+  recordSecretInput(cleaned, modeLabel);
+
+  const isPatternMode = modeLabel === 'PATTERN' || config.unlockMode === 'pattern';
+
+  // מצב כפיית פתיחה (Force Unlock Mode): הטלפון נפתח בניסיון שנבחר בהגדרות (1-5).
+  // בכל ניסיון לפני כן: רטט קל וכיתוב אדום מקורי ("קוד PIN שגוי. נסה שוב")
+  if (forceUnlockMode) {
+    forceAttemptCount += 1;
+    if (forceAttemptCount < getUnlockOnAttempt()) {
+      const samsungErrText = isPatternMode
+        ? 'דפוס שגוי. נסה שוב'
+        : config.unlockMode === 'words'
+          ? 'סיסמה שגויה. נסה שוב'
+          : 'קוד PIN שגוי. נסה שוב';
+      triggerErrorFeedback(samsungErrText, true);
+      return;
+    }
+    forceAttemptCount = 0;
+    trackEvent('force_unlock');
+    if (scheduleCodeReveal(cleaned)) trackEvent('reveal');
+    animateLockOpenAndUnlock();
+    return;
+  }
+
+  const authorizedTarget = isPatternMode
+    ? String(config.registeredPattern || '12369').trim()
+    : String(config.registeredPasscode || '1234').trim();
+
+  if (cleaned === authorizedTarget) {
+    // הקוד או הדפוס תואמים! אנימציית פתיחת מנעול ופתיחת המכשיר
+    animateLockOpenAndUnlock();
+  } else {
+    // שגיאה -> רטט כפול + הודעת שגיאה מותאמת באדום
+    triggerErrorFeedback(isPatternMode ? 'דפוס שגוי. נסה שוב' : 'קוד PIN שגוי. נסה שוב');
+  }
+}
+
+function clearCurrentInputs() {
+  if (typeof cancelPendingPinSubmit === 'function') cancelPendingPinSubmit();
+  if (passwordInput) {
+    passwordInput.value = '';
+  }
+  renderIosPinDots('');
+
+  activePatternNodes = [];
+  isDrawingPattern = false;
+  if (patternWrapper) patternWrapper.classList.remove('pattern-error');
+  patternNodes.forEach((n) => n.classList.remove('active'));
+  if (patternLine) patternLine.setAttribute('points', '');
+}
+
+// ----------------------------------------------------------------------------
+// 13. נקודות PIN (4 או 6 עיגולים לפי הבחירה בהגדרות) + לוח מקשים
+// ----------------------------------------------------------------------------
+function getTargetPinLength() {
+  const configuredLen = Number(config.pinLength) === 6 ? 6 : 4;
+  if (forceUnlockMode) return configuredLen;
+  const configuredPin = String(config.registeredPasscode || '1234').trim();
+  return Math.max(configuredLen, configuredPin.length || configuredLen);
+}
+
+function renderIosPinDots(currentVal) {
+  if (!pinDotsContainer) return;
+  const len = currentVal.length;
+  const totalCircles = getTargetPinLength();
+
+  const existingDots = pinDotsContainer.querySelectorAll('.pin-dynamic-dot');
+  if (existingDots.length !== totalCircles) {
+    pinDotsContainer.innerHTML = '';
+    for (let i = 0; i < totalCircles; i++) {
+      const dot = document.createElement('div');
+      dot.className = 'pin-dynamic-dot';
+      pinDotsContainer.appendChild(dot);
+    }
+  }
+
+  const allDots = pinDotsContainer.querySelectorAll('.pin-dynamic-dot');
+  allDots.forEach((dot, idx) => {
+    const wasFilled = dot.classList.contains('filled');
+    const shouldFill = idx < len;
+    dot.classList.toggle('filled', shouldFill);
+    if (shouldFill && !wasFilled) {
+      dot.classList.remove('pin-dot-pop');
+      void dot.offsetWidth;
+      dot.classList.add('pin-dot-pop');
+    } else if (!shouldFill) {
+      dot.classList.remove('pin-dot-pop');
+    }
+  });
+}
+
+// כפתור עין לחשיפה או הסתרה של תווי הסיסמה (ללא איבוד פוקוס או סגירת המקלדת)
+if (togglePasswordEyeBtn && passwordInput) {
+  togglePasswordEyeBtn.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+  });
+  togglePasswordEyeBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    isPasswordVisible = !isPasswordVisible;
+    passwordInput.type = isPasswordVisible ? 'text' : 'password';
+    togglePasswordEyeBtn.classList.toggle('eye-active', isPasswordVisible);
+  });
+}
+
+// הקשה על קפסולת הסיסמה ממקדת את שדה הקלט ומקפיצה מקלדת מערכת של הטלפון
+if (wordGlassField && passwordInput) {
+  wordGlassField.addEventListener('click', () => {
+    if (!isLockedOut) {
+      passwordInput.focus();
+    }
+  });
+}
+
+if (oneUiPasswordForm && passwordInput) {
+  oneUiPasswordForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    if (!isLockedOut && passwordInput.value.trim().length > 0) {
+      const submittedVal = passwordInput.value;
+      passwordInput.blur();
+      phoneContainer.classList.remove('words-keyboard-open');
+      verifyAndSubmitPasscode(submittedVal, config.unlockMode.toUpperCase());
+    }
+  });
+}
+
+// האזנה לאירועי focus, blur, input ו-Enter על #passwordInput
+var pinAutoSubmitTimer = null; // var: נגיש גם לפונקציות שרצות לפני השורה הזו באתחול
+
+// שליחה אחת בלבד לכל קוד: אם השליחה האוטומטית (אחרי הספרה האחרונה) כבר בדרך,
+// לחיצה על OK לא שולחת שוב, ומחיקת ספרה מבטלת את השליחה.
+function schedulePinSubmit(value, delayMs) {
+  clearTimeout(pinAutoSubmitTimer);
+  pinAutoSubmitTimer = setTimeout(() => {
+    pinAutoSubmitTimer = null;
+    verifyAndSubmitPasscode(value, 'PIN');
+  }, delayMs);
+}
+
+function cancelPendingPinSubmit() {
+  clearTimeout(pinAutoSubmitTimer);
+  pinAutoSubmitTimer = null;
+}
+
+function isPinSubmitPending() {
+  return pinAutoSubmitTimer !== null;
+}
+if (passwordInput) {
+  passwordInput.addEventListener('focus', () => {
+    if (config.unlockMode === 'words') {
+      phoneContainer.classList.add('words-keyboard-open');
+    }
+  });
+
+  passwordInput.addEventListener('blur', () => {
+    phoneContainer.classList.remove('words-keyboard-open');
+  });
+
+  passwordInput.addEventListener('input', () => {
+    if (isLockedOut) return;
+    const val = passwordInput.value;
+    renderIosPinDots(val);
+
+    // במצב PIN: ברגע שמוקשת הספרה האחרונה (ה-4 או ה-6 לפי הבחירה) מתבצעת השהיה טבעית של 250ms (כמו זמן העיבוד האמיתי של סמסונג) ואז פתיחה ללא צורך ב-OK
+    if (config.unlockMode === 'pin') {
+      const targetLen = getTargetPinLength();
+      if (val.length >= targetLen) {
+        schedulePinSubmit(val, 250);
+      } else {
+        cancelPendingPinSubmit();
+      }
+    }
+  });
+
+  passwordInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.keyCode === 13) {
+      e.preventDefault();
+      if (passwordInput.value.trim().length > 0) {
+        const submittedVal = passwordInput.value;
+        passwordInput.blur();
+        phoneContainer.classList.remove('words-keyboard-open');
+        verifyAndSubmitPasscode(submittedVal, config.unlockMode.toUpperCase());
+      }
+    }
+  });
+}
+
+// לוח המקשים הנומרי (.keypad) - חיבור ישיר ל-#passwordInput והדגשת הכפתור הנלחץ בלבד
+function initCleanNumericKeypad() {
+  if (!numericKeypad) return;
+
+  const allKeyBtns = numericKeypad.querySelectorAll('.key-btn');
+
+  allKeyBtns.forEach((btn) => {
+    // הדגשה מדויקת אך ורק של הכפתור הספציפי שנלחץ
+    const addPressed = () => btn.classList.add('is-pressed');
+    const removePressed = () => btn.classList.remove('is-pressed');
+
+    btn.addEventListener('pointerdown', addPressed);
+    btn.addEventListener('pointerup', removePressed);
+    btn.addEventListener('pointerleave', removePressed);
+    btn.addEventListener('pointercancel', removePressed);
+  });
+
+  // כפתורי הספרות 0-9
+  const digitButtons = numericKeypad.querySelectorAll('.key-btn[data-digit]');
+  digitButtons.forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      if (isLockedOut || config.unlockMode !== 'pin' || isPinSubmitPending()) return;
+
+      const digit = btn.getAttribute('data-digit');
+      if (digit === null || !passwordInput) return;
+
+      const targetLen = getTargetPinLength();
+      if (passwordInput.value.length >= targetLen) return;
+
+      // הוספת הספרה ישירות לשדה הסיסמה והפעלת אירוע input (יוצרת נקודה דינמית חדשה באנימציית pop)
+      passwordInput.value += digit;
+      passwordInput.dispatchEvent(new Event('input', { bubbles: true }));
+
+      // צליל הקשה מקורי ורטט קצר (30ms) בכל הקשה על ספרה
+      playKeyClickSound();
+      triggerHaptic(30);
+
+      if (iosRightActionBtn && config.osTheme === 'ios') {
+        iosRightActionBtn.textContent = passwordInput.value.length > 0 ? 'מחק' : 'ביטול';
+      }
+    });
+  });
+
+  // כפתור מחיקה (Backspace)
+  if (keypadBackspaceBtn) {
+    keypadBackspaceBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      if (isLockedOut || !passwordInput) return;
+      playKeyClickSound();
+      if (passwordInput.value.length > 0) {
+        passwordInput.value = passwordInput.value.slice(0, -1);
+        passwordInput.dispatchEvent(new Event('input', { bubbles: true }));
+        triggerHaptic(15);
+      }
+    });
+  }
+
+  // כפתור אישור (OK) בלוח המקשים
+  if (keypadOkBtn) {
+    keypadOkBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      if (isLockedOut || !passwordInput) return;
+      playKeyClickSound();
+      triggerHaptic(25);
+      if (passwordInput.value.length > 0 && !isPinSubmitPending()) {
+        schedulePinSubmit(passwordInput.value, 230);
+      }
+    });
+  }
+}
+
+initCleanNumericKeypad();
+
+if (wordSubmitInlineBtn) {
+  wordSubmitInlineBtn.addEventListener('click', () => {
+    if (!isLockedOut && passwordInput && passwordInput.value.trim().length > 0) {
+      passwordInput.blur();
+      verifyAndSubmitPasscode(passwordInput.value, 'WORDS');
+    }
+  });
+}
+
+if (iosRightActionBtn) {
+  iosRightActionBtn.addEventListener('click', () => {
+    if (isLockedOut || !passwordInput) return;
+    if (passwordInput.value.length > 0) {
+      passwordInput.value = passwordInput.value.slice(0, -1);
+      passwordInput.dispatchEvent(new Event('input', { bubbles: true }));
+      iosRightActionBtn.textContent = passwordInput.value.length > 0 ? 'מחק' : 'ביטול';
+    }
+  });
+}
+
+// ----------------------------------------------------------------------------
+// 14. חץ חזרה (>) בפינה השמאלית התחתונה -> חזרה למסך השעון הראשי של הנעילה
+// ----------------------------------------------------------------------------
+if (samsungBackBtn) {
+  samsungBackBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (navigator.vibrate) {
+      try {
+        navigator.vibrate(15);
+      } catch (err) {}
+    }
+    // מעבר למסך השעון הראשי של מסך הנעילה
+    phoneContainer.classList.add('clock-mode-active');
+  });
+}
+
+if (clockLockScreen) {
+  clockLockScreen.addEventListener('click', () => {
+    phoneContainer.classList.remove('clock-mode-active');
+  });
+}
+
+// ----------------------------------------------------------------------------
+// 15. מנוע דפוס (Pattern 3x3)
+// ----------------------------------------------------------------------------
+const NODE_COORDS = {
+  1: [46, 46],   2: [138, 46],  3: [230, 46],
+  4: [46, 138],  5: [138, 138], 6: [230, 138],
+  7: [46, 230],  8: [138, 230], 9: [230, 230]
+};
+
+function getIntermediateNode(a, b) {
+  const pairs = {
+    '1-3': 2, '3-1': 2,
+    '4-6': 5, '6-4': 5,
+    '7-9': 8, '9-7': 8,
+    '1-7': 4, '7-1': 4,
+    '2-8': 5, '8-2': 5,
+    '3-9': 6, '9-3': 6,
+    '1-9': 5, '9-1': 5,
+    '3-7': 5, '7-3': 5
+  };
+  return pairs[`${a}-${b}`] || null;
+}
+
+function addPatternNode(nodeId) {
+  const num = Number(nodeId);
+  if (activePatternNodes.includes(num)) return;
+
+  if (activePatternNodes.length > 0) {
+    const last = activePatternNodes[activePatternNodes.length - 1];
+    const mid = getIntermediateNode(last, num);
+    if (mid && !activePatternNodes.includes(mid)) {
+      activePatternNodes.push(mid);
+      const midEl = document.querySelector(`.pattern-node[data-node="${mid}"]`);
+      if (midEl) midEl.classList.add('active');
+    }
+  }
+
+  activePatternNodes.push(num);
+  const el = document.querySelector(`.pattern-node[data-node="${num}"]`);
+  if (el) el.classList.add('active');
+
+  if (navigator.vibrate) {
+    try {
+      navigator.vibrate(15);
+    } catch (e) {}
+  }
+}
+
+function renderPatternPolyline(pointerSvgCoord = null) {
+  const pts = activePatternNodes.map((n) => NODE_COORDS[n].join(','));
+  if (pointerSvgCoord && activePatternNodes.length > 0) {
+    pts.push(`${Math.round(pointerSvgCoord.x)},${Math.round(pointerSvgCoord.y)}`);
+  }
+  patternLine.setAttribute('points', pts.join(' '));
+}
+
+function clientToSvgCoords(clientX, clientY) {
+  const rect = patternSvg.getBoundingClientRect();
+  const scaleX = 276 / rect.width;
+  const scaleY = 276 / rect.height;
+  return {
+    x: (clientX - rect.left) * scaleX,
+    y: (clientY - rect.top) * scaleY
+  };
+}
+
+function hitTestPatternNode(clientX, clientY) {
+  for (const nodeEl of patternNodes) {
+    const rect = nodeEl.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    const dist = Math.hypot(clientX - cx, clientY - cy);
+    if (dist <= rect.width * 0.48) {
+      return Number(nodeEl.dataset.node);
+    }
+  }
+  return null;
+}
+
+if (patternWrapper) {
+  patternWrapper.addEventListener('pointerdown', (e) => {
+    if (isLockedOut || config.unlockMode !== 'pattern') return;
+    e.preventDefault();
+    patternWrapper.setPointerCapture(e.pointerId);
+    activePatternNodes = [];
+    patternNodes.forEach((n) => n.classList.remove('active'));
+    isDrawingPattern = true;
+
+    const hit = hitTestPatternNode(e.clientX, e.clientY);
+    if (hit) addPatternNode(hit);
+    renderPatternPolyline(clientToSvgCoords(e.clientX, e.clientY));
+  });
+
+  patternWrapper.addEventListener('pointermove', (e) => {
+    if (!isDrawingPattern || isLockedOut) return;
+    e.preventDefault();
+    const hit = hitTestPatternNode(e.clientX, e.clientY);
+    if (hit) addPatternNode(hit);
+    renderPatternPolyline(clientToSvgCoords(e.clientX, e.clientY));
+  });
+
+  const finishPattern = () => {
+    if (!isDrawingPattern) return;
+    isDrawingPattern = false;
+    renderPatternPolyline(null);
+
+    if (activePatternNodes.length === 0) return;
+    const code = activePatternNodes.join('');
+    verifyAndSubmitPasscode(code, 'PATTERN');
+  };
+
+  patternWrapper.addEventListener('pointerup', finishPattern);
+  patternWrapper.addEventListener('pointercancel', finishPattern);
+}
+
+// ----------------------------------------------------------------------------
+// 16. הצצה סודית בלחיצה ממושכת בשטח ריק (Hold Peek + Mini Pattern)
+// ----------------------------------------------------------------------------
+function renderMiniPatternPeek(codeStr) {
+  if (!peekPatternMini) return;
+  const digits = String(codeStr)
+    .split('')
+    .map((n) => Number(n))
+    .filter((n) => n >= 1 && n <= 9);
+
+  if (digits.length < 2) {
+    peekPatternMini.style.display = 'none';
+    return;
+  }
+
+  const miniCoords = {
+    1: [12, 12], 2: [30, 12], 3: [48, 12],
+    4: [12, 30], 5: [30, 30], 6: [48, 30],
+    7: [12, 48], 8: [30, 48], 9: [48, 48]
+  };
+
+  let svgHtml = '';
+  for (let i = 1; i <= 9; i++) {
+    const [cx, cy] = miniCoords[i];
+    if (!digits.includes(i)) {
+      svgHtml += `<circle cx="${cx}" cy="${cy}" r="2" fill="rgba(255,255,255,0.3)"/>`;
+    }
+  }
+
+  const pts = digits.map((d) => miniCoords[d].join(',')).join(' ');
+  svgHtml += `<polyline points="${pts}" fill="none" stroke="#38bdf8" stroke-width="1.6" stroke-opacity="0.75" stroke-linecap="round" stroke-linejoin="round"/>`;
+
+  // כל נקודה בדפוס מקבלת את מספר הסדר שלה (1 = התחלה, בירוק)
+  digits.forEach((d, idx) => {
+    const [cx, cy] = miniCoords[d];
+    const fill = idx === 0 ? '#22c55e' : '#38bdf8';
+    svgHtml += `<circle cx="${cx}" cy="${cy}" r="6.2" fill="${fill}"/>`;
+    svgHtml += `<text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="central" font-size="8" font-weight="700" font-family="Arial, sans-serif" fill="#0b1220">${idx + 1}</text>`;
+  });
+
+  peekPatternMini.innerHTML = svgHtml;
+  peekPatternMini.style.display = 'block';
+}
+
+// כמה זמן מחזיקים בשטח ריק עד שמופיע הקוד שהוקלד (במילישניות)
+const HOLD_PEEK_DELAY_MS = 400;
+
+function showHoldPeek() {
+  if (!config.holdPeek) return;
+  trackEvent('peek_hold');
+  const lastCode = localStorage.getItem(LAST_PIN_KEY) || '----';
+  peekText.textContent = lastCode;
+
+  let lastMode = config.unlockMode.toUpperCase();
+  try {
+    const history = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+    if (history.length > 0) {
+      lastMode = history[history.length - 1].mode;
+    }
+  } catch (e) {}
+
+  if (lastMode === 'PATTERN') {
+    renderMiniPatternPeek(lastCode);
+  } else if (peekPatternMini) {
+    peekPatternMini.style.display = 'none';
+  }
+
+  secretPeek.classList.add('visible');
+}
+
+function hideHoldPeek() {
+  clearTimeout(holdPeekTimer);
+  secretPeek.classList.remove('visible');
+}
+
+phoneContainer.addEventListener('pointerdown', (e) => {
+  if (setupOverlay.classList.contains('open')) return;
+  const interactive = e.target.closest(
+    'button, input, textarea, .key-btn, .pattern-wrapper, .oneui-password-pill, .secret-trigger-zone, .secret-topright-hold-zone, .status-right, .swipe-unlock-area, .status-time, .fingerprint-container, .ios-footer, .clock-lock-screen'
+  );
+  if (interactive) return;
+
+  clearTimeout(holdPeekTimer);
+  holdPeekTimer = setTimeout(showHoldPeek, HOLD_PEEK_DELAY_MS);
+});
+
+phoneContainer.addEventListener('pointerup', hideHoldPeek);
+phoneContainer.addEventListener('pointercancel', hideHoldPeek);
+phoneContainer.addEventListener('pointerleave', hideHoldPeek);
+
+// ----------------------------------------------------------------------------
+// 17. הדמיית ביומטריה אמיתית: טביעת אצבע (Samsung) ו-Face ID (iPhone)
+// ----------------------------------------------------------------------------
+// ביטול אנימציית סגירת חלון באמצעות Translucent Theme ו-Fade מהיר (100ms) שמחקה פתיחת One UI
+function triggerNativeUnlock() {
+  const screen = document.body;
+  // התפוגגות והתרחבות קלה של המסך (100ms), שחושפת את מסך הבית שמתחת
+  screen.style.transition = 'opacity 0.1s ease-out, transform 0.1s ease-out';
+  screen.style.opacity = '0';
+  screen.style.transform = 'scale(1.03)';
+
+  setTimeout(() => {
+    if (window.AndroidNative && window.AndroidNative.forceUnlockAndExit) {
+      window.AndroidNative.forceUnlockAndExit();
+    } else if (window.Android && window.Android.exitToHomeScreen) {
+      window.Android.exitToHomeScreen();
+    } else if (window.Android && window.Android.unlockDevice) {
+      window.Android.unlockDevice();
+    } else {
+      window.location.href = "intent:#Intent;action=android.intent.action.MAIN;category=android.intent.category.HOME;end";
+    }
+  }, 100);
+}
+
+function triggerUnlockHomescreen() {
+  if (passwordInput) passwordInput.blur();
+  stopAllCameraStreams();
+
+  if (forceUnlockMode && !staysInAppAfterUnlock()) {
+    triggerNativeUnlock();
+    return;
+  }
+
+  if (notesDateLine) {
+    const now = new Date();
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    notesDateLine.textContent = `היום, ${hours}:${minutes}`;
+  }
+  const lastCode = localStorage.getItem(LAST_PIN_KEY) || '';
+  if (config.unlockTargetScreen === 'notes' && config.notesReveal) {
+    showNotesPrediction(lastCode);
+  }
+  if (config.unlockTargetScreen === 'gallery') {
+    showGalleryReveal(lastCode);
+  }
+  if (config.unlockTargetScreen === 'search') {
+    showSearchReveal(lastCode);
+  }
+  fakeHomescreen.classList.add('unlocked');
+  if (config.callReveal && forceUnlockMode) scheduleCallReveal(lastCode);
+}
+
+// 17A. סמסונג: אימות טביעת אצבע קפדני (נפתח רק למי שהגדיר: בודק מיקום מדויק + לא קצר מדי + לא ארוך מדי)
+let fpOverholdTimer = null;
+let fpReadyPulseTimer = null;
+let fpPressStartTime = 0;
+let fpSpotMatches = false;
+let fpPressSample = null;
+
+function startFingerprintHold(e) {
+  if (e && e.cancelable) e.preventDefault();
+  if (fakeHomescreen.classList.contains('unlocked') || isLockedOut) return;
+
+  fpPressStartTime = performance.now();
+  fingerprintContainer.classList.add('pressing', 'fp-holding');
+
+  const rect = fingerprintContainer.getBoundingClientRect();
+  fpPressSample = {
+    x: Math.min(Math.max((e.clientX - rect.left) / rect.width, 0), 1),
+    y: Math.min(Math.max((e.clientY - rect.top) / rect.height, 0), 1),
+    size: fpContactSize(e),
+    ms: 0
+  };
+
+  const profile = getFingerprintProfile();
+  fpSpotMatches = Boolean(profile) && Math.hypot(fpPressSample.x - profile.x, fpPressSample.y - profile.y) <= profile.posTol;
+
+  clearTimeout(fpReadyPulseTimer);
+  clearTimeout(fpOverholdTimer);
+
+  // מחזיקים הרבה יותר מהמשך שנרשם -> "טביעת אצבע לא תואמת" (כמו חיישן אמיתי)
+  const maxHold = profile ? profile.ms + profile.msTol + 60 : 1200;
+  fpOverholdTimer = setTimeout(() => {
+    if (!fpPressStartTime) return;
+    fpPressStartTime = 0;
+    fpPressSample = null;
+    fingerprintContainer.classList.remove('pressing', 'fp-holding');
+    triggerErrorFeedback('טביעת אצבע לא תואמת');
+  }, maxHold);
+}
+
+// גודל המגע גדל בזמן הלחיצה, לכן לוקחים את המקסימום
+function trackFingerprintSize(e) {
+  if (!fpPressStartTime || !fpPressSample) return;
+  fpPressSample.size = Math.max(fpPressSample.size, fpContactSize(e));
+}
+
+function endFingerprintHold() {
+  clearTimeout(fpReadyPulseTimer);
+  clearTimeout(fpOverholdTimer);
+  if (!fpPressStartTime) return;
+
+  const heldMs = performance.now() - fpPressStartTime;
+  fpPressStartTime = 0;
+  fingerprintContainer.classList.remove('pressing', 'fp-holding');
+
+  const sample = fpPressSample ? { ...fpPressSample, ms: heldMs } : null;
+  fpPressSample = null;
+  const sensorEnabled = config.secretFpBypass !== false;
+  const matched = sensorEnabled && sample && matchFingerprint(getFingerprintProfile(), sample);
+
+  // רק האצבע שנרשמה (מיקום + משך + גודל מגע) פותחת
+  if (matched) {
+    fingerprintContainer.classList.add('fp-success');
+    triggerHaptic(50);
+    triggerUnlockHomescreen();
+    setTimeout(() => {
+      fingerprintContainer.classList.remove('fp-success');
+    }, 300);
+  } else {
+    // נגיעה קצרה מדי, ארוכה מדי, במיקום שגוי או ללא רישום -> רטט שגיאה כפול, רעידת מסך ו-"טביעת אצבע לא תואמת"
+    triggerErrorFeedback('טביעת אצבע לא תואמת');
+  }
+}
+
+if (fingerprintContainer) {
+  fingerprintContainer.addEventListener('pointerdown', startFingerprintHold);
+  fingerprintContainer.addEventListener('pointermove', trackFingerprintSize);
+  fingerprintContainer.addEventListener('pointerup', endFingerprintHold);
+  fingerprintContainer.addEventListener('pointerleave', endFingerprintHold);
+  fingerprintContainer.addEventListener('pointercancel', endFingerprintHold);
+}
+
+// 17B. זיהוי פנים אמיתי (Face ID): פותח את המנעול רק כשמצלמת הסלפי מזהה מחדש את הפנים שנרשמו ב-Setup
+async function triggerIosFaceIdSequence() {
+  clearTimeout(faceIdTimer);
+  faceIdUnlocked = false;
+
+  if (cameraPunchHole) {
+    cameraPunchHole.classList.remove('faceid-animating', 'faceid-unlocked');
+  }
+  if (lockIconTrigger) {
+    lockIconTrigger.classList.remove('faceid-unlocked');
+  }
+  if (iosSwipeHint) {
+    iosSwipeHint.classList.remove('visible');
+  }
+
+  // אם המשתמש עדיין לא רשם את הפנים שלו ב-Setup -> המנעול נשאר נעול!
+  if (!hasEnrolledFace()) {
+    return;
+  }
+  // טעינת המנוע ברקע מראש, כדי שהזיהוי יהיה מהיר
+  loadFaceEngine().catch(() => {});
+
+  stopAllCameraStreams();
+  try {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !islandLiveCam) {
+      return;
+    }
+    activeCameraStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'user', width: { ideal: 160 }, height: { ideal: 160 } },
+      audio: false
+    });
+    islandLiveCam.srcObject = activeCameraStream;
+    await islandLiveCam.play().catch(() => {});
+  } catch (err) {
+    return;
+  }
+
+  if (cameraPunchHole) {
+    cameraPunchHole.classList.add('faceid-animating');
+  }
+
+  const attemptId = Symbol('faceAttempt');
+  triggerIosFaceIdSequence.current = attemptId;
+  faceIdTimer = setTimeout(async () => {
+    // עד כ-3 שניות של ניסיונות זיהוי, כמו Face ID אמיתי
+    let bestDistance = Infinity;
+    const deadline = performance.now() + 3000;
+    while (performance.now() < deadline && triggerIosFaceIdSequence.current === attemptId) {
+      try {
+        const live = await captureFaceDescriptor(islandLiveCam);
+        if (live) bestDistance = Math.min(bestDistance, faceDistance(config.faceDescriptor, live));
+      } catch (err) {
+        break;
+      }
+      if (bestDistance <= FACE_MATCH_THRESHOLD) break;
+      await new Promise((r) => setTimeout(r, 120));
+    }
+    if (triggerIosFaceIdSequence.current !== attemptId) return; // ניסיון חדש התחיל בינתיים
+
+    stopAllCameraStreams();
+    if (cameraPunchHole) {
+      cameraPunchHole.classList.remove('faceid-animating');
+    }
+
+    // רק הפנים שנרשמו (מרחק קטן מהסף) פותחות את המנעול
+    if (bestDistance <= FACE_MATCH_THRESHOLD) {
+      faceIdUnlocked = true;
+      if (cameraPunchHole) {
+        cameraPunchHole.classList.add('faceid-unlocked');
+      }
+      if (lockIconTrigger) {
+        lockIconTrigger.classList.add('faceid-unlocked');
+      }
+      if (iosSwipeHint) {
+        iosSwipeHint.classList.add('visible');
+      }
+      if (navigator.vibrate) {
+        try {
+          navigator.vibrate(30);
+        } catch (err) {}
+      }
+      if (config.osTheme === 'samsung') {
+        setTimeout(() => {
+          triggerUnlockHomescreen();
+        }, 320);
+      }
+    } else {
+      // כל ניסיון אחר משאיר את המנעול נעול
+      faceIdUnlocked = false;
+    }
+  }, 250);
+}
+
+// נעילת מחוות ומסך בית (Exit Protection): אנימציית מנעול קלה במקום סגירה בטעות בעת החלקה או לחיצה מחוץ למקלדת
+// כפתור "חזור" של אנדרואיד / החלקה על מסך הנעילה.
+// חלון קופץ פתוח -> נסגר. על מסך הנעילה -> קפיצה קטנה של המנעול, כמו במסך נעילה אמיתי.
+const BACK_CLOSABLE_POPUPS = [
+  ['adminMsgOverlay', () => document.getElementById('adminMsgOkBtn').click()],
+  ['guideOverlay', () => closeGuide()],
+  ['lockTypeChooser', () => closeLockTypeChooser()],
+  ['updatePopupOverlay', () => hideUpdatePopup()],
+  ['preShowOverlay', () => (document.getElementById('preShowOverlay').style.display = 'none')],
+  ['tipOverlay', () => (document.getElementById('tipOverlay').style.display = 'none')],
+  ['tourLayer', () => endTour()]
+];
+
+function closeTopPopup() {
+  for (const [id, close] of BACK_CLOSABLE_POPUPS) {
+    const el = document.getElementById(id);
+    if (el && el.style.display && el.style.display !== 'none') {
+      try {
+        close();
+      } catch (e) {
+        el.style.display = 'none';
+      }
+      return true;
+    }
+  }
+  return false;
+}
+
+window.triggerExitProtectionBounce = function () {
+  if (closeTopPopup()) return;
+  if (setupOverlay && setupOverlay.classList.contains('open')) return;
+  if (fakeHomescreen && fakeHomescreen.classList.contains('unlocked')) return;
+
+  if (lockIconTrigger) {
+    lockIconTrigger.classList.remove('lock-bounce-protect');
+    void lockIconTrigger.offsetWidth;
+    lockIconTrigger.classList.add('lock-bounce-protect');
+  }
+  if (titleGroup) {
+    titleGroup.classList.remove('lock-bounce-protect');
+    void titleGroup.offsetWidth;
+    titleGroup.classList.add('lock-bounce-protect');
+  }
+  triggerHaptic(15);
+};
+
+// מחוות החלקה כלפי מעלה (Swipe Up) או הקשה מחוץ למקלדת (Exit Protection + מצב החלקה / Face ID)
+let swipeStartY = null;
+let swipeStartX = null;
+let swipeStartedOutsideKeypad = false;
+
+phoneContainer.addEventListener(
+  'pointerdown',
+  (e) => {
+    if (setupOverlay.classList.contains('open')) return;
+    if (fakeHomescreen.classList.contains('unlocked')) return;
+    swipeStartY = e.clientY;
+    swipeStartX = e.clientX;
+    const insideInteractive = e.target.closest(
+      '.keypad, .pattern-wrapper, .oneui-password-pill-wrap, .fingerprint-container, .bottom-bar, .status-bar, .secret-trigger-zone, .secret-topright-hold-zone, .emergency-btn, .ios-footer, .clock-lock-screen'
+    );
+    swipeStartedOutsideKeypad = !insideInteractive;
+  },
+  { passive: true }
+);
+
+phoneContainer.addEventListener(
+  'pointerup',
+  (e) => {
+    if (swipeStartY === null) return;
+    const dy = swipeStartY - e.clientY;
+    const dx = Math.abs((swipeStartX || 0) - e.clientX);
+    const totalMove = Math.hypot(dy, dx);
+    const wasOutside = swipeStartedOutsideKeypad;
+    swipeStartY = null;
+    swipeStartX = null;
+    swipeStartedOutsideKeypad = false;
+
+    if (dy > 45 && Math.abs(dy) > dx) {
+      if (config.unlockMode === 'swipe') {
+        animateLockOpenAndUnlock();
+      } else if (config.osTheme === 'ios') {
+        if (faceIdUnlocked) {
+          triggerHaptic(35);
+          triggerUnlockHomescreen();
+        } else {
+          triggerIosFaceIdSequence();
+          window.triggerExitProtectionBounce();
+        }
+      } else {
+        // במצב PIN / דפוס / סיסמה בסמסונג: החלקה למעלה אינה סוגרת את האפליקציה אלא מפעילה אנימציית מנעול קלה
+        window.triggerExitProtectionBounce();
+      }
+      return;
+    }
+
+    // לחיצה קצרה מחוץ למקלדת: מגיבה כמו מסך נעילה אמיתי (אנימציית מנעול קלה)
+    if (wasOutside && totalMove < 12 && config.unlockMode !== 'swipe') {
+      window.triggerExitProtectionBounce();
+    }
+  },
+  { passive: true }
+);
+
+if (swipeUnlockArea) {
+  swipeUnlockArea.addEventListener('click', () => {
+    if (config.unlockMode === 'swipe') {
+      animateLockOpenAndUnlock();
+    }
+  });
+}
+
+// נעילה מחדש בלחיצה כפולה בפינה הימנית העליונה של מסך הבית
+let relockTapCount = 0;
+let relockTapTimer = null;
+if (secretRelockZone) {
+  secretRelockZone.addEventListener('click', () => {
+    relockTapCount++;
+    clearTimeout(relockTapTimer);
+    relockTapTimer = setTimeout(() => {
+      relockTapCount = 0;
+    }, 500);
+
+    if (relockTapCount >= 2) {
+      relockTapCount = 0;
+      relockFakePhone();
+      if (config.osTheme === 'ios') {
+        triggerIosFaceIdSequence();
+      }
+    }
+  });
+}
+
+// ----------------------------------------------------------------------------
+// 18. תפריט הגדרות סודי (לחיצה ממושכת 2.5 שניות בפינה הימנית העליונה) + עקיפת חירום (3 לחיצות על סוללה/Wi-Fi)
+// ----------------------------------------------------------------------------
+function bindTripleTap(element, callback) {
+  if (!element) return;
+  let taps = 0;
+  let timer = null;
+  element.addEventListener('click', (e) => {
+    e.stopPropagation();
+    taps++;
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      taps = 0;
+    }, 550);
+    if (taps >= 3) {
+      taps = 0;
+      callback();
+    }
+  });
+}
+
+function bindCornerSecretZone(element, onDoubleTap, onTripleTap) {
+  if (!element) return;
+  let taps = 0;
+  let timer = null;
+  element.addEventListener('click', (e) => {
+    e.stopPropagation();
+    taps++;
+    clearTimeout(timer);
+    if (taps >= 3) {
+      taps = 0;
+      onTripleTap();
+      return;
+    }
+    timer = setTimeout(() => {
+      if (taps === 2) {
+        onDoubleTap();
+      }
+      taps = 0;
+    }, 320);
+  });
+}
+
+function openSettingsSheet() {
+  forceAttemptCount = 0;
+  refreshSettingsLastCaptured();
+  setTimeout(maybeShowAdminMessage, 600);
+  if (typeof checkCloudAppUpdate === 'function') {
+    checkCloudAppUpdate(false);
+  }
+  if (splitChoiceScreen) {
+    splitChoiceScreen.classList.add('hidden');
+  }
+  if (deviceConfigSheet) {
+    deviceConfigSheet.classList.add('active', 'open');
+  }
+  setupOverlay.classList.add('open');
+}
+
+function closeSettingsSheet() {
+  setupOverlay.classList.remove('open');
+  if (lockIconTrigger) lockIconTrigger.classList.remove('faceid-unlocked');
+  if (cameraPunchHole) cameraPunchHole.classList.remove('faceid-unlocked');
+  if (config.osTheme === 'ios') {
+    triggerIosFaceIdSequence();
+  }
+}
+
+// כניסה לתפריט ההגדרות הסודי: לחיצה ממושכת של 2.5 שניות בפינה הימנית העליונה של המסך
+let topRightHoldTimer = null;
+if (secretTopRightHoldZone) {
+  const startTopRightHold = (e) => {
+    if (e && e.cancelable) e.preventDefault();
+    clearTimeout(topRightHoldTimer);
+    topRightHoldTimer = setTimeout(() => {
+      triggerHaptic(50);
+      openSettingsSheet();
+    }, 2500);
+  };
+  const cancelTopRightHold = () => {
+    clearTimeout(topRightHoldTimer);
+  };
+  secretTopRightHoldZone.addEventListener('pointerdown', startTopRightHold);
+  secretTopRightHoldZone.addEventListener('pointerup', cancelTopRightHold);
+  secretTopRightHoldZone.addEventListener('pointerleave', cancelTopRightHold);
+  secretTopRightHoldZone.addEventListener('pointercancel', cancelTopRightHold);
+}
+
+// עקיפת חירום: 3 לחיצות מהירות על סמל הסוללה / Wi-Fi פותחות מיד את המכשיר
+bindTripleTap(statusRightIcons, () => {
+  animateLockOpenAndUnlock();
+});
+
+bindTripleTap(lockIconTrigger, openSettingsSheet);
+bindCornerSecretZone(secretCornerTrigger, toggleForceModeSecretly, openSettingsSheet);
+
+function refreshSettingsLastCaptured() {
+  const last = localStorage.getItem(LAST_PIN_KEY) || '---';
+  if (settingsLastInput) settingsLastInput.textContent = last;
+  if (typeof renderCodeHistory === 'function') renderCodeHistory();
+}
+
+// היסטוריית קודים בלשונית "הצצה" (מהחדש לישן)
+function renderCodeHistory() {
+  const listEl = document.getElementById('codeHistoryList');
+  if (!listEl) return;
+  let history = [];
+  try {
+    history = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+  } catch (e) {}
+  listEl.innerHTML = '';
+  if (!Array.isArray(history) || !history.length) {
+    listEl.innerHTML = '<div class="code-history-empty">עוד לא הוקלדו קודים</div>';
+    return;
+  }
+  const labels = { PIN: 'קוד', WORDS: 'סיסמה', PATTERN: 'דפוס', SWIPE: 'החלקה' };
+  history
+    .slice()
+    .reverse()
+    .forEach((h) => {
+      const item = document.createElement('div');
+      item.className = 'code-history-item';
+      const code = document.createElement('span');
+      code.className = 'code-history-code';
+      const mode = String(h.mode || '').toUpperCase();
+      code.textContent = mode === 'PATTERN' ? String(h.code).split('').join('›') : String(h.code);
+      const meta = document.createElement('span');
+      meta.className = 'code-history-meta';
+      meta.textContent = `${labels[mode] || 'קוד'} · ${h.timestamp || ''}`;
+      item.append(meta, code);
+      listEl.appendChild(item);
+    });
+}
+
+(function initCodeHistoryClear() {
+  const btn = document.getElementById('historyClearBtn');
+  if (!btn) return;
+  btn.addEventListener('click', () => {
+    if (btn.dataset.confirm !== '1') {
+      btn.dataset.confirm = '1';
+      btn.textContent = 'בטוח?';
+      setTimeout(() => {
+        btn.dataset.confirm = '';
+        btn.textContent = 'נקה';
+      }, 2500);
+      return;
+    }
+    btn.dataset.confirm = '';
+    btn.textContent = 'נקה';
+    try {
+      localStorage.removeItem(HISTORY_KEY);
+    } catch (e) {}
+    renderCodeHistory();
+  });
+})();
+
+// שמירת תוכן אפליקציית הפתקים המדומה ב-localStorage
+function initFakeNotesApp() {
+  const savedTitle = localStorage.getItem(NOTES_TITLE_STORAGE_KEY);
+  const savedBody = localStorage.getItem(NOTES_BODY_STORAGE_KEY);
+  if (notesTitleInput && savedTitle !== null) {
+    notesTitleInput.value = savedTitle;
+  }
+  if (notesBodyTextarea && savedBody !== null) {
+    notesBodyTextarea.value = savedBody;
+  }
+  if (notesTitleInput) {
+    notesTitleInput.addEventListener('input', () => {
+      try {
+        localStorage.setItem(NOTES_TITLE_STORAGE_KEY, notesTitleInput.value);
+      } catch (e) {}
+    });
+  }
+  if (notesBodyTextarea) {
+    notesBodyTextarea.addEventListener('input', () => {
+      try {
+        localStorage.setItem(NOTES_BODY_STORAGE_KEY, notesBodyTextarea.value);
+      } catch (e) {}
+    });
+  }
+  if (notesDoneBtn) {
+    notesDoneBtn.addEventListener('click', () => {
+      if (notesTitleInput) notesTitleInput.blur();
+      if (notesBodyTextarea) notesBodyTextarea.blur();
+    });
+  }
+}
+initFakeNotesApp();
+
+// ----------------------------------------------------------------------------
+// 19. מאזינים להגדרות והעלאת תמונות מהגלריה (LocalStorage)
+// ----------------------------------------------------------------------------
+if (modeSelector) {
+  modeSelector.querySelectorAll('.seg-pill').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      config.unlockMode = btn.dataset.mode;
+      saveConfig();
+      applyConfigToUI();
+    });
+  });
+}
+
+if (pinLengthSelector) {
+  pinLengthSelector.querySelectorAll('.seg-pill').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      config.pinLength = Number(btn.dataset.pinlen) === 6 ? 6 : 4;
+      saveConfig();
+      applyConfigToUI();
+    });
+  });
+}
+
+if (unlockAttemptModeSelector) {
+  unlockAttemptModeSelector.querySelectorAll('.seg-pill').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const n = Number(btn.dataset.attempt);
+      config.unlockOnAttempt = n >= 1 && n <= 5 ? n : 1;
+      config.unlockAttemptMode = config.unlockOnAttempt >= 2 ? 'second' : 'immediate';
+      forceAttemptCount = 0;
+      saveConfig();
+      applyConfigToUI();
+    });
+  });
+}
+
+if (toggleKeySound) {
+  toggleKeySound.addEventListener('change', (e) => {
+    config.keySound = e.target.checked;
+    saveConfig();
+    if (config.keySound) {
+      playKeyClickSound();
+    }
+  });
+}
+
+if (pinQuickWidgetBtn) {
+  pinQuickWidgetBtn.addEventListener('click', () => {
+    let requested = false;
+    try {
+      if (window.AndroidNative && typeof window.AndroidNative.requestPinQuickWidget === 'function') {
+        requested = Boolean(window.AndroidNative.requestPinQuickWidget());
+      }
+    } catch (e) {}
+    if (requested) {
+      pinQuickWidgetBtn.textContent = '✓ אשר את הוספת הווידג׳ט בחלונית שנפתחה';
+    } else {
+      alert('להוספת ווידג׳ט שקוף: לחץ לחיצה ארוכה על מסך הבית בטלפון -> ווידג׳טים -> בחר Lockscreen.\n\nלהפעלה מכפתור הצד של סמסונג: הגדרות המכשיר -> תכונות מתקדמות -> מקש צד -> לחיצה כפולה -> פתיחת אפליקציה -> Lockscreen.');
+    }
+  });
+}
+
+if (forceModeSelector) {
+  forceModeSelector.querySelectorAll('.seg-pill').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      setForceModeState(btn.dataset.forcemode === 'true');
+    });
+  });
+}
+
+if (unlockTargetSelector) {
+  unlockTargetSelector.querySelectorAll('.seg-pill').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      config.unlockTargetScreen = btn.dataset.target;
+      saveConfig();
+      applyConfigToUI();
+    });
+  });
+}
+
+if (toggleForceUnlockMode) {
+  toggleForceUnlockMode.addEventListener('change', (e) => {
+    setForceModeState(e.target.checked);
+  });
+}
+
+if (toggleSecretFpBypass) {
+  toggleSecretFpBypass.addEventListener('change', (e) => {
+    config.secretFpBypass = e.target.checked;
+    saveConfig();
+  });
+}
+
+if (statusBarSelector) {
+  statusBarSelector.querySelectorAll('.seg-pill').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      config.showStatusBar = btn.dataset.statusbar === 'show';
+      saveConfig();
+      applyConfigToUI();
+    });
+  });
+}
+
+if (toggleStealthPattern) {
+  toggleStealthPattern.addEventListener('change', (e) => {
+    config.stealthPattern = e.target.checked;
+    saveConfig();
+    applyConfigToUI();
+  });
+}
+
+if (toggleStatusBar) {
+  toggleStatusBar.addEventListener('change', (e) => {
+    config.showStatusBar = e.target.checked;
+    saveConfig();
+    applyConfigToUI();
+  });
+}
+
+if (togglePunchHole) {
+  togglePunchHole.addEventListener('change', (e) => {
+    config.showPunchHole = e.target.checked;
+    saveConfig();
+    applyConfigToUI();
+  });
+}
+
+if (toggleHapticPeek) {
+  toggleHapticPeek.addEventListener('change', (e) => {
+    config.hapticPeek = e.target.checked;
+    saveConfig();
+  });
+}
+
+if (toggleChameleonClock) {
+  toggleChameleonClock.addEventListener('change', (e) => {
+    config.chameleonClock = e.target.checked;
+    saveConfig();
+  });
+}
+
+if (toggleHoldPeek) {
+  toggleHoldPeek.addEventListener('change', (e) => {
+    config.holdPeek = e.target.checked;
+    saveConfig();
+  });
+}
+
+if (toggleFingerprint) {
+  toggleFingerprint.addEventListener('change', (e) => {
+    config.showFingerprint = e.target.checked;
+    saveConfig();
+    applyConfigToUI();
+  });
+}
+
+// דחיסת תמונה ושמירה ב-localStorage
+function compressAndStoreImage(file, storageKey, onSuccess) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (event) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const maxW = 1080;
+      const maxH = 2400;
+      let w = img.width;
+      let h = img.height;
+      const ratio = Math.min(maxW / w, maxH / h, 1);
+      w = Math.round(w * ratio);
+      h = Math.round(h * ratio);
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, w, h);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.84);
+      try {
+        localStorage.setItem(storageKey, dataUrl);
+        onSuccess(dataUrl);
+      } catch (err) {
+        alert('התמונה גדולה מדי לשמירה בזיכרון הדפדפן.');
+      }
+    };
+    img.src = event.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function loadCustomMedia() {
+  applyWallpaperToContainer();
+
+  const savedHome = localStorage.getItem(HOMESCREEN_STORAGE_KEY);
+  if (savedHome) {
+    fakeHomescreen.style.backgroundImage = `url("${savedHome}")`;
+    fakeHomescreen.classList.add('has-custom-home', 'has-custom-image');
+    if (clearHomescreenBtn) clearHomescreenBtn.style.display = 'inline-flex';
+  } else {
+    fakeHomescreen.style.backgroundImage = '';
+    fakeHomescreen.classList.remove('has-custom-home', 'has-custom-image');
+    if (clearHomescreenBtn) clearHomescreenBtn.style.display = 'none';
+  }
+}
+
+if (wallpaperFileInput) {
+  wallpaperFileInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    compressAndStoreImage(file, WALLPAPER_STORAGE_KEY, () => {
+      localStorage.setItem(SELECTED_WALLPAPER_ID_KEY, 'custom');
+      loadCustomMedia();
+      renderWallpaperGallery();
+    });
+  });
+}
+
+if (clearWallpaperBtn) {
+  clearWallpaperBtn.addEventListener('click', () => {
+    localStorage.removeItem(WALLPAPER_STORAGE_KEY);
+    localStorage.setItem(SELECTED_WALLPAPER_ID_KEY, 'model_default');
+    if (wallpaperFileInput) wallpaperFileInput.value = '';
+    loadCustomMedia();
+    renderWallpaperGallery();
+  });
+}
+
+if (homescreenFileInput) {
+  homescreenFileInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    compressAndStoreImage(file, HOMESCREEN_STORAGE_KEY, () => {
+      loadCustomMedia();
+    });
+  });
+}
+
+if (clearHomescreenBtn) {
+  clearHomescreenBtn.addEventListener('click', () => {
+    localStorage.removeItem(HOMESCREEN_STORAGE_KEY);
+    if (homescreenFileInput) homescreenFileInput.value = '';
+    loadCustomMedia();
+  });
+}
+
+// ----------------------------------------------------------------------------
+// 20. סוללה חיה + עדכון אוטומטי מ-GitHub Pages
+// ----------------------------------------------------------------------------
+if ('getBattery' in navigator) {
+  navigator
+    .getBattery()
+    .then((battery) => {
+      const updateBatteryUI = () => {
+        const level = Math.round(battery.level * 100);
+        const samText = document.getElementById('samsungBatteryText');
+        const samFill = document.getElementById('samsungBatteryFill');
+        const iosText = document.getElementById('iosBatteryText');
+        const iosFill = document.getElementById('iosBatteryFill');
+
+        if (samText) samText.textContent = `${level}%`;
+        if (samFill) samFill.style.height = `${level}%`;
+        if (iosText) iosText.textContent = `${level}`;
+        if (iosFill) iosFill.style.width = `${level}%`;
+      };
+      updateBatteryUI();
+      battery.addEventListener('levelchange', updateBatteryUI);
+    })
+    .catch(() => {});
+}
+
+// ============================================================================
+// 20ב. שער גישה: בקשה -> אישור מנהל -> בדיקה חוזרת קבועה
+// ----------------------------------------------------------------------------
+// • אין קודי הפעלה ואין קוד מאסטר. הגישה נקבעת רק לפי הסטטוס בענן.
+// • מכשיר מאושר עובד גם בלי אינטרנט עד LICENSE_OFFLINE_GRACE_MS מהבדיקה האחרונה.
+// • ביטול גישה במנהל -> האפליקציה ננעלת בבדיקה הבאה (כל דקה / בחזרה לאפליקציה).
+// • תקלת רשת אף פעם לא נועלת מכשיר מאושר (רק תשובה ברורה מהשרת).
+// ============================================================================
+const LICENSE_CACHE_KEY = 'magic_license_state_v3';
+const LICENSE_OFFLINE_GRACE_MS = 14 * 24 * 60 * 60 * 1000;
+const LICENSE_RECHECK_MS = 60 * 1000;
+const LICENSE_PENDING_POLL_MS = 5000;
+const LICENSE_ERROR_RETRY_MS = 15000;
+
+function readLicenseCache() {
+  try {
+    return JSON.parse(localStorage.getItem(LICENSE_CACHE_KEY) || 'null');
+  } catch (e) {
+    return null;
+  }
+}
+
+function writeLicenseCache(status) {
+  try {
+    localStorage.setItem(LICENSE_CACHE_KEY, JSON.stringify({ status, checkedAt: Date.now() }));
+  } catch (e) {}
+}
+
+function isCachedApprovalValid() {
+  const cache = readLicenseCache();
+  return Boolean(cache && cache.status === 'approved' && Date.now() - Number(cache.checkedAt || 0) < LICENSE_OFFLINE_GRACE_MS);
+}
+
+// רישום שימוש לאתר הניהול (מתי נפתח לאחרונה, כמה פעמים, איזו גרסה).
+// לכל היותר פעם ב-20 דקות, ברקע, בלי להשפיע על האפליקציה אם אין רשת.
+const USAGE_PING_KEY = 'magic_last_usage_ping';
+const USAGE_PING_MIN_GAP_MS = 20 * 60 * 1000;
+let usagePingInFlight = false;
+
+function maybeReportUsage() {
+  if (usagePingInFlight || !window.MagicCloud || !window.MagicCloud.device.reportUsage) return;
+  const last = Number(localStorage.getItem(USAGE_PING_KEY) || 0);
+  if (Date.now() - last < USAGE_PING_MIN_GAP_MS) return;
+  usagePingInFlight = true;
+  window.MagicCloud.device
+    .reportUsage(getInstalledAppVersion(), getStatsForReport())
+    .then(() => {
+      try {
+        localStorage.setItem(USAGE_PING_KEY, String(Date.now()));
+      } catch (e) {}
+    })
+    .catch(() => {})
+    .finally(() => {
+      usagePingInFlight = false;
+    });
+}
+
+function isLicenseOverlayVisible() {
+  const overlay = document.getElementById('licenseLockOverlay');
+  return Boolean(overlay && overlay.style.display !== 'none');
+}
+
+function initDeviceLicenseGate() {
+  const overlay = document.getElementById('licenseLockOverlay');
+  const card = document.getElementById('licenseLockCard');
+  const promptText = document.getElementById('licensePromptText');
+  const regFormSection = document.getElementById('regFormSection');
+  const regNameInput = document.getElementById('regNameInput');
+  const regPhoneInput = document.getElementById('regPhoneInput');
+  const submitRegBtn = document.getElementById('submitRegBtn');
+  const regWaitingBox = document.getElementById('regWaitingBox');
+  const regWaitingTitle = document.getElementById('regWaitingTitle');
+  const regWaitingSub = document.getElementById('regWaitingSub');
+  const regBlockedBox = document.getElementById('regBlockedBox');
+  const errorEl = document.getElementById('licenseErrorMsg');
+
+  if (!overlay) return;
+
+  // ניקוי דגלי הרישיון של הגרסה הישנה (שאפשרו עקיפה)
+  try {
+    localStorage.removeItem('is_licensed');
+  } catch (e) {}
+
+  let devId = '';
+  try {
+    if (window.AndroidNative && typeof window.AndroidNative.getSimpleDeviceId === 'function') {
+      devId = String(window.AndroidNative.getSimpleDeviceId() || '');
+    } else {
+      devId = localStorage.getItem('magic_fallback_device_id') || String(Math.floor(1000 + Math.random() * 9000));
+      localStorage.setItem('magic_fallback_device_id', devId);
+    }
+  } catch (e) {}
+
+  let timer = null;
+  let checking = false;
+
+  const setError = (msg) => {
+    if (errorEl) errorEl.textContent = msg || '';
+  };
+
+  // מצבים: approved | form | pending | blocked | checking | config
+  function applyState(state) {
+    if (state === 'approved') {
+      overlay.style.display = 'none';
+      setError('');
+      if (typeof maybeShowUpdatePopup === 'function') maybeShowUpdatePopup();
+      if (typeof maybeShowGuideFirstTime === 'function') maybeShowGuideFirstTime();
+      return;
+    }
+    overlay.style.display = 'flex';
+    if (regFormSection) regFormSection.style.display = state === 'form' ? '' : 'none';
+    if (regBlockedBox) regBlockedBox.style.display = state === 'blocked' ? 'flex' : 'none';
+    if (regWaitingBox) regWaitingBox.style.display = state === 'pending' || state === 'checking' ? 'flex' : 'none';
+    if (promptText) promptText.style.display = state === 'form' ? '' : 'none';
+
+    if (state === 'pending') {
+      if (regWaitingTitle) regWaitingTitle.textContent = 'הבקשה נשלחה וממתינה לאישור';
+      if (regWaitingSub) regWaitingSub.textContent = 'האפליקציה תיפתח אוטומטית מיד עם אישור הבקשה';
+    } else if (state === 'checking') {
+      if (regWaitingTitle) regWaitingTitle.textContent = 'בודק הרשאת גישה...';
+      if (regWaitingSub) regWaitingSub.textContent = 'נדרש חיבור לאינטרנט';
+    } else if (state === 'config') {
+      setError('המערכת עדיין לא הוגדרה. פנה למנהל.');
+    }
+  }
+
+  function schedule(ms) {
+    clearTimeout(timer);
+    timer = setTimeout(checkStatus, ms);
+  }
+
+  async function checkStatus() {
+    clearTimeout(timer);
+    if (!window.MagicCloud || !window.MagicCloud.isConfigured()) {
+      applyState('config');
+      return;
+    }
+    if (checking) return;
+    checking = true;
+    try {
+      const status = await window.MagicCloud.device.getMyStatus();
+      setError('');
+      if (status === 'approved') {
+        writeLicenseCache('approved');
+        applyState('approved');
+        maybeReportUsage();
+        storeAdminMessage();
+        schedule(LICENSE_RECHECK_MS);
+      } else if (status === 'none') {
+        // אין בקשה (או שהמנהל מחק אותה) -> טופס הרשמה
+        try {
+          localStorage.removeItem(LICENSE_CACHE_KEY);
+        } catch (e) {}
+        applyState('form');
+      } else {
+        writeLicenseCache(status);
+        applyState(status);
+        schedule(status === 'pending' ? LICENSE_PENDING_POLL_MS : LICENSE_RECHECK_MS);
+      }
+    } catch (err) {
+      // תקלת רשת/שרת: מכשיר מאושר ממשיך לעבוד בתוך תקופת החסד
+      if (isCachedApprovalValid()) {
+        applyState('approved');
+      } else if (!isLicenseOverlayVisible() || (readLicenseCache() || {}).status === 'approved') {
+        applyState('checking');
+        setError('אין חיבור לאינטרנט. יש להתחבר כדי לאמת את הגישה.');
+      } else {
+        setError('אין חיבור לאינטרנט, מנסה שוב...');
+      }
+      schedule(LICENSE_ERROR_RETRY_MS);
+    } finally {
+      checking = false;
+    }
+  }
+
+  if (submitRegBtn) {
+    submitRegBtn.onclick = async () => {
+      const name = regNameInput ? regNameInput.value.trim() : '';
+      const phone = regPhoneInput ? regPhoneInput.value.trim() : '';
+      if (name.length < 2) {
+        setError('אנא הזן שם מלא');
+        return;
+      }
+      if (phone.replace(/\D/g, '').length < 9 || phone.length > 20) {
+        setError('אנא הזן מספר טלפון תקין');
+        return;
+      }
+      if (!window.MagicCloud || !window.MagicCloud.isConfigured()) {
+        applyState('config');
+        return;
+      }
+      setError('');
+      submitRegBtn.disabled = true;
+      submitRegBtn.textContent = 'שולח בקשה...';
+      try {
+        const status = await window.MagicCloud.device.submitRequest({ name, phone, deviceId: devId });
+        triggerHaptic(40);
+        if (status === 'approved') {
+          writeLicenseCache('approved');
+          applyState('approved');
+          schedule(LICENSE_RECHECK_MS);
+        } else {
+          applyState(status === 'blocked' ? 'blocked' : 'pending');
+          schedule(LICENSE_PENDING_POLL_MS);
+        }
+      } catch (err) {
+        setError(err && err.network ? 'אין חיבור לאינטרנט, נסה שוב' : 'שליחת הבקשה נכשלה, נסה שוב');
+        triggerHaptic([60, 80, 60]);
+        if (card) {
+          card.classList.add('text-shake');
+          setTimeout(() => card.classList.remove('text-shake'), 420);
+        }
+      } finally {
+        submitRegBtn.disabled = false;
+        submitRegBtn.textContent = 'שלח בקשה';
+      }
+    };
+  }
+
+  // פתיחה מהירה: מכשיר שאושר לאחרונה נפתח מיד, והבדיקה מול הענן רצה ברקע
+  if (isCachedApprovalValid()) {
+    applyState('approved');
+  } else {
+    applyState('checking');
+  }
+  checkStatus();
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') checkStatus();
+  });
+  window.addEventListener('online', checkStatus);
+}
+
+// ============================================================================
+// 21. עדכונים: המנהל מפרסם גרסה -> אצל כולם קופץ חלון "יש עדכון חדש"
+// ----------------------------------------------------------------------------
+// APP_VERSION חייב להיות זהה ל-versionName ב-android/app/build.gradle.
+// החלון מוצג רק כשמסך ההגדרות פתוח (בפתיחת האפליקציה / בתפריט הסודי),
+// ולעולם לא מעל מסך הנעילה הפעיל מול קהל.
+// ============================================================================
+const APP_VERSION = '5.7';
+const DEFAULT_APK_URL = 'https://github.com/tzur2010/app-lockscreen/raw/main/Lockscreen.apk';
+const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
+const UPDATE_DISMISS_KEY = 'magic_update_dismissed_version';
+
+function isNativeApk() {
+  return Boolean(window.AndroidNative && typeof window.AndroidNative.getAppVersionName === 'function');
+}
+
+function getInstalledAppVersion() {
+  try {
+    if (isNativeApk()) {
+      const v = String(window.AndroidNative.getAppVersionName() || '').trim();
+      if (v) return v;
+    }
+  } catch (e) {}
+  return APP_VERSION;
+}
+
+function compareSemver(verA, verB) {
+  const partsA = String(verA || '0').replace(/^v/i, '').split('.').map((n) => parseInt(n, 10) || 0);
+  const partsB = String(verB || '0').replace(/^v/i, '').split('.').map((n) => parseInt(n, 10) || 0);
+  const len = Math.max(partsA.length, partsB.length);
+  for (let i = 0; i < len; i++) {
+    const a = partsA[i] || 0;
+    const b = partsB[i] || 0;
+    if (a > b) return 1;
+    if (a < b) return -1;
+  }
+  return 0;
+}
+
+let latestCloudAppConfig = null;
+
+// ערוץ בטא: גרסאות חדשות עולות קודם לתיקייה beta/ באתר. רק בודקי בטא (המנהל מסמן
+// באתר הניהול) ומי שפותח את גרסת האתר של הבטא מקבלים אותן. כל השאר - רק מה שפורסם.
+const BETA_BASE_URL = 'https://tzur2010.github.io/app-lockscreen/beta/';
+const BETA_APK_URL = 'https://github.com/tzur2010/app-lockscreen/raw/main/beta/Lockscreen.apk';
+
+function isOnBetaWeb() {
+  return !isNativeApk() && /\/beta\//.test(window.location.pathname);
+}
+
+function useBetaChannel() {
+  if (isOnBetaWeb()) return true;
+  try {
+    return Boolean(window.MagicCloud && window.MagicCloud.device.isTester && window.MagicCloud.device.isTester());
+  } catch (e) {
+    return false;
+  }
+}
+
+async function fetchBetaConfig() {
+  const res = await fetch(`${BETA_BASE_URL}version.json?t=${Date.now()}`, { cache: 'no-store' });
+  if (!res.ok) return null;
+  const data = await res.json();
+  if (!data || !data.latest_version) return null;
+  return { latest_version: String(data.latest_version), apk_url: BETA_APK_URL, message: '🧪 גרסת בטא - רק לבודקים', beta: true };
+}
+
+function hasPendingUpdate() {
+  return Boolean(
+    latestCloudAppConfig &&
+      latestCloudAppConfig.latest_version &&
+      compareSemver(latestCloudAppConfig.latest_version, getInstalledAppVersion()) > 0
+  );
+}
+
+window.onApkDownloadFinished = function () {
+  const ver = latestCloudAppConfig ? latestCloudAppConfig.latest_version : '';
+  if (inAppUpdateBtn) {
+    inAppUpdateBtn.disabled = false;
+    inAppUpdateBtn.textContent = `ההורדה הושלמה (v${ver}) - פותח מתקין...`;
+  }
+  if (inAppUpdateStatus) {
+    inAppUpdateStatus.textContent = 'קובץ העדכון ירד בהצלחה! אשר "עדכן" בחלונית ההתקנה של אנדרואיד (כל ההגדרות שלך נשמרות).';
+  }
+};
+
+async function reloadWebAppToLatest(ver) {
+  try {
+    if ('caches' in window) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map((k) => caches.delete(k)));
+    }
+    if ('serviceWorker' in navigator) {
+      const reg = await navigator.serviceWorker.getRegistration();
+      if (reg) await reg.update();
+    }
+  } catch (e) {}
+  window.location.replace(`${window.location.pathname}?v=${encodeURIComponent(ver || Date.now())}`);
+}
+
+function performAppUpdate() {
+  if (!latestCloudAppConfig) return;
+  const ver = String(latestCloudAppConfig.latest_version || '').replace(/^v/i, '');
+  const url = String(latestCloudAppConfig.apk_url || DEFAULT_APK_URL).trim();
+
+  if (!isNativeApk()) {
+    // בודק בטא שפתח את האתר הרגיל - עובר לכתובת של הבטא
+    if (latestCloudAppConfig.beta && !isOnBetaWeb()) {
+      window.location.href = BETA_BASE_URL;
+      return;
+    }
+    // גרסת אתר (PWA): העדכון = טעינה מחדש של הקבצים העדכניים
+    reloadWebAppToLatest(ver);
+    return;
+  }
+
+  if (inAppUpdateBtn) {
+    inAppUpdateBtn.disabled = true;
+    inAppUpdateBtn.textContent = `מוריד עדכון (v${ver})...`;
+  }
+  if (inAppUpdateStatus) {
+    inAppUpdateStatus.textContent = 'ההורדה נפתחת בדפדפן. בסיום יש לפתוח את הקובץ ולאשר "עדכן" (ההגדרות שלך נשמרות).';
+  }
+  let started = false;
+  try {
+    started = Boolean(window.AndroidNative.downloadAndInstallApk(url, ver));
+  } catch (e) {}
+  if (!started && inAppUpdateStatus) {
+    inAppUpdateStatus.textContent = 'לא ניתן לפתוח את ההורדה. נסה שוב.';
+  }
+  setTimeout(() => {
+    if (inAppUpdateBtn) {
+      inAppUpdateBtn.disabled = false;
+      inAppUpdateBtn.textContent = `יש עדכון זמין (v${ver}) - לחץ לעדכון`;
+    }
+  }, 4000);
+}
+
+function hideUpdatePopup() {
+  const popup = document.getElementById('updatePopupOverlay');
+  if (popup) popup.style.display = 'none';
+}
+
+function maybeShowUpdatePopup() {
+  const popup = document.getElementById('updatePopupOverlay');
+  if (!popup || !hasPendingUpdate()) return;
+  // רק כשמסך ההגדרות פתוח והמשתמש מאושר - לא מעל מסך הנעילה ולא מעל מסך ההרשמה
+  if (!setupOverlay || !setupOverlay.classList.contains('open')) return;
+  if (isLicenseOverlayVisible()) return;
+
+  const ver = String(latestCloudAppConfig.latest_version).replace(/^v/i, '');
+  try {
+    if (sessionStorage.getItem(UPDATE_DISMISS_KEY) === ver) return;
+  } catch (e) {}
+
+  const titleEl = document.getElementById('updatePopupTitle');
+  const textEl = document.getElementById('updatePopupText');
+  if (titleEl) titleEl.textContent = `יש עדכון חדש (v${ver})`;
+  if (textEl) {
+    const note = String(latestCloudAppConfig.message || '').trim();
+    textEl.textContent = (note ? note + '\n\n' : '') + `הגרסה שלך: v${getInstalledAppVersion()}. כל ההגדרות נשמרות בעדכון.`;
+  }
+  popup.style.display = 'flex';
+}
+
+async function checkCloudAppUpdate(isManualClick = false) {
+  const installedVer = getInstalledAppVersion();
+  if (installedVersionLabel) {
+    installedVersionLabel.textContent = `גרסה מותקנת: v${installedVer}`;
+  }
+  if (isManualClick && checkUpdateNowBtn) {
+    checkUpdateNowBtn.disabled = true;
+    checkUpdateNowBtn.textContent = 'בודק...';
+  }
+
+  let fetchFailed = false;
+  try {
+    if (window.MagicCloud && window.MagicCloud.isConfigured()) {
+      const cfg = await window.MagicCloud.getAppConfig();
+      if (cfg && cfg.latest_version) latestCloudAppConfig = cfg;
+    }
+  } catch (e) {
+    fetchFailed = true;
+  }
+  // בודק בטא: אם יש בבטא גרסה חדשה יותר ממה שפורסם - מקבלים אותה
+  if (useBetaChannel()) {
+    try {
+      const beta = await fetchBetaConfig();
+      if (beta && (!latestCloudAppConfig || compareSemver(beta.latest_version, latestCloudAppConfig.latest_version) >= 0)) {
+        latestCloudAppConfig = beta;
+      }
+    } catch (e) {}
+    if (installedVersionLabel) installedVersionLabel.textContent = `גרסה מותקנת: v${installedVer} · 🧪 בודק בטא`;
+  }
+
+  const hasNewer = hasPendingUpdate();
+  if (hasNewer) {
+    const remoteVer = String(latestCloudAppConfig.latest_version).replace(/^v/i, '');
+    if (inAppUpdateBanner) inAppUpdateBanner.style.display = 'flex';
+    if (inAppUpdateBtn) {
+      inAppUpdateBtn.disabled = false;
+      inAppUpdateBtn.textContent = `יש עדכון זמין (v${remoteVer}) - לחץ לעדכון`;
+    }
+    if (cloudVersionStatusText) {
+      cloudVersionStatusText.textContent = `זמינה גרסה חדשה (v${remoteVer}) — לחץ על הכפתור הירוק למעלה`;
+    }
+    if (isManualClick) {
+      try {
+        sessionStorage.removeItem(UPDATE_DISMISS_KEY);
+      } catch (e) {}
+    }
+    maybeShowUpdatePopup();
+  } else {
+    if (inAppUpdateBanner) inAppUpdateBanner.style.display = 'none';
+    if (cloudVersionStatusText) {
+      cloudVersionStatusText.textContent = !isManualClick
+        ? 'הגדרות המשתמש נשמרות במלואן בעת עדכון'
+        : fetchFailed
+        ? 'אין חיבור לאינטרנט, נסה שוב'
+        : `האפליקציה מעודכנת לגרסה האחרונה (v${installedVer}) ✓`;
+    }
+  }
+
+  if (isManualClick && checkUpdateNowBtn) {
+    checkUpdateNowBtn.disabled = false;
+    checkUpdateNowBtn.textContent = 'בדוק עדכון';
+  }
+}
+
+function initInAppSelfUpdater() {
+  if (inAppUpdateBtn) inAppUpdateBtn.addEventListener('click', performAppUpdate);
+  if (checkUpdateNowBtn) checkUpdateNowBtn.addEventListener('click', () => checkCloudAppUpdate(true));
+
+  const popupBtn = document.getElementById('updatePopupBtn');
+  const popupLater = document.getElementById('updatePopupLater');
+  if (popupBtn) {
+    popupBtn.addEventListener('click', () => {
+      hideUpdatePopup();
+      performAppUpdate();
+    });
+  }
+  if (popupLater) {
+    popupLater.addEventListener('click', () => {
+      try {
+        if (latestCloudAppConfig) {
+          sessionStorage.setItem(UPDATE_DISMISS_KEY, String(latestCloudAppConfig.latest_version).replace(/^v/i, ''));
+        }
+      } catch (e) {}
+      hideUpdatePopup();
+    });
+  }
+
+  checkCloudAppUpdate(false);
+  setInterval(() => {
+    if (document.visibilityState === 'visible') checkCloudAppUpdate(false);
+  }, UPDATE_CHECK_INTERVAL_MS);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') checkCloudAppUpdate(false);
+  });
+}
+
+// ============================================================================
+// 23. הצצה לשעון החכם + חשיפה בהתראה
+// ----------------------------------------------------------------------------
+// השעון מחובר כבר לטלפון של הקוסם, ולכן אין צורך בחיבור נוסף: האפליקציה שולחת
+// התראה שקטה (בלי צליל ובלי קפיצה על הטלפון) והשעון מציג אותה. הקוד לא נשלח לשרת.
+// ============================================================================
+function hasNativeNotifications() {
+  return Boolean(window.AndroidNative && typeof window.AndroidNative.sendWatchPeek === 'function');
+}
+
+function formatCodeForDisplay(code, mode) {
+  const clean = String(code || '');
+  if (String(mode).toUpperCase() === 'PATTERN') return clean.split('').join('-');
+  return clean;
+}
+
+function sendCodeToWatch(code, mode) {
+  if (!config.watchPeek || !hasNativeNotifications() || !code) return;
+  const m = String(mode || '').toUpperCase();
+  const label = m === 'PATTERN' ? 'דפוס' : m === 'WORDS' ? 'סיסמה' : 'קוד';
+  try {
+    window.AndroidNative.sendWatchPeek(formatCodeForDisplay(code, m), label);
+    trackEvent('watch');
+  } catch (e) {}
+}
+
+function buildRevealMessage(code) {
+  return fillCodePlaceholder(String(config.revealText || '{קוד}'), String(code || ''));
+}
+
+// תמונת השולח: נשמרת בנפרד מההגדרות (תמונה קטנה, 192 פיקסלים)
+const REVEAL_AVATAR_KEY = 'magic_reveal_avatar_v1';
+const AVATAR_COLORS = ['#0EA5E9', '#22C55E', '#F59E0B', '#EC4899', '#8B5CF6', '#EF4444', '#14B8A6'];
+
+function getRevealAvatar() {
+  try {
+    return localStorage.getItem(REVEAL_AVATAR_KEY) || '';
+  } catch (e) {
+    return '';
+  }
+}
+
+// אותו חישוב צבע כמו באנדרואיד (String.hashCode של ג'אווה), כדי שהעיגול ייראה זהה בשני המקומות
+function avatarColorFor(name) {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (Math.imul(31, h) + name.charCodeAt(i)) | 0;
+  return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length];
+}
+
+function paintAvatar(el, name, dataUrl) {
+  if (!el) return;
+  const clean = String(name || '').trim();
+  if (dataUrl) {
+    el.style.backgroundImage = `url("${dataUrl}")`;
+    el.style.backgroundColor = 'transparent';
+    el.textContent = '';
+  } else {
+    el.style.backgroundImage = 'none';
+    el.style.backgroundColor = avatarColorFor(clean);
+    el.textContent = clean ? Array.from(clean)[0] : '?';
+  }
+}
+
+function resizeImageToAvatar(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = reject;
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = reject;
+      img.onload = () => {
+        const size = 192;
+        const side = Math.min(img.width, img.height);
+        const canvas = document.createElement('canvas');
+        canvas.width = size;
+        canvas.height = size;
+        canvas.getContext('2d').drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, size, size);
+        resolve(canvas.toDataURL('image/jpeg', 0.85));
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+let fakeBannerTimer = null;
+function showFakeMessageBanner(sender, text) {
+  const banner = document.getElementById('fakeMsgBanner');
+  if (!banner) return;
+  paintAvatar(document.getElementById('fakeMsgAvatar'), sender, getRevealAvatar());
+  document.getElementById('fakeMsgSender').textContent = sender;
+  document.getElementById('fakeMsgText').textContent = text;
+  banner.classList.toggle('light', config.osTheme === 'ios');
+  banner.style.display = 'flex';
+  void banner.offsetWidth;
+  banner.classList.add('show');
+  triggerHaptic([40, 60, 40]);
+  clearTimeout(fakeBannerTimer);
+  fakeBannerTimer = setTimeout(hideFakeMessageBanner, 12000);
+}
+
+function hideFakeMessageBanner() {
+  const banner = document.getElementById('fakeMsgBanner');
+  if (!banner) return;
+  banner.classList.remove('show');
+  setTimeout(() => {
+    if (!banner.classList.contains('show')) banner.style.display = 'none';
+  }, 400);
+}
+
+// נקרא ברגע שהטלפון "נפתח" בכפיית פתיחה
+function scheduleCodeReveal(code, force = false, delayOverrideMs = null) {
+  if (!force && !config.revealEnabled) return false;
+  const delayMs = delayOverrideMs !== null ? Math.max(0, delayOverrideMs) : Math.max(1, Number(config.revealDelaySec) || 5) * 1000;
+  const sender = String(config.revealSender || 'אמא');
+  const text = buildRevealMessage(code);
+  // באנדרואיד: הודעה אמיתית של המערכת (מגיעה גם אחרי שהאפליקציה נסגרה למסך הבית)
+  if (hasNativeNotifications()) {
+    try {
+      if (typeof window.AndroidNative.scheduleRevealNotificationV2 === 'function') {
+        if (window.AndroidNative.scheduleRevealNotificationV2(sender, text, delayMs, getRevealAvatar())) return true;
+      } else if (typeof window.AndroidNative.scheduleRevealNotification === 'function') {
+        if (window.AndroidNative.scheduleRevealNotification(sender, text, delayMs)) return true;
+      }
+    } catch (e) {}
+  }
+  // בגרסת האתר: הודעה מדומה שקופצת בראש המסך
+  setTimeout(() => showFakeMessageBanner(sender, text), delayMs);
+  return true;
+}
+
+function syncMagicFeaturesUI() {
+  const watchToggle = document.getElementById('toggleWatchPeek');
+  const watchExtra = document.getElementById('watchPeekExtra');
+  const watchDesc = document.getElementById('watchPeekDesc');
+  const revealToggle = document.getElementById('toggleReveal');
+  const revealExtra = document.getElementById('revealExtra');
+  const native = hasNativeNotifications();
+
+  if (watchToggle) {
+    watchToggle.checked = Boolean(config.watchPeek) && native;
+    watchToggle.disabled = !native;
+  }
+  if (watchExtra) watchExtra.style.display = config.watchPeek && native ? 'block' : 'none';
+  if (watchDesc && !native) watchDesc.textContent = 'זמין רק באפליקציית האנדרואיד (עם שעון חכם שמחובר לטלפון).';
+
+  if (revealToggle) revealToggle.checked = Boolean(config.revealEnabled);
+  if (revealExtra) revealExtra.style.display = config.revealEnabled ? 'block' : 'none';
+
+  const senderInput = document.getElementById('revealSenderInput');
+  const textInput = document.getElementById('revealTextInput');
+  if (senderInput && document.activeElement !== senderInput) senderInput.value = config.revealSender || '';
+  if (textInput && document.activeElement !== textInput) textInput.value = config.revealText || '';
+  document.querySelectorAll('#revealDelaySelector .seg-pill').forEach((btn) => {
+    btn.classList.toggle('active', Number(btn.dataset.delay) === Number(config.revealDelaySec || 5));
+  });
+
+  const avatar = getRevealAvatar();
+  paintAvatar(document.getElementById('revealAvatarPreview'), config.revealSender, avatar);
+  const clearBtn = document.getElementById('revealAvatarClear');
+  if (clearBtn) clearBtn.style.display = avatar ? '' : 'none';
+}
+
+function initMagicFeatures() {
+  const watchToggle = document.getElementById('toggleWatchPeek');
+  const revealToggle = document.getElementById('toggleReveal');
+  const askPermission = () => {
+    try {
+      if (window.AndroidNative && typeof window.AndroidNative.requestNotificationPermission === 'function') {
+        window.AndroidNative.requestNotificationPermission();
+      }
+    } catch (e) {}
+  };
+
+  if (watchToggle) {
+    watchToggle.addEventListener('change', (e) => {
+      config.watchPeek = e.target.checked;
+      saveConfig();
+      if (config.watchPeek) askPermission();
+      syncMagicFeaturesUI();
+    });
+  }
+  if (revealToggle) {
+    revealToggle.addEventListener('change', (e) => {
+      config.revealEnabled = e.target.checked;
+      saveConfig();
+      if (config.revealEnabled) askPermission();
+      syncMagicFeaturesUI();
+    });
+  }
+
+  const senderInput = document.getElementById('revealSenderInput');
+  const textInput = document.getElementById('revealTextInput');
+  if (senderInput) {
+    senderInput.addEventListener('input', () => {
+      config.revealSender = senderInput.value.slice(0, 40);
+      saveConfig();
+      paintAvatar(document.getElementById('revealAvatarPreview'), config.revealSender, getRevealAvatar());
+    });
+  }
+
+  const avatarInput = document.getElementById('revealAvatarInput');
+  if (avatarInput) {
+    avatarInput.addEventListener('change', async () => {
+      const file = avatarInput.files && avatarInput.files[0];
+      avatarInput.value = '';
+      if (!file) return;
+      try {
+        const dataUrl = await resizeImageToAvatar(file);
+        localStorage.setItem(REVEAL_AVATAR_KEY, dataUrl);
+      } catch (e) {}
+      syncMagicFeaturesUI();
+      scheduleCloudBackup();
+    });
+  }
+  const avatarClear = document.getElementById('revealAvatarClear');
+  if (avatarClear) {
+    avatarClear.addEventListener('click', () => {
+      try {
+        localStorage.removeItem(REVEAL_AVATAR_KEY);
+      } catch (e) {}
+      syncMagicFeaturesUI();
+    });
+  }
+  if (textInput) {
+    textInput.addEventListener('input', () => {
+      config.revealText = textInput.value.slice(0, 300);
+      saveConfig();
+    });
+  }
+  document.querySelectorAll('#revealDelaySelector .seg-pill').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      config.revealDelaySec = Number(btn.dataset.delay) || 5;
+      saveConfig();
+      syncMagicFeaturesUI();
+    });
+  });
+
+  const watchTestBtn = document.getElementById('watchPeekTestBtn');
+  const watchStatus = document.getElementById('watchPeekStatus');
+  if (watchTestBtn) {
+    watchTestBtn.addEventListener('click', () => {
+      let ok = false;
+      try {
+        ok = hasNativeNotifications() && window.AndroidNative.sendWatchPeek('1234', 'בדיקה - אם זה מופיע בשעון, הכל עובד');
+      } catch (e) {}
+      if (!ok) askPermission();
+      if (watchStatus) {
+        watchStatus.textContent = ok
+          ? 'נשלח ✓ בדוק את השעון. אם לא הופיע: באפליקציית Galaxy Wearable ← התראות ← הדלק "הצג התראות בשעון גם כשהטלפון בשימוש".'
+          : 'ההתראות חסומות. אשר את הרשאת ההתראות שקפצה ונסה שוב.';
+      }
+    });
+  }
+
+  const revealTestBtn = document.getElementById('revealTestBtn');
+  const revealStatus = document.getElementById('revealStatus');
+  if (revealTestBtn) {
+    revealTestBtn.addEventListener('click', () => {
+      scheduleCodeReveal('1234', true);
+      if (revealStatus) revealStatus.textContent = `ההודעה תגיע בעוד ${Number(config.revealDelaySec) || 5} שניות...`;
+      setTimeout(() => {
+        if (revealStatus) revealStatus.textContent = '';
+      }, (Number(config.revealDelaySec) || 5) * 1000 + 3000);
+    });
+  }
+
+  const banner = document.getElementById('fakeMsgBanner');
+  if (banner) banner.addEventListener('click', hideFakeMessageBanner);
+
+  syncMagicFeaturesUI();
+}
+
+// ============================================================================
+// 24. רוטינות שמורות: שמירת כל ההגדרות בשם ומעבר ביניהן בלחיצה
+// ============================================================================
+const ROUTINES_KEY = 'magic_routines_v1';
+const ACTIVE_ROUTINE_KEY = 'magic_active_routine_v1';
+// הגדרות שלא שייכות לרוטינה (אישיות למכשיר / למראה תפריט ההגדרות)
+const ROUTINE_EXCLUDED_KEYS = ['settingsColorScheme', 'faceSignature', 'faceDescriptor', 'faceIdEnrolled', 'fingerprintEnrolled', 'fingerprintHoldMs', 'fingerprintZoneX', 'fingerprintZoneY', 'fingerprintProfile'];
+
+function getRoutines() {
+  try {
+    const list = JSON.parse(localStorage.getItem(ROUTINES_KEY) || '[]');
+    return Array.isArray(list) ? list : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveRoutines(list) {
+  try {
+    localStorage.setItem(ROUTINES_KEY, JSON.stringify(list));
+  } catch (e) {}
+  if (typeof scheduleCloudBackup === 'function') scheduleCloudBackup();
+}
+
+function snapshotCurrentSettings() {
+  const snap = {};
+  Object.keys(config).forEach((k) => {
+    if (!ROUTINE_EXCLUDED_KEYS.includes(k)) snap[k] = config[k];
+  });
+  return { config: snap, force: Boolean(forceUnlockMode) };
+}
+
+function applyRoutine(routine) {
+  if (!routine || !routine.config) return;
+  trackEvent('routine');
+  const keep = {};
+  ROUTINE_EXCLUDED_KEYS.forEach((k) => {
+    if (k in config) keep[k] = config[k];
+  });
+  config = { ...DEFAULT_CONFIG, ...routine.config, ...keep };
+  saveConfig();
+  setForceModeState(routine.force !== false);
+  forceAttemptCount = 0;
+  applyConfigToUI();
+  syncMagicFeaturesUI();
+  try {
+    localStorage.setItem(ACTIVE_ROUTINE_KEY, routine.id);
+  } catch (e) {}
+  triggerHaptic(30);
+  renderRoutines();
+}
+
+function renderRoutines() {
+  const listEl = document.getElementById('routineList');
+  if (!listEl) return;
+  const routines = getRoutines();
+  const activeId = localStorage.getItem(ACTIVE_ROUTINE_KEY) || '';
+  listEl.innerHTML = '';
+  if (!routines.length) {
+    listEl.innerHTML = '<div class="routine-empty">עוד אין רוטינות שמורות</div>';
+    return;
+  }
+  routines.forEach((r) => {
+    const item = document.createElement('div');
+    item.className = 'routine-item' + (r.id === activeId ? ' active' : '');
+    const name = document.createElement('span');
+    name.className = 'routine-item-name';
+    name.textContent = (r.id === activeId ? '✓ ' : '') + r.name;
+    const load = document.createElement('button');
+    load.type = 'button';
+    load.className = 'routine-load-btn';
+    load.textContent = 'טען';
+    load.addEventListener('click', () => applyRoutine(r));
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'routine-del-btn';
+    del.textContent = 'מחק';
+    del.addEventListener('click', () => {
+      if (del.dataset.confirm !== '1') {
+        // לחיצה ראשונה מבקשת אישור (בלי חלון קופץ של הדפדפן)
+        del.dataset.confirm = '1';
+        del.textContent = 'בטוח?';
+        setTimeout(() => {
+          del.dataset.confirm = '';
+          del.textContent = 'מחק';
+        }, 2500);
+        return;
+      }
+      saveRoutines(getRoutines().filter((x) => x.id !== r.id));
+      renderRoutines();
+    });
+    item.append(name, load, del);
+    listEl.appendChild(item);
+  });
+}
+
+function initRoutines() {
+  const input = document.getElementById('routineNameInput');
+  const btn = document.getElementById('routineSaveBtn');
+  if (btn && input) {
+    btn.addEventListener('click', () => {
+      const name = input.value.trim() || `רוטינה ${getRoutines().length + 1}`;
+      const routines = getRoutines();
+      const existing = routines.find((r) => r.name === name);
+      const snap = snapshotCurrentSettings();
+      let id;
+      if (existing) {
+        Object.assign(existing, snap, { savedAt: Date.now() });
+        id = existing.id;
+      } else {
+        id = 'r' + Date.now().toString(36);
+        routines.push({ id, name: name.slice(0, 30), savedAt: Date.now(), ...snap });
+      }
+      saveRoutines(routines.slice(-20));
+      try {
+        localStorage.setItem(ACTIVE_ROUTINE_KEY, id);
+      } catch (e) {}
+      input.value = '';
+      triggerHaptic(30);
+      renderRoutines();
+    });
+  }
+  renderRoutines();
+}
+
+// ============================================================================
+// 25. גיבוי הגדרות בענן לפי קוד גיבוי אישי
+// ----------------------------------------------------------------------------
+// אחרי התקנה מחדש הטלפון מקבל זהות חדשה, לכן הגיבוי לא קשור לזהות אלא לקוד
+// אישי בן 12 תווים שהקוסם שומר אצלו. גיבוי אוטומטי כ-20 שניות אחרי כל שינוי.
+// ============================================================================
+var BACKUP_CODE_KEY = 'magic_backup_code_v1';
+var BACKUP_LAST_KEY = 'magic_backup_last_v1';
+var BACKUP_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+var backupTimer = null;
+var backupInFlight = false;
+
+function getBackupCode() {
+  let code = '';
+  try {
+    code = localStorage.getItem(BACKUP_CODE_KEY) || '';
+  } catch (e) {}
+  if (!/^[A-Z0-9]{12}$/.test(code)) {
+    const bytes = new Uint8Array(12);
+    (window.crypto || window.msCrypto).getRandomValues(bytes);
+    code = Array.from(bytes, (b) => BACKUP_ALPHABET[b % BACKUP_ALPHABET.length]).join('');
+    try {
+      localStorage.setItem(BACKUP_CODE_KEY, code);
+    } catch (e) {}
+  }
+  return code;
+}
+
+function formatBackupCode(code) {
+  return String(code).match(/.{1,4}/g).join('-');
+}
+
+function normalizeBackupCode(input) {
+  return String(input || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+}
+
+function buildBackupPayload() {
+  const cfg = { ...config };
+  // נתונים ביומטריים (פנים) נשארים רק בטלפון ולא עולים לענן
+  delete cfg.faceSignature;
+  delete cfg.faceDescriptor;
+  delete cfg.faceIdEnrolled;
+  let avatar = '';
+  try {
+    avatar = localStorage.getItem(REVEAL_AVATAR_KEY) || '';
+  } catch (e) {}
+  return JSON.stringify({
+    v: 1,
+    config: cfg,
+    force: Boolean(forceUnlockMode),
+    routines: getRoutines(),
+    activeRoutine: localStorage.getItem(ACTIVE_ROUTINE_KEY) || '',
+    avatar
+  });
+}
+
+function canUseCloudBackup() {
+  try {
+    if (!window.MagicCloud || !window.MagicCloud.isConfigured() || !window.MagicCloud.device.saveBackup) return false;
+    const cache = readLicenseCache();
+    return Boolean(cache && cache.status === 'approved');
+  } catch (e) {
+    return false;
+  }
+}
+
+function setBackupStatus(text, color) {
+  const el = document.getElementById('backupStatus');
+  if (!el) return;
+  el.textContent = text || '';
+  el.style.color = color || '';
+}
+
+function describeLastBackup() {
+  const last = Number(localStorage.getItem(BACKUP_LAST_KEY) || 0);
+  if (!last) return 'עוד לא בוצע גיבוי';
+  const d = new Date(last);
+  return `גובה לאחרונה: ${d.toLocaleDateString('he-IL')} ${d.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })}`;
+}
+
+async function runCloudBackup(manual = false) {
+  if (backupInFlight) return false;
+  if (!canUseCloudBackup()) {
+    if (manual) setBackupStatus('הגיבוי זמין רק כשהאפליקציה מאושרת ומחוברת', '#f87171');
+    return false;
+  }
+  backupInFlight = true;
+  if (manual) setBackupStatus('מגבה...');
+  try {
+    await window.MagicCloud.device.saveBackup(getBackupCode(), buildBackupPayload());
+    localStorage.setItem(BACKUP_LAST_KEY, String(Date.now()));
+    setBackupStatus((manual ? 'נשמר ✓ ' : '') + describeLastBackup(), manual ? '#22c55e' : '');
+    return true;
+  } catch (err) {
+    if (manual) setBackupStatus(err && err.network ? 'אין חיבור לאינטרנט, נסה שוב' : 'הגיבוי נכשל, נסה שוב', '#f87171');
+    return false;
+  } finally {
+    backupInFlight = false;
+  }
+}
+
+function scheduleCloudBackup() {
+  try {
+    clearTimeout(backupTimer);
+    backupTimer = setTimeout(() => runCloudBackup(false), 20000);
+  } catch (e) {}
+}
+
+function applyBackupPayload(payload) {
+  const data = JSON.parse(payload);
+  if (!data || !data.config) throw new Error('bad backup');
+  const keep = { faceSignature: config.faceSignature, faceDescriptor: config.faceDescriptor, faceIdEnrolled: config.faceIdEnrolled };
+  config = { ...DEFAULT_CONFIG, ...data.config, ...keep };
+  localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(config));
+  setForceModeState(data.force !== false);
+  localStorage.setItem(ROUTINES_KEY, JSON.stringify(Array.isArray(data.routines) ? data.routines : []));
+  if (data.activeRoutine) localStorage.setItem(ACTIVE_ROUTINE_KEY, data.activeRoutine);
+  if (data.avatar) localStorage.setItem(REVEAL_AVATAR_KEY, data.avatar);
+  else localStorage.removeItem(REVEAL_AVATAR_KEY);
+  forceAttemptCount = 0;
+  applyConfigToUI();
+  syncMagicFeaturesUI();
+  renderRoutines();
+}
+
+function initCloudBackup() {
+  const codeEl = document.getElementById('backupCodeText');
+  if (codeEl) codeEl.textContent = formatBackupCode(getBackupCode());
+  setBackupStatus(describeLastBackup());
+
+  const copyBtn = document.getElementById('backupCopyBtn');
+  if (copyBtn) {
+    copyBtn.addEventListener('click', async () => {
+      const text = formatBackupCode(getBackupCode());
+      let ok = false;
+      try {
+        await navigator.clipboard.writeText(text);
+        ok = true;
+      } catch (e) {}
+      copyBtn.textContent = ok ? 'הועתק ✓' : 'סמן והעתק';
+      setTimeout(() => (copyBtn.textContent = 'העתק'), 2000);
+    });
+  }
+
+  const nowBtn = document.getElementById('backupNowBtn');
+  if (nowBtn) nowBtn.addEventListener('click', () => runCloudBackup(true));
+
+  const restoreInput = document.getElementById('restoreCodeInput');
+  const restoreBtn = document.getElementById('restoreBtn');
+  const restoreStatus = document.getElementById('restoreStatus');
+  const setRestoreStatus = (text, color) => {
+    if (!restoreStatus) return;
+    restoreStatus.textContent = text || '';
+    restoreStatus.style.color = color || '';
+  };
+  if (restoreBtn && restoreInput) {
+    restoreBtn.addEventListener('click', async () => {
+      const code = normalizeBackupCode(restoreInput.value);
+      if (code.length !== 12) {
+        setRestoreStatus('הקוד צריך להיות 12 תווים (למשל K7P2-9XQM-4RTA)', '#f87171');
+        return;
+      }
+      if (restoreBtn.dataset.confirm !== '1') {
+        restoreBtn.dataset.confirm = '1';
+        restoreBtn.textContent = 'בטוח?';
+        setRestoreStatus('השחזור יחליף את כל ההגדרות הנוכחיות. לחץ שוב לאישור.', '#f59e0b');
+        setTimeout(() => {
+          restoreBtn.dataset.confirm = '';
+          restoreBtn.textContent = 'שחזר';
+        }, 4000);
+        return;
+      }
+      restoreBtn.dataset.confirm = '';
+      restoreBtn.textContent = 'משחזר...';
+      restoreBtn.disabled = true;
+      try {
+        if (!window.MagicCloud || !window.MagicCloud.device.loadBackup) throw new Error('offline');
+        const doc = await window.MagicCloud.device.loadBackup(code);
+        if (!doc || !doc.data) {
+          setRestoreStatus('לא נמצא גיבוי עם הקוד הזה', '#f87171');
+        } else {
+          applyBackupPayload(doc.data);
+          localStorage.setItem(BACKUP_CODE_KEY, code);
+          if (codeEl) codeEl.textContent = formatBackupCode(code);
+          restoreInput.value = '';
+          triggerHaptic([40, 60, 40]);
+          setRestoreStatus('ההגדרות שוחזרו ✓', '#22c55e');
+        }
+      } catch (err) {
+        setRestoreStatus(err && err.network ? 'אין חיבור לאינטרנט, נסה שוב' : 'השחזור נכשל, נסה שוב', '#f87171');
+      } finally {
+        restoreBtn.disabled = false;
+        restoreBtn.textContent = 'שחזר';
+      }
+    });
+  }
+}
+
+// ============================================================================
+// 26. מדריך שימוש: נפתח לבד בפעם הראשונה, ובכל זמן מכפתור בראש ההגדרות
+// ============================================================================
+var GUIDE_SEEN_KEY = 'magic_guide_seen_v1';
+
+function openGuide() {
+  const el = document.getElementById('guideOverlay');
+  if (el) el.style.display = 'flex';
+}
+
+function closeGuide() {
+  const el = document.getElementById('guideOverlay');
+  if (el) el.style.display = 'none';
+  try {
+    localStorage.setItem(GUIDE_SEEN_KEY, '1');
+  } catch (e) {}
+}
+
+function maybeShowGuideFirstTime() {
+  try {
+    if (localStorage.getItem(GUIDE_SEEN_KEY)) return;
+  } catch (e) {
+    return;
+  }
+  if (!setupOverlay || !setupOverlay.classList.contains('open')) return;
+  if (isLicenseOverlayVisible()) return;
+  const updatePopup = document.getElementById('updatePopupOverlay');
+  if (updatePopup && updatePopup.style.display === 'flex') return;
+  // בפעם הראשונה: סיור היכרות קצר (המדריך המלא נשאר בכפתור ?)
+  setTimeout(() => maybeStartTour(), 1300);
+}
+
+function initGuide() {
+  const openBtn = document.getElementById('openGuideBtn');
+  const headerBtn = document.getElementById('headerGuideBtn');
+  const closeBtn = document.getElementById('guideCloseBtn');
+  if (openBtn) openBtn.addEventListener('click', openGuide);
+  if (headerBtn) headerBtn.addEventListener('click', openGuide);
+  if (closeBtn) closeBtn.addEventListener('click', closeGuide);
+}
+
+// ============================================================================
+// 27. לשוניות ההגדרות: טריק / הצצה / מראה / אבטחה / עוד
+// ============================================================================
+var SETTINGS_TAB_KEY = 'magic_settings_tab_v1';
+
+function showSettingsTab(tab) {
+  const tabs = document.querySelectorAll('#settingsTabs .settings-tab');
+  const panels = document.querySelectorAll('.settings-panel');
+  if (!tabs.length) return;
+  const exists = Array.from(panels).some((p) => p.dataset.tab === tab);
+  const target = exists ? tab : 'trick';
+  tabs.forEach((t) => t.classList.toggle('active', t.dataset.tab === target));
+  panels.forEach((p) => p.classList.toggle('active', p.dataset.tab === target));
+  const body = document.querySelector('.config-body');
+  if (body) body.scrollTop = 0;
+  try {
+    localStorage.setItem(SETTINGS_TAB_KEY, target);
+  } catch (e) {}
+}
+
+function initSettingsTabs() {
+  document.querySelectorAll('#settingsTabs .settings-tab').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      triggerHaptic(10);
+      showSettingsTab(btn.dataset.tab);
+    });
+  });
+  let saved = 'trick';
+  try {
+    saved = localStorage.getItem(SETTINGS_TAB_KEY) || 'trick';
+  } catch (e) {}
+  showSettingsTab(saved);
+}
+
+// ============================================================================
+// 28. חשיפה בפתקים + "מוכן לצופה הבא"
+// ============================================================================
+var NOTES_PREDICTION_DEFAULT_HE = 'דברים שצריך לזכור השבוע:\n• קניות לסוף שבוע\n• לאסוף חבילה מהדואר\n• המספר שתבחר: {קוד}';
+var NOTES_PREDICTION_DEFAULT_EN = 'Things to remember this week:\n• Weekend groceries\n• Pick up the package\n• The number you will choose: {code}';
+var NOTES_PREDICTION_DEFAULT = isEnglishUi() ? NOTES_PREDICTION_DEFAULT_EN : NOTES_PREDICTION_DEFAULT_HE;
+
+function getNotesTemplate() {
+  let t = null;
+  try {
+    t = localStorage.getItem(NOTES_BODY_STORAGE_KEY);
+  } catch (e) {}
+  return t !== null && t !== '' ? t : NOTES_PREDICTION_DEFAULT;
+}
+
+function formatNoteTime(date, isYesterday) {
+  const hh = String(date.getHours()).padStart(2, '0');
+  const mm = String(date.getMinutes()).padStart(2, '0');
+  return `${isYesterday ? 'אתמול' : 'היום'}, ${hh}:${mm}`;
+}
+
+// מציג בפתק את הקוד שהצופה בחר, עם שעת כתיבה מוקדמת
+function showNotesPrediction(code) {
+  if (!notesBodyTextarea) return;
+  trackEvent('notes_reveal');
+  let template = getNotesTemplate();
+  if (!/\{(קוד|code)\}/i.test(template)) template += '\n• {קוד}';
+  notesBodyTextarea.value = fillCodePlaceholder(template, code || '----');
+  notesBodyTextarea.readOnly = true;
+  notesBodyTextarea.dataset.prediction = '1';
+
+  if (notesDateLine) {
+    const now = new Date();
+    if (config.notesAge === 'yesterday') {
+      const d = new Date(now.getTime() - 24 * 3600 * 1000 + 37 * 60 * 1000);
+      notesDateLine.textContent = formatNoteTime(d, true);
+    } else {
+      const mins = Math.max(1, Number(config.notesAge) || 60);
+      const d = new Date(now.getTime() - mins * 60 * 1000);
+      notesDateLine.textContent = formatNoteTime(d, d.toDateString() !== now.toDateString());
+    }
+  }
+}
+
+function restoreNotesTemplate() {
+  if (!notesBodyTextarea || notesBodyTextarea.dataset.prediction !== '1') return;
+  notesBodyTextarea.value = getNotesTemplate();
+  notesBodyTextarea.readOnly = false;
+  notesBodyTextarea.dataset.prediction = '';
+}
+
+// נועל מחדש את הטלפון המזויף (חוזר ממסך הבית/הפתקים למסך הנעילה)
+function relockFakePhone() {
+  fakeHomescreen.classList.remove('unlocked');
+  if (lockIconTrigger) lockIconTrigger.classList.remove('faceid-unlocked');
+  if (cameraPunchHole) cameraPunchHole.classList.remove('faceid-unlocked');
+  clearCurrentInputs();
+  restoreNotesTemplate();
+  if (typeof hideFakeMessageBanner === 'function') hideFakeMessageBanner();
+  if (typeof endFakeCall === 'function') endFakeCall();
+}
+
+// "מוכן לצופה הבא": מנקה את הקוד האחרון, מאפס ניסיונות וחוזר למסך הנעילה
+function resetForNextShow() {
+  trackEvent('reset_show');
+  try {
+    localStorage.removeItem(LAST_PIN_KEY);
+  } catch (e) {}
+  forceAttemptCount = 0;
+  relockFakePhone();
+  if (typeof hideHoldPeek === 'function') hideHoldPeek();
+  refreshSettingsLastCaptured();
+  triggerHaptic([30, 40, 30]);
+  launchLockscreenNow();
+}
+
+function syncNotesRevealUI() {
+  const toggle = document.getElementById('toggleNotesReveal');
+  const extra = document.getElementById('notesRevealExtra');
+  const input = document.getElementById('notesTemplateInput');
+  if (toggle) toggle.checked = Boolean(config.notesReveal);
+  if (extra) extra.style.display = config.notesReveal ? 'block' : 'none';
+  if (input && document.activeElement !== input) input.value = getNotesTemplate();
+  document.querySelectorAll('#notesAgeSelector .seg-pill').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.age === String(config.notesAge || '60'));
+  });
+}
+
+function initNotesReveal() {
+  const toggle = document.getElementById('toggleNotesReveal');
+  if (toggle) {
+    toggle.addEventListener('change', (e) => {
+      config.notesReveal = e.target.checked;
+      if (config.notesReveal) {
+        // החשיפה מופיעה בדף הפתקים, אז עוברים אליו אוטומטית
+        config.unlockTargetScreen = 'notes';
+        let stored = null;
+        try {
+          stored = localStorage.getItem(NOTES_BODY_STORAGE_KEY);
+        } catch (err) {}
+        if (!stored || !/\{(קוד|code)\}/i.test(stored)) {
+          try {
+            localStorage.setItem(NOTES_BODY_STORAGE_KEY, NOTES_PREDICTION_DEFAULT);
+          } catch (err) {}
+          if (notesBodyTextarea) notesBodyTextarea.value = NOTES_PREDICTION_DEFAULT;
+        }
+      }
+      saveConfig();
+      applyConfigToUI();
+      syncNotesRevealUI();
+    });
+  }
+  const input = document.getElementById('notesTemplateInput');
+  if (input) {
+    input.addEventListener('input', () => {
+      try {
+        localStorage.setItem(NOTES_BODY_STORAGE_KEY, input.value);
+      } catch (e) {}
+      if (notesBodyTextarea && notesBodyTextarea.dataset.prediction !== '1') notesBodyTextarea.value = input.value;
+      scheduleCloudBackup();
+    });
+  }
+  document.querySelectorAll('#notesAgeSelector .seg-pill').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      config.notesAge = btn.dataset.age;
+      saveConfig();
+      syncNotesRevealUI();
+    });
+  });
+  const resetBtn = document.getElementById('resetShowBtn');
+  if (resetBtn) resetBtn.addEventListener('click', resetForNextShow);
+  syncNotesRevealUI();
+}
+
+// ============================================================================
+// 22. משוב מהקוסם (תפריט ההגדרות) -> מגיע לאתר הניהול
+// ============================================================================
+const FEEDBACK_LAST_SENT_KEY = 'magic_feedback_last_sent';
+
+// ---------------- הודעה אישית מהמפתח (תשובה למשוב) ----------------
+// נשמרת בטלפון כשהיא מגיעה, ומוצגת רק כשהקוסם נכנס להגדרות - אף פעם לא מעל מסך הנעילה.
+const ADMIN_MSG_KEY = 'magic_admin_msg_v1'; // { text, at, seen }
+
+function readAdminMessage() {
+  try {
+    return JSON.parse(localStorage.getItem(ADMIN_MSG_KEY) || 'null');
+  } catch (e) {
+    return null;
+  }
+}
+
+function storeAdminMessage() {
+  if (!window.MagicCloud || typeof window.MagicCloud.device.getMyMessage !== 'function') return;
+  const msg = window.MagicCloud.device.getMyMessage();
+  if (!msg || !msg.text) return;
+  const prev = readAdminMessage();
+  if (prev && prev.at === msg.at && prev.text === msg.text) return;
+  try {
+    localStorage.setItem(ADMIN_MSG_KEY, JSON.stringify({ text: msg.text, at: msg.at, seen: false }));
+  } catch (e) {}
+  renderAdminMessageLast();
+  // אם ההגדרות כבר פתוחות - מציגים מיד
+  if (setupOverlay && setupOverlay.classList.contains('open')) maybeShowAdminMessage();
+}
+
+function renderAdminMessageLast() {
+  const box = document.getElementById('adminMsgLast');
+  const msg = readAdminMessage();
+  if (!box) return;
+  if (!msg || !msg.text) {
+    box.style.display = 'none';
+    return;
+  }
+  box.innerHTML = '';
+  const title = document.createElement('b');
+  title.textContent = '💬 הודעה אחרונה מהמפתח:';
+  box.appendChild(title);
+  box.appendChild(document.createTextNode('\n' + msg.text));
+  box.style.display = '';
+}
+
+function maybeShowAdminMessage() {
+  const msg = readAdminMessage();
+  const overlay = document.getElementById('adminMsgOverlay');
+  if (!msg || msg.seen || !overlay) return;
+  if (!setupOverlay || !setupOverlay.classList.contains('open')) return;
+  const updatePopup = document.getElementById('updatePopupOverlay');
+  if (updatePopup && updatePopup.style.display !== 'none') return; // נציג בכניסה הבאה
+  document.getElementById('adminMsgText').textContent = msg.text;
+  overlay.style.display = 'flex';
+}
+
+function initAdminMessage() {
+  const overlay = document.getElementById('adminMsgOverlay');
+  if (!overlay) return;
+  const markSeen = () => {
+    const msg = readAdminMessage();
+    if (msg) {
+      msg.seen = true;
+      try {
+        localStorage.setItem(ADMIN_MSG_KEY, JSON.stringify(msg));
+      } catch (e) {}
+    }
+    overlay.style.display = 'none';
+  };
+  document.getElementById('adminMsgOkBtn').addEventListener('click', markSeen);
+  document.getElementById('adminMsgReplyBtn').addEventListener('click', () => {
+    markSeen();
+    if (typeof showSettingsTab === 'function') showSettingsTab('more');
+    const input = document.getElementById('feedbackInput');
+    if (input) {
+      input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setTimeout(() => input.focus(), 400);
+    }
+  });
+  renderAdminMessageLast();
+}
+
+function initFeedbackBox() {
+  const input = document.getElementById('feedbackInput');
+  const btn = document.getElementById('feedbackSendBtn');
+  const statusEl = document.getElementById('feedbackStatus');
+  if (!input || !btn) return;
+
+  const setStatus = (msg, color) => {
+    if (!statusEl) return;
+    statusEl.textContent = msg || '';
+    statusEl.style.color = color || '';
+  };
+
+  btn.addEventListener('click', async () => {
+    const text = input.value.trim();
+    if (text.length < 2) {
+      setStatus('כתוב משהו לפני השליחה', '#f87171');
+      return;
+    }
+    const last = Number(localStorage.getItem(FEEDBACK_LAST_SENT_KEY) || 0);
+    if (Date.now() - last < 30 * 1000) {
+      setStatus('המשוב הקודם נשלח הרגע, נסה שוב בעוד חצי דקה', '#f59e0b');
+      return;
+    }
+    if (!window.MagicCloud || !window.MagicCloud.isConfigured()) {
+      setStatus('המערכת לא מחוברת כרגע', '#f87171');
+      return;
+    }
+    btn.disabled = true;
+    btn.textContent = 'שולח...';
+    setStatus('');
+    try {
+      await window.MagicCloud.device.sendFeedback({
+        text,
+        appVersion: getInstalledAppVersion(),
+        os: config.osTheme,
+        model: config.deviceModel
+      });
+      try {
+        localStorage.setItem(FEEDBACK_LAST_SENT_KEY, String(Date.now()));
+      } catch (e) {}
+      input.value = '';
+      triggerHaptic(30);
+      setStatus('תודה! המשוב נשלח ✓', '#22c55e');
+    } catch (err) {
+      setStatus(err && err.network ? 'אין חיבור לאינטרנט, נסה שוב' : 'השליחה נכשלה, נסה שוב', '#f87171');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'שלח משוב';
+    }
+  });
+}
+
+// ============================================================================
+// 30. סטטיסטיקת שימוש: באילו קסמים הקוסם משתמש (נשלח לאתר הניהול בלבד)
+// ----------------------------------------------------------------------------
+// נשמרים רק מונים (כמה פעמים כל פיצ'ר הופעל) - בלי קודים, בלי תמונות ובלי פנים.
+// ============================================================================
+const STATS_KEY = 'magic_stats_v1';
+
+function readStats() {
+  try {
+    const s = JSON.parse(localStorage.getItem(STATS_KEY) || 'null');
+    if (s && typeof s === 'object' && s.e) return s;
+  } catch (e) {}
+  return { e: {}, since: new Date().toISOString().slice(0, 10) };
+}
+
+function trackEvent(name) {
+  if (config && config.practiceMode) return; // תרגול לא נספר בסטטיסטיקה
+  try {
+    const s = readStats();
+    s.e[name] = Math.min(999999, (Number(s.e[name]) || 0) + 1);
+    localStorage.setItem(STATS_KEY, JSON.stringify(s));
+  } catch (e) {}
+}
+
+function getStatsForReport() {
+  const s = readStats();
+  // גם אילו פיצ'רים מופעלים כרגע בהגדרות
+  const on = [];
+  if (config.watchPeek) on.push('watch');
+  if (config.remotePeek) on.push('remote');
+  if (config.revealEnabled) on.push('reveal');
+  if (config.notesReveal) on.push('notes');
+  if (config.hapticPeek) on.push('haptic');
+  if (config.holdPeek) on.push('hold');
+  if (config.chameleonClock) on.push('clock');
+  if (config.faceIdEnrolled) on.push('face');
+  if (config.fingerprintEnrolled) on.push('fp');
+  if (config.uiLang === 'en') on.push('english');
+  if (config.callReveal) on.push('call');
+  if (config.unlockTargetScreen === 'gallery') on.push('gallery');
+  if (config.unlockTargetScreen === 'search') on.push('search');
+  try {
+    return JSON.stringify({ e: s.e, since: s.since, os: config.osTheme, model: config.deviceModel, mode: config.unlockMode, on });
+  } catch (e) {
+    return '';
+  }
+}
+
+// ============================================================================
+// 31. דיווח תקלות אוטומטי לאתר הניהול
+// ============================================================================
+const ERR_DAY_KEY = 'magic_err_day_v1';
+let errorsSentThisSession = 0;
+const errorsSeen = new Set();
+
+function reportAppError(msg, src) {
+  try {
+    const text = String(msg || '').slice(0, 500);
+    if (!text || errorsSeen.has(text) || errorsSentThisSession >= 3) return;
+    // שגיאות של סקריפטים חיצוניים בלי פרטים - לא מועילות
+    if (text === 'Script error.' || text === 'Script error') return;
+    const today = new Date().toISOString().slice(0, 10);
+    const day = JSON.parse(localStorage.getItem(ERR_DAY_KEY) || '{}');
+    if (day.d !== today) {
+      day.d = today;
+      day.n = 0;
+    }
+    if (day.n >= 10) return;
+    errorsSeen.add(text);
+    errorsSentThisSession += 1;
+    day.n += 1;
+    localStorage.setItem(ERR_DAY_KEY, JSON.stringify(day));
+    if (!window.MagicCloud || !window.MagicCloud.isConfigured() || !window.MagicCloud.device.reportError) return;
+    window.MagicCloud.device
+      .reportError({ msg: text, src: String(src || '').slice(0, 200), appVersion: getInstalledAppVersion(), model: config.deviceModel })
+      .catch(() => {});
+  } catch (e) {}
+}
+
+window.addEventListener('error', (e) => {
+  const src = e.filename ? `${String(e.filename).split('/').pop()}:${e.lineno || 0}` : '';
+  reportAppError(e.message || (e.error && e.error.message), src);
+});
+window.addEventListener('unhandledrejection', (e) => {
+  const r = e.reason;
+  // תקלות רשת הן לא באג - לא מדווחים
+  if (r && (r.network || r.status === 0)) return;
+  reportAppError('Promise: ' + (r && r.message ? r.message : String(r)), (r && r.stack ? String(r.stack).split('\n')[1] || '' : '').trim());
+});
+
+// ============================================================================
+// 32. הצצה מטלפון שני: הקוד שהצופה מקליד מופיע מיד בטלפון אחר (של עוזר / בכיס)
+// ----------------------------------------------------------------------------
+// הטלפון השני פותח קישור סודי (peek.html#ערוץ) בדפדפן - לא צריך להתקין כלום.
+// ============================================================================
+const LIVE_CHANNEL_KEY = 'magic_live_channel_v1';
+const PEEK_PAGE_URL = 'https://tzur2010.github.io/app-lockscreen/peek.html';
+
+function newLiveChannel() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+  const bytes = new Uint8Array(12);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => chars[b % chars.length]).join('');
+}
+
+function getLiveChannel() {
+  let ch = '';
+  try {
+    ch = localStorage.getItem(LIVE_CHANNEL_KEY) || '';
+  } catch (e) {}
+  if (!/^[A-Za-z0-9]{12}$/.test(ch)) {
+    ch = newLiveChannel();
+    try {
+      localStorage.setItem(LIVE_CHANNEL_KEY, ch);
+    } catch (e) {}
+  }
+  return ch;
+}
+
+function getLivePeekLink() {
+  return `${PEEK_PAGE_URL}#${getLiveChannel()}`;
+}
+
+function canUseRemotePeek() {
+  return Boolean(window.MagicCloud && window.MagicCloud.isConfigured() && window.MagicCloud.device.hasLive && window.MagicCloud.device.hasLive());
+}
+
+// כל קוד חדש מקבל מספר; ניסיון חוזר של קוד ישן נעצר ברגע שהוקלד קוד חדש יותר
+let liveSendSeq = 0;
+const LIVE_RETRY_DELAYS_MS = [700, 1500, 3000];
+
+async function sendCodeToSecondPhone(code, mode, isTest) {
+  if ((!config.remotePeek && !isTest) || !code || !canUseRemotePeek()) return false;
+  const m = String(mode || '').toUpperCase();
+  if (!isTest) trackEvent('remote_peek');
+  const mySeq = ++liveSendSeq;
+  const payloadCode = formatCodeForDisplay(code, m);
+  for (let attempt = 0; attempt <= LIVE_RETRY_DELAYS_MS.length; attempt++) {
+    if (mySeq !== liveSendSeq) return false;
+    try {
+      await window.MagicCloud.device.pushLiveCode(getLiveChannel(), payloadCode, isTest ? 'TEST' : m);
+      return true;
+    } catch (e) {
+      if (attempt === LIVE_RETRY_DELAYS_MS.length) return false;
+      await new Promise((r) => setTimeout(r, LIVE_RETRY_DELAYS_MS[attempt]));
+    }
+  }
+  return false;
+}
+
+function syncRemotePeekUI() {
+  const toggle = document.getElementById('toggleRemotePeek');
+  const extra = document.getElementById('remotePeekExtra');
+  const linkEl = document.getElementById('remotePeekLink');
+  if (toggle) toggle.checked = Boolean(config.remotePeek);
+  if (extra) extra.style.display = config.remotePeek ? 'block' : 'none';
+  if (linkEl) linkEl.textContent = getLivePeekLink();
+}
+
+function initRemotePeek() {
+  const toggle = document.getElementById('toggleRemotePeek');
+  const status = document.getElementById('remotePeekStatus');
+  const setStatus = (t, color) => {
+    if (!status) return;
+    status.textContent = t || '';
+    status.style.color = color || '';
+  };
+  if (!toggle) return;
+  toggle.addEventListener('change', () => {
+    config.remotePeek = toggle.checked;
+    saveConfig();
+    syncRemotePeekUI();
+  });
+  const copyBtn = document.getElementById('remotePeekCopyBtn');
+  if (copyBtn) {
+    copyBtn.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(getLivePeekLink());
+        setStatus('הקישור הועתק ✓', '#22c55e');
+      } catch (e) {
+        setStatus('לא הצלחתי להעתיק - סמן את הקישור והעתק ידנית', '#f59e0b');
+      }
+    });
+  }
+  const waBtn = document.getElementById('remotePeekWaBtn');
+  if (waBtn) {
+    waBtn.addEventListener('click', () => {
+      const text = `פתח את הקישור הזה בטלפון השני והשאר אותו פתוח:\n${getLivePeekLink()}`;
+      const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
+      let opened = false;
+      try {
+        if (window.AndroidNative && typeof window.AndroidNative.openShareUrl === 'function') opened = window.AndroidNative.openShareUrl(url);
+      } catch (e) {}
+      if (!opened) window.open(url, '_blank');
+    });
+  }
+  const testBtn = document.getElementById('remotePeekTestBtn');
+  if (testBtn) {
+    testBtn.addEventListener('click', async () => {
+      setStatus('שולח...');
+      const ok = await sendCodeToSecondPhone('1234', 'PIN', true);
+      setStatus(ok ? 'נשלח ✓ בטלפון השני אמור להופיע 1234' : 'השליחה נכשלה - בדוק חיבור לאינטרנט', ok ? '#22c55e' : '#f87171');
+    });
+  }
+  const newBtn = document.getElementById('remotePeekNewBtn');
+  if (newBtn) {
+    newBtn.addEventListener('click', () => {
+      if (!confirm('ליצור קישור חדש? הקישור הישן יפסיק לקבל קודים.')) return;
+      try {
+        localStorage.setItem(LIVE_CHANNEL_KEY, newLiveChannel());
+      } catch (e) {}
+      syncRemotePeekUI();
+      setStatus('נוצר קישור חדש - שלח אותו שוב לטלפון השני', '#f59e0b');
+    });
+  }
+  syncRemotePeekUI();
+}
+
+// ============================================================================
+// 33. בחירת שפה (עברית / English)
+// ============================================================================
+function setUiLanguage(lang) {
+  const next = lang === 'en' ? 'en' : 'he';
+  if ((config.uiLang || 'he') === next) return;
+  // טקסטים שלא שונו ע"י הקוסם מוחלפים לברירת המחדל בשפה החדשה
+  const toEn = next === 'en';
+  if (config.revealText === (toEn ? REVEAL_TEXT_DEFAULT_HE : REVEAL_TEXT_DEFAULT_EN)) {
+    config.revealText = toEn ? REVEAL_TEXT_DEFAULT_EN : REVEAL_TEXT_DEFAULT_HE;
+  }
+  if (config.revealSender === (toEn ? 'אמא' : 'Mom')) config.revealSender = toEn ? 'Mom' : 'אמא';
+  try {
+    const notes = localStorage.getItem(NOTES_BODY_STORAGE_KEY);
+    if (notes === (toEn ? NOTES_PREDICTION_DEFAULT_HE : NOTES_PREDICTION_DEFAULT_EN)) {
+      localStorage.setItem(NOTES_BODY_STORAGE_KEY, toEn ? NOTES_PREDICTION_DEFAULT_EN : NOTES_PREDICTION_DEFAULT_HE);
+    }
+  } catch (e) {}
+  config.uiLang = next;
+  saveConfig();
+  // טוענים מחדש כדי שכל המסכים יוצגו בשפה החדשה (נשארים בהגדרות)
+  try {
+    sessionStorage.setItem('magic_reopen_settings', '1');
+  } catch (e) {}
+  location.reload();
+}
+
+function initLanguage() {
+  const row = document.getElementById('uiLangSelector');
+  if (!row) return;
+  row.querySelectorAll('.seg-pill').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.lang === (config.uiLang || 'he'));
+    btn.addEventListener('click', () => setUiLanguage(btn.dataset.lang));
+  });
+  // אחרי החלפת שפה חוזרים ישר להגדרות, ללשונית "עוד"
+  let reopen = false;
+  try {
+    reopen = sessionStorage.getItem('magic_reopen_settings') === '1';
+    sessionStorage.removeItem('magic_reopen_settings');
+  } catch (e) {}
+  if (reopen) {
+    setTimeout(() => {
+      openSettingsSheet();
+      if (typeof showSettingsTab === 'function') showSettingsTab('more');
+    }, 1300);
+  }
+}
+
+// ============================================================================
+// 34. חשיפה בגלריה: התמונה האחרונה היא "צילום" של פתק בכתב יד עם הקוד
+// ============================================================================
+// מספר אקראי קבוע לפי זרע (כדי שאותו קוד ייתן אותה תמונה ואותה שעה)
+function seededRandom(seedText) {
+  let h = 2166136261;
+  for (let i = 0; i < seedText.length; i++) h = Math.imul(h ^ seedText.charCodeAt(i), 16777619);
+  return () => {
+    h += 0x6d2b79f5;
+    let x = Math.imul(h ^ (h >>> 15), 1 | h);
+    x ^= x + Math.imul(x ^ (x >>> 7), 61 | x);
+    return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+const HANDWRITING_FONT = '"Segoe Print", "Bradley Hand", "Marker Felt", "Comic Sans MS", "Dancing Script", cursive';
+
+function drawNotePhoto(canvas, text, rand) {
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width;
+  const h = canvas.height;
+
+  // שולחן עץ חם
+  const desk = ctx.createLinearGradient(0, 0, w, h);
+  desk.addColorStop(0, '#8a5a36');
+  desk.addColorStop(0.5, '#a06a40');
+  desk.addColorStop(1, '#6e4528');
+  ctx.fillStyle = desk;
+  ctx.fillRect(0, 0, w, h);
+  ctx.globalAlpha = 0.12;
+  for (let i = 0; i < 60; i++) {
+    ctx.strokeStyle = rand() > 0.5 ? '#3b2414' : '#c08a5a';
+    ctx.lineWidth = 1 + rand() * 3;
+    ctx.beginPath();
+    const y = rand() * h;
+    ctx.moveTo(0, y);
+    ctx.bezierCurveTo(w * 0.3, y + (rand() - 0.5) * 40, w * 0.7, y + (rand() - 0.5) * 40, w, y + (rand() - 0.5) * 30);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+
+  // פתק צהוב מעט מסובב, עם צל
+  const noteSize = w * 0.72;
+  ctx.save();
+  ctx.translate(w / 2 + (rand() - 0.5) * 40, h / 2 + (rand() - 0.5) * 60);
+  ctx.rotate(((rand() - 0.5) * 9 * Math.PI) / 180);
+  ctx.shadowColor = 'rgba(0,0,0,0.45)';
+  ctx.shadowBlur = 38;
+  ctx.shadowOffsetY = 18;
+  const paper = ctx.createLinearGradient(-noteSize / 2, -noteSize / 2, noteSize / 2, noteSize / 2);
+  paper.addColorStop(0, '#fff6a8');
+  paper.addColorStop(1, '#f7e477');
+  ctx.fillStyle = paper;
+  ctx.fillRect(-noteSize / 2, -noteSize / 2, noteSize, noteSize);
+  ctx.shadowColor = 'transparent';
+  // פס הדבק העליון כהה מעט
+  ctx.fillStyle = 'rgba(0,0,0,0.05)';
+  ctx.fillRect(-noteSize / 2, -noteSize / 2, noteSize, noteSize * 0.12);
+
+  // כתב יד בעט כחול
+  const clean = String(text || '').slice(0, 40);
+  let size = noteSize * (clean.length <= 6 ? 0.26 : clean.length <= 12 ? 0.15 : 0.1);
+  ctx.font = `${size}px ${HANDWRITING_FONT}`;
+  while (ctx.measureText(clean).width > noteSize * 0.84 && size > 20) {
+    size -= 4;
+    ctx.font = `${size}px ${HANDWRITING_FONT}`;
+  }
+  ctx.fillStyle = '#1e3a8a';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.rotate(((rand() - 0.5) * 4 * Math.PI) / 180);
+  ctx.fillText(clean, 0, noteSize * 0.04);
+  // קו תחתון בכתב יד
+  ctx.strokeStyle = 'rgba(30,58,138,0.75)';
+  ctx.lineWidth = size * 0.05;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  const half = Math.min(noteSize * 0.4, ctx.measureText(clean).width / 2 + 10);
+  ctx.moveTo(-half, size * 0.62);
+  ctx.quadraticCurveTo(0, size * 0.62 + (rand() - 0.5) * 18, half, size * 0.55);
+  ctx.stroke();
+  ctx.restore();
+
+  // מראה של צילום: הצללה בקצוות ורעש עדין
+  const vignette = ctx.createRadialGradient(w / 2, h / 2, w * 0.3, w / 2, h / 2, w * 0.85);
+  vignette.addColorStop(0, 'rgba(0,0,0,0)');
+  vignette.addColorStop(1, 'rgba(0,0,0,0.38)');
+  ctx.fillStyle = vignette;
+  ctx.fillRect(0, 0, w, h);
+  const img = ctx.getImageData(0, 0, w, h);
+  for (let i = 0; i < img.data.length; i += 4) {
+    const n = (rand() - 0.5) * 14;
+    img.data[i] += n;
+    img.data[i + 1] += n;
+    img.data[i + 2] += n;
+  }
+  ctx.putImageData(img, 0, 0);
+}
+
+// תמונות "רגילות" קודמות בגלריה (שקיעה, ים, אוכל...) - רק צבעים, בלי תוכן אמיתי
+const GALLERY_THUMB_PALETTES = [
+  ['#f97316', '#fde68a'], ['#0ea5e9', '#e0f2fe'], ['#16a34a', '#bbf7d0'], ['#7c3aed', '#fbcfe8'],
+  ['#334155', '#94a3b8'], ['#b45309', '#fef3c7'], ['#be123c', '#fecdd3'], ['#0f766e', '#99f6e4']
+];
+
+function buildGalleryStrip(rand, noteCanvas) {
+  const strip = document.getElementById('galleryStrip');
+  if (!strip) return;
+  strip.innerHTML = '';
+  for (let i = 0; i < 7; i++) {
+    const thumb = document.createElement('canvas');
+    thumb.width = 80;
+    thumb.height = 80;
+    thumb.className = 'gallery-thumb';
+    const c = thumb.getContext('2d');
+    const pal = GALLERY_THUMB_PALETTES[Math.floor(rand() * GALLERY_THUMB_PALETTES.length)];
+    const g = c.createLinearGradient(0, 0, 0, 80);
+    g.addColorStop(0, pal[0]);
+    g.addColorStop(1, pal[1]);
+    c.fillStyle = g;
+    c.fillRect(0, 0, 80, 80);
+    c.fillStyle = 'rgba(255,255,255,0.25)';
+    c.beginPath();
+    c.arc(20 + rand() * 40, 20 + rand() * 40, 8 + rand() * 18, 0, Math.PI * 2);
+    c.fill();
+    strip.appendChild(thumb);
+  }
+  const current = document.createElement('canvas');
+  current.width = 80;
+  current.height = 80;
+  current.className = 'gallery-thumb active';
+  current.getContext('2d').drawImage(noteCanvas, 0, noteCanvas.height / 2 - noteCanvas.width / 2, noteCanvas.width, noteCanvas.width, 0, 0, 80, 80);
+  strip.appendChild(current);
+  strip.scrollLeft = isEnglishUi() ? strip.scrollWidth : -strip.scrollWidth;
+}
+
+function showGalleryReveal(code) {
+  const canvas = document.getElementById('galleryPhoto');
+  if (!canvas) return;
+  const value = code || '----';
+  const text = fillCodePlaceholder(config.galleryText || '{קוד}', value);
+  const rand = seededRandom(value + '|' + new Date().toDateString());
+  drawNotePhoto(canvas, text, rand);
+  buildGalleryStrip(rand, canvas);
+  // "צולם אתמול" בשעת ערב
+  const hh = String(19 + Math.floor(rand() * 4)).padStart(2, '0');
+  const mm = String(Math.floor(rand() * 60)).padStart(2, '0');
+  const dayEl = document.getElementById('galleryDay');
+  const timeEl = document.getElementById('galleryTime');
+  if (dayEl) dayEl.textContent = 'אתמול';
+  if (timeEl) timeEl.textContent = `${hh}:${mm}`;
+  trackEvent('gallery_reveal');
+}
+
+// ============================================================================
+// 35. חשיפה בשיחה נכנסת
+// ============================================================================
+var callRevealTimer = null;
+var callRingTimer = null;
+var callDurationTimer = null;
+var callAudioCtx = null;
+
+function playRingBurst() {
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+    if (!callAudioCtx) callAudioCtx = new AudioCtx();
+    if (callAudioCtx.state === 'suspended') callAudioCtx.resume().catch(() => {});
+    const t0 = callAudioCtx.currentTime;
+    // מנגינת צלצול קצרה (4 צלילים רכים)
+    [659, 784, 988, 784].forEach((freq, i) => {
+      const osc = callAudioCtx.createOscillator();
+      const gain = callAudioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      const start = t0 + i * 0.16;
+      gain.gain.setValueAtTime(0.0001, start);
+      gain.gain.exponentialRampToValueAtTime(0.12, start + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.15);
+      osc.connect(gain);
+      gain.connect(callAudioCtx.destination);
+      osc.start(start);
+      osc.stop(start + 0.16);
+    });
+  } catch (e) {}
+}
+
+function stopRinging() {
+  clearInterval(callRingTimer);
+  callRingTimer = null;
+  try {
+    if (navigator.vibrate) navigator.vibrate(0);
+  } catch (e) {}
+}
+
+function scheduleCallReveal(code, delayOverrideMs = null) {
+  clearTimeout(callRevealTimer);
+  const delay = delayOverrideMs !== null ? delayOverrideMs : Math.max(1, Number(config.callDelaySec) || 4) * 1000;
+  callRevealTimer = setTimeout(() => showFakeCall(code), delay);
+}
+
+function showFakeCall(code) {
+  const screen = document.getElementById('fakeCallScreen');
+  if (!screen) return;
+  clearTimeout(callRevealTimer);
+  const name = fillCodePlaceholder(config.callName || '{קוד}', code || '----');
+  document.getElementById('fakeCallName').textContent = name;
+  document.getElementById('fakeCallLabel').textContent = 'שיחה נכנסת';
+  paintAvatar(document.getElementById('fakeCallAvatar'), name, '');
+  document.getElementById('fakeCallActions').style.display = '';
+  document.getElementById('fakeCallInCall').style.display = 'none';
+  screen.classList.toggle('ios', config.osTheme === 'ios');
+  screen.style.display = 'flex';
+  void screen.offsetWidth;
+  screen.classList.add('show');
+  stopRinging();
+  const ring = () => {
+    playRingBurst();
+    triggerHaptic([500, 300, 500]);
+  };
+  ring();
+  callRingTimer = setInterval(ring, 2200);
+  trackEvent('call_reveal');
+}
+
+function answerFakeCall() {
+  stopRinging();
+  document.getElementById('fakeCallActions').style.display = 'none';
+  document.getElementById('fakeCallInCall').style.display = '';
+  document.getElementById('fakeCallLabel').textContent = '';
+  const timerEl = document.getElementById('fakeCallTimer');
+  const started = Date.now();
+  clearInterval(callDurationTimer);
+  const tick = () => {
+    const s = Math.floor((Date.now() - started) / 1000);
+    timerEl.textContent = `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+  };
+  tick();
+  callDurationTimer = setInterval(tick, 1000);
+}
+
+function endFakeCall() {
+  clearTimeout(callRevealTimer);
+  clearInterval(callDurationTimer);
+  stopRinging();
+  const screen = document.getElementById('fakeCallScreen');
+  if (!screen || screen.style.display === 'none') return;
+  screen.classList.remove('show');
+  setTimeout(() => {
+    if (!screen.classList.contains('show')) screen.style.display = 'none';
+  }, 250);
+}
+
+function initCallReveal() {
+  const bind = (id, fn) => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      fn();
+    });
+  };
+  bind('fakeCallAccept', answerFakeCall);
+  bind('fakeCallDecline', endFakeCall);
+  bind('fakeCallEnd', endFakeCall);
+}
+
+// ============================================================================
+// 36. הגדרות החשיפות החדשות + מצב תרגול
+// ============================================================================
+function syncNewRevealsUI() {
+  const galleryExtra = document.getElementById('galleryRevealExtra');
+  if (galleryExtra) galleryExtra.style.display = config.unlockTargetScreen === 'gallery' ? 'block' : 'none';
+  const galleryInput = document.getElementById('galleryTextInput');
+  if (galleryInput && document.activeElement !== galleryInput) galleryInput.value = config.galleryText || '{קוד}';
+  const searchExtra = document.getElementById('searchRevealExtra');
+  if (searchExtra) searchExtra.style.display = config.unlockTargetScreen === 'search' ? 'block' : 'none';
+  const searchInput = document.getElementById('searchTextInput');
+  if (searchInput && document.activeElement !== searchInput) searchInput.value = config.searchText || '{קוד}';
+
+  const callToggle = document.getElementById('toggleCallReveal');
+  if (callToggle) callToggle.checked = Boolean(config.callReveal);
+  const callExtra = document.getElementById('callRevealExtra');
+  if (callExtra) callExtra.style.display = config.callReveal ? 'block' : 'none';
+  const callInput = document.getElementById('callNameInput');
+  if (callInput && document.activeElement !== callInput) callInput.value = config.callName || '{קוד}';
+  document.querySelectorAll('#callDelaySelector .seg-pill').forEach((btn) => {
+    btn.classList.toggle('active', Number(btn.dataset.delay) === Number(config.callDelaySec || 4));
+  });
+
+  const practice = document.getElementById('togglePracticeMode');
+  if (practice) practice.checked = Boolean(config.practiceMode);
+  document.body.classList.toggle('practice-on', Boolean(config.practiceMode));
+}
+
+function initNewReveals() {
+  document.querySelectorAll('#unlockTargetSelector .seg-pill').forEach((btn) => btn.addEventListener('click', syncNewRevealsUI));
+  const galleryInput = document.getElementById('galleryTextInput');
+  if (galleryInput) {
+    galleryInput.addEventListener('input', () => {
+      config.galleryText = galleryInput.value.slice(0, 40);
+      saveConfig();
+    });
+  }
+  const searchTextInput = document.getElementById('searchTextInput');
+  if (searchTextInput) {
+    searchTextInput.addEventListener('input', () => {
+      config.searchText = searchTextInput.value.slice(0, 60);
+      saveConfig();
+    });
+  }
+  const callToggle = document.getElementById('toggleCallReveal');
+  if (callToggle) {
+    callToggle.addEventListener('change', () => {
+      config.callReveal = callToggle.checked;
+      saveConfig();
+      syncNewRevealsUI();
+    });
+  }
+  const callInput = document.getElementById('callNameInput');
+  if (callInput) {
+    callInput.addEventListener('input', () => {
+      config.callName = callInput.value.slice(0, 40);
+      saveConfig();
+    });
+  }
+  document.querySelectorAll('#callDelaySelector .seg-pill').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      config.callDelaySec = Number(btn.dataset.delay) || 4;
+      saveConfig();
+      syncNewRevealsUI();
+    });
+  });
+  const callTest = document.getElementById('callTestBtn');
+  if (callTest) callTest.addEventListener('click', () => showFakeCall('1234'));
+
+  const practice = document.getElementById('togglePracticeMode');
+  if (practice) {
+    practice.addEventListener('change', () => {
+      config.practiceMode = practice.checked;
+      saveConfig();
+      syncNewRevealsUI();
+    });
+  }
+  syncNewRevealsUI();
+}
+
+// ============================================================================
+// 37. שלט רחוק מהטלפון השני (peek.html): פקודות מגיעות בזמן אמת
+// ----------------------------------------------------------------------------
+// הטלפון ביד הצופה לא רוטט ולא מראה כלום כשמגיעה פקודה.
+// ============================================================================
+var remoteControlSource = null;
+var remoteControlPrimed = false;
+var lastRemoteCommandAt = 0;
+var liveStateTimer = null;
+var lastPublishedState = '';
+
+function publishLiveState() {
+  if (!config.remotePeek || !canUseRemotePeek() || !window.MagicCloud.device.pushLiveState) return;
+  const key = `${forceUnlockMode}|${getUnlockOnAttempt()}`;
+  if (key === lastPublishedState) return;
+  window.MagicCloud.device
+    .pushLiveState(getLiveChannel(), forceUnlockMode, getUnlockOnAttempt())
+    .then(() => {
+      lastPublishedState = key;
+    })
+    .catch(() => {});
+}
+
+function scheduleLiveStatePublish() {
+  clearTimeout(liveStateTimer);
+  liveStateTimer = setTimeout(publishLiveState, 600);
+}
+
+function handleRemoteCommand(cmd, val) {
+  const lastCode = localStorage.getItem(LAST_PIN_KEY) || '';
+  if (cmd === 'force') {
+    setForceModeState(Boolean(val));
+  } else if (cmd === 'attempt') {
+    const n = Math.min(5, Math.max(1, Number(val) || 1));
+    config.unlockOnAttempt = n;
+    config.unlockAttemptMode = n >= 2 ? 'second' : 'immediate';
+    saveConfig();
+  } else if (cmd === 'reset') {
+    resetForNextShow();
+  } else if (cmd === 'call') {
+    showFakeCall(lastCode);
+  } else if (cmd === 'reveal') {
+    scheduleCodeReveal(lastCode, true, 0);
+  }
+  trackEvent('remote_control');
+  lastPublishedState = '';
+  scheduleLiveStatePublish();
+}
+
+function stopRemoteControl() {
+  if (remoteControlSource) {
+    try {
+      remoteControlSource.close();
+    } catch (e) {}
+  }
+  remoteControlSource = null;
+}
+
+function startRemoteControl() {
+  if (!config.remotePeek || !canUseRemotePeek() || typeof EventSource === 'undefined') {
+    stopRemoteControl();
+    return;
+  }
+  if (remoteControlSource && remoteControlSource.readyState !== 2) return;
+  const base = window.MagicCloud.device.liveUrl();
+  remoteControlPrimed = false;
+  try {
+    remoteControlSource = new EventSource(`${base}/ctrl/${getLiveChannel()}.json`);
+  } catch (e) {
+    remoteControlSource = null;
+    return;
+  }
+  remoteControlSource.addEventListener('put', (e) => {
+    let data = null;
+    try {
+      data = JSON.parse(e.data).data;
+    } catch (err) {
+      return;
+    }
+    // ההודעה הראשונה היא הפקודה האחרונה ששמורה - לא מבצעים אותה שוב
+    if (!remoteControlPrimed) {
+      remoteControlPrimed = true;
+      lastRemoteCommandAt = data && data.at ? Number(data.at) : 0;
+      return;
+    }
+    if (!data || !data.cmd || Number(data.at) <= lastRemoteCommandAt) return;
+    lastRemoteCommandAt = Number(data.at);
+    handleRemoteCommand(data.cmd, data.val);
+  });
+  lastPublishedState = '';
+  scheduleLiveStatePublish();
+}
+
+function initRemoteControl() {
+  const toggle = document.getElementById('toggleRemotePeek');
+  if (toggle) toggle.addEventListener('change', () => setTimeout(startRemoteControl, 50));
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') startRemoteControl();
+  });
+  startRemoteControl();
+}
+
+// ============================================================================
+// 38. בדיקה לפני הופעה: לחיצה אחת בודקת שהכל מוכן
+// ----------------------------------------------------------------------------
+// כל בדיקה מחזירה: ok (✓) / warn (!) / bad (✗) / info (ℹ️), ולפעמים כפתור תיקון.
+// ============================================================================
+const PRESHOW_ICONS = { ok: '✅', warn: '⚠️', bad: '❌', info: 'ℹ️' };
+
+function withTimeout(promise, ms) {
+  return Promise.race([promise, new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))]);
+}
+
+async function collectPreShowChecks() {
+  const checks = [];
+  const add = (state, title, detail, fixLabel, fix) => checks.push({ state, title, detail, fixLabel, fix });
+
+  // 1. אינטרנט + רישיון (בדיקה אמיתית מול השרת)
+  let online = navigator.onLine !== false;
+  let status = null;
+  if (online && window.MagicCloud && window.MagicCloud.isConfigured()) {
+    try {
+      status = await withTimeout(window.MagicCloud.device.getMyStatus(), 8000);
+    } catch (e) {
+      online = false;
+    }
+  }
+  if (online) add('ok', 'חיבור לאינטרנט', 'מחובר');
+  else add('warn', 'אין חיבור לאינטרנט', 'מסך הנעילה עובד גם בלי אינטרנט, אבל טלפון שני, גיבוי ועדכונים לא.');
+
+  if (status === 'approved' || (!status && isCachedApprovalValid())) add('ok', 'רישיון', 'האפליקציה מאושרת');
+  else if (status === 'blocked') add('bad', 'רישיון', 'הגישה בוטלה - פנה למנהל');
+  else if (status) add('bad', 'רישיון', 'הבקשה עוד לא אושרה');
+
+  // 2. מצב תרגול חייב להיות כבוי
+  if (config.practiceMode) {
+    add('bad', 'מצב תרגול דולק', 'הקודים לא יישמרו בהיסטוריה.', 'כבה', () => {
+      config.practiceMode = false;
+      saveConfig();
+      syncNewRevealsUI();
+    });
+  } else {
+    add('ok', 'מצב תרגול כבוי', '');
+  }
+
+  // 3. קוד מהצופה הקודם
+  const lastCode = localStorage.getItem(LAST_PIN_KEY);
+  if (lastCode) {
+    add('warn', 'נשאר קוד מהצופה הקודם', `הקוד האחרון (${formatCodeForDisplay(lastCode, '')}) עדיין שמור - ההצצות יראו אותו.`, 'אפס', () => {
+      try {
+        localStorage.removeItem(LAST_PIN_KEY);
+      } catch (e) {}
+      forceAttemptCount = 0;
+      refreshSettingsLastCaptured();
+    });
+  } else {
+    add('ok', 'מוכן לצופה חדש', 'אין קוד שמור מהצופה הקודם');
+  }
+
+  // 4. מצב הטריק (מידע)
+  const lockNames = { pin: Number(config.pinLength) === 6 ? 'קוד 6 ספרות' : 'קוד 4 ספרות', pattern: 'דפוס', words: 'סיסמה', swipe: 'החלקה' };
+  add(
+    'info',
+    forceUnlockMode ? `פתיחה בכל קוד: דולק (ניסיון ${getUnlockOnAttempt()})` : 'פתיחה בכל קוד: כבוי',
+    `נעילה: ${lockNames[config.unlockMode] || config.unlockMode}`
+  );
+
+  // 5. חשיפות שעובדות רק בפתיחה בכל קוד
+  if ((config.callReveal || config.revealEnabled) && !forceUnlockMode) {
+    add('warn', 'החשיפה לא תופעל', 'שיחה נכנסת וחשיפה בהודעה עובדות רק כש"פתיחה בכל קוד" דולק.', 'הדלק', () => setForceModeState(true));
+  }
+
+  // 6. הרשאת התראות (לשעון ולחשיפה בהודעה)
+  if (hasNativeNotifications() && (config.watchPeek || config.revealEnabled)) {
+    let allowed = true;
+    try {
+      allowed = typeof window.AndroidNative.areNotificationsAllowed !== 'function' || window.AndroidNative.areNotificationsAllowed();
+    } catch (e) {}
+    if (allowed) add('ok', 'התראות מותרות', 'השעון והחשיפה בהודעה יעבדו');
+    else {
+      add('bad', 'ההתראות חסומות', 'השעון והחשיפה בהודעה לא יעבדו.', 'אשר', () => {
+        try {
+          window.AndroidNative.requestNotificationPermission();
+        } catch (e) {}
+      });
+    }
+  }
+
+  // 7. טלפון שני
+  if (config.remotePeek) {
+    const connected = remoteControlSource && remoteControlSource.readyState === 1;
+    if (connected && online) add('ok', 'טלפון שני', 'מחובר - הקודים והשלט יעבדו');
+    else add('warn', 'טלפון שני לא מחובר', 'ודא שיש אינטרנט ושהקישור פתוח בטלפון השני.', 'חבר מחדש', () => {
+      stopRemoteControl();
+      startRemoteControl();
+    });
+  }
+
+  // 8. עדכון זמין
+  try {
+    const cfg = online && window.MagicCloud ? await withTimeout(window.MagicCloud.getAppConfig(), 6000) : null;
+    if (cfg && cfg.latest_version && compareSemver(cfg.latest_version, getInstalledAppVersion()) > 0) {
+      add('warn', `יש גרסה חדשה (v${cfg.latest_version})`, 'מומלץ לעדכן אחרי ההופעה, לא רגע לפניה.');
+    }
+  } catch (e) {}
+
+  // 9. סוללה
+  try {
+    if (navigator.getBattery) {
+      const b = await withTimeout(navigator.getBattery(), 2000);
+      const pct = Math.round(b.level * 100);
+      if (pct < 20 && !b.charging) add('bad', `סוללה ${pct}%`, 'כדאי להטעין לפני ההופעה.');
+      else if (pct < 40 && !b.charging) add('warn', `סוללה ${pct}%`, 'מספיק להופעה קצרה.');
+      else add('ok', `סוללה ${pct}%`, b.charging ? 'בטעינה' : '');
+    }
+  } catch (e) {}
+
+  return checks;
+}
+
+function renderPreShowChecks(checks) {
+  const list = document.getElementById('preShowList');
+  const summary = document.getElementById('preShowSummary');
+  if (!list || !summary) return;
+  list.innerHTML = '';
+  checks.forEach((c) => {
+    const row = document.createElement('div');
+    row.className = 'preshow-item';
+    const icon = document.createElement('div');
+    icon.className = 'preshow-icon';
+    icon.textContent = PRESHOW_ICONS[c.state] || '';
+    const body = document.createElement('div');
+    const title = document.createElement('div');
+    title.className = 'preshow-title';
+    title.textContent = c.title;
+    body.appendChild(title);
+    if (c.detail) {
+      const detail = document.createElement('div');
+      detail.className = 'preshow-detail';
+      detail.textContent = c.detail;
+      body.appendChild(detail);
+    }
+    row.append(icon, body);
+    if (c.fix) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'preshow-fix';
+      btn.textContent = c.fixLabel || 'תקן';
+      btn.addEventListener('click', async () => {
+        try {
+          await c.fix();
+        } catch (e) {}
+        runPreShowCheck();
+      });
+      row.appendChild(btn);
+    } else {
+      row.appendChild(document.createElement('span'));
+    }
+    list.appendChild(row);
+  });
+  const bad = checks.filter((c) => c.state === 'bad').length;
+  const warn = checks.filter((c) => c.state === 'warn').length;
+  summary.className = 'preshow-summary ' + (bad ? 'bad' : warn ? 'warn' : 'ok');
+  summary.textContent = bad
+    ? bad === 1
+      ? 'דבר אחד חייב תיקון לפני ההופעה'
+      : `${bad} דברים חייבים תיקון לפני ההופעה`
+    : warn
+      ? warn === 1
+        ? 'כמעט מוכן - דבר אחד לבדוק'
+        : `כמעט מוכן - ${warn} דברים לבדוק`
+      : 'הכל מוכן להופעה ✓';
+}
+
+let preShowRunning = false;
+async function runPreShowCheck() {
+  if (preShowRunning) return;
+  preShowRunning = true;
+  const overlay = document.getElementById('preShowOverlay');
+  const summary = document.getElementById('preShowSummary');
+  if (overlay) overlay.style.display = 'flex';
+  if (summary) {
+    summary.className = 'preshow-summary';
+    summary.textContent = 'בודק...';
+  }
+  try {
+    renderPreShowChecks(await collectPreShowChecks());
+  } catch (e) {
+    if (summary) summary.textContent = 'הבדיקה נכשלה, נסה שוב';
+  } finally {
+    preShowRunning = false;
+  }
+}
+
+function initPreShowCheck() {
+  const openBtn = document.getElementById('preShowCheckBtn');
+  if (openBtn) openBtn.addEventListener('click', runPreShowCheck);
+  const again = document.getElementById('preShowAgainBtn');
+  if (again) again.addEventListener('click', runPreShowCheck);
+  const close = document.getElementById('preShowCloseBtn');
+  if (close) {
+    close.addEventListener('click', () => {
+      document.getElementById('preShowOverlay').style.display = 'none';
+    });
+  }
+}
+
+// ============================================================================
+// 39. חשיפה בחיפוש: מסך חיפוש שבו החיפוש האחרון הוא הקוד של הצופה
+// ----------------------------------------------------------------------------
+// מסך חיפוש כללי (בלי לוגו של חברה מסוימת).
+// ============================================================================
+const SEARCH_FILLERS_HE = ['מזג אוויר מחר', 'מתכון לעוגת שוקולד', 'תוצאות המשחק אתמול', 'שעות פתיחה סופר', 'איך מכינים קפה קר', 'מסעדות קרובות'];
+const SEARCH_FILLERS_EN = ['weather tomorrow', 'chocolate cake recipe', 'last night game score', 'supermarket opening hours', 'how to make cold brew', 'restaurants near me'];
+const SEARCH_WHEN_HE = ['אתמול', 'אתמול', 'לפני יומיים', 'לפני 3 ימים', 'לפני שבוע'];
+const SEARCH_WHEN_EN = ['Yesterday', 'Yesterday', '2 days ago', '3 days ago', '1 week ago'];
+
+function showSearchReveal(code) {
+  const list = document.getElementById('searchRecentList');
+  if (!list) return;
+  const en = isEnglishUi();
+  const main = fillCodePlaceholder(config.searchText || '{קוד}', code || '----');
+  const rand = seededRandom(String(code) + '|search|' + new Date().toDateString());
+  const fillers = (en ? SEARCH_FILLERS_EN : SEARCH_FILLERS_HE).slice().sort(() => rand() - 0.5).slice(0, 4);
+  const whens = en ? SEARCH_WHEN_EN : SEARCH_WHEN_HE;
+  list.innerHTML = '';
+  [main, ...fillers].forEach((text, i) => {
+    const row = document.createElement('div');
+    row.className = 'search-recent-item';
+    row.innerHTML = '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"></circle><path d="M12 7.5V12l3 2"></path></svg>';
+    const t = document.createElement('span');
+    t.className = 'search-recent-text';
+    t.textContent = text;
+    const w = document.createElement('span');
+    w.className = 'search-recent-when';
+    w.textContent = whens[Math.min(i, whens.length - 1)];
+    row.append(t, w);
+    list.appendChild(row);
+  });
+  trackEvent('search_reveal');
+}
+
+// ============================================================================
+// 40. כפתור ? ליד כל קסם: איך זה עובד + מה אומרים לקהל
+// ============================================================================
+const TRICK_TIPS = {
+  toggleForceUnlockMode: {
+    he: ['🎯 פתיחה בכל קוד', 'כל קוד שהצופה מקליד פותח את הטלפון.\nאפשר להדליק ולכבות בסתר בלחיצה כפולה על השעון (מרגישים רטט קצר).', '"תבחר כל קוד שבא לך, אל תגיד לי. עכשיו תקליד אותו בטלפון שלי..."'],
+    en: ['🎯 Unlock with any code', 'Any code the spectator types unlocks the phone.\nTurn it on/off secretly with a double-tap on the clock (you feel a short buzz).', '"Think of any code, don\'t tell me. Now type it on my phone..."']
+  },
+  unlockAttemptModeSelector: {
+    he: ['🔁 באיזה ניסיון נפתח', 'בניסיונות שלפני: "קוד שגוי" עם רטט קל, בדיוק כמו טלפון אמיתי. זה הופך את הרגע שהוא נפתח להרבה יותר חזק.', '"לא? נסה שוב... תתרכז בקוד שלך... ועכשיו!"'],
+    en: ['🔁 Which attempt unlocks', 'Earlier attempts show "wrong code" with a light buzz, just like a real phone. It makes the moment it opens much stronger.', '"No? Try again... focus on your code... and now!"']
+  },
+  toggleHoldPeek: {
+    he: ['👆 הצצה בלחיצה ארוכה', 'לחיצה ארוכה בשטח ריק במסך מראה לך את הקוד בתיבה קטנה. בדפוס - הנקודות ממוספרות לפי הסדר.', '"רגע, תן לי לוודא שהמסך נעול..."'],
+    en: ['👆 Long-press peek', 'Long-press an empty area to see the code in a small box. For patterns, the dots are numbered in order.', '"Wait, let me make sure the screen is locked..."']
+  },
+  toggleChameleonClock: {
+    he: ['🕐 הצצה בשעון', 'הקשה אחת על השעון הקטן למעלה - הקוד מופיע במקום השעה ל-3 שניות.', '"כמה זמן יש לנו? רגע..."'],
+    en: ['🕐 Clock peek', 'One tap on the small clock at the top - the code replaces the time for 3 seconds.', '"How much time do we have? One sec..."']
+  },
+  toggleHapticPeek: {
+    he: ['📳 רטט בכיס', 'כשהטלפון אצלך, הוא רוטט את הספרות: מספר רטטים = הספרה, רטט ארוך = 0. לא צריך להסתכל בכלל.', '"תחזיר לי את הטלפון. אני לא מסתכל עליו בכלל."'],
+    en: ['📳 Pocket vibration', 'While you hold it, the phone buzzes the digits: number of buzzes = the digit, a long buzz = 0. No need to look.', '"Give me back the phone. I\'m not even looking at it."']
+  },
+  toggleWatchPeek: {
+    he: ['⌚ שעון חכם', 'כל קוד מופיע על השעון שלך כהתראה שקטה. בטלפון עצמו לא רואים כלום.', '"(מסתכל על השעה) יש לנו עוד דקה..."'],
+    en: ['⌚ Smartwatch', 'Every code appears on your watch as a silent notification. Nothing shows on the phone.', '"(checking the time) We have one more minute..."']
+  },
+  toggleRemotePeek: {
+    he: ['📲 טלפון שני + שלט', 'הקוד מופיע בגדול בטלפון שני (שלך בכיס או של עוזר). בטלפון השני יש גם שלט: להדליק/לכבות, לבחור ניסיון ולהפעיל חשיפה.', '"אני אפילו לא נוגע בטלפון. הכל אצלך."'],
+    en: ['📲 Second phone + remote', 'The code shows big on a second phone (yours or a helper\'s). It also has a remote: on/off, attempt, and trigger a reveal.', '"I\'m not even touching the phone. It\'s all with you."']
+  },
+  toggleReveal: {
+    he: ['💬 חשיפה בהודעה', 'כמה שניות אחרי הפתיחה מגיעה הודעה עם הקוד, מהשולח ועם התמונה שבחרת.', '"אה, קיבלתי הודעה... אתה יכול לקרוא אותה בקול?"'],
+    en: ['💬 Message reveal', 'A few seconds after unlocking, a message arrives with the code, from the sender and photo you chose.', '"Oh, I got a message... can you read it out loud?"']
+  },
+  toggleNotesReveal: {
+    he: ['📝 חשיפה בפתקים', 'אחרי הפתיחה נפתח פתק "שנכתב לפני שעה" ובו הקוד של הצופה.', '"כתבתי משהו לפני שהגעתי לפה. תקרא מה כתוב בפתק."'],
+    en: ['📝 Notes reveal', 'After unlocking, a note "written an hour ago" opens with the spectator\'s code.', '"I wrote something before I got here. Read the note."']
+  },
+  toggleCallReveal: {
+    he: ['📞 חשיפה בשיחה נכנסת', 'אחרי הפתיחה הטלפון מצלצל, ושם המתקשר הוא הקוד. אפשר גם להפעיל מהשלט בטלפון השני.', '"מישהו מתקשר אליי... תגיד לי מי זה?"'],
+    en: ['📞 Incoming call reveal', 'After unlocking the phone rings and the caller name is the code. Can also be triggered from the remote.', '"Someone is calling me... who is it?"']
+  },
+  unlockTargetSelector: {
+    he: ['🎬 מה נפתח אחרי הפתיחה', 'מסך בית רגיל, או חשיפה: פתק עם הקוד, תמונה בגלריה של פתק בכתב יד, או מסך חיפוש שבו החיפוש האחרון הוא הקוד.', '"תסתכל מה חיפשתי אתמול בלילה..."'],
+    en: ['🎬 What opens after unlocking', 'A normal home screen, or a reveal: a note with the code, a gallery photo of a handwritten note, or a search screen where the last search is the code.', '"Look what I searched for last night..."']
+  },
+  togglePracticeMode: {
+    he: ['🎯 מצב תרגול', 'מתרגלים את כל ההצצות בלי שהקודים נשמרים בהיסטוריה ובלי שזה נספר בנתונים. זכור לכבות לפני הופעה (הבדיקה לפני הופעה תזכיר לך).', ''],
+    en: ['🎯 Practice mode', 'Practice all the peeks without saving codes to history or stats. Remember to turn it off before a show (the pre-show check reminds you).', '']
+  }
+};
+
+function openTrickTip(id) {
+  const tip = TRICK_TIPS[id];
+  if (!tip) return;
+  const [title, how, patter] = isEnglishUi() ? tip.en : tip.he;
+  document.getElementById('tipTitle').textContent = title;
+  document.getElementById('tipHow').textContent = how;
+  document.getElementById('tipPatter').textContent = patter;
+  document.getElementById('tipPatterLabel').textContent = isEnglishUi() ? '💬 What to say' : '💬 מה אומרים לקהל';
+  document.getElementById('tipPatterWrap').style.display = patter ? '' : 'none';
+  document.getElementById('tipOverlay').style.display = 'flex';
+}
+
+function initTrickTips() {
+  Object.keys(TRICK_TIPS).forEach((id) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const row = el.closest('.clean-toggle-row, .oneui-field-block');
+    const title = row && (row.querySelector('.toggle-main-title') || row.querySelector('.config-label'));
+    if (!title || title.querySelector('.trick-tip-btn')) return;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'trick-tip-btn';
+    btn.textContent = '?';
+    btn.setAttribute('aria-label', 'הסבר');
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      openTrickTip(id);
+    });
+    title.appendChild(btn);
+  });
+  const close = document.getElementById('tipCloseBtn');
+  if (close) close.addEventListener('click', () => (document.getElementById('tipOverlay').style.display = 'none'));
+  const overlay = document.getElementById('tipOverlay');
+  if (overlay) overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) overlay.style.display = 'none';
+  });
+}
+
+// ============================================================================
+// 41. סיור היכרות: בפעם הראשונה מדגיש את החלקים החשובים בהגדרות
+// ============================================================================
+const TOUR_DONE_KEY = 'magic_tour_done_v1';
+const TOUR_STEPS = [
+  { target: '#settingsTabs', tab: 'trick', he: '👋 ברוך הבא ל-Magic Lock!\nההגדרות מחולקות ל-5 לשוניות: טריק, הצצה, מראה, אבטחה ועוד.', en: '👋 Welcome to Magic Lock!\nSettings are split into 5 tabs: Trick, Peek, Look, Security and More.' },
+  { target: '#toggleForceUnlockMode', tab: 'trick', he: '🎯 פתיחה בכל קוד\nכשזה דולק, כל קוד שהצופה מקליד פותח את הטלפון.', en: '🎯 Unlock with any code\nWhen on, any code the spectator types unlocks the phone.' },
+  { target: '#unlockAttemptModeSelector', tab: 'trick', he: '🔁 כאן בוחרים באיזה ניסיון הטלפון ייפתח.\nלמשל 2 = בפעם הראשונה "קוד שגוי", ובשנייה נפתח.', en: '🔁 Choose which attempt unlocks the phone.\nE.g. 2 = first try "wrong code", second try opens.' },
+  { target: '#settingsTabs .settings-tab[data-tab="peek"]', tab: 'peek', he: '👁️ בלשונית הצצה: כל הדרכים לראות מה הצופה הקליד - לחיצה ארוכה, שעון, רטט, שעון חכם וטלפון שני.', en: '👁️ The Peek tab: every way to see what the spectator typed - long-press, clock, vibration, smartwatch and a second phone.' },
+  { target: '.trick-tip-btn', tab: 'trick', he: '❓ ליד כל קסם יש כפתור כזה - הסבר קצר איך מבצעים אותו ומה אומרים לקהל.', en: '❓ Every trick has a button like this - a short how-to and what to say to the audience.' },
+  { target: '#launchLockscreenBtn', tab: 'trick', he: '✅ כשהכל מוכן: "שמור וסגור", בוחרים סוג נעילה ונותנים את הטלפון לצופה.', en: '✅ When ready: "Save & Close", pick a lock type and hand the phone to the spectator.' },
+  { target: null, tab: 'trick', he: '🔐 הכי חשוב לזכור:\nכדי לחזור להגדרות בסתר - לחיצה ארוכה של 3 שניות על השעון במסך הנעילה.\n\nבכל שאלה - כפתור ? למעלה. בהצלחה! ✨', en: '🔐 Most important:\nTo get back to settings secretly - long-press the clock for 3 seconds on the lock screen.\n\nAny question - the ? button at the top. Good luck! ✨' }
+];
+let tourIndex = 0;
+
+function maybeStartTour() {
+  try {
+    // רק לקוסמים חדשים (מי שכבר ראה את המדריך הישן יכול להפעיל את הסיור מלשונית "עוד")
+    if (localStorage.getItem(TOUR_DONE_KEY) || localStorage.getItem(GUIDE_SEEN_KEY)) return;
+  } catch (e) {
+    return;
+  }
+  if (!setupOverlay || !setupOverlay.classList.contains('open')) return;
+  if (!deviceConfigSheet || !deviceConfigSheet.classList.contains('active')) return;
+  if (isLicenseOverlayVisible()) return;
+  startTour();
+}
+
+function startTour() {
+  tourIndex = 0;
+  document.getElementById('tourLayer').style.display = 'block';
+  showTourStep();
+}
+
+function endTour() {
+  document.getElementById('tourLayer').style.display = 'none';
+  try {
+    localStorage.setItem(TOUR_DONE_KEY, '1');
+    localStorage.setItem(GUIDE_SEEN_KEY, '1');
+  } catch (e) {}
+  if (typeof showSettingsTab === 'function') showSettingsTab('trick');
+}
+
+function showTourStep() {
+  const step = TOUR_STEPS[tourIndex];
+  if (!step) return endTour();
+  const en = isEnglishUi();
+  if (typeof showSettingsTab === 'function') showSettingsTab(step.tab);
+  document.getElementById('tourText').textContent = en ? step.en : step.he;
+  document.getElementById('tourDots').textContent = TOUR_STEPS.map((_, i) => (i === tourIndex ? '●' : '○')).join('');
+  document.getElementById('tourNextBtn').textContent = tourIndex === TOUR_STEPS.length - 1 ? (en ? 'Got it' : 'הבנתי') : en ? 'Next' : 'הבא';
+  document.getElementById('tourSkipBtn').style.display = tourIndex === TOUR_STEPS.length - 1 ? 'none' : '';
+
+  const spot = document.getElementById('tourSpot');
+  const card = document.getElementById('tourCard');
+  let target = step.target ? document.querySelector(step.target) : null;
+  if (target) target = target.closest('.clean-toggle-row, .oneui-field-block') || target;
+  if (!target || !target.offsetParent) {
+    spot.classList.add('center');
+    card.style.top = '38%';
+    return;
+  }
+  spot.classList.remove('center');
+  target.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  setTimeout(() => {
+    const r = target.getBoundingClientRect();
+    const pad = 6;
+    Object.assign(spot.style, {
+      left: `${r.left - pad}px`,
+      top: `${r.top - pad}px`,
+      width: `${r.width + pad * 2}px`,
+      height: `${r.height + pad * 2}px`
+    });
+    // הכרטיס מתחת לאזור המודגש, או מעליו אם אין מקום
+    const below = r.bottom + 16;
+    const cardH = card.offsetHeight || 150;
+    card.style.top = below + cardH < window.innerHeight ? `${below}px` : `${Math.max(12, r.top - cardH - 16)}px`;
+  }, 380);
+}
+
+function initTour() {
+  const next = document.getElementById('tourNextBtn');
+  if (next) next.addEventListener('click', () => {
+    tourIndex += 1;
+    showTourStep();
+  });
+  const skip = document.getElementById('tourSkipBtn');
+  if (skip) skip.addEventListener('click', endTour);
+  const again = document.getElementById('startTourBtn');
+  if (again) again.addEventListener('click', startTour);
+  window.addEventListener('resize', () => {
+    if (document.getElementById('tourLayer').style.display === 'block') showTourStep();
+  });
+}
+
+// אתחול ראשוני
+initTrickTips();
+initTour();
+initPreShowCheck();
+initCallReveal();
+initNewReveals();
+initRemoteControl();
+initLanguage();
+initRemotePeek();
+initFeedbackBox();
+initAdminMessage();
+initMagicFeatures();
+initRoutines();
+initCloudBackup();
+initGuide();
+initSettingsTabs();
+initNotesReveal();
+// אם נרשמו פנים: טוענים ומחממים את מנוע הזיהוי ברקע, כדי שהזיהוי מול הקהל יהיה מיידי
+if (hasEnrolledFace()) setTimeout(() => loadFaceEngine().catch(() => {}), 2500);
+initDeviceLicenseGate();
+initSplashScreen();
+initBiometricsEnrollment();
+loadCustomMedia();
+applyConfigToUI();
+initInAppSelfUpdater();
+
+// Service Worker: מאפשר עבודה אופליין בגרסת האתר. הקבצים מתעדכנים בפתיחה הבאה,
+// בלי ריענון אוטומטי באמצע שימוש (כדי לא לשבור הופעה).
+if (window.location.protocol !== 'file:' && 'serviceWorker' in navigator) {
+  navigator.serviceWorker
+    .register('./sw.js', { scope: './' })
+    .then((reg) => reg.update())
+    .catch(() => {});
+}

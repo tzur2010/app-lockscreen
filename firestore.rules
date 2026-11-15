@@ -56,8 +56,9 @@ service cloud.firestore {
       // המכשיר עצמו יכול לעדכן רק את נתוני השימוש שלו (זמן אחרון, מספר פתיחות, גרסה).
       // המנהל יכול גם לשלוח לקוסם הודעה אישית (adminMessage).
       allow update: if (isAdmin()
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt', 'adminMessage', 'adminMessageAt'])
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt', 'adminMessage', 'adminMessageAt', 'tester'])
           && request.resource.data.status in ['pending', 'approved', 'blocked']
+          && (!('tester' in request.resource.data) || request.resource.data.tester is bool)
           && (!('adminMessage' in request.resource.data) || validStr(request.resource.data.adminMessage, 1, 2000)))
         || (signedIn() && request.auth.uid == uid
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastSeen', 'openCount', 'appVersion', 'stats'])

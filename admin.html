@@ -399,6 +399,7 @@
               <div class="version-value" id="readyVersion">—</div>
             </div>
           </div>
+          <div class="hint" id="betaHint" style="margin-top:6px;"></div>
           <div class="hint" id="readyHint">בודק איזו גרסה הועלתה...</div>
           <div>
             <label class="field-label" for="updMessage">מה חדש (יוצג לקוסמים בחלון העדכון, לא חובה)</label>
@@ -1099,7 +1100,7 @@
 
         const tr = document.createElement('tr');
         tr.innerHTML = `
-          <td class="name-cell" style="font-weight:700;"><span class="name-link" data-action="details" data-id="${id}">${escapeHtml(u.name) || '—'}</span>${allNotes[u.id] ? '<span class="note-dot" title="יש הערה">📝</span>' : ''} ${statusHtml}${u.deviceId ? `<div class="muted">מכשיר <span class="mono">${escapeHtml(u.deviceId)}</span></div>` : ''}</td>
+          <td class="name-cell" style="font-weight:700;"><span class="name-link" data-action="details" data-id="${id}">${escapeHtml(u.name) || '—'}</span>${allNotes[u.id] ? '<span class="note-dot" title="יש הערה">📝</span>' : ''}${u.tester ? '<span class="note-dot" title="בודק בטא">🧪</span>' : ''} ${statusHtml}${u.deviceId ? `<div class="muted">מכשיר <span class="mono">${escapeHtml(u.deviceId)}</span></div>` : ''}</td>
           <td data-label="טלפון"><span class="mono" style="color:#e2e8f0;">${escapeHtml(u.phone) || '—'}</span></td>
           <td data-label="בקשה" class="muted">${formatDate(u.createdAt)}</td>
           <td data-label="שימוש">${usageHtml(u)}</td>
@@ -1170,6 +1171,14 @@
       $('badgeUpdate').style.display = hasNew ? '' : 'none';
       if (readyVersion && !$('updVersion').value) $('updVersion').value = readyVersion;
       if (allUsers.length) renderUsers();
+      // גרסת הבטא (רק לבודקים)
+      try {
+        const b = await fetch(`beta/version.json?t=${Date.now()}`, { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null));
+        const testers = allUsers.filter((u) => u.tester).map((u) => u.name);
+        $('betaHint').textContent = b && b.latest_version
+          ? `🧪 בבטא עכשיו: v${b.latest_version} · בודקים: ${testers.length ? testers.join(', ') : 'אין עדיין (מסמנים בחלון פרטי הלקוח)'}`
+          : '';
+      } catch (e) {}
     }
 
     async function publishVersion(version, apkUrl, message, btn) {
@@ -1340,6 +1349,7 @@
           ${user.phone ? `<a class="btn btn-wa-outline" href="https://wa.me/${escapeHtml(phoneDigits)}" target="_blank" rel="noopener">🟢 וואטסאפ</a>` : ''}
           ${user.status !== 'pending' ? `<button type="button" class="btn btn-ghost" id="drawerMsg">💬 הודעה באפליקציה</button>` : ''}
         </div>
+        ${user.status === 'approved' ? `<div class="drawer-sec"><h3>🧪 ערוץ בטא</h3><button type="button" class="btn ${user.tester ? 'btn-whatsapp' : 'btn-ghost'}" id="drawerTester" style="width:100%; justify-content:center;">${user.tester ? '✓ בודק בטא - מקבל כל גרסה חדשה לפני כולם' : 'סמן כבודק בטא'}</button><div class="muted" style="margin-top:6px; line-height:1.5;">בודק בטא מקבל כל גרסה חדשה מיד כשהיא מוכנה, לפני שאתה מפרסם לכולם. מתאים לך ולקוסם או שניים שאתה סומך עליהם.</div></div>` : ''}
         <div class="drawer-sec">
           <h3>פרטים</h3>
           <div class="kv">
@@ -1371,6 +1381,21 @@
       if (msgBtn) msgBtn.addEventListener('click', () => {
         closeDetails();
         openMessageBox(user, null);
+      });
+      const testerBtn = document.getElementById('drawerTester');
+      if (testerBtn) testerBtn.addEventListener('click', async () => {
+        const next = !user.tester;
+        testerBtn.disabled = true;
+        try {
+          await Cloud.admin.setTester(user.id, next);
+          user.tester = next;
+          renderUsers();
+          openDetails(user);
+          toast(next ? `${user.name} יקבל גרסאות בטא 🧪` : `${user.name} חזר לגרסאות הרגילות`);
+        } catch (err) {
+          toast('השמירה נכשלה: ' + err.message, true);
+          testerBtn.disabled = false;
+        }
       });
       $('noteSave').addEventListener('click', async () => {
         const btn = $('noteSave');

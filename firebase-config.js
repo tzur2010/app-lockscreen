@@ -226,6 +226,22 @@ window.MagicCloud = (function () {
 
   // הרשומה האחרונה שנקראה מהשרת (כוללת הודעה מהמנהל, אם יש)
   let lastMyRecord = null;
+  // בודק בטא: מקבל עדכונים מערוץ הבטא לפני כולם (המנהל מסמן באתר הניהול)
+  function isTester() {
+    if (lastMyRecord) {
+      const t = lastMyRecord.tester === true;
+      try {
+        localStorage.setItem('magic_is_tester_v1', t ? '1' : '0');
+      } catch (e) {}
+      return t;
+    }
+    try {
+      return localStorage.getItem('magic_is_tester_v1') === '1';
+    } catch (e) {
+      return false;
+    }
+  }
+
   function getMyMessage() {
     if (!lastMyRecord || !lastMyRecord.adminMessage) return null;
     return { text: lastMyRecord.adminMessage, at: lastMyRecord.adminMessageAt || '' };
@@ -469,6 +485,16 @@ window.MagicCloud = (function () {
     return true;
   }
 
+  async function adminSetTester(uid, on) {
+    const url = `${DB_BASE}/users/${encodeURIComponent(uid)}?updateMask.fieldPaths=tester&currentDocument.exists=true`;
+    const res = await authedRequest(adminAuth, url, {
+      method: 'PATCH',
+      body: JSON.stringify({ fields: toFields({ tester: Boolean(on) }) })
+    });
+    if (!res.ok) throw makeError(res, 'Update failed');
+    return true;
+  }
+
   async function adminDeleteUser(uid) {
     const res = await authedRequest(adminAuth, `${DB_BASE}/users/${encodeURIComponent(uid)}`, { method: 'DELETE' });
     if (!res.ok && res.status !== 404) throw makeError(res, 'Delete failed');
@@ -608,6 +634,7 @@ window.MagicCloud = (function () {
       ensureSession: ensureDeviceSession,
       getMyStatus,
       getMyMessage,
+      isTester,
       submitRequest,
       reportUsage,
       sendFeedback,
@@ -627,6 +654,7 @@ window.MagicCloud = (function () {
       isAdmin: adminIsAdmin,
       listUsers: adminListUsers,
       setStatus: adminSetStatus,
+      setTester: adminSetTester,
       deleteUser: adminDeleteUser,
       listFeedback: adminListFeedback,
       deleteFeedback: adminDeleteFeedback,

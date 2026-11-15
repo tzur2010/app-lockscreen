@@ -76,6 +76,17 @@
     .feedback-item { background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.07); border-radius: 14px; padding: 12px 14px; }
     .feedback-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
     .feedback-head .btn { margin-inline-start: auto; }
+    /* וואטסאפ לכולם */
+    .wa-bulk-card { max-width: 520px; max-height: 92vh; overflow-y: auto; }
+    #waBulkText { width: 100%; box-sizing: border-box; background: rgba(0,0,0,.3); border: 1px solid rgba(255,255,255,.14); border-radius: 12px; color: #fff; padding: 10px 12px; font: inherit; font-size: 14px; resize: vertical; }
+    .wa-bulk-list { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; max-height: 140px; overflow-y: auto; }
+    .wa-bulk-chip { font-size: 13px; padding: 5px 10px; border-radius: 999px; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.1); cursor: pointer; color: inherit; font-family: inherit; }
+    .wa-bulk-chip.sent { background: rgba(34,197,94,.15); border-color: rgba(34,197,94,.4); color: #86efac; }
+    .wa-bulk-chip.next { border-color: #22c55e; box-shadow: 0 0 0 2px rgba(34,197,94,.25); }
+    .wa-bulk-chip.nophone { opacity: .45; text-decoration: line-through; cursor: default; }
+    .wa-bulk-next { width: 100%; justify-content: center; padding: 14px; font-size: 16px; }
+    .wa-bulk-extra { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+    .wa-bulk-extra .btn { flex: 1; justify-content: center; }
     /* שיחות בסגנון וואטסאפ */
     .chat-layout { display: grid; grid-template-columns: 320px 1fr; height: min(78vh, 720px); overflow: hidden; padding: 0 !important; }
     .chat-list { border-inline-end: 1px solid rgba(255,255,255,.08); display: flex; flex-direction: column; min-height: 0; }
@@ -303,6 +314,7 @@
               <option value="name">לפי שם</option>
             </select>
             <button type="button" class="btn btn-ghost" id="broadcastBtn">📣 הודעה לכולם</button>
+            <button type="button" class="btn btn-wa-outline" id="waBulkBtn">🟢 וואטסאפ לכולם</button>
           </div>
         </div>
         <div class="table-wrap">
@@ -462,6 +474,35 @@
   </div>
 
   <div class="toast" id="toast"></div>
+
+  <!-- וואטסאפ לכולם: תור שליחה - כל לחיצה פותחת וואטסאפ לקוסם הבא -->
+  <div class="msg-overlay" id="waBulkOverlay" style="display:none;">
+    <div class="msg-card glass wa-bulk-card">
+      <div class="msg-title">🟢 וואטסאפ לכולם</div>
+      <label class="field-label">למי לשלוח</label>
+      <div class="filter-tabs" id="waBulkAudience">
+        <button type="button" class="tab-pill active" data-aud="approved">כל המאושרים</button>
+        <button type="button" class="tab-pill" data-aud="outdated">⬆️ לא עודכנו</button>
+        <button type="button" class="tab-pill" data-aud="inactive">💤 לא פעילים</button>
+        <button type="button" class="tab-pill" data-aud="pending">ממתינים</button>
+      </div>
+      <label class="field-label" for="waBulkText" style="margin-top:10px;">ההודעה ({שם} יוחלף בשם של כל קוסם)</label>
+      <textarea id="waBulkText" rows="5" maxlength="3000" dir="rtl"></textarea>
+      <div class="actions-cell" style="margin:6px 0 10px;">
+        <button type="button" class="btn btn-ghost" id="waBulkUseGuide">📖 המדריך המלא</button>
+        <button type="button" class="btn btn-ghost" id="waBulkUseUpdate">⬆️ הודעת עדכון</button>
+      </div>
+      <div class="wa-bulk-list" id="waBulkList"></div>
+      <button type="button" class="btn btn-whatsapp wa-bulk-next" id="waBulkNext">פתח וואטסאפ</button>
+      <div class="muted" style="margin-top:8px; line-height:1.5;">כל לחיצה פותחת וואטסאפ עם ההודעה מוכנה לקוסם הבא - שולחים שם וחוזרים לכאן ללחוץ שוב.</div>
+      <div class="wa-bulk-extra">
+        <button type="button" class="btn btn-ghost" id="waBulkCopyNums">📋 העתק מספרים</button>
+        <button type="button" class="btn btn-ghost" id="waBulkVcf">📇 קובץ אנשי קשר</button>
+        <button type="button" class="btn btn-ghost" id="waBulkClose">סגור</button>
+      </div>
+      <div class="muted" style="margin-top:6px; line-height:1.5;">💡 רוצה לשלוח לכולם בלחיצה אחת? הורד את קובץ אנשי הקשר לטלפון, ובוואטסאפ צור <b>רשימת תפוצה</b> (⋮ ← רשימת תפוצה חדשה) עם כולם. רק מי ששמר את המספר שלך יקבל.</div>
+    </div>
+  </div>
 
   <!-- פרטי לקוח -->
   <div class="drawer-overlay" id="drawerOverlay" style="display:none;">
@@ -1375,6 +1416,123 @@
     let msgTarget = null; // { user, feedback } או { broadcast: [users] }
 
     // הודעה לכל הקוסמים המאושרים (מופיעה אצל כל אחד כשהוא נכנס להגדרות)
+    // ---------------- וואטסאפ לכולם (תור שליחה) ----------------
+    let waBulkAudience = 'approved';
+    let waBulkSent = new Set();
+
+    function waBulkTargets() {
+      const pick = {
+        approved: (u) => u.status === 'approved',
+        outdated: isOutdated,
+        inactive: isInactive,
+        pending: (u) => u.status === 'pending'
+      }[waBulkAudience];
+      return allUsers.filter(pick);
+    }
+
+    function waBulkNextUser() {
+      return waBulkTargets().find((u) => u.phone && !waBulkSent.has(u.id)) || null;
+    }
+
+    function renderWaBulk() {
+      const targets = waBulkTargets();
+      const next = waBulkNextUser();
+      $('waBulkList').innerHTML = targets.length
+        ? targets
+            .map((u) => {
+              const cls = !u.phone ? 'nophone' : waBulkSent.has(u.id) ? 'sent' : next && next.id === u.id ? 'next' : '';
+              return `<button type="button" class="wa-bulk-chip ${cls}" data-bulk-user="${escapeHtml(u.id)}">${waBulkSent.has(u.id) ? '✓ ' : ''}${escapeHtml(u.name)}</button>`;
+            })
+            .join('')
+        : '<span class="muted">אין קוסמים בקבוצה הזו</span>';
+      const withPhone = targets.filter((u) => u.phone).length;
+      const done = targets.filter((u) => waBulkSent.has(u.id)).length;
+      const btn = $('waBulkNext');
+      btn.disabled = !next;
+      btn.textContent = next ? `🟢 שלח ל${next.name} (${done + 1}/${withPhone})` : withPhone ? `✓ נשלח לכולם (${done}/${withPhone})` : 'אין למי לשלוח';
+    }
+
+    function openWaFor(user) {
+      const text = $('waBulkText').value.trim();
+      if (!text) return toast('כתוב הודעה קודם', true);
+      const msg = text.split('{שם}').join(user.name || '');
+      window.open(`https://wa.me/${formatPhoneForWhatsapp(user.phone)}?text=${encodeURIComponent(msg)}`, '_blank', 'noopener');
+      waBulkSent.add(user.id);
+      renderWaBulk();
+      // נשמר גם בשיחה עם הקוסם
+      Cloud.admin.logMessage(user.id, msg, 'wa')
+        .then(() => {
+          allMessages.push({ uid: user.id, text: msg, via: 'wa', createdAt: new Date().toISOString() });
+          renderFeedback();
+        })
+        .catch(() => {});
+    }
+
+    $('waBulkBtn').addEventListener('click', () => {
+      waBulkSent = new Set();
+      if (!$('waBulkText').value.trim()) $('waBulkText').value = updateMessageText();
+      $('waBulkOverlay').style.display = 'flex';
+      renderWaBulk();
+    });
+    $('waBulkClose').addEventListener('click', () => ($('waBulkOverlay').style.display = 'none'));
+    $('waBulkOverlay').addEventListener('click', (e) => {
+      if (e.target === $('waBulkOverlay')) $('waBulkOverlay').style.display = 'none';
+    });
+    $('waBulkAudience').addEventListener('click', (e) => {
+      const pill = e.target.closest('[data-aud]');
+      if (!pill) return;
+      $('waBulkAudience').querySelectorAll('.tab-pill').forEach((p) => p.classList.toggle('active', p === pill));
+      waBulkAudience = pill.getAttribute('data-aud');
+      renderWaBulk();
+    });
+    $('waBulkNext').addEventListener('click', () => {
+      const next = waBulkNextUser();
+      if (next) openWaFor(next);
+    });
+    // לחיצה על שם: שליחה ישירה אליו (גם שוב, אם צריך)
+    $('waBulkList').addEventListener('click', (e) => {
+      const chip = e.target.closest('[data-bulk-user]');
+      if (!chip) return;
+      const u = allUsers.find((x) => x.id === chip.getAttribute('data-bulk-user'));
+      if (u && u.phone) openWaFor(u);
+    });
+
+    function updateMessageText() {
+      const ver = publishedVersion || (waGuide && waGuide.version) || '';
+      return `היי {שם}! 🎉\nיצאה גרסה חדשה של Magic Lock (v${ver}).\n\nכדי לעדכן: פותחים את האפליקציה ← נכנסים להגדרות (לחיצה ארוכה של 3 שניות על השעון) ← "עדכן עכשיו".\nבאנדרואיד אפשר גם להוריד ישר מכאן:\n${ANDROID_LINK}\n\nכל ההגדרות שלך נשמרות בעדכון 🙂`;
+    }
+    $('waBulkUseGuide').addEventListener('click', () => ($('waBulkText').value = getTemplate()));
+    $('waBulkUseUpdate').addEventListener('click', () => ($('waBulkText').value = updateMessageText()));
+
+    $('waBulkCopyNums').addEventListener('click', async () => {
+      const nums = waBulkTargets().filter((u) => u.phone).map((u) => '+' + formatPhoneForWhatsapp(u.phone));
+      try {
+        await navigator.clipboard.writeText(nums.join('\n'));
+        toast(`הועתקו ${nums.length} מספרים ✓`);
+      } catch (e) {
+        toast('לא הצלחתי להעתיק', true);
+      }
+    });
+
+    // קובץ אנשי קשר (vCard) - לייבא לטלפון וליצור ממנו רשימת תפוצה בוואטסאפ
+    $('waBulkVcf').addEventListener('click', () => {
+      const people = waBulkTargets().filter((u) => u.phone);
+      if (!people.length) return toast('אין מספרים בקבוצה הזו', true);
+      const esc = (s) => String(s || '').replace(/[\\;,]/g, (c) => '\\' + c).replace(/\n/g, ' ');
+      const vcf = people
+        .map((u) => `BEGIN:VCARD\r\nVERSION:3.0\r\nFN:${esc(u.name)} (Magic Lock)\r\nN:${esc(u.name)};;;;\r\nTEL;TYPE=CELL:+${formatPhoneForWhatsapp(u.phone)}\r\nEND:VCARD`)
+        .join('\r\n');
+      const url = URL.createObjectURL(new Blob([vcf], { type: 'text/vcard' }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'magic-lock-contacts.vcf';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+      toast(`קובץ עם ${people.length} אנשי קשר ירד ✓`);
+    });
+
     $('broadcastBtn').addEventListener('click', () => {
       const targets = allUsers.filter((u) => u.status === 'approved');
       if (!targets.length) return toast('אין קוסמים מאושרים', true);

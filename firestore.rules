@@ -20,11 +20,11 @@ service cloud.firestore {
       return signedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
     }
 
-    // קוסם שהמנהל אישר (רק הוא יכול לשלוח משוב/תקלות ולהשתמש בגיבוי)
+    // קוסם פעיל: מאושר או בתקופת ניסיון (יכול לשלוח משוב/תקלות ולהשתמש בגיבוי)
     function isApproved() {
       return signedIn()
         && exists(/databases/$(database)/documents/users/$(request.auth.uid))
-        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.status == 'approved';
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.status in ['approved', 'trial'];
     }
 
     function validStr(v, minLen, maxLen) {
@@ -49,15 +49,23 @@ service cloud.firestore {
         && validStr(request.resource.data.name, 2, 80)
         && validStr(request.resource.data.phone, 7, 20)
         && (!('deviceId' in request.resource.data) || validStr(request.resource.data.deviceId, 0, 16))
-        && request.resource.data.status == 'pending'
-        && request.resource.data.createdAt is timestamp;
+        && request.resource.data.createdAt is timestamp
+        // "ממתין" רגיל, או "ניסיון" - רק אם המנהל הפעיל תקופת ניסיון, ועם שעת הרשמה של השרת (אי אפשר לזייף)
+        && (request.resource.data.status == 'pending'
+          || (request.resource.data.status == 'trial'
+            && request.resource.data.createdAt == request.time
+            && exists(/databases/$(database)/documents/app_config/main)
+            && get(/databases/$(database)/documents/app_config/main).data.get('trial_days', 0) > 0));
 
       // רק המנהל משנה סטטוס (אישור / ביטול גישה / החזרה).
       // המכשיר עצמו יכול לעדכן רק את נתוני השימוש שלו (זמן אחרון, מספר פתיחות, גרסה).
       // המנהל יכול גם לשלוח לקוסם הודעה אישית (adminMessage).
       allow update: if (isAdmin()
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt', 'adminMessage', 'adminMessageAt', 'tester'])
-          && request.resource.data.status in ['pending', 'approved', 'blocked']
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt', 'adminMessage', 'adminMessageAt', 'tester', 'paid', 'paidAt', 'paidAmount', 'payMethod'])
+          && request.resource.data.status in ['pending', 'approved', 'blocked', 'trial']
+          && (!('paid' in request.resource.data) || request.resource.data.paid is bool)
+          && (!('paidAmount' in request.resource.data) || request.resource.data.paidAmount is number)
+          && (!('payMethod' in request.resource.data) || validStr(request.resource.data.payMethod, 0, 30))
           && (!('tester' in request.resource.data) || request.resource.data.tester is bool)
           && (!('adminMessage' in request.resource.data) || validStr(request.resource.data.adminMessage, 1, 2000)))
         || (signedIn() && request.auth.uid == uid

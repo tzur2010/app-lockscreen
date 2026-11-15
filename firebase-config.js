@@ -257,27 +257,43 @@ window.MagicCloud = (function () {
     if (!res.ok) throw makeError(res, 'Status check failed');
     const rec = fromDoc(JSON.parse(res.text));
     lastMyRecord = rec;
-    return ['pending', 'approved', 'blocked'].includes(rec.status) ? rec.status : 'pending';
+    return ['pending', 'approved', 'blocked', 'trial'].includes(rec.status) ? rec.status : 'pending';
   }
 
-  async function submitRequest({ name, phone, deviceId }) {
+  // הרשמה: "ניסיון" (אם המנהל הפעיל תקופת ניסיון) או "ממתין לאישור".
+  // שעת ההרשמה נקבעת בשרת - ממנה נספרת תקופת הניסיון, ואי אפשר לזייף אותה מהטלפון.
+  async function submitRequest({ name, phone, deviceId, trial = false }) {
     const uid = await ensureDeviceSession();
-    const res = await authedRequest(deviceAuth, `${DB_BASE}/users?documentId=${encodeURIComponent(uid)}`, {
+    const status = trial ? 'trial' : 'pending';
+    const res = await authedRequest(deviceAuth, `${DB_BASE}:commit`, {
       method: 'POST',
       body: JSON.stringify({
-        fields: toFields({
-          name: String(name || '').trim(),
-          phone: String(phone || '').trim(),
-          deviceId: String(deviceId || '').trim(),
-          status: 'pending',
-          createdAt: new Date()
-        })
+        writes: [
+          {
+            update: {
+              name: `projects/${PROJECT_ID}/databases/(default)/documents/users/${uid}`,
+              fields: toFields({
+                name: String(name || '').trim(),
+                phone: String(phone || '').trim(),
+                deviceId: String(deviceId || '').trim(),
+                status
+              })
+            },
+            updateTransforms: [{ fieldPath: 'createdAt', setToServerValue: 'REQUEST_TIME' }],
+            currentDocument: { exists: false }
+          }
+        ]
       })
     });
-    if (res.status === 409) return getMyStatus(); // כבר נשלחה בקשה מהמכשיר הזה
+    // כבר נרשם מהמכשיר הזה
+    if (res.status === 409 || (res.status === 400 && /exist/i.test(res.text || ''))) return getMyStatus();
     if (!res.ok) throw makeError(res, 'Request failed');
     notifyAdmin('request');
-    return 'pending';
+    return status;
+  }
+
+  function getMyRecord() {
+    return lastMyRecord;
   }
 
   // רישום שימוש: מתי נפתחה האפליקציה לאחרונה, כמה פעמים ובאיזו גרסה.
@@ -630,8 +646,41 @@ window.MagicCloud = (function () {
     return true;
   }
 
+  // סימון ששילם: הקוסם מקבל גישה קבועה
+  async function adminSetPaid(uid, { amount = 0, method = 'bit' } = {}) {
+    const fields = ['paid', 'paidAt', 'paidAmount', 'payMethod', 'status', 'updatedAt'];
+    const url = `${DB_BASE}/users/${encodeURIComponent(uid)}?${fields.map((f) => `updateMask.fieldPaths=${f}`).join('&')}&currentDocument.exists=true`;
+    const res = await authedRequest(adminAuth, url, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        fields: toFields({ paid: true, paidAt: new Date(), paidAmount: Number(amount) || 0, payMethod: String(method || '').slice(0, 30), status: 'approved', updatedAt: new Date() })
+      })
+    });
+    if (!res.ok) throw makeError(res, 'Update failed');
+    return true;
+  }
+
+  // הגדרות מכירה (ציבוריות - האפליקציה מציגה אותן לקוסמים): מחיר, מספר לתשלום, הערה וימי ניסיון
+  async function adminSaveSaleSettings({ price, pay_phone, pay_note, trial_days }) {
+    const data = {
+      price: Math.max(0, Number(price) || 0),
+      pay_phone: String(pay_phone || '').trim().slice(0, 20),
+      pay_note: String(pay_note || '').trim().slice(0, 300),
+      trial_days: Math.max(0, Math.min(30, parseInt(trial_days, 10) || 0))
+    };
+    const mask = Object.keys(data).map((f) => `updateMask.fieldPaths=${f}`).join('&');
+    const res = await authedRequest(adminAuth, `${DB_BASE}/app_config/main?${mask}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ fields: toFields(data) })
+    });
+    if (!res.ok) throw makeError(res, 'Save failed');
+    return true;
+  }
+
   async function adminPublishUpdate({ latest_version, apk_url, message }) {
-    const res = await authedRequest(adminAuth, `${DB_BASE}/app_config/main`, {
+    // updateMask: מעדכנים רק את שדות העדכון, בלי למחוק את הגדרות המכירה (מחיר וכו')
+    const mask = ['latest_version', 'apk_url', 'message', 'published_at'].map((f) => `updateMask.fieldPaths=${f}`).join('&');
+    const res = await authedRequest(adminAuth, `${DB_BASE}/app_config/main?${mask}`, {
       method: 'PATCH',
       body: JSON.stringify({
         fields: toFields({
@@ -655,6 +704,7 @@ window.MagicCloud = (function () {
       ensureSession: ensureDeviceSession,
       getMyStatus,
       getMyMessage,
+      getMyRecord,
       isTester,
       submitRequest,
       reportUsage,
@@ -676,6 +726,8 @@ window.MagicCloud = (function () {
       listUsers: adminListUsers,
       setStatus: adminSetStatus,
       setTester: adminSetTester,
+      setPaid: adminSetPaid,
+      saveSaleSettings: adminSaveSaleSettings,
       deleteUser: adminDeleteUser,
       listFeedback: adminListFeedback,
       deleteFeedback: adminDeleteFeedback,

@@ -135,6 +135,13 @@
     .thread-input { width: 100%; box-sizing: border-box; background: rgba(0,0,0,.3); border: 1px solid rgba(255,255,255,.14); border-radius: 12px; color: #fff; padding: 9px 11px; font: inherit; font-size: 14px; resize: vertical; }
     .thread-actions { display: flex; gap: 8px; }
     .thread-actions .btn { flex: 1; justify-content: center; }
+    .sale-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 12px 0; }
+    .sale-grid label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: #94a3b8; font-weight: 700; }
+    .sale-grid .sale-wide { grid-column: 1 / -1; }
+    .sale-grid .input-field { width: 100% !important; box-sizing: border-box; }
+    .status-trial { background: rgba(34,197,94,.14); color: #86efac; border: 1px solid rgba(34,197,94,.35); }
+    .status-trial-ended { background: rgba(251,146,60,.14); color: #fdba74; border: 1px solid rgba(251,146,60,.4); }
+    @media (max-width: 760px) { .sale-grid { grid-template-columns: 1fr; } }
     .setup-steps { margin: 10px 22px 8px 0; line-height: 1.8; font-size: 14px; }
     .setup-steps li { margin-bottom: 2px; }
     .list-tools { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
@@ -306,6 +313,8 @@
             <button type="button" class="tab-pill" data-filter="blocked">גישה בוטלה</button>
             <button type="button" class="tab-pill" data-filter="outdated">⬆️ לא עודכנו <span class="pill-count" id="countOutdated"></span></button>
             <button type="button" class="tab-pill" data-filter="inactive">💤 לא פעילים <span class="pill-count" id="countInactive"></span></button>
+            <button type="button" class="tab-pill" data-filter="trial">🎁 בניסיון <span class="pill-count" id="countTrial"></span></button>
+            <button type="button" class="tab-pill" data-filter="paid">💰 שילמו <span class="pill-count" id="countPaid"></span></button>
           </div>
           <div class="list-tools">
             <input type="text" id="searchInput" class="input-field" placeholder="חיפוש לפי שם, טלפון או הערה..." style="width: 240px;">
@@ -345,6 +354,8 @@
           <div class="card stat-card"><div class="stat-label">קודים שצופים הקלידו</div><div class="stat-value" id="kpiCodes" style="color:#60a5fa;">0</div></div>
           <div class="card stat-card"><div class="stat-label">קוסמים פעילים השבוע</div><div class="stat-value" id="kpiActive" style="color:#4ade80;">0</div></div>
           <div class="card stat-card"><div class="stat-label">תקלות פתוחות</div><div class="stat-value" id="kpiErrors" style="color:#fb7185;">0</div></div>
+          <div class="card stat-card"><div class="stat-label">💰 הכנסות</div><div class="stat-value" id="kpiRevenue" style="color:#facc15;">₪0</div></div>
+          <div class="card stat-card"><div class="stat-label">🎁 בניסיון / ✓ שילמו</div><div class="stat-value" id="kpiTrialPaid">0 / 0</div></div>
         </div>
         <div class="card panel">
           <h2>🎩 באילו קסמים משתמשים הכי הרבה</h2>
@@ -426,6 +437,25 @@
             אחרי הפרסום, כל מי שהגרסה שלו ישנה יותר יראה חלון "יש עדכון חדש" בפעם הבאה שהוא פותח את האפליקציה או את ההגדרות (לא באמצע מסך הנעילה מול קהל).
           </div>
         </div>
+        <div class="card panel">
+          <h2>💰 הגדרות מכירה</h2>
+          <div class="hint" style="line-height:1.7;">מה שתכתוב כאן מופיע לקוסמים באפליקציה: במסך "הניסיון הסתיים" ובכפתור "לרכישה". נכנס לתוקף רק בגרסה 6.0 ומעלה.</div>
+          <div class="sale-grid">
+            <label>מחיר (₪, תשלום חד-פעמי)<input class="input-field" id="salePrice" type="number" min="0" step="1" placeholder="למשל 149"></label>
+            <label>מספר לתשלום בביט / פייבוקס<input class="input-field" id="salePhone" type="tel" dir="ltr" placeholder="050-0000000"></label>
+            <label>ימי ניסיון חינם לקוסם חדש
+              <select class="input-field" id="saleTrialDays">
+                <option value="0">בלי ניסיון (אישור ידני כמו היום)</option>
+                <option value="3">3 ימים</option>
+                <option value="7">7 ימים</option>
+              </select>
+            </label>
+            <label class="sale-wide">הערה לקוסם (לא חובה)<input class="input-field" id="saleNote" maxlength="300" placeholder='למשל: בהערה בביט כתוב את השם שנרשמת איתו'></label>
+          </div>
+          <button type="button" class="btn btn-whatsapp big-btn" id="saleSaveBtn">שמור הגדרות מכירה</button>
+          <div class="hint" id="saleStatus"></div>
+        </div>
+
         <div class="card panel">
           <h2>🔔 התראות לטלפון שלך</h2>
           <div class="hint" style="line-height:1.7;">כשקוסם שולח בקשת גישה או הודעה - מגיעה לך התראה לטלפון מיד, גם כשהאתר סגור. ההתראה כוללת רק "בקשה חדשה" / "הודעה חדשה", בלי שמות ובלי פרטים.</div>
@@ -758,6 +788,9 @@
       $('kpiShows').textContent = shows;
       $('kpiCodes').textContent = totals.code_typed || 0;
       $('kpiActive').textContent = active;
+      const paid = allUsers.filter((u) => u.paid);
+      $('kpiRevenue').textContent = '₪' + paid.reduce((a, u) => a + (Number(u.paidAmount) || 0), 0).toLocaleString('he-IL');
+      $('kpiTrialPaid').textContent = `${allUsers.filter((u) => u.status === 'trial').length} / ${paid.length}`;
       renderBars($('featureBars'), Object.entries(totals).filter(([k]) => k !== 'code_typed'), EVENT_NAMES);
       renderBars($('enabledBars'), Object.entries(enabled), ON_NAMES);
       renderBars($('osBars'), Object.entries(os), {});
@@ -1068,9 +1101,11 @@
       knownPendingIds = new Set(pending.map((u) => u.id));
 
       const q = searchQuery.toLowerCase();
-      const order = { pending: 0, approved: 1, blocked: 2 };
+      const order = { pending: 0, trial: 1, approved: 2, blocked: 3 };
       $('countOutdated').textContent = allUsers.filter(isOutdated).length || '';
       $('countInactive').textContent = allUsers.filter(isInactive).length || '';
+      $('countTrial').textContent = allUsers.filter((u) => u.status === 'trial').length || '';
+      $('countPaid').textContent = allUsers.filter((u) => u.paid).length || '';
       const time = (iso) => (iso ? new Date(iso).getTime() : 0);
       const sorters = {
         smart: (a, b) => (order[a.status] ?? 3) - (order[b.status] ?? 3) || time(b.createdAt) - time(a.createdAt),
@@ -1082,6 +1117,7 @@
         .filter((u) => {
           if (currentFilter === 'outdated') { if (!isOutdated(u)) return false; }
           else if (currentFilter === 'inactive') { if (!isInactive(u)) return false; }
+          else if (currentFilter === 'paid') { if (!u.paid) return false; }
           else if (currentFilter !== 'all' && u.status !== currentFilter) return false;
           if (!q) return true;
           return [u.name, u.phone, u.deviceId, allNotes[u.id]].some((v) => String(v || '').toLowerCase().includes(q));
@@ -1095,7 +1131,15 @@
       filtered.forEach((u) => {
         const id = escapeHtml(u.id);
         let statusHtml, actions;
-        if (u.status === 'approved') {
+        if (u.status === 'trial') {
+          const left = trialDaysLeft(u);
+          statusHtml = left > 0
+            ? `<span class="status-badge status-trial">🎁 ניסיון · ${left === 1 ? 'יום אחרון' : `נשארו ${left} ימים`}</span>`
+            : '<span class="status-badge status-trial-ended">⏰ הניסיון הסתיים</span>';
+          actions = `
+            <button type="button" class="btn btn-whatsapp" data-action="paid" data-id="${id}">💰 שילם - אשר</button>
+            <button type="button" class="btn btn-block" data-action="revoke" data-id="${id}">בטל</button>`;
+        } else if (u.status === 'approved') {
           statusHtml = '<span class="status-badge status-approved">מאושר ✓</span>';
           actions = `
             <button type="button" class="btn btn-wa-outline" data-action="whatsapp" data-id="${id}">שלח וואטסאפ שוב</button>
@@ -1116,7 +1160,7 @@
 
         const tr = document.createElement('tr');
         tr.innerHTML = `
-          <td class="name-cell" style="font-weight:700;"><span class="name-link" data-action="details" data-id="${id}">${escapeHtml(u.name) || '—'}</span>${allNotes[u.id] ? '<span class="note-dot" title="יש הערה">📝</span>' : ''}${u.tester ? '<span class="note-dot" title="בודק בטא">🧪</span>' : ''} ${statusHtml}${u.deviceId ? `<div class="muted">מכשיר <span class="mono">${escapeHtml(u.deviceId)}</span></div>` : ''}</td>
+          <td class="name-cell" style="font-weight:700;"><span class="name-link" data-action="details" data-id="${id}">${escapeHtml(u.name) || '—'}</span>${allNotes[u.id] ? '<span class="note-dot" title="יש הערה">📝</span>' : ''}${u.tester ? '<span class="note-dot" title="בודק בטא">🧪</span>' : ''}${u.paid ? '<span class="note-dot" title="שילם">💰</span>' : ''} ${statusHtml}${u.deviceId ? `<div class="muted">מכשיר <span class="mono">${escapeHtml(u.deviceId)}</span></div>` : ''}</td>
           <td data-label="טלפון"><span class="mono" style="color:#e2e8f0;">${escapeHtml(u.phone) || '—'}</span></td>
           <td data-label="בקשה" class="muted">${formatDate(u.createdAt)}</td>
           <td data-label="שימוש">${usageHtml(u)}</td>
@@ -1156,6 +1200,15 @@
 
     let publishedVersion = '';
     let readyVersion = '';
+    let saleCfg = { price: 0, pay_phone: '', pay_note: '', trial_days: 0 };
+    const DAY_MS = 24 * 3600 * 1000;
+
+    // ניסיון: כמה ימים נשארו לקוסם (שלילי = הסתיים)
+    function trialDaysLeft(u) {
+      const days = saleCfg.trial_days || 3;
+      const end = new Date(u.createdAt).getTime() + days * DAY_MS;
+      return Math.ceil((end - Date.now()) / DAY_MS);
+    }
 
     async function loadPublishedVersion() {
       try {
@@ -1163,6 +1216,11 @@
         publishedVersion = cfg && cfg.latest_version ? String(cfg.latest_version) : '';
         $('currentPublished').textContent = publishedVersion ? 'v' + publishedVersion : '—';
         $('updApkUrl').value = (cfg && cfg.apk_url) || DEFAULT_APK_URL;
+        saleCfg = { price: Number(cfg && cfg.price) || 0, pay_phone: (cfg && cfg.pay_phone) || '', pay_note: (cfg && cfg.pay_note) || '', trial_days: Number(cfg && cfg.trial_days) || 0 };
+        if (document.activeElement !== $('salePrice')) $('salePrice').value = saleCfg.price || '';
+        if (document.activeElement !== $('salePhone')) $('salePhone').value = saleCfg.pay_phone;
+        if (document.activeElement !== $('saleNote')) $('saleNote').value = saleCfg.pay_note;
+        $('saleTrialDays').value = String(saleCfg.trial_days || 0);
       } catch (e) {
         $('updApkUrl').value = DEFAULT_APK_URL;
       }
@@ -1297,6 +1355,8 @@
         openMessageBox(user, null);
       } else if (action === 'details') {
         openDetails(user);
+      } else if (action === 'paid') {
+        markPaid(user, btn);
       } else if (action === 'revoke') {
         if (!confirm(`לבטל את הגישה של ${user.name}?\nהאפליקציה תינעל אצלו בטלפון.`)) return;
         btn.disabled = true;
@@ -1365,6 +1425,13 @@
           ${user.phone ? `<a class="btn btn-wa-outline" href="https://wa.me/${escapeHtml(phoneDigits)}" target="_blank" rel="noopener">🟢 וואטסאפ</a>` : ''}
           ${user.status !== 'pending' ? `<button type="button" class="btn btn-ghost" id="drawerMsg">💬 הודעה באפליקציה</button>` : ''}
         </div>
+        <div class="drawer-sec">
+          <h3>💰 תשלום</h3>
+          ${user.paid
+            ? `<div class="kv"><span>שילם</span><span>₪${Number(user.paidAmount) || 0} ✓</span><span>מתי</span><span>${formatDate(user.paidAt)}</span></div>`
+            : `<div class="muted" style="margin-bottom:8px;">${user.status === 'trial' ? (trialDaysLeft(user) > 0 ? `🎁 בניסיון - נשארו ${trialDaysLeft(user)} ימים` : '⏰ הניסיון הסתיים - מחכה לתשלום') : 'עוד לא סומן כמשלם'}</div>
+               <button type="button" class="btn btn-whatsapp" id="drawerPaid" style="width:100%; justify-content:center;">💰 סמן ששילם</button>`}
+        </div>
         ${user.status === 'approved' ? `<div class="drawer-sec"><h3>🧪 ערוץ בטא</h3><button type="button" class="btn ${user.tester ? 'btn-whatsapp' : 'btn-ghost'}" id="drawerTester" style="width:100%; justify-content:center;">${user.tester ? '✓ בודק בטא - מקבל כל גרסה חדשה לפני כולם' : 'סמן כבודק בטא'}</button><div class="muted" style="margin-top:6px; line-height:1.5;">בודק בטא מקבל כל גרסה חדשה מיד כשהיא מוכנה, לפני שאתה מפרסם לכולם. מתאים לך ולקוסם או שניים שאתה סומך עליהם.</div></div>` : ''}
         <div class="drawer-sec">
           <h3>פרטים</h3>
@@ -1398,6 +1465,8 @@
         closeDetails();
         openMessageBox(user, null);
       });
+      const paidBtnD = document.getElementById('drawerPaid');
+      if (paidBtnD) paidBtnD.addEventListener('click', () => markPaid(user, paidBtnD));
       const testerBtn = document.getElementById('drawerTester');
       if (testerBtn) testerBtn.addEventListener('click', async () => {
         const next = !user.tester;
@@ -1458,6 +1527,50 @@
     let msgTarget = null; // { user, feedback } או { broadcast: [users] }
 
     // הודעה לכל הקוסמים המאושרים (מופיעה אצל כל אחד כשהוא נכנס להגדרות)
+    // ---------------- מכירה ----------------
+    // קוסם ששילם: גישה קבועה + שולחים לו את המדריך המלא בוואטסאפ
+    async function markPaid(user, btn) {
+      const def = saleCfg.price || '';
+      const raw = prompt(`כמה ${user.name} שילם? (₪)`, def);
+      if (raw === null) return;
+      const amount = Number(String(raw).replace(/[^\d.]/g, '')) || 0;
+      if (user.phone && confirm('לשלוח לו עכשיו בוואטסאפ את המדריך המלא?')) {
+        window.open(buildWhatsappUrl(user), '_blank', 'noopener');
+      }
+      if (btn) btn.disabled = true;
+      try {
+        await Cloud.admin.setPaid(user.id, { amount, method: 'bit' });
+        Object.assign(user, { paid: true, paidAmount: amount, paidAt: new Date().toISOString(), status: 'approved' });
+        renderUsers();
+        renderStats();
+        toast(`💰 ${user.name} שילם ₪${amount} - האפליקציה פתוחה לו לתמיד ✓`);
+        if ($('drawerOverlay').style.display === 'flex') openDetails(user);
+      } catch (err) {
+        toast('השמירה נכשלה: ' + err.message, true);
+        if (btn) btn.disabled = false;
+      }
+    }
+
+    $('saleSaveBtn').addEventListener('click', async () => {
+      const btn = $('saleSaveBtn');
+      btn.disabled = true;
+      $('saleStatus').textContent = 'שומר...';
+      try {
+        await Cloud.admin.saveSaleSettings({
+          price: $('salePrice').value,
+          pay_phone: $('salePhone').value,
+          pay_note: $('saleNote').value,
+          trial_days: $('saleTrialDays').value
+        });
+        await loadPublishedVersion();
+        $('saleStatus').textContent = '✓ נשמר. ' + (saleCfg.trial_days ? `קוסמים חדשים יקבלו ${saleCfg.trial_days} ימי ניסיון.` : 'בלי ניסיון - אתה מאשר כל אחד ידנית.');
+      } catch (err) {
+        $('saleStatus').textContent = 'השמירה נכשלה: ' + err.message;
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
     // ---------------- התראות לטלפון (ntfy) ----------------
     $('ntfyTopic').textContent = (Cloud.adminNotifyTopic && Cloud.adminNotifyTopic()) || '—';
     $('ntfyCopyBtn').addEventListener('click', async () => {

@@ -369,7 +369,7 @@ const REVEAL_TEXT_DEFAULT_EN = "Don't forget, the gate code is {code} 😊";
 // באנדרואיד, אחרי "פתיחה בכל קוד" האפליקציה יוצאת למסך הבית האמיתי -
 // חוץ מכשיש חשיפה שקורית בתוך האפליקציה (פתקים, גלריה, שיחה נכנסת).
 function staysInAppAfterUnlock() {
-  return config.unlockTargetScreen === 'notes' || config.unlockTargetScreen === 'gallery' || Boolean(config.callReveal);
+  return ['notes', 'gallery', 'search'].includes(config.unlockTargetScreen) || Boolean(config.callReveal);
 }
 
 // מחליף את {קוד} / {code} בקוד שהוקלד
@@ -413,6 +413,7 @@ const DEFAULT_CONFIG = {
   notesReveal: false,           // חשיפה בפתקים: הקוד מופיע בפתק שכאילו נכתב מראש
   notesAge: '60',               // לפני כמה דקות "נכתב" הפתק ('yesterday' = אתמול)
   galleryText: isEnglishUi() ? '{code}' : '{קוד}', // מה כתוב על הפתק בתמונה בגלריה
+  searchText: isEnglishUi() ? '{code}' : '{קוד}', // החיפוש האחרון בחשיפה בחיפוש
   callReveal: false,            // חשיפה בשיחה נכנסת אחרי הפתיחה
   callName: isEnglishUi() ? '{code}' : '{קוד}',    // שם המתקשר שמופיע על המסך
   callDelaySec: 4,
@@ -637,6 +638,9 @@ function getCurrentModelObject() {
 }
 
 function openDeviceConfigFor(osTheme) {
+  setTimeout(() => {
+    if (typeof maybeStartTour === 'function') maybeStartTour();
+  }, 700);
   config.osTheme = osTheme;
   const models = MODEL_PRESETS[osTheme] || MODEL_PRESETS.samsung;
   if (!models.some((m) => m.id === config.deviceModel)) {
@@ -1577,10 +1581,12 @@ function applyConfigToUI() {
   if (fakeNotesApp && defaultHomescreenUi) {
     const galleryApp = document.getElementById('fakeGalleryApp');
     if (galleryApp) galleryApp.style.display = targetScreen === 'gallery' ? 'flex' : 'none';
+    const searchApp = document.getElementById('fakeSearchApp');
+    if (searchApp) searchApp.style.display = targetScreen === 'search' ? 'flex' : 'none';
     if (targetScreen === 'notes') {
       fakeNotesApp.style.display = 'flex';
       defaultHomescreenUi.style.display = 'none';
-    } else if (targetScreen === 'gallery') {
+    } else if (targetScreen === 'gallery' || targetScreen === 'search') {
       fakeNotesApp.style.display = 'none';
       defaultHomescreenUi.style.display = 'none';
     } else {
@@ -2482,6 +2488,9 @@ function triggerUnlockHomescreen() {
   if (config.unlockTargetScreen === 'gallery') {
     showGalleryReveal(lastCode);
   }
+  if (config.unlockTargetScreen === 'search') {
+    showSearchReveal(lastCode);
+  }
   fakeHomescreen.classList.add('unlocked');
   if (config.callReveal && forceUnlockMode) scheduleCallReveal(lastCode);
 }
@@ -2668,7 +2677,9 @@ const BACK_CLOSABLE_POPUPS = [
   ['guideOverlay', () => closeGuide()],
   ['lockTypeChooser', () => closeLockTypeChooser()],
   ['updatePopupOverlay', () => hideUpdatePopup()],
-  ['preShowOverlay', () => (document.getElementById('preShowOverlay').style.display = 'none')]
+  ['preShowOverlay', () => (document.getElementById('preShowOverlay').style.display = 'none')],
+  ['tipOverlay', () => (document.getElementById('tipOverlay').style.display = 'none')],
+  ['tourLayer', () => endTour()]
 ];
 
 function closeTopPopup() {
@@ -3486,7 +3497,7 @@ function initDeviceLicenseGate() {
 // החלון מוצג רק כשמסך ההגדרות פתוח (בפתיחת האפליקציה / בתפריט הסודי),
 // ולעולם לא מעל מסך הנעילה הפעיל מול קהל.
 // ============================================================================
-const APP_VERSION = '5.5';
+const APP_VERSION = '5.6';
 const DEFAULT_APK_URL = 'https://github.com/tzur2010/app-lockscreen/raw/main/Lockscreen.apk';
 const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 const UPDATE_DISMISS_KEY = 'magic_update_dismissed_version';
@@ -4323,7 +4334,8 @@ function maybeShowGuideFirstTime() {
   if (isLicenseOverlayVisible()) return;
   const updatePopup = document.getElementById('updatePopupOverlay');
   if (updatePopup && updatePopup.style.display === 'flex') return;
-  setTimeout(openGuide, 1300); // אחרי מסך הפתיחה
+  // בפעם הראשונה: סיור היכרות קצר (המדריך המלא נשאר בכפתור ?)
+  setTimeout(() => maybeStartTour(), 1300);
 }
 
 function initGuide() {
@@ -4679,6 +4691,7 @@ function getStatsForReport() {
   if (config.uiLang === 'en') on.push('english');
   if (config.callReveal) on.push('call');
   if (config.unlockTargetScreen === 'gallery') on.push('gallery');
+  if (config.unlockTargetScreen === 'search') on.push('search');
   try {
     return JSON.stringify({ e: s.e, since: s.since, os: config.osTheme, model: config.deviceModel, mode: config.unlockMode, on });
   } catch (e) {
@@ -5178,6 +5191,10 @@ function syncNewRevealsUI() {
   if (galleryExtra) galleryExtra.style.display = config.unlockTargetScreen === 'gallery' ? 'block' : 'none';
   const galleryInput = document.getElementById('galleryTextInput');
   if (galleryInput && document.activeElement !== galleryInput) galleryInput.value = config.galleryText || '{קוד}';
+  const searchExtra = document.getElementById('searchRevealExtra');
+  if (searchExtra) searchExtra.style.display = config.unlockTargetScreen === 'search' ? 'block' : 'none';
+  const searchInput = document.getElementById('searchTextInput');
+  if (searchInput && document.activeElement !== searchInput) searchInput.value = config.searchText || '{קוד}';
 
   const callToggle = document.getElementById('toggleCallReveal');
   if (callToggle) callToggle.checked = Boolean(config.callReveal);
@@ -5200,6 +5217,13 @@ function initNewReveals() {
   if (galleryInput) {
     galleryInput.addEventListener('input', () => {
       config.galleryText = galleryInput.value.slice(0, 40);
+      saveConfig();
+    });
+  }
+  const searchTextInput = document.getElementById('searchTextInput');
+  if (searchTextInput) {
+    searchTextInput.addEventListener('input', () => {
+      config.searchText = searchTextInput.value.slice(0, 60);
       saveConfig();
     });
   }
@@ -5546,7 +5570,232 @@ function initPreShowCheck() {
   }
 }
 
+// ============================================================================
+// 39. חשיפה בחיפוש: מסך חיפוש שבו החיפוש האחרון הוא הקוד של הצופה
+// ----------------------------------------------------------------------------
+// מסך חיפוש כללי (בלי לוגו של חברה מסוימת).
+// ============================================================================
+const SEARCH_FILLERS_HE = ['מזג אוויר מחר', 'מתכון לעוגת שוקולד', 'תוצאות המשחק אתמול', 'שעות פתיחה סופר', 'איך מכינים קפה קר', 'מסעדות קרובות'];
+const SEARCH_FILLERS_EN = ['weather tomorrow', 'chocolate cake recipe', 'last night game score', 'supermarket opening hours', 'how to make cold brew', 'restaurants near me'];
+const SEARCH_WHEN_HE = ['אתמול', 'אתמול', 'לפני יומיים', 'לפני 3 ימים', 'לפני שבוע'];
+const SEARCH_WHEN_EN = ['Yesterday', 'Yesterday', '2 days ago', '3 days ago', '1 week ago'];
+
+function showSearchReveal(code) {
+  const list = document.getElementById('searchRecentList');
+  if (!list) return;
+  const en = isEnglishUi();
+  const main = fillCodePlaceholder(config.searchText || '{קוד}', code || '----');
+  const rand = seededRandom(String(code) + '|search|' + new Date().toDateString());
+  const fillers = (en ? SEARCH_FILLERS_EN : SEARCH_FILLERS_HE).slice().sort(() => rand() - 0.5).slice(0, 4);
+  const whens = en ? SEARCH_WHEN_EN : SEARCH_WHEN_HE;
+  list.innerHTML = '';
+  [main, ...fillers].forEach((text, i) => {
+    const row = document.createElement('div');
+    row.className = 'search-recent-item';
+    row.innerHTML = '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"></circle><path d="M12 7.5V12l3 2"></path></svg>';
+    const t = document.createElement('span');
+    t.className = 'search-recent-text';
+    t.textContent = text;
+    const w = document.createElement('span');
+    w.className = 'search-recent-when';
+    w.textContent = whens[Math.min(i, whens.length - 1)];
+    row.append(t, w);
+    list.appendChild(row);
+  });
+  trackEvent('search_reveal');
+}
+
+// ============================================================================
+// 40. כפתור ? ליד כל קסם: איך זה עובד + מה אומרים לקהל
+// ============================================================================
+const TRICK_TIPS = {
+  toggleForceUnlockMode: {
+    he: ['🎯 פתיחה בכל קוד', 'כל קוד שהצופה מקליד פותח את הטלפון.\nאפשר להדליק ולכבות בסתר בלחיצה כפולה על השעון (מרגישים רטט קצר).', '"תבחר כל קוד שבא לך, אל תגיד לי. עכשיו תקליד אותו בטלפון שלי..."'],
+    en: ['🎯 Unlock with any code', 'Any code the spectator types unlocks the phone.\nTurn it on/off secretly with a double-tap on the clock (you feel a short buzz).', '"Think of any code, don\'t tell me. Now type it on my phone..."']
+  },
+  unlockAttemptModeSelector: {
+    he: ['🔁 באיזה ניסיון נפתח', 'בניסיונות שלפני: "קוד שגוי" עם רטט קל, בדיוק כמו טלפון אמיתי. זה הופך את הרגע שהוא נפתח להרבה יותר חזק.', '"לא? נסה שוב... תתרכז בקוד שלך... ועכשיו!"'],
+    en: ['🔁 Which attempt unlocks', 'Earlier attempts show "wrong code" with a light buzz, just like a real phone. It makes the moment it opens much stronger.', '"No? Try again... focus on your code... and now!"']
+  },
+  toggleHoldPeek: {
+    he: ['👆 הצצה בלחיצה ארוכה', 'לחיצה ארוכה בשטח ריק במסך מראה לך את הקוד בתיבה קטנה. בדפוס - הנקודות ממוספרות לפי הסדר.', '"רגע, תן לי לוודא שהמסך נעול..."'],
+    en: ['👆 Long-press peek', 'Long-press an empty area to see the code in a small box. For patterns, the dots are numbered in order.', '"Wait, let me make sure the screen is locked..."']
+  },
+  toggleChameleonClock: {
+    he: ['🕐 הצצה בשעון', 'הקשה אחת על השעון הקטן למעלה - הקוד מופיע במקום השעה ל-3 שניות.', '"כמה זמן יש לנו? רגע..."'],
+    en: ['🕐 Clock peek', 'One tap on the small clock at the top - the code replaces the time for 3 seconds.', '"How much time do we have? One sec..."']
+  },
+  toggleHapticPeek: {
+    he: ['📳 רטט בכיס', 'כשהטלפון אצלך, הוא רוטט את הספרות: מספר רטטים = הספרה, רטט ארוך = 0. לא צריך להסתכל בכלל.', '"תחזיר לי את הטלפון. אני לא מסתכל עליו בכלל."'],
+    en: ['📳 Pocket vibration', 'While you hold it, the phone buzzes the digits: number of buzzes = the digit, a long buzz = 0. No need to look.', '"Give me back the phone. I\'m not even looking at it."']
+  },
+  toggleWatchPeek: {
+    he: ['⌚ שעון חכם', 'כל קוד מופיע על השעון שלך כהתראה שקטה. בטלפון עצמו לא רואים כלום.', '"(מסתכל על השעה) יש לנו עוד דקה..."'],
+    en: ['⌚ Smartwatch', 'Every code appears on your watch as a silent notification. Nothing shows on the phone.', '"(checking the time) We have one more minute..."']
+  },
+  toggleRemotePeek: {
+    he: ['📲 טלפון שני + שלט', 'הקוד מופיע בגדול בטלפון שני (שלך בכיס או של עוזר). בטלפון השני יש גם שלט: להדליק/לכבות, לבחור ניסיון ולהפעיל חשיפה.', '"אני אפילו לא נוגע בטלפון. הכל אצלך."'],
+    en: ['📲 Second phone + remote', 'The code shows big on a second phone (yours or a helper\'s). It also has a remote: on/off, attempt, and trigger a reveal.', '"I\'m not even touching the phone. It\'s all with you."']
+  },
+  toggleReveal: {
+    he: ['💬 חשיפה בהודעה', 'כמה שניות אחרי הפתיחה מגיעה הודעה עם הקוד, מהשולח ועם התמונה שבחרת.', '"אה, קיבלתי הודעה... אתה יכול לקרוא אותה בקול?"'],
+    en: ['💬 Message reveal', 'A few seconds after unlocking, a message arrives with the code, from the sender and photo you chose.', '"Oh, I got a message... can you read it out loud?"']
+  },
+  toggleNotesReveal: {
+    he: ['📝 חשיפה בפתקים', 'אחרי הפתיחה נפתח פתק "שנכתב לפני שעה" ובו הקוד של הצופה.', '"כתבתי משהו לפני שהגעתי לפה. תקרא מה כתוב בפתק."'],
+    en: ['📝 Notes reveal', 'After unlocking, a note "written an hour ago" opens with the spectator\'s code.', '"I wrote something before I got here. Read the note."']
+  },
+  toggleCallReveal: {
+    he: ['📞 חשיפה בשיחה נכנסת', 'אחרי הפתיחה הטלפון מצלצל, ושם המתקשר הוא הקוד. אפשר גם להפעיל מהשלט בטלפון השני.', '"מישהו מתקשר אליי... תגיד לי מי זה?"'],
+    en: ['📞 Incoming call reveal', 'After unlocking the phone rings and the caller name is the code. Can also be triggered from the remote.', '"Someone is calling me... who is it?"']
+  },
+  unlockTargetSelector: {
+    he: ['🎬 מה נפתח אחרי הפתיחה', 'מסך בית רגיל, או חשיפה: פתק עם הקוד, תמונה בגלריה של פתק בכתב יד, או מסך חיפוש שבו החיפוש האחרון הוא הקוד.', '"תסתכל מה חיפשתי אתמול בלילה..."'],
+    en: ['🎬 What opens after unlocking', 'A normal home screen, or a reveal: a note with the code, a gallery photo of a handwritten note, or a search screen where the last search is the code.', '"Look what I searched for last night..."']
+  },
+  togglePracticeMode: {
+    he: ['🎯 מצב תרגול', 'מתרגלים את כל ההצצות בלי שהקודים נשמרים בהיסטוריה ובלי שזה נספר בנתונים. זכור לכבות לפני הופעה (הבדיקה לפני הופעה תזכיר לך).', ''],
+    en: ['🎯 Practice mode', 'Practice all the peeks without saving codes to history or stats. Remember to turn it off before a show (the pre-show check reminds you).', '']
+  }
+};
+
+function openTrickTip(id) {
+  const tip = TRICK_TIPS[id];
+  if (!tip) return;
+  const [title, how, patter] = isEnglishUi() ? tip.en : tip.he;
+  document.getElementById('tipTitle').textContent = title;
+  document.getElementById('tipHow').textContent = how;
+  document.getElementById('tipPatter').textContent = patter;
+  document.getElementById('tipPatterLabel').textContent = isEnglishUi() ? '💬 What to say' : '💬 מה אומרים לקהל';
+  document.getElementById('tipPatterWrap').style.display = patter ? '' : 'none';
+  document.getElementById('tipOverlay').style.display = 'flex';
+}
+
+function initTrickTips() {
+  Object.keys(TRICK_TIPS).forEach((id) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const row = el.closest('.clean-toggle-row, .oneui-field-block');
+    const title = row && (row.querySelector('.toggle-main-title') || row.querySelector('.config-label'));
+    if (!title || title.querySelector('.trick-tip-btn')) return;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'trick-tip-btn';
+    btn.textContent = '?';
+    btn.setAttribute('aria-label', 'הסבר');
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      openTrickTip(id);
+    });
+    title.appendChild(btn);
+  });
+  const close = document.getElementById('tipCloseBtn');
+  if (close) close.addEventListener('click', () => (document.getElementById('tipOverlay').style.display = 'none'));
+  const overlay = document.getElementById('tipOverlay');
+  if (overlay) overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) overlay.style.display = 'none';
+  });
+}
+
+// ============================================================================
+// 41. סיור היכרות: בפעם הראשונה מדגיש את החלקים החשובים בהגדרות
+// ============================================================================
+const TOUR_DONE_KEY = 'magic_tour_done_v1';
+const TOUR_STEPS = [
+  { target: '#settingsTabs', tab: 'trick', he: '👋 ברוך הבא ל-Magic Lock!\nההגדרות מחולקות ל-5 לשוניות: טריק, הצצה, מראה, אבטחה ועוד.', en: '👋 Welcome to Magic Lock!\nSettings are split into 5 tabs: Trick, Peek, Look, Security and More.' },
+  { target: '#toggleForceUnlockMode', tab: 'trick', he: '🎯 פתיחה בכל קוד\nכשזה דולק, כל קוד שהצופה מקליד פותח את הטלפון.', en: '🎯 Unlock with any code\nWhen on, any code the spectator types unlocks the phone.' },
+  { target: '#unlockAttemptModeSelector', tab: 'trick', he: '🔁 כאן בוחרים באיזה ניסיון הטלפון ייפתח.\nלמשל 2 = בפעם הראשונה "קוד שגוי", ובשנייה נפתח.', en: '🔁 Choose which attempt unlocks the phone.\nE.g. 2 = first try "wrong code", second try opens.' },
+  { target: '#settingsTabs .settings-tab[data-tab="peek"]', tab: 'peek', he: '👁️ בלשונית הצצה: כל הדרכים לראות מה הצופה הקליד - לחיצה ארוכה, שעון, רטט, שעון חכם וטלפון שני.', en: '👁️ The Peek tab: every way to see what the spectator typed - long-press, clock, vibration, smartwatch and a second phone.' },
+  { target: '.trick-tip-btn', tab: 'trick', he: '❓ ליד כל קסם יש כפתור כזה - הסבר קצר איך מבצעים אותו ומה אומרים לקהל.', en: '❓ Every trick has a button like this - a short how-to and what to say to the audience.' },
+  { target: '#launchLockscreenBtn', tab: 'trick', he: '✅ כשהכל מוכן: "שמור וסגור", בוחרים סוג נעילה ונותנים את הטלפון לצופה.', en: '✅ When ready: "Save & Close", pick a lock type and hand the phone to the spectator.' },
+  { target: null, tab: 'trick', he: '🔐 הכי חשוב לזכור:\nכדי לחזור להגדרות בסתר - לחיצה ארוכה של 3 שניות על השעון במסך הנעילה.\n\nבכל שאלה - כפתור ? למעלה. בהצלחה! ✨', en: '🔐 Most important:\nTo get back to settings secretly - long-press the clock for 3 seconds on the lock screen.\n\nAny question - the ? button at the top. Good luck! ✨' }
+];
+let tourIndex = 0;
+
+function maybeStartTour() {
+  try {
+    // רק לקוסמים חדשים (מי שכבר ראה את המדריך הישן יכול להפעיל את הסיור מלשונית "עוד")
+    if (localStorage.getItem(TOUR_DONE_KEY) || localStorage.getItem(GUIDE_SEEN_KEY)) return;
+  } catch (e) {
+    return;
+  }
+  if (!setupOverlay || !setupOverlay.classList.contains('open')) return;
+  if (!deviceConfigSheet || !deviceConfigSheet.classList.contains('active')) return;
+  if (isLicenseOverlayVisible()) return;
+  startTour();
+}
+
+function startTour() {
+  tourIndex = 0;
+  document.getElementById('tourLayer').style.display = 'block';
+  showTourStep();
+}
+
+function endTour() {
+  document.getElementById('tourLayer').style.display = 'none';
+  try {
+    localStorage.setItem(TOUR_DONE_KEY, '1');
+    localStorage.setItem(GUIDE_SEEN_KEY, '1');
+  } catch (e) {}
+  if (typeof showSettingsTab === 'function') showSettingsTab('trick');
+}
+
+function showTourStep() {
+  const step = TOUR_STEPS[tourIndex];
+  if (!step) return endTour();
+  const en = isEnglishUi();
+  if (typeof showSettingsTab === 'function') showSettingsTab(step.tab);
+  document.getElementById('tourText').textContent = en ? step.en : step.he;
+  document.getElementById('tourDots').textContent = TOUR_STEPS.map((_, i) => (i === tourIndex ? '●' : '○')).join('');
+  document.getElementById('tourNextBtn').textContent = tourIndex === TOUR_STEPS.length - 1 ? (en ? 'Got it' : 'הבנתי') : en ? 'Next' : 'הבא';
+  document.getElementById('tourSkipBtn').style.display = tourIndex === TOUR_STEPS.length - 1 ? 'none' : '';
+
+  const spot = document.getElementById('tourSpot');
+  const card = document.getElementById('tourCard');
+  let target = step.target ? document.querySelector(step.target) : null;
+  if (target) target = target.closest('.clean-toggle-row, .oneui-field-block') || target;
+  if (!target || !target.offsetParent) {
+    spot.classList.add('center');
+    card.style.top = '38%';
+    return;
+  }
+  spot.classList.remove('center');
+  target.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  setTimeout(() => {
+    const r = target.getBoundingClientRect();
+    const pad = 6;
+    Object.assign(spot.style, {
+      left: `${r.left - pad}px`,
+      top: `${r.top - pad}px`,
+      width: `${r.width + pad * 2}px`,
+      height: `${r.height + pad * 2}px`
+    });
+    // הכרטיס מתחת לאזור המודגש, או מעליו אם אין מקום
+    const below = r.bottom + 16;
+    const cardH = card.offsetHeight || 150;
+    card.style.top = below + cardH < window.innerHeight ? `${below}px` : `${Math.max(12, r.top - cardH - 16)}px`;
+  }, 380);
+}
+
+function initTour() {
+  const next = document.getElementById('tourNextBtn');
+  if (next) next.addEventListener('click', () => {
+    tourIndex += 1;
+    showTourStep();
+  });
+  const skip = document.getElementById('tourSkipBtn');
+  if (skip) skip.addEventListener('click', endTour);
+  const again = document.getElementById('startTourBtn');
+  if (again) again.addEventListener('click', startTour);
+  window.addEventListener('resize', () => {
+    if (document.getElementById('tourLayer').style.display === 'block') showTourStep();
+  });
+}
+
 // אתחול ראשוני
+initTrickTips();
+initTour();
 initPreShowCheck();
 initCallReveal();
 initNewReveals();

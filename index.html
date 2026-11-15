@@ -171,6 +171,32 @@
     </div>
   </div>
 
+  <!-- סיור היכרות: מדגיש כל פעם חלק אחר בהגדרות -->
+  <div class="tour-layer" id="tourLayer" style="display: none;">
+    <div class="tour-spot" id="tourSpot"></div>
+    <div class="tour-card" id="tourCard">
+      <div class="tour-text" id="tourText"></div>
+      <div class="tour-foot">
+        <span class="tour-dots" id="tourDots"></span>
+        <button type="button" class="tour-skip" id="tourSkipBtn">דלג</button>
+        <button type="button" class="tour-next" id="tourNextBtn">הבא</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- הסבר קצר על קסם (כפתור ? ליד כל קסם) -->
+  <div class="update-popup-overlay" id="tipOverlay" style="display: none;">
+    <div class="update-popup-card tip-card">
+      <div class="update-popup-title" id="tipTitle"></div>
+      <div class="tip-how" id="tipHow"></div>
+      <div class="tip-patter" id="tipPatterWrap">
+        <div class="tip-patter-label" id="tipPatterLabel">💬 מה אומרים לקהל</div>
+        <div class="tip-patter-text" id="tipPatter"></div>
+      </div>
+      <button type="button" class="update-popup-btn" id="tipCloseBtn">הבנתי</button>
+    </div>
+  </div>
+
   <!-- בדיקה לפני הופעה: רשימת בדיקות עם ✓ / ! / ✗ -->
   <div class="update-popup-overlay" id="preShowOverlay" style="display: none;">
     <div class="update-popup-card preshow-card">
@@ -477,7 +503,13 @@
               <button type="button" class="seg-pill active" data-target="homescreen">מסך בית סמסונג</button>
               <button type="button" class="seg-pill" data-target="notes">דף פתקים מדומה (Notes)</button>
               <button type="button" class="seg-pill" data-target="gallery">🖼️ גלריה (תחזית בתמונה)</button>
+              <button type="button" class="seg-pill" data-target="search">🔍 חיפוש (תחזית בחיפוש)</button>
             </div>
+          </div>
+          <div class="oneui-field-block" id="searchRevealExtra" style="display: none; padding-top: 0;">
+            <span class="toggle-sub-desc">אחרי הפתיחה נפתח מסך חיפוש, והחיפוש האחרון (מ"אתמול") הוא הקוד או המילה שהצופה בחר.</span>
+            <label class="config-label" for="searchTextInput" style="margin-top: 8px;">מה חיפשת "אתמול" ({קוד} יוחלף בקוד)</label>
+            <input type="text" id="searchTextInput" class="feedback-textarea gallery-text-input" maxlength="60" dir="rtl">
           </div>
           <div class="oneui-field-block" id="galleryRevealExtra" style="display: none; padding-top: 0;">
             <span class="toggle-sub-desc">אחרי הפתיחה נפתחת הגלריה, והתמונה האחרונה (מ"אתמול") היא פתק בכתב יד עם הקוד שהצופה בחר.</span>
@@ -808,6 +840,7 @@
         <section class="settings-panel" data-tab="more">
 
         <button type="button" class="guide-open-btn" id="openGuideBtn">📖 מדריך: איך משתמשים באפליקציה</button>
+        <button type="button" class="guide-open-btn" id="startTourBtn">🧭 סיור היכרות בהגדרות</button>
 
         <div class="oneui-section-header">🌐 שפה / Language</div>
         <div class="config-group oneui-card">
@@ -1193,6 +1226,17 @@
 • קניות לסוף שבוע
 • לאסוף חבילה מהדואר
 • מספר מזל / קוד: 1234</textarea>
+      </div>
+
+      <!-- חיפוש מדומה: החיפוש האחרון הוא הקוד / המילה של הצופה -->
+      <div class="fake-search-app" id="fakeSearchApp" style="display: none;">
+        <div class="search-bar">
+          <svg viewBox="0 0 24 24" class="search-ico"><circle cx="11" cy="11" r="6.5"></circle><path d="M16 16l4.5 4.5"></path></svg>
+          <span class="search-placeholder">חיפוש</span>
+          <svg viewBox="0 0 24 24" class="search-mic"><rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M6 11a6 6 0 0 0 12 0M12 17v4"></path></svg>
+        </div>
+        <div class="search-recent-title">חיפושים אחרונים</div>
+        <div class="search-recent-list" id="searchRecentList"></div>
       </div>
 
       <!-- גלריה מדומה: התמונה האחרונה היא פתק בכתב יד עם הקוד שהצופה בחר -->

@@ -352,6 +352,17 @@
     'ענה': 'Accept',
     'נתק': 'End',
 
+    // 5.6: חיפוש, סיור, טיפים
+    '🔍 חיפוש (תחזית בחיפוש)': '🔍 Search (search prediction)',
+    'אחרי הפתיחה נפתח מסך חיפוש, והחיפוש האחרון (מ"אתמול") הוא הקוד או המילה שהצופה בחר.': 'After unlocking, a search screen opens and the most recent search (from "yesterday") is the spectator\'s code or word.',
+    'מה חיפשת "אתמול" ({קוד} יוחלף בקוד)': 'What you searched "yesterday" ({code} is replaced with the code)',
+    'חיפוש': 'Search',
+    'חיפושים אחרונים': 'Recent searches',
+    '🧭 סיור היכרות בהגדרות': '🧭 Settings tour',
+    'דלג': 'Skip',
+    'הסבר': 'Help',
+    '💬 מה אומרים לקהל': '💬 What to say',
+
     // 5.5: בדיקה לפני הופעה
     '✅ בדיקה לפני הופעה': '✅ Pre-show check',
     'בדוק שוב': 'Check again',

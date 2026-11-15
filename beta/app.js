@@ -457,7 +457,7 @@ const REVEAL_TEXT_DEFAULT_EN = "Don't forget, the gate code is {code} 😊";
 // באנדרואיד, אחרי "פתיחה בכל קוד" האפליקציה יוצאת למסך הבית האמיתי -
 // חוץ מכשיש חשיפה שקורית בתוך האפליקציה (פתקים, גלריה, שיחה נכנסת).
 function staysInAppAfterUnlock() {
-  return ['notes', 'gallery', 'search'].includes(config.unlockTargetScreen) || Boolean(config.callReveal);
+  return ['notes', 'gallery', 'search'].includes(config.unlockTargetScreen) || Boolean(config.callReveal) || Boolean(config.faceTrick);
 }
 
 // מחליף את {קוד} / {code} בקוד שהוקלד
@@ -503,6 +503,8 @@ const DEFAULT_CONFIG = {
   notesAge: '60',               // לפני כמה דקות "נכתב" הפתק ('yesterday' = אתמול)
   galleryText: isEnglishUi() ? '{code}' : '{קוד}', // מה כתוב על הפתק בתמונה בגלריה
   searchText: isEnglishUi() ? '{code}' : '{קוד}', // החיפוש האחרון בחשיפה בחיפוש
+  faceTrick: false,             // "הטלפון מזהה את הצופה": נכשל לקוסם, נפתח לצופה + סלפי שלו כטפט
+  faceTrickFails: 1,            // כמה פעמים הזיהוי נכשל לקוסם לפני שמגישים לצופה
   callReveal: false,            // חשיפה בשיחה נכנסת אחרי הפתיחה
   callName: isEnglishUi() ? '{code}' : '{קוד}',    // שם המתקשר שמופיע על המסך
   callDelaySec: 4,
@@ -2356,6 +2358,11 @@ if (samsungBackBtn) {
 
 if (clockLockScreen) {
   clockLockScreen.addEventListener('click', () => {
+    // בקסם זיהוי הצופה: נגיעה במסך השעון = ניסיון זיהוי פנים (נשארים על השעון, כמו טלפון אמיתי)
+    if (config.faceTrick) {
+      faceTrickScan();
+      return;
+    }
     phoneContainer.classList.remove('clock-mode-active');
   });
 }
@@ -2733,6 +2740,8 @@ async function triggerIosFaceIdSequence() {
     iosSwipeHint.classList.remove('visible');
   }
 
+  // בקסם "הטלפון מזהה את הצופה" הסריקות נשלטות על ידי הקסם (נגיעה / החלקה), לא אוטומטית
+  if (config.faceTrick) return;
   // אם המשתמש עדיין לא רשם את הפנים שלו ב-Setup -> המנעול נשאר נעול!
   if (!hasEnrolledFace()) {
     return;
@@ -2809,6 +2818,130 @@ async function triggerIosFaceIdSequence() {
       faceIdUnlocked = false;
     }
   }, 250);
+}
+
+// ----------------------------------------------------------------------------
+// 17C. "הטלפון מזהה את הצופה": הסריקה נכשלת לקוסם (כמה פעמים שבחר), ואז נפתחת לצופה -
+// ובאותו רגע המצלמה הקדמית מצלמת אותו, והתמונה הופכת לטפט של מסך הבית המזויף.
+// התמונה נשמרת רק בזיכרון (לא בטלפון ולא בענן) ונמחקת בנעילה מחדש / "מוכן לצופה הבא".
+// ----------------------------------------------------------------------------
+let faceTrickAttempts = 0;
+let faceTrickBusy = false;
+let faceTrickPhotoActive = false;
+
+function faceTrickFails() {
+  const n = Number(config.faceTrickFails);
+  return n >= 1 && n <= 3 ? n : 1;
+}
+
+// לוקח פריים מהמצלמה הקדמית, חותך לפרופורציה של המסך והופך כמו מראה (כמו סלפי אמיתי)
+function grabSelfieFrame(video) {
+  const vw = video.videoWidth;
+  const vh = video.videoHeight;
+  if (!vw || !vh) return null;
+  const rect = phoneContainer.getBoundingClientRect();
+  const ratio = rect.width && rect.height ? rect.width / rect.height : 9 / 19.5;
+  const outH = Math.min(1600, vh * 2);
+  const outW = Math.round(outH * ratio);
+  let sw = vw;
+  let sh = vw / ratio;
+  if (sh > vh) {
+    sh = vh;
+    sw = vh * ratio;
+  }
+  const canvas = document.createElement('canvas');
+  canvas.width = outW;
+  canvas.height = outH;
+  const ctx = canvas.getContext('2d');
+  ctx.translate(outW, 0);
+  ctx.scale(-1, 1);
+  ctx.drawImage(video, (vw - sw) / 2, (vh - sh) / 2, sw, sh, 0, 0, outW, outH);
+  try {
+    return canvas.toDataURL('image/jpeg', 0.86);
+  } catch (e) {
+    return null;
+  }
+}
+
+function resetFaceTrick() {
+  faceTrickAttempts = 0;
+  faceTrickBusy = false;
+  if (faceTrickPhotoActive) {
+    faceTrickPhotoActive = false;
+    fakeHomescreen.classList.remove('face-wallpaper');
+    fakeHomescreen.style.backgroundSize = '';
+    fakeHomescreen.style.backgroundPosition = '';
+    loadCustomMedia(); // מחזיר את טפט מסך הבית הרגיל
+  }
+}
+
+async function faceTrickScan() {
+  if (!config.faceTrick || faceTrickBusy || isLockedOut) return;
+  if (fakeHomescreen.classList.contains('unlocked') || setupOverlay.classList.contains('open')) return;
+  faceTrickBusy = true;
+  faceTrickAttempts += 1;
+  const willOpen = faceTrickAttempts > faceTrickFails();
+
+  stopAllCameraStreams();
+  let hasCamera = false;
+  try {
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia && islandLiveCam) {
+      activeCameraStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'user', width: { ideal: 720 }, height: { ideal: 960 } },
+        audio: false
+      });
+      islandLiveCam.srcObject = activeCameraStream;
+      await islandLiveCam.play().catch(() => {});
+      hasCamera = true;
+    }
+  } catch (e) {}
+
+  if (cameraPunchHole) cameraPunchHole.classList.add('faceid-animating');
+  phoneContainer.classList.add('face-scanning');
+  // סריקה של כשנייה, כמו זיהוי פנים אמיתי (בכישלון קצת יותר - "מנסה")
+  await new Promise((r) => setTimeout(r, willOpen ? 1000 : 1400));
+
+  const photo = willOpen && hasCamera ? grabSelfieFrame(islandLiveCam) : null;
+  stopAllCameraStreams();
+  if (cameraPunchHole) cameraPunchHole.classList.remove('faceid-animating');
+  phoneContainer.classList.remove('face-scanning');
+
+  if (!willOpen) {
+    const failText = config.osTheme === 'ios' ? 'Face ID: הפנים לא זוהו' : 'הפנים לא זוהו. נסה שוב';
+    triggerErrorFeedback(failText);
+    // גם על מסך השעון (שם אין שורת שגיאה) - ההוראה למטה מתחלפת לרגע
+    const prompt = document.querySelector('.clock-lock-swipe-prompt');
+    if (prompt && phoneContainer.classList.contains('clock-mode-active')) {
+      if (!prompt.dataset.orig) prompt.dataset.orig = prompt.textContent;
+      prompt.textContent = failText;
+      prompt.classList.add('face-fail');
+      clearTimeout(faceTrickScan.promptTimer);
+      faceTrickScan.promptTimer = setTimeout(() => {
+        prompt.textContent = prompt.dataset.orig;
+        prompt.classList.remove('face-fail');
+      }, 1800);
+    }
+    faceTrickBusy = false;
+    return;
+  }
+
+  if (photo) {
+    fakeHomescreen.classList.remove('has-custom-home', 'has-custom-image');
+    fakeHomescreen.classList.add('face-wallpaper');
+    fakeHomescreen.style.backgroundImage = `url("${photo}")`;
+    fakeHomescreen.style.backgroundSize = 'cover';
+    fakeHomescreen.style.backgroundPosition = 'center';
+    faceTrickPhotoActive = true;
+  }
+  faceIdUnlocked = true;
+  if (cameraPunchHole) cameraPunchHole.classList.add('faceid-unlocked');
+  if (lockIconTrigger) lockIconTrigger.classList.add('faceid-unlocked');
+  triggerHaptic(35);
+  trackEvent('face_trick');
+  setTimeout(() => {
+    triggerUnlockHomescreen();
+    faceTrickBusy = false;
+  }, 380);
 }
 
 // נעילת מחוות ומסך בית (Exit Protection): אנימציית מנעול קלה במקום סגירה בטעות בעת החלקה או לחיצה מחוץ למקלדת
@@ -2892,7 +3025,10 @@ phoneContainer.addEventListener(
     swipeStartedOutsideKeypad = false;
 
     if (dy > 45 && Math.abs(dy) > dx) {
-      if (config.unlockMode === 'swipe') {
+      if (config.faceTrick) {
+        // קסם "הטלפון מזהה את הצופה": החלקה למעלה = ניסיון זיהוי פנים
+        faceTrickScan();
+      } else if (config.unlockMode === 'swipe') {
         animateLockOpenAndUnlock();
       } else if (config.osTheme === 'ios') {
         if (faceIdUnlocked) {
@@ -2910,7 +3046,10 @@ phoneContainer.addEventListener(
     }
 
     // לחיצה קצרה מחוץ למקלדת: מגיבה כמו מסך נעילה אמיתי (אנימציית מנעול קלה)
-    if (wasOutside && totalMove < 12 && config.unlockMode !== 'swipe') {
+    if (wasOutside && totalMove < 12 && config.faceTrick) {
+      // נגיעה במסך (לא על המקשים) = "מסתכלים על הטלפון" -> ניסיון זיהוי פנים
+      faceTrickScan();
+    } else if (wasOutside && totalMove < 12 && config.unlockMode !== 'swipe') {
       window.triggerExitProtectionBounce();
     }
   },
@@ -3691,7 +3830,7 @@ function initDeviceLicenseGate() {
 // החלון מוצג רק כשמסך ההגדרות פתוח (בפתיחת האפליקציה / בתפריט הסודי),
 // ולעולם לא מעל מסך הנעילה הפעיל מול קהל.
 // ============================================================================
-const APP_VERSION = '6.6';
+const APP_VERSION = '6.7';
 const DEFAULT_APK_URL = 'https://github.com/tzur2010/app-lockscreen/raw/main/Lockscreen.apk';
 const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 const UPDATE_DISMISS_KEY = 'magic_update_dismissed_version';
@@ -4675,6 +4814,7 @@ function relockFakePhone() {
   if (cameraPunchHole) cameraPunchHole.classList.remove('faceid-unlocked');
   clearCurrentInputs();
   restoreNotesTemplate();
+  resetFaceTrick(); // מוחק את תמונת הצופה ומאפס את ספירת הניסיונות
   if (typeof hideFakeMessageBanner === 'function') hideFakeMessageBanner();
   if (typeof endFakeCall === 'function') endFakeCall();
 }
@@ -4926,6 +5066,7 @@ function getStatsForReport() {
   if (config.fingerprintEnrolled) on.push('fp');
   if (config.uiLang === 'en') on.push('english');
   if (config.callReveal) on.push('call');
+  if (config.faceTrick) on.push('facetrick');
   if (config.unlockTargetScreen === 'gallery') on.push('gallery');
   if (config.unlockTargetScreen === 'search') on.push('search');
   try {
@@ -5432,6 +5573,14 @@ function syncNewRevealsUI() {
   const searchInput = document.getElementById('searchTextInput');
   if (searchInput && document.activeElement !== searchInput) searchInput.value = config.searchText || '{קוד}';
 
+  const faceToggle = document.getElementById('toggleFaceTrick');
+  if (faceToggle) faceToggle.checked = Boolean(config.faceTrick);
+  const faceExtra = document.getElementById('faceTrickExtra');
+  if (faceExtra) faceExtra.style.display = config.faceTrick ? 'block' : 'none';
+  document.querySelectorAll('#faceTrickFailsSelector .seg-pill').forEach((btn) => {
+    btn.classList.toggle('active', Number(btn.dataset.fails) === faceTrickFails());
+  });
+
   const callToggle = document.getElementById('toggleCallReveal');
   if (callToggle) callToggle.checked = Boolean(config.callReveal);
   const callExtra = document.getElementById('callRevealExtra');
@@ -5463,6 +5612,37 @@ function initNewReveals() {
       saveConfig();
     });
   }
+  const faceToggle = document.getElementById('toggleFaceTrick');
+  if (faceToggle) {
+    faceToggle.addEventListener('change', () => {
+      config.faceTrick = faceToggle.checked;
+      saveConfig();
+      resetFaceTrick();
+      syncNewRevealsUI();
+      // מבקשים את הרשאת המצלמה כבר עכשיו (בהגדרות) - כדי שהבקשה לא תקפוץ באמצע הופעה
+      if (faceToggle.checked && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        navigator.mediaDevices
+          .getUserMedia({ video: { facingMode: 'user' }, audio: false })
+          .then((s) => {
+            s.getTracks().forEach((t) => t.stop());
+            const note = document.getElementById('faceTrickCamNote');
+            if (note) note.textContent = '✓ המצלמה מוכנה';
+          })
+          .catch(() => {
+            const note = document.getElementById('faceTrickCamNote');
+            if (note) note.textContent = '⚠️ צריך לאשר גישה למצלמה (בהגדרות הטלפון) - אחרת הטלפון ייפתח אבל בלי התמונה של הצופה';
+          });
+      }
+    });
+  }
+  document.querySelectorAll('#faceTrickFailsSelector .seg-pill').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      config.faceTrickFails = Number(btn.dataset.fails) || 1;
+      saveConfig();
+      syncNewRevealsUI();
+    });
+  });
+
   const callToggle = document.getElementById('toggleCallReveal');
   if (callToggle) {
     callToggle.addEventListener('change', () => {
@@ -5881,6 +6061,10 @@ const TRICK_TIPS = {
     he: ['📝 חשיפה בפתקים', 'אחרי הפתיחה נפתח פתק "שנכתב לפני שעה" ובו הקוד של הצופה.', '"כתבתי משהו לפני שהגעתי לפה. תקרא מה כתוב בפתק."'],
     en: ['📝 Notes reveal', 'After unlocking, a note "written an hour ago" opens with the spectator\'s code.', '"I wrote something before I got here. Read the note."']
   },
+  toggleFaceTrick: {
+    he: ['🤳 הטלפון מזהה את הצופה', '1. נגיעה במסך / החלקה למעלה = "זיהוי פנים". בפעמים הראשונות (כמה שבחרת) הוא נכשל - "הפנים לא זוהו".\n2. מגישים לצופה ונוגעים שוב במסך כשהוא מסתכל: הטלפון נפתח מיד.\n3. באותו רגע המצלמה הקדמית מצלמת אותו - והתמונה שלו היא הטפט של מסך הבית.\nטיפ: תחזיק את הטלפון מול הפנים של הצופה בגובה העיניים, כמו שמצלמים סלפי.', '"הטלפון שלי לא מזהה אותי היום... רגע, תסתכל אתה? ...איך הוא מכיר אותך?! ותסתכל על הטפט שלי..."'],
+    en: ['🤳 The phone knows the spectator', '1. Tap the screen / swipe up = "face scan". The first times (as many as you chose) it fails - "Face not recognized".\n2. Hand it to the spectator and tap again while they look: it unlocks instantly.\n3. At that moment the front camera takes their photo - and it becomes the home screen wallpaper.\nTip: hold the phone at their eye level, like taking a selfie.', '"My phone doesn\'t recognize me today... wait, you try? ...how does it know you?! And look at my wallpaper..."']
+  },
   toggleCallReveal: {
     he: ['📞 חשיפה בשיחה נכנסת', 'אחרי הפתיחה הטלפון מצלצל, ושם המתקשר הוא הקוד. אפשר גם להפעיל מהשלט בטלפון השני.', '"מישהו מתקשר אליי... תגיד לי מי זה?"'],
     en: ['📞 Incoming call reveal', 'After unlocking the phone rings and the caller name is the code. Can also be triggered from the remote.', '"Someone is calling me... who is it?"']
@@ -6040,6 +6224,7 @@ function initTour() {
 const WHATS_NEW_SEEN_KEY = 'magic_whats_new_seen_v1';
 const WHATS_NEW_MAX_ITEMS = 6;
 const WHATS_NEW = [
+  { ver: '6.7', icon: '🤳', target: '#toggleFaceTrick', he: ['הטלפון מזהה את הצופה', 'הטלפון לא נפתח לפנים שלך - אבל נפתח מיד לצופה. ובמסך הבית מחכה לו הפתעה: התמונה שלו כטפט.'], en: ['The phone knows the spectator', 'Your phone won\'t unlock for your face - but unlocks instantly for the spectator. And on the home screen: their photo as the wallpaper.'] },
   { ver: '6.5', icon: '📱', target: '#backToSplitBtn', he: ['Google Pixel ו-Xiaomi', 'מעכשיו יש גם מסך נעילה של פיקסל ושל שיאומי/רדמי - "החלף מכשיר" ובוחרים את הטלפון שלך.'], en: ['Google Pixel & Xiaomi', 'Now with Pixel and Xiaomi/Redmi lock screens too - "Switch device" and pick your phone.'] },
   { ver: '6.1', icon: '📋', target: '#openWhatsNewBtn', he: ['החידושים תמיד זמינים', 'פספסת משהו? בלשונית "עוד" יש כפתור "מה חדש" שמראה את כל החידושים האחרונים.'], en: ['What\'s new, any time', 'Missed something? The More tab has a "What\'s new" button with all the latest features.'] },
   { ver: '5.9', icon: '🎉', target: null, he: ['מסך "מה חדש"', 'מעכשיו אחרי כל עדכון תראה בדיוק מה התחדש - עם כפתור שלוקח אותך ישר לנסות.'], en: ['"What\'s new" screen', 'After every update you\'ll see exactly what\'s new - with a button that takes you straight to it.'] },

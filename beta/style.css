@@ -3857,3 +3857,17 @@ html[dir="ltr"] body.practice-on .settings-tabs::after { content: '🎯 Practice
 
 /* מסך השעון: בפיקסל ובשיאומי אין "קפסולה" סביב ההוראה למטה */
 .phone-container.theme-pixel .clock-lock-swipe-prompt { background: transparent; font-size: 13px; opacity: .75; }
+/* טביעת אצבע (פיקסל/שיאומי) - הסמל הסטנדרטי של אנדרואיד, בלי "הילה" שמנה */
+.fp-drawn { width: 40px; height: 40px; }
+.phone-container.theme-pixel .fingerprint-halo,
+.phone-container.theme-xiaomi .fingerprint-halo { display: none; }
+.phone-container.theme-pixel .fp-drawn { width: 38px; height: 38px; color: rgba(230,225,229,.92); }
+.phone-container.theme-xiaomi .fp-drawn { width: 40px; height: 40px; color: #ffffff; filter: drop-shadow(0 0 6px rgba(255,255,255,.25)); }
+.phone-container.theme-pixel .fingerprint-container.pressing .fp-drawn { color: #a8c7fa; transform: scale(1.06); }
+.phone-container.theme-xiaomi .fingerprint-container.pressing .fp-drawn { transform: scale(1.08); filter: drop-shadow(0 0 12px rgba(255,255,255,.55)); }
+/* קסם "הטלפון מזהה את הצופה": אנימציית סריקה על המנעול (באנדרואיד אין "אי" כמו באייפון) */
+@keyframes faceScanPulse { 0%,100% { scale: 1; opacity: 1; } 50% { scale: 1.18; opacity: .6; } }
+.phone-container.face-scanning:not(.theme-ios) .lock-icon { animation: faceScanPulse .7s ease-in-out infinite; }
+.clock-lock-swipe-prompt.face-fail { color: #ffb4ab; animation: textShakeFace .35s ease; }
+@keyframes textShakeFace { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
+.fake-homescreen.face-wallpaper { background-repeat: no-repeat; }

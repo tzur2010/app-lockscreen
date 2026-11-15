@@ -852,6 +852,11 @@
       return days === 1 ? 'אתמול' : `לפני ${days} ימים`;
     }
 
+    // סוג הטלפון שהקוסם בחר באפליקציה (גרסאות ישנות שולחות 'samsung' לכל אנדרואיד)
+    function phoneLabel(os) {
+      return { ios: '🍎 iPhone', pixel: '🔵 Pixel', xiaomi: '🟠 Xiaomi' }[os] || '🤖 Samsung';
+    }
+
     function usageHtml(u) {
       if (!u.lastSeen) return '<span class="muted">עוד לא השתמש</span>';
       const opens = Number(u.openCount) || 0;
@@ -941,7 +946,7 @@
         });
         shows += sumShows(st.e);
         (st.on || []).forEach((k) => (enabled[k] = (enabled[k] || 0) + 1));
-        const osName = st.os === 'ios' ? '🍎 iPhone' : '🤖 Samsung';
+        const osName = phoneLabel(st.os);
         os[osName] = (os[osName] || 0) + 1;
         if (st.mode) modes[st.mode] = (modes[st.mode] || 0) + 1;
       });
@@ -1674,7 +1679,7 @@
             <span>פעיל לאחרונה</span><span>${user.lastSeen ? timeAgo(user.lastSeen) : 'עוד לא השתמש'}</span>
             <span>פתיחות</span><span>${Number(user.openCount) || 0}</span>
             <span>גרסה</span><span>${ver}</span>
-            <span>מכשיר</span><span>${st ? (st.os === 'ios' ? '🍎 iPhone' : '🤖 Samsung') + ' · ' + escapeHtml(st.model || '') : '—'}</span>
+            <span>מכשיר</span><span>${st ? phoneLabel(st.os) + ' · ' + escapeHtml(st.model || '') : '—'}</span>
             <span>הופעות</span><span>${st ? sumShows(st.e) : 0} · ${st ? Number(st.e.code_typed) || 0 : 0} קודים</span>
           </div>
         </div>

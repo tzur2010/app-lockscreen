@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="robots" content="noindex, nofollow">
   <!-- אבטחה: הדף מדבר רק עם Firebase ולא טוען שום קוד או תמונה מאתר אחר -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com; manifest-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://ntfy.sh; manifest-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
   <meta name="referrer" content="no-referrer">
   <title>ניהול לקוחות - Magic Lock</title>
   <style>
@@ -135,6 +135,8 @@
     .thread-input { width: 100%; box-sizing: border-box; background: rgba(0,0,0,.3); border: 1px solid rgba(255,255,255,.14); border-radius: 12px; color: #fff; padding: 9px 11px; font: inherit; font-size: 14px; resize: vertical; }
     .thread-actions { display: flex; gap: 8px; }
     .thread-actions .btn { flex: 1; justify-content: center; }
+    .setup-steps { margin: 10px 22px 8px 0; line-height: 1.8; font-size: 14px; }
+    .setup-steps li { margin-bottom: 2px; }
     .list-tools { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
     .sort-select { width: auto !important; padding: 9px 10px !important; }
     .pill-count { font-size: 11px; opacity: .75; }
@@ -424,7 +426,21 @@
             אחרי הפרסום, כל מי שהגרסה שלו ישנה יותר יראה חלון "יש עדכון חדש" בפעם הבאה שהוא פותח את האפליקציה או את ההגדרות (לא באמצע מסך הנעילה מול קהל).
           </div>
         </div>
-      </section>
+        <div class="card panel">
+          <h2>🔔 התראות לטלפון שלך</h2>
+          <div class="hint" style="line-height:1.7;">כשקוסם שולח בקשת גישה או הודעה - מגיעה לך התראה לטלפון מיד, גם כשהאתר סגור. ההתראה כוללת רק "בקשה חדשה" / "הודעה חדשה", בלי שמות ובלי פרטים.</div>
+          <ol class="setup-steps">
+            <li>מתקינים בטלפון את האפליקציה החינמית <b>ntfy</b> (מחנות האפליקציות).</li>
+            <li>פותחים אותה ← <b>+</b> (הירשם לנושא) ← מדביקים את השם הזה:</li>
+          </ol>
+          <div class="link-row"><span class="mono" id="ntfyTopic">—</span><button type="button" class="btn btn-ghost" id="ntfyCopyBtn">העתק</button></div>
+          <ol class="setup-steps" start="3">
+            <li>לוחצים כאן כדי לבדוק שזה עובד:</li>
+          </ol>
+          <button type="button" class="btn btn-whatsapp big-btn" id="ntfyTestBtn">🔔 שלח התראת בדיקה לטלפון שלי</button>
+          <div class="hint" id="ntfyStatus"></div>
+          <div class="hint">⚠️ ההתראות נשלחות מגרסה 5.8 ומעלה של האפליקציה - קוסמים בגרסה ישנה יותר יתחילו לשלוח התראות אחרי שתפרסם.</div>
+        </div>      </section>
 
       <!-- ===================== לשונית: הזמנה ===================== -->
       <section class="admin-panel" data-tab="invite">
@@ -1442,6 +1458,24 @@
     let msgTarget = null; // { user, feedback } או { broadcast: [users] }
 
     // הודעה לכל הקוסמים המאושרים (מופיעה אצל כל אחד כשהוא נכנס להגדרות)
+    // ---------------- התראות לטלפון (ntfy) ----------------
+    $('ntfyTopic').textContent = (Cloud.adminNotifyTopic && Cloud.adminNotifyTopic()) || '—';
+    $('ntfyCopyBtn').addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText($('ntfyTopic').textContent);
+        toast('הועתק ✓ הדבק אותו באפליקציית ntfy');
+      } catch (e) {
+        toast('לא הצלחתי להעתיק', true);
+      }
+    });
+    $('ntfyTestBtn').addEventListener('click', async () => {
+      const btn = $('ntfyTestBtn');
+      btn.disabled = true;
+      $('ntfyStatus').textContent = 'שולח...';
+      const ok = Cloud.notifyAdmin ? await Cloud.notifyAdmin('test') : false;
+      $('ntfyStatus').textContent = ok ? '✓ נשלח! אם נרשמת לנושא באפליקציה, ההתראה כבר אצלך בטלפון.' : 'השליחה נכשלה - בדוק חיבור לאינטרנט';
+      btn.disabled = false;
+    });
     // ---------------- וואטסאפ לכולם (תור שליחה) ----------------
     let waBulkAudience = 'approved';
     let waBulkSent = new Set();

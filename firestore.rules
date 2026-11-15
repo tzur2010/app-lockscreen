@@ -44,7 +44,9 @@ service cloud.firestore {
 
       // מכשיר יכול רק ליצור בקשה חדשה במצב "ממתין" - אף פעם לא לאשר את עצמו.
       allow create: if signedIn() && request.auth.uid == uid
-        && request.resource.data.keys().hasOnly(['name', 'phone', 'deviceId', 'status', 'createdAt'])
+        && request.resource.data.keys().hasOnly(['name', 'phone', 'deviceId', 'status', 'createdAt', 'transfer'])
+        // בקשת העברה לטלפון חדש: רק סימון, תמיד במצב "ממתין" (המנהל מחליט)
+        && (!('transfer' in request.resource.data) || (request.resource.data.transfer == true && request.resource.data.status == 'pending'))
         && request.resource.data.keys().hasAll(['name', 'phone', 'status', 'createdAt'])
         && validStr(request.resource.data.name, 2, 80)
         && validStr(request.resource.data.phone, 7, 20)
@@ -61,8 +63,12 @@ service cloud.firestore {
       // המכשיר עצמו יכול לעדכן רק את נתוני השימוש שלו (זמן אחרון, מספר פתיחות, גרסה).
       // המנהל יכול גם לשלוח לקוסם הודעה אישית (adminMessage).
       allow update: if (isAdmin()
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt', 'adminMessage', 'adminMessageAt', 'tester', 'paid', 'paidAt', 'paidAmount', 'payMethod'])
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt', 'adminMessage', 'adminMessageAt', 'tester', 'paid', 'paidAt', 'paidAmount', 'payMethod', 'receiptNo', 'refundedAt', 'transferredFrom', 'transferredTo'])
           && request.resource.data.status in ['pending', 'approved', 'blocked', 'trial']
+          && (!('receiptNo' in request.resource.data) || validStr(request.resource.data.receiptNo, 0, 40))
+          && (!('refundedAt' in request.resource.data) || request.resource.data.refundedAt is timestamp)
+          && (!('transferredFrom' in request.resource.data) || validStr(request.resource.data.transferredFrom, 1, 128))
+          && (!('transferredTo' in request.resource.data) || validStr(request.resource.data.transferredTo, 1, 128))
           && (!('paid' in request.resource.data) || request.resource.data.paid is bool)
           && (!('paidAmount' in request.resource.data) || request.resource.data.paidAmount is number)
           && (!('payMethod' in request.resource.data) || validStr(request.resource.data.payMethod, 0, 30))

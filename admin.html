@@ -135,7 +135,20 @@
     .thread-input { width: 100%; box-sizing: border-box; background: rgba(0,0,0,.3); border: 1px solid rgba(255,255,255,.14); border-radius: 12px; color: #fff; padding: 9px 11px; font: inherit; font-size: 14px; resize: vertical; }
     .thread-actions { display: flex; gap: 8px; }
     .thread-actions .btn { flex: 1; justify-content: center; }
-    .sale-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 12px 0; }
+    .checklist { display: flex; flex-direction: column; gap: 6px; margin: 10px 0; }
+    .check-row { display: flex; align-items: flex-start; gap: 10px; padding: 9px 12px; border-radius: 12px; background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.06); font-size: 14px; line-height: 1.5; }
+    .check-row.done { border-color: rgba(34,197,94,.35); background: rgba(34,197,94,.07); }
+    .check-row input { width: 18px; height: 18px; margin-top: 2px; accent-color: #22c55e; flex: 0 0 auto; }
+    .check-row .auto { font-size: 11px; color: #64748b; margin-inline-start: 6px; }
+    .check-row .sub { display: block; color: #94a3b8; font-size: 12.5px; }
+    .sale-list { display: flex; flex-direction: column; gap: 6px; }
+    .sale-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 9px 12px; border-radius: 12px; background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.06); font-size: 14px; }
+    .sale-row .who { font-weight: 800; cursor: pointer; }
+    .sale-row .meta { color: #94a3b8; font-size: 12.5px; }
+    .flag { font-size: 11.5px; font-weight: 800; padding: 2px 8px; border-radius: 999px; margin-inline-start: 6px; }
+    .flag-transfer { background: rgba(96,165,250,.16); color: #93c5fd; }
+    .flag-dup { background: rgba(251,146,60,.16); color: #fdba74; }
+    .flag-noreceipt { background: rgba(250,204,21,.14); color: #fde68a; }    .sale-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 12px 0; }
     .sale-grid label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: #94a3b8; font-weight: 700; }
     .sale-grid .sale-wide { grid-column: 1 / -1; }
     .sale-grid .input-field { width: 100% !important; box-sizing: border-box; }
@@ -291,6 +304,7 @@
         <button type="button" class="admin-tab active" data-tab="users">👥 לקוחות <span class="tab-badge" id="badgePending" style="display:none;">0</span></button>
         <button type="button" class="admin-tab" data-tab="feedback">💬 שיחות <span class="tab-badge tab-badge-blue" id="badgeFeedback" style="display:none;">0</span></button>
         <button type="button" class="admin-tab" data-tab="update">📢 עדכון <span class="tab-badge tab-badge-green" id="badgeUpdate" style="display:none;">!</span></button>
+        <button type="button" class="admin-tab" data-tab="sale">💰 מכירה <span class="tab-badge" id="badgeSale" style="display:none;">0</span></button>
         <button type="button" class="admin-tab" data-tab="stats">📊 נתונים <span class="tab-badge" id="badgeErrors" style="display:none;">0</span></button>
         <button type="button" class="admin-tab" data-tab="invite">✉️ הזמנה</button>
       </nav>
@@ -314,6 +328,7 @@
             <button type="button" class="tab-pill" data-filter="outdated">⬆️ לא עודכנו <span class="pill-count" id="countOutdated"></span></button>
             <button type="button" class="tab-pill" data-filter="inactive">💤 לא פעילים <span class="pill-count" id="countInactive"></span></button>
             <button type="button" class="tab-pill" data-filter="trial">🎁 בניסיון <span class="pill-count" id="countTrial"></span></button>
+            <button type="button" class="tab-pill" data-filter="trialEnded">⏰ ניסיון נגמר <span class="pill-count" id="countTrialEnded"></span></button>
             <button type="button" class="tab-pill" data-filter="paid">💰 שילמו <span class="pill-count" id="countPaid"></span></button>
           </div>
           <div class="list-tools">
@@ -437,24 +452,7 @@
             אחרי הפרסום, כל מי שהגרסה שלו ישנה יותר יראה חלון "יש עדכון חדש" בפעם הבאה שהוא פותח את האפליקציה או את ההגדרות (לא באמצע מסך הנעילה מול קהל).
           </div>
         </div>
-        <div class="card panel">
-          <h2>💰 הגדרות מכירה</h2>
-          <div class="hint" style="line-height:1.7;">מה שתכתוב כאן מופיע לקוסמים באפליקציה: במסך "הניסיון הסתיים" ובכפתור "לרכישה". נכנס לתוקף רק בגרסה 6.0 ומעלה.</div>
-          <div class="sale-grid">
-            <label>מחיר (₪, תשלום חד-פעמי)<input class="input-field" id="salePrice" type="number" min="0" step="1" placeholder="למשל 149"></label>
-            <label>מספר לתשלום בביט / פייבוקס<input class="input-field" id="salePhone" type="tel" dir="ltr" placeholder="050-0000000"></label>
-            <label>ימי ניסיון חינם לקוסם חדש
-              <select class="input-field" id="saleTrialDays">
-                <option value="0">בלי ניסיון (אישור ידני כמו היום)</option>
-                <option value="3">3 ימים</option>
-                <option value="7">7 ימים</option>
-              </select>
-            </label>
-            <label class="sale-wide">הערה לקוסם (לא חובה)<input class="input-field" id="saleNote" maxlength="300" placeholder='למשל: בהערה בביט כתוב את השם שנרשמת איתו'></label>
-          </div>
-          <button type="button" class="btn btn-whatsapp big-btn" id="saleSaveBtn">שמור הגדרות מכירה</button>
-          <div class="hint" id="saleStatus"></div>
-        </div>
+
 
         <div class="card panel">
           <h2>🔔 התראות לטלפון שלך</h2>
@@ -471,6 +469,68 @@
           <div class="hint" id="ntfyStatus"></div>
           <div class="hint">⚠️ ההתראות נשלחות מגרסה 5.8 ומעלה של האפליקציה - קוסמים בגרסה ישנה יותר יתחילו לשלוח התראות אחרי שתפרסם.</div>
         </div>      </section>
+
+      <!-- ===================== לשונית: מכירה ===================== -->
+      <section class="admin-panel" data-tab="sale">
+        <div class="stats-grid">
+          <div class="card stat-card"><div class="stat-label">💰 הכנסות</div><div class="stat-value" id="saleKpiRevenue" style="color:#facc15;">₪0</div></div>
+          <div class="card stat-card"><div class="stat-label">✓ שילמו</div><div class="stat-value" id="saleKpiPaid" style="color:#4ade80;">0</div></div>
+          <div class="card stat-card"><div class="stat-label">🎁 בניסיון עכשיו</div><div class="stat-value" id="saleKpiTrial">0</div></div>
+          <div class="card stat-card"><div class="stat-label">⏰ ניסיון נגמר, לא שילמו</div><div class="stat-value" id="saleKpiEnded" style="color:#fdba74;">0</div></div>
+          <div class="card stat-card"><div class="stat-label">📈 אחוז המרה</div><div class="stat-value" id="saleKpiConv">—</div><div class="muted" id="saleKpiConvSub" style="font-size:12px;"></div></div>
+        </div>
+
+        <div class="card panel">
+          <h2>🚀 מוכנות למכירה</h2>
+          <div class="hint" style="line-height:1.7;">מה שמסומן אוטומטית נבדק מול ההגדרות. את השאר מסמנים בעצמך כשסיימת.</div>
+          <div class="checklist" id="saleChecklist"></div>
+          <div class="hint" id="saleReadySummary"></div>
+        </div>
+
+        <div class="card panel">
+          <h2>💰 הגדרות מכירה</h2>
+          <div class="hint" style="line-height:1.7;">מה שתכתוב כאן מופיע לקוסמים באפליקציה: במסך "הניסיון הסתיים" ובכפתור "לרכישה". נכנס לתוקף מגרסה 6.0 ומעלה (קישור תשלום ומחיר מבצע - מ-6.2).</div>
+          <div class="sale-grid">
+            <label>מחיר (₪, תשלום חד-פעמי)<input class="input-field" id="salePrice" type="number" min="0" step="1" placeholder="למשל 149"></label>
+            <label>מחיר לפני הנחה (לא חובה - מוצג מחוק)<input class="input-field" id="salePriceWas" type="number" min="0" step="1" placeholder="למשל 199"></label>
+            <label>מספר לתשלום בביט / פייבוקס<input class="input-field" id="salePhone" type="tel" dir="ltr" placeholder="050-0000000"></label>
+            <label>קישור לתשלום (לא חובה)<input class="input-field" id="salePayLink" type="url" dir="ltr" placeholder="https://..."></label>
+            <label>ימי ניסיון חינם לקוסם חדש
+              <select class="input-field" id="saleTrialDays">
+                <option value="0">בלי ניסיון (אישור ידני כמו היום)</option>
+                <option value="3">3 ימים</option>
+                <option value="7">7 ימים</option>
+              </select>
+            </label>
+            <label class="sale-wide">הערה לקוסם (לא חובה)<input class="input-field" id="saleNote" maxlength="300" placeholder='למשל: בהערה בביט כתוב את השם שנרשמת איתו'></label>
+          </div>
+          <div class="hint" style="line-height:1.7;">💡 <b>קישור לתשלום:</b> בפייבוקס אפשר ליצור "קבוצה" ולשתף קישור. אם יש לעסק של אבא שלך עמוד סליקה (למשל משירות חשבוניות), אפשר להדביק גם אותו - הקוסם יקבל כפתור "💳 לתשלום".</div>
+          <button type="button" class="btn btn-whatsapp big-btn" id="saleSaveBtn">שמור הגדרות מכירה</button>
+          <div class="hint" id="saleStatus"></div>
+        </div>
+
+        <div class="card panel">
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
+            <h2 style="margin:0;">⏰ הניסיון נגמר ולא שילמו (<span id="endedCount">0</span>)</h2>
+          </div>
+          <div class="hint" style="line-height:1.7;">תזכורת אחת בוואטסאפ ממירה הרבה. ההודעה כוללת את המחיר ומספר התשלום.</div>
+          <textarea id="remindTemplate" class="input-field" rows="4" style="width:100%; box-sizing:border-box;"></textarea>
+          <div style="display:flex; gap:8px; margin:8px 0 12px;">
+            <button type="button" class="btn btn-ghost" id="remindSaveBtn">שמור נוסח</button>
+            <button type="button" class="btn btn-ghost" id="remindResetBtn">נוסח ברירת מחדל</button>
+          </div>
+          <div id="endedList" class="sale-list"></div>
+        </div>
+
+        <div class="card panel">
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
+            <h2 style="margin:0;">🧾 מכירות (<span id="salesCount">0</span>)</h2>
+            <button type="button" class="btn btn-ghost" id="salesExportBtn">⬇️ ייצוא לאקסל (לרואה החשבון)</button>
+          </div>
+          <div class="hint" style="line-height:1.7;">על כל תשלום צריך להוציא קבלה מהעסק. אחרי שהוצאת - רשום את מספר הקבלה אצל הקוסם (לחיצה על השם ← תשלום), וכאן תראה למי עוד חסרה.</div>
+          <div id="salesList" class="sale-list"></div>
+        </div>
+      </section>
 
       <!-- ===================== לשונית: הזמנה ===================== -->
       <section class="admin-panel" data-tab="invite">
@@ -1106,6 +1166,7 @@
       $('countInactive').textContent = allUsers.filter(isInactive).length || '';
       $('countTrial').textContent = allUsers.filter((u) => u.status === 'trial').length || '';
       $('countPaid').textContent = allUsers.filter((u) => u.paid).length || '';
+      $('countTrialEnded').textContent = allUsers.filter(isTrialEnded).length || '';
       const time = (iso) => (iso ? new Date(iso).getTime() : 0);
       const sorters = {
         smart: (a, b) => (order[a.status] ?? 3) - (order[b.status] ?? 3) || time(b.createdAt) - time(a.createdAt),
@@ -1118,6 +1179,7 @@
           if (currentFilter === 'outdated') { if (!isOutdated(u)) return false; }
           else if (currentFilter === 'inactive') { if (!isInactive(u)) return false; }
           else if (currentFilter === 'paid') { if (!u.paid) return false; }
+          else if (currentFilter === 'trialEnded') { if (!isTrialEnded(u)) return false; }
           else if (currentFilter !== 'all' && u.status !== currentFilter) return false;
           if (!q) return true;
           return [u.name, u.phone, u.deviceId, allNotes[u.id]].some((v) => String(v || '').toLowerCase().includes(q));
@@ -1138,6 +1200,7 @@
             : '<span class="status-badge status-trial-ended">⏰ הניסיון הסתיים</span>';
           actions = `
             <button type="button" class="btn btn-whatsapp" data-action="paid" data-id="${id}">💰 שילם - אשר</button>
+            ${left <= 0 && u.phone ? `<button type="button" class="btn btn-wa-outline" data-action="remind" data-id="${id}">🟢 תזכורת תשלום</button>` : ''}
             <button type="button" class="btn btn-block" data-action="revoke" data-id="${id}">בטל</button>`;
         } else if (u.status === 'approved') {
           statusHtml = '<span class="status-badge status-approved">מאושר ✓</span>';
@@ -1149,8 +1212,10 @@
           actions = `<button type="button" class="btn btn-wa-outline" data-action="restore" data-id="${id}">החזר גישה</button>`;
         } else {
           statusHtml = '<span class="status-badge status-pending">ממתין לאישור</span>';
+          const paidOld = findPaidByPhone(u);
           actions = `
-            <button type="button" class="btn btn-whatsapp" data-action="approve" data-id="${id}">אשר ושלח וואטסאפ</button>
+            ${paidOld ? `<button type="button" class="btn btn-whatsapp" data-action="transfer" data-id="${id}">🔁 העבר רישיון מהטלפון הישן</button>` : ''}
+            <button type="button" class="btn ${paidOld ? 'btn-wa-outline' : 'btn-whatsapp'}" data-action="approve" data-id="${id}">אשר ושלח וואטסאפ</button>
             <button type="button" class="btn btn-block" data-action="reject" data-id="${id}">דחה</button>`;
         }
         if (u.status !== 'pending') {
@@ -1160,7 +1225,7 @@
 
         const tr = document.createElement('tr');
         tr.innerHTML = `
-          <td class="name-cell" style="font-weight:700;"><span class="name-link" data-action="details" data-id="${id}">${escapeHtml(u.name) || '—'}</span>${allNotes[u.id] ? '<span class="note-dot" title="יש הערה">📝</span>' : ''}${u.tester ? '<span class="note-dot" title="בודק בטא">🧪</span>' : ''}${u.paid ? '<span class="note-dot" title="שילם">💰</span>' : ''} ${statusHtml}${u.deviceId ? `<div class="muted">מכשיר <span class="mono">${escapeHtml(u.deviceId)}</span></div>` : ''}</td>
+          <td class="name-cell" style="font-weight:700;"><span class="name-link" data-action="details" data-id="${id}">${escapeHtml(u.name) || '—'}</span>${allNotes[u.id] ? '<span class="note-dot" title="יש הערה">📝</span>' : ''}${u.tester ? '<span class="note-dot" title="בודק בטא">🧪</span>' : ''}${u.paid ? '<span class="note-dot" title="שילם">💰</span>' : ''}${userFlags(u)} ${statusHtml}${u.deviceId ? `<div class="muted">מכשיר <span class="mono">${escapeHtml(u.deviceId)}</span></div>` : ''}</td>
           <td data-label="טלפון"><span class="mono" style="color:#e2e8f0;">${escapeHtml(u.phone) || '—'}</span></td>
           <td data-label="בקשה" class="muted">${formatDate(u.createdAt)}</td>
           <td data-label="שימוש">${usageHtml(u)}</td>
@@ -1168,6 +1233,7 @@
           <td><div class="actions-cell">${actions}</div></td>`;
         tbody.appendChild(tr);
       });
+      renderSale();
     }
 
     async function loadUsers() {
@@ -1216,8 +1282,17 @@
         publishedVersion = cfg && cfg.latest_version ? String(cfg.latest_version) : '';
         $('currentPublished').textContent = publishedVersion ? 'v' + publishedVersion : '—';
         $('updApkUrl').value = (cfg && cfg.apk_url) || DEFAULT_APK_URL;
-        saleCfg = { price: Number(cfg && cfg.price) || 0, pay_phone: (cfg && cfg.pay_phone) || '', pay_note: (cfg && cfg.pay_note) || '', trial_days: Number(cfg && cfg.trial_days) || 0 };
+        saleCfg = {
+          price: Number(cfg && cfg.price) || 0,
+          price_was: Number(cfg && cfg.price_was) || 0,
+          pay_phone: (cfg && cfg.pay_phone) || '',
+          pay_link: (cfg && cfg.pay_link) || '',
+          pay_note: (cfg && cfg.pay_note) || '',
+          trial_days: Number(cfg && cfg.trial_days) || 0
+        };
         if (document.activeElement !== $('salePrice')) $('salePrice').value = saleCfg.price || '';
+        if (document.activeElement !== $('salePriceWas')) $('salePriceWas').value = saleCfg.price_was || '';
+        if (document.activeElement !== $('salePayLink')) $('salePayLink').value = saleCfg.pay_link;
         if (document.activeElement !== $('salePhone')) $('salePhone').value = saleCfg.pay_phone;
         if (document.activeElement !== $('saleNote')) $('saleNote').value = saleCfg.pay_note;
         $('saleTrialDays').value = String(saleCfg.trial_days || 0);
@@ -1357,6 +1432,10 @@
         openDetails(user);
       } else if (action === 'paid') {
         markPaid(user, btn);
+      } else if (action === 'remind') {
+        sendPayReminder(user);
+      } else if (action === 'transfer') {
+        transferLicense(user, btn);
       } else if (action === 'revoke') {
         if (!confirm(`לבטל את הגישה של ${user.name}?\nהאפליקציה תינעל אצלו בטלפון.`)) return;
         btn.disabled = true;
@@ -1428,7 +1507,14 @@
         <div class="drawer-sec">
           <h3>💰 תשלום</h3>
           ${user.paid
-            ? `<div class="kv"><span>שילם</span><span>₪${Number(user.paidAmount) || 0} ✓</span><span>מתי</span><span>${formatDate(user.paidAt)}</span></div>`
+            ? `<div class="kv"><span>שילם</span><span>₪${Number(user.paidAmount) || 0} ✓</span><span>מתי</span><span>${formatDate(user.paidAt)}</span>${user.transferredFrom ? '<span>הערה</span><span>🔁 הועבר מטלפון קודם</span>' : ''}</div>
+               <div style="display:flex; gap:8px; margin-top:10px;">
+                 <input class="input-field" id="drawerReceipt" maxlength="40" placeholder="מספר קבלה" value="${escapeHtml(user.receiptNo || '')}" style="flex:1; min-width:0;">
+                 <button type="button" class="btn btn-ghost" id="drawerReceiptSave">🧾 שמור</button>
+               </div>
+               <button type="button" class="btn btn-delete" id="drawerRefund" style="width:100%; justify-content:center; margin-top:8px;">↩️ החזר כספי (נועל את האפליקציה)</button>`
+            : user.refundedAt ? `<div class="muted">↩️ קיבל החזר כספי ב-${formatDate(user.refundedAt)}</div>`
+            : user.transferredTo ? `<div class="muted">🔁 הרישיון הועבר לטלפון חדש</div>`
             : `<div class="muted" style="margin-bottom:8px;">${user.status === 'trial' ? (trialDaysLeft(user) > 0 ? `🎁 בניסיון - נשארו ${trialDaysLeft(user)} ימים` : '⏰ הניסיון הסתיים - מחכה לתשלום') : 'עוד לא סומן כמשלם'}</div>
                <button type="button" class="btn btn-whatsapp" id="drawerPaid" style="width:100%; justify-content:center;">💰 סמן ששילם</button>`}
         </div>
@@ -1467,6 +1553,37 @@
       });
       const paidBtnD = document.getElementById('drawerPaid');
       if (paidBtnD) paidBtnD.addEventListener('click', () => markPaid(user, paidBtnD));
+      const rcptBtn = document.getElementById('drawerReceiptSave');
+      if (rcptBtn) rcptBtn.addEventListener('click', async () => {
+        const val = $('drawerReceipt').value.trim();
+        rcptBtn.disabled = true;
+        try {
+          await Cloud.admin.setReceipt(user.id, val);
+          user.receiptNo = val;
+          renderUsers();
+          toast(val ? '🧾 מספר הקבלה נשמר ✓' : 'מספר הקבלה נמחק');
+        } catch (err) {
+          toast('השמירה נכשלה: ' + err.message, true);
+        } finally {
+          rcptBtn.disabled = false;
+        }
+      });
+      const refundBtn = document.getElementById('drawerRefund');
+      if (refundBtn) refundBtn.addEventListener('click', async () => {
+        if (!confirm(`לסמן ש${user.name} קיבל החזר של ₪${Number(user.paidAmount) || 0}?\nהאפליקציה תינעל אצלו והסכום יירד מההכנסות.\n(את הכסף עצמו מחזירים בביט בנפרד)`)) return;
+        refundBtn.disabled = true;
+        try {
+          await Cloud.admin.refund(user.id);
+          Object.assign(user, { paid: false, paidAmount: 0, refundedAt: new Date().toISOString(), status: 'blocked' });
+          renderUsers();
+          renderStats();
+          openDetails(user);
+          toast('↩️ סומן החזר');
+        } catch (err) {
+          toast('הפעולה נכשלה: ' + err.message, true);
+          refundBtn.disabled = false;
+        }
+      });
       const testerBtn = document.getElementById('drawerTester');
       if (testerBtn) testerBtn.addEventListener('click', async () => {
         const next = !user.tester;
@@ -1551,6 +1668,129 @@
       }
     }
 
+    // ---------------- כלי מכירה ----------------
+    const phoneKey = (u) => String((u && u.phone) || '').replace(/\D/g, '').slice(-9);
+    const isTrialEnded = (u) => u.status === 'trial' && !u.paid && trialDaysLeft(u) <= 0;
+    const findPaidByPhone = (u) => (phoneKey(u).length >= 9 ? allUsers.find((x) => x.id !== u.id && x.paid && phoneKey(x) === phoneKey(u)) : null) || null;
+
+    function userFlags(u) {
+      let out = '';
+      if (u.transfer && u.status === 'pending') out += '<span class="flag flag-transfer">🔁 העברה</span>';
+      if (phoneKey(u).length >= 9 && allUsers.some((x) => x.id !== u.id && phoneKey(x) === phoneKey(u))) out += '<span class="flag flag-dup" title="יש עוד רשומה עם אותו טלפון">⚠️ נרשם בעבר</span>';
+      return out;
+    }
+
+    const REMIND_KEY = 'admin_remind_template_v1';
+    const DEFAULT_REMIND = 'היי {שם} 👋\nראיתי שניסית את Magic Lock - איך היה? 🎩\nתקופת הניסיון הסתיימה. כדי להמשיך: ₪{מחיר} תשלום חד-פעמי, כולל כל העדכונים.\nתשלום בביט / פייבוקס ל-{מספר}\n{קישור}\nאחרי התשלום האפליקציה נפתחת לך לתמיד 🙂';
+    const getRemind = () => localStorage.getItem(REMIND_KEY) || DEFAULT_REMIND;
+    $('remindTemplate').value = getRemind();
+    $('remindSaveBtn').addEventListener('click', () => { localStorage.setItem(REMIND_KEY, $('remindTemplate').value); toast('נשמר ✓'); });
+    $('remindResetBtn').addEventListener('click', () => { localStorage.removeItem(REMIND_KEY); $('remindTemplate').value = DEFAULT_REMIND; });
+
+    function sendPayReminder(user) {
+      const msg = getRemind()
+        .split('{שם}').join(user.name || '')
+        .split('{מחיר}').join(String(saleCfg.price || ''))
+        .split('{מספר}').join(saleCfg.pay_phone || '')
+        .split('\n').map((l) => (l.includes('{קישור}') ? (saleCfg.pay_link ? l.split('{קישור}').join(saleCfg.pay_link) : null) : l))
+        .filter((l) => l !== null).join('\n');
+      window.open(`https://wa.me/${formatPhoneForWhatsapp(user.phone)}?text=${encodeURIComponent(msg)}`, '_blank', 'noopener');
+    }
+
+    async function transferLicense(user, btn) {
+      const old = findPaidByPhone(user);
+      if (!old) return toast('לא נמצא קוסם משלם עם אותו טלפון', true);
+      if (!confirm(`להעביר את הרישיון של ${old.name} (₪${Number(old.paidAmount) || 0}) לטלפון החדש?\nהטלפון הישן יינעל.`)) return;
+      if (btn) btn.disabled = true;
+      try {
+        await Cloud.admin.transferLicense(old, user.id);
+        await loadUsers();
+        toast('🔁 הרישיון הועבר ✓');
+      } catch (err) {
+        toast('ההעברה נכשלה: ' + err.message, true);
+        if (btn) btn.disabled = false;
+      }
+    }
+
+    const CHECK_KEY = 'admin_sale_checklist_v1';
+    function renderSale() {
+      if (!$('saleKpiRevenue')) return;
+      const paid = allUsers.filter((u) => u.paid);
+      const ended = allUsers.filter(isTrialEnded);
+      const everTrial = allUsers.filter((u) => u.status === 'trial' || u.paid).length;
+      $('saleKpiRevenue').textContent = '₪' + paid.reduce((a, u) => a + (Number(u.paidAmount) || 0), 0).toLocaleString('he-IL');
+      $('saleKpiPaid').textContent = paid.length;
+      $('saleKpiTrial').textContent = allUsers.filter((u) => u.status === 'trial' && trialDaysLeft(u) > 0).length;
+      $('saleKpiEnded').textContent = ended.length;
+      $('saleKpiConv').textContent = everTrial ? Math.round((paid.length / everTrial) * 100) + '%' : '—';
+      $('saleKpiConvSub').textContent = everTrial ? `${paid.length} מתוך ${everTrial}` : '';
+      $('badgeSale').textContent = ended.length;
+      $('badgeSale').style.display = ended.length ? '' : 'none';
+
+      $('endedCount').textContent = ended.length;
+      $('endedList').innerHTML = ended.length
+        ? ended.map((u) => `<div class="sale-row"><span><span class="who" data-sale-open="${escapeHtml(u.id)}">${escapeHtml(u.name)}</span> <span class="meta">${escapeHtml(u.phone)}</span></span><span><button type="button" class="btn btn-wa-outline" data-sale-remind="${escapeHtml(u.id)}">🟢 תזכורת</button> <button type="button" class="btn btn-whatsapp" data-sale-paid="${escapeHtml(u.id)}">💰 שילם</button></span></div>`).join('')
+        : '<div class="muted">אין כרגע 🎉</div>';
+
+      const sales = paid.slice().sort((a, b) => String(b.paidAt || '').localeCompare(String(a.paidAt || '')));
+      $('salesCount').textContent = sales.length;
+      $('salesList').innerHTML = sales.length
+        ? sales.map((u) => `<div class="sale-row"><span><span class="who" data-sale-open="${escapeHtml(u.id)}">${escapeHtml(u.name)}</span> <span class="meta">${formatDate(u.paidAt)} · ${escapeHtml(u.payMethod || '')}</span>${u.receiptNo ? ` <span class="meta">🧾 ${escapeHtml(u.receiptNo)}</span>` : '<span class="flag flag-noreceipt">חסרה קבלה</span>'}</span><span style="font-weight:800;">₪${Number(u.paidAmount) || 0}</span></div>`).join('')
+        : '<div class="muted">עוד אין מכירות</div>';
+
+      const done = JSON.parse(localStorage.getItem(CHECK_KEY) || '{}');
+      const items = [
+        ['price', 'נקבע מחיר', '', saleCfg.price > 0],
+        ['pay', 'הוגדרה דרך תשלום (מספר ביט או קישור)', '', Boolean(saleCfg.pay_phone || saleCfg.pay_link)],
+        ['tests', 'אין רשומות בדיקה ברשימת הלקוחות', 'למחוק את "בדיקת מכירה (למחוק)"', !allUsers.some((u) => /בדיקת/.test(u.name || ''))],
+        ['father', 'אבא אישר למכור דרך העסק', 'לשאול את רואה החשבון שלו איך לרשום את ההכנסה'],
+        ['receipts', 'יש דרך להוציא קבלה על כל תשלום', 'אפליקציית חשבוניות של העסק'],
+        ['vat', 'אם העסק עוסק מורשה - המחיר כולל מע"מ', 'מחיר לצרכן מוצג כולל מע"מ'],
+        ['refund', 'הוחלט על מדיניות החזרים', 'למשל החזר מלא תוך 14 יום אם לא עובד במכשיר'],
+        ['terms', 'פרטי העסק הושלמו בתנאי השימוש ובמדיניות הפרטיות', ''],
+        ['lawyer', 'עורך דין עבר על התנאים (מומלץ)', ''],
+        ['flow', 'בדקת את כל המסלול בטלפון: הרשמה ← ניסיון ← תשלום ← אישור', '']
+      ];
+      let ok = 0;
+      $('saleChecklist').innerHTML = items.map(([k, text, sub, auto]) => {
+        const isAuto = auto !== undefined;
+        const on = isAuto ? auto : Boolean(done[k]);
+        if (on) ok += 1;
+        return `<label class="check-row ${on ? 'done' : ''}"><input type="checkbox" data-check="${k}" ${on ? 'checked' : ''} ${isAuto ? 'disabled' : ''}><span>${escapeHtml(text)}${isAuto ? '<span class="auto">(נבדק לבד)</span>' : ''}${sub ? `<span class="sub">${escapeHtml(sub)}</span>` : ''}</span></label>`;
+      }).join('');
+      $('saleReadySummary').textContent = ok === items.length ? '✅ הכל מוכן למכירה!' : `${ok} מתוך ${items.length} מוכנים`;
+    }
+
+    document.addEventListener('change', (e) => {
+      const k = e.target && e.target.dataset && e.target.dataset.check;
+      if (!k) return;
+      const done = JSON.parse(localStorage.getItem(CHECK_KEY) || '{}');
+      done[k] = e.target.checked;
+      localStorage.setItem(CHECK_KEY, JSON.stringify(done));
+      renderSale();
+    });
+    document.addEventListener('click', (e) => {
+      const t = e.target.closest('[data-sale-open],[data-sale-remind],[data-sale-paid]');
+      if (!t) return;
+      const id = t.dataset.saleOpen || t.dataset.saleRemind || t.dataset.salePaid;
+      const user = allUsers.find((u) => u.id === id);
+      if (!user) return;
+      if (t.dataset.saleOpen) openDetails(user);
+      else if (t.dataset.saleRemind) sendPayReminder(user);
+      else markPaid(user, t);
+    });
+    $('salesExportBtn').addEventListener('click', () => {
+      const rows = [['תאריך', 'שם', 'טלפון', 'סכום', 'אמצעי', 'מספר קבלה', 'סטטוס']];
+      allUsers.filter((u) => u.paid || u.refundedAt).forEach((u) => rows.push([
+        formatDate(u.paidAt || u.refundedAt), u.name || '', u.phone || '', u.paid ? Number(u.paidAmount) || 0 : 0, u.payMethod || '', u.receiptNo || '', u.paid ? 'שולם' : 'הוחזר'
+      ]));
+      const csv = '﻿' + rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\r\n');
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+      a.download = `magic-lock-sales-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+    });
+
     $('saleSaveBtn').addEventListener('click', async () => {
       const btn = $('saleSaveBtn');
       btn.disabled = true;
@@ -1558,11 +1798,14 @@
       try {
         await Cloud.admin.saveSaleSettings({
           price: $('salePrice').value,
+          price_was: $('salePriceWas').value,
           pay_phone: $('salePhone').value,
+          pay_link: $('salePayLink').value,
           pay_note: $('saleNote').value,
           trial_days: $('saleTrialDays').value
         });
         await loadPublishedVersion();
+        renderSale();
         $('saleStatus').textContent = '✓ נשמר. ' + (saleCfg.trial_days ? `קוסמים חדשים יקבלו ${saleCfg.trial_days} ימי ניסיון.` : 'בלי ניסיון - אתה מאשר כל אחד ידנית.');
       } catch (err) {
         $('saleStatus').textContent = 'השמירה נכשלה: ' + err.message;

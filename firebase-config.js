@@ -262,9 +262,17 @@ window.MagicCloud = (function () {
 
   // הרשמה: "ניסיון" (אם המנהל הפעיל תקופת ניסיון) או "ממתין לאישור".
   // שעת ההרשמה נקבעת בשרת - ממנה נספרת תקופת הניסיון, ואי אפשר לזייף אותה מהטלפון.
-  async function submitRequest({ name, phone, deviceId, trial = false }) {
+  // transfer = קוסם שכבר קנה ועבר לטלפון חדש: בקשה רגילה (בלי ניסיון) שמסומנת למנהל כהעברה
+  async function submitRequest({ name, phone, deviceId, trial = false, transfer = false }) {
     const uid = await ensureDeviceSession();
-    const status = trial ? 'trial' : 'pending';
+    const status = trial && !transfer ? 'trial' : 'pending';
+    const data = {
+      name: String(name || '').trim(),
+      phone: String(phone || '').trim(),
+      deviceId: String(deviceId || '').trim(),
+      status
+    };
+    if (transfer) data.transfer = true;
     const res = await authedRequest(deviceAuth, `${DB_BASE}:commit`, {
       method: 'POST',
       body: JSON.stringify({
@@ -272,12 +280,7 @@ window.MagicCloud = (function () {
           {
             update: {
               name: `projects/${PROJECT_ID}/databases/(default)/documents/users/${uid}`,
-              fields: toFields({
-                name: String(name || '').trim(),
-                phone: String(phone || '').trim(),
-                deviceId: String(deviceId || '').trim(),
-                status
-              })
+              fields: toFields(data)
             },
             updateTransforms: [{ fieldPath: 'createdAt', setToServerValue: 'REQUEST_TIME' }],
             currentDocument: { exists: false }
@@ -288,7 +291,7 @@ window.MagicCloud = (function () {
     // כבר נרשם מהמכשיר הזה
     if (res.status === 409 || (res.status === 400 && /exist/i.test(res.text || ''))) return getMyStatus();
     if (!res.ok) throw makeError(res, 'Request failed');
-    notifyAdmin('request');
+    notifyAdmin(transfer ? 'transfer' : 'request');
     return status;
   }
 
@@ -360,7 +363,7 @@ window.MagicCloud = (function () {
   }
 
   // שליחת משוב מהקוסם (מגיע לאתר הניהול)
-  async function sendFeedback({ text, appVersion, os, model }) {
+  async function sendFeedback({ text, appVersion, os, model, notify = 'message' }) {
     const uid = await ensureDeviceSession();
     const res = await authedRequest(deviceAuth, `${DB_BASE}/feedback`, {
       method: 'POST',
@@ -376,7 +379,7 @@ window.MagicCloud = (function () {
       })
     });
     if (!res.ok) throw makeError(res, 'Feedback failed');
-    notifyAdmin('message');
+    notifyAdmin(notify === 'paid' ? 'paid' : 'message');
     return true;
   }
 
@@ -385,11 +388,18 @@ window.MagicCloud = (function () {
   function notifyAdmin(kind) {
     const topic = String(cfg.adminNotifyTopic || '').trim();
     if (!/^[A-Za-z0-9_-]{8,64}$/.test(topic)) return Promise.resolve(false);
-    const text = kind === 'request' ? '🔔 בקשת גישה חדשה מחכה לאישור' : kind === 'message' ? '💬 הודעה חדשה מקוסם' : '🧪 בדיקת התראה - הכל עובד!';
+    const kinds = {
+      request: ['🔔 בקשת גישה חדשה מחכה לאישור', 'bell'],
+      message: ['💬 הודעה חדשה מקוסם', 'speech_balloon'],
+      paid: ['💰 קוסם דיווח שהוא שילם - בדוק בביט ואשר', 'moneybag'],
+      transfer: ['🔁 בקשה להעביר רישיון לטלפון חדש', 'arrows_counterclockwise'],
+      test: ['🧪 בדיקת התראה - הכל עובד!', 'test_tube']
+    };
+    const [text, tag] = kinds[kind] || kinds.test;
     return fetch(`https://ntfy.sh/${topic}`, {
       method: 'POST',
       body: text,
-      headers: { Title: 'Magic Lock', Click: ADMIN_PAGE_URL, Tags: kind === 'request' ? 'bell' : kind === 'message' ? 'speech_balloon' : 'test_tube' }
+      headers: { Title: 'Magic Lock', Click: ADMIN_PAGE_URL, Tags: tag }
     })
       .then((r) => r.ok)
       .catch(() => false);
@@ -647,24 +657,64 @@ window.MagicCloud = (function () {
   }
 
   // סימון ששילם: הקוסם מקבל גישה קבועה
-  async function adminSetPaid(uid, { amount = 0, method = 'bit' } = {}) {
-    const fields = ['paid', 'paidAt', 'paidAmount', 'payMethod', 'status', 'updatedAt'];
-    const url = `${DB_BASE}/users/${encodeURIComponent(uid)}?${fields.map((f) => `updateMask.fieldPaths=${f}`).join('&')}&currentDocument.exists=true`;
-    const res = await authedRequest(adminAuth, url, {
+  // עדכון חלקי של רשומת קוסם (רק השדות שנשלחים)
+  async function adminPatchUser(uid, data) {
+    const mask = Object.keys(data).map((f) => `updateMask.fieldPaths=${f}`).join('&');
+    const res = await authedRequest(adminAuth, `${DB_BASE}/users/${encodeURIComponent(uid)}?${mask}&currentDocument.exists=true`, {
       method: 'PATCH',
-      body: JSON.stringify({
-        fields: toFields({ paid: true, paidAt: new Date(), paidAmount: Number(amount) || 0, payMethod: String(method || '').slice(0, 30), status: 'approved', updatedAt: new Date() })
-      })
+      body: JSON.stringify({ fields: toFields(data) })
     });
     if (!res.ok) throw makeError(res, 'Update failed');
     return true;
   }
 
+  async function adminSetPaid(uid, { amount = 0, method = 'bit', receipt = '' } = {}) {
+    return adminPatchUser(uid, {
+      paid: true,
+      paidAt: new Date(),
+      paidAmount: Number(amount) || 0,
+      payMethod: String(method || '').slice(0, 30),
+      receiptNo: String(receipt || '').trim().slice(0, 40),
+      status: 'approved',
+      updatedAt: new Date()
+    });
+  }
+
+  // מספר קבלה אחרי שהוצאת אותה (אפשר גם אחרי הסימון כמשלם)
+  async function adminSetReceipt(uid, receipt) {
+    return adminPatchUser(uid, { receiptNo: String(receipt || '').trim().slice(0, 40), updatedAt: new Date() });
+  }
+
+  // החזר כספי: מבטל את התשלום ונועל את האפליקציה
+  async function adminRefund(uid) {
+    return adminPatchUser(uid, { paid: false, paidAmount: 0, refundedAt: new Date(), status: 'blocked', updatedAt: new Date() });
+  }
+
+  // העברת רישיון לטלפון חדש: החדש מקבל את פרטי התשלום, הישן ננעל (וכך לא נספר פעמיים בהכנסות)
+  async function adminTransferLicense(fromUser, toUid) {
+    await adminPatchUser(toUid, {
+      paid: true,
+      paidAt: fromUser.paidAt ? new Date(fromUser.paidAt) : new Date(),
+      paidAmount: Number(fromUser.paidAmount) || 0,
+      payMethod: String(fromUser.payMethod || 'bit').slice(0, 30),
+      receiptNo: String(fromUser.receiptNo || '').slice(0, 40),
+      transferredFrom: fromUser.id,
+      status: 'approved',
+      updatedAt: new Date()
+    });
+    await adminPatchUser(fromUser.id, { paid: false, paidAmount: 0, transferredTo: toUid, status: 'blocked', updatedAt: new Date() });
+    return true;
+  }
+
   // הגדרות מכירה (ציבוריות - האפליקציה מציגה אותן לקוסמים): מחיר, מספר לתשלום, הערה וימי ניסיון
-  async function adminSaveSaleSettings({ price, pay_phone, pay_note, trial_days }) {
+  async function adminSaveSaleSettings({ price, price_was, pay_phone, pay_link, pay_note, trial_days }) {
+    const link = String(pay_link || '').trim();
+    if (link && !/^https:\/\/[^\s]+$/i.test(link)) throw new Error('קישור התשלום חייב להתחיל ב-https://');
     const data = {
       price: Math.max(0, Number(price) || 0),
+      price_was: Math.max(0, Number(price_was) || 0),
       pay_phone: String(pay_phone || '').trim().slice(0, 20),
+      pay_link: link.slice(0, 300),
       pay_note: String(pay_note || '').trim().slice(0, 300),
       trial_days: Math.max(0, Math.min(30, parseInt(trial_days, 10) || 0))
     };
@@ -727,6 +777,9 @@ window.MagicCloud = (function () {
       setStatus: adminSetStatus,
       setTester: adminSetTester,
       setPaid: adminSetPaid,
+      setReceipt: adminSetReceipt,
+      refund: adminRefund,
+      transferLicense: adminTransferLicense,
       saveSaleSettings: adminSaveSaleSettings,
       deleteUser: adminDeleteUser,
       listFeedback: adminListFeedback,

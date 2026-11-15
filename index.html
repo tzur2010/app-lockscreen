@@ -51,7 +51,32 @@
           autocomplete="tel"
           dir="ltr"
         />
+        <input
+          type="text"
+          id="regVipInput"
+          class="license-reg-input"
+          placeholder="קוד הזמנה (VIP)"
+          autocomplete="off"
+          autocapitalize="characters"
+          dir="ltr"
+          style="display: none;"
+        />
+        <label class="reg-terms-row">
+          <input type="checkbox" id="regTermsCheck">
+          <span>קראתי ואני מסכים ל<a href="https://tzur2010.github.io/app-lockscreen/terms.html" target="_blank" rel="noopener">תנאי השימוש</a> ול<a href="https://tzur2010.github.io/app-lockscreen/privacy.html" target="_blank" rel="noopener">מדיניות הפרטיות</a></span>
+        </label>
+        <div class="reg-trial-note" id="regTrialNote" style="display: none;"></div>
         <button type="button" class="license-reg-submit-btn" id="submitRegBtn">שלח בקשה</button>
+        <div class="reg-links">
+          <button type="button" class="reg-link-btn" id="regVipToggle">⭐ יש לך קוד הזמנה?</button>
+          <button type="button" class="reg-link-btn" id="regTransferToggle">קנית כבר ועברת לטלפון חדש?</button>
+        </div>
+      </div>
+
+      <!-- תקופת הניסיון הסתיימה: הוראות תשלום -->
+      <div class="reg-waiting-box reg-pay-box" id="regTrialEndBox" style="display: none;">
+        <div class="reg-waiting-title" id="regTrialEndTitle">⏰ תקופת הניסיון הסתיימה</div>
+        <div class="pay-panel" id="regPayPanel"></div>
       </div>
 
       <!-- מצב המתנה לאישור מרחוק -->
@@ -171,6 +196,19 @@
     </div>
   </div>
 
+  <!-- מה חדש: מופיע פעם אחת אחרי עדכון -->
+  <div class="update-popup-overlay" id="whatsNewOverlay" style="display: none;">
+    <div class="update-popup-card whats-new-card">
+      <div class="whats-new-head">
+        <div class="whats-new-burst">🎉</div>
+        <div class="update-popup-title" id="whatsNewTitle">מה חדש</div>
+        <div class="whats-new-sub" id="whatsNewSub"></div>
+      </div>
+      <div class="whats-new-list" id="whatsNewList"></div>
+      <button type="button" class="update-popup-btn" id="whatsNewDoneBtn">מעולה, בוא נתחיל</button>
+    </div>
+  </div>
+
   <!-- סיור היכרות: מדגיש כל פעם חלק אחר בהגדרות -->
   <div class="tour-layer" id="tourLayer" style="display: none;">
     <div class="tour-spot" id="tourSpot"></div>
@@ -185,6 +223,15 @@
   </div>
 
   <!-- הסבר קצר על קסם (כפתור ? ליד כל קסם) -->
+  <!-- רכישה מתוך תקופת הניסיון -->
+  <div class="update-popup-overlay" id="buyOverlay" style="display: none;">
+    <div class="update-popup-card tip-card">
+      <div class="update-popup-title" id="buyTitle">💰 רכישת Magic Lock</div>
+      <div class="pay-panel" id="buyPanel"></div>
+      <button type="button" class="update-popup-btn secondary-btn" id="buyCloseBtn">סגור</button>
+    </div>
+  </div>
+
   <div class="update-popup-overlay" id="tipOverlay" style="display: none;">
     <div class="update-popup-card tip-card">
       <div class="update-popup-title" id="tipTitle"></div>
@@ -327,6 +374,10 @@
         <!-- ===================== לשונית: טריק ===================== -->
         <section class="settings-panel active" data-tab="trick">
 
+        <div class="trial-banner" id="trialBanner" style="display: none;">
+          <span id="trialBannerText"></span>
+          <button type="button" class="trial-banner-btn" id="trialBuyBtn">לרכישה</button>
+        </div>
         <button type="button" class="reset-show-btn" id="resetShowBtn">🔄 מוכן לצופה הבא</button>
         <button type="button" class="preshow-btn" id="preShowCheckBtn">✅ בדיקה לפני הופעה</button>
 
@@ -841,6 +892,7 @@
 
         <button type="button" class="guide-open-btn" id="openGuideBtn">📖 מדריך: איך משתמשים באפליקציה</button>
         <button type="button" class="guide-open-btn" id="startTourBtn">🧭 סיור היכרות בהגדרות</button>
+        <button type="button" class="guide-open-btn" id="openWhatsNewBtn">🎉 מה חדש באפליקציה</button>
 
         <div class="oneui-section-header">🌐 שפה / Language</div>
         <div class="config-group oneui-card">

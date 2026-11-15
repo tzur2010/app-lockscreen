@@ -3710,3 +3710,61 @@ html[dir="ltr"] body.practice-on .settings-tabs::after { content: '🎯 Practice
 .tip-patter { background: rgba(34,197,94,.1); border: 1px solid rgba(34,197,94,.3); border-radius: 14px; padding: 10px 12px; margin-bottom: 14px; }
 .tip-patter-label { font-size: 12px; font-weight: 800; color: #4ade80; margin-bottom: 4px; }
 .tip-patter-text { font-size: 15px; font-style: italic; line-height: 1.55; }
+
+/* ===================== אנימציית שחרור נעילה ===================== */
+/* סמסונג: מסך הנעילה מתקרב ונעלם, ומסך הבית "מתיישב" ממרחק קטן */
+.phone-container.unlocking > *:not(.lockscreen-dim-backdrop):not(.fake-homescreen):not(.fake-call):not(.secret-peek) {
+  transition: transform 0.26s cubic-bezier(0.2, 0.7, 0.3, 1), opacity 0.22s ease-out !important;
+  transform: scale(1.12) !important;
+  opacity: 0 !important;
+  pointer-events: none;
+}
+.theme-samsung .fake-homescreen { transform: scale(0.94); transition: opacity 0.26s ease, transform 0.32s cubic-bezier(0.2, 0.7, 0.3, 1); }
+.theme-samsung .fake-homescreen.unlocked { transform: scale(1); }
+/* אייפון: מסך הנעילה מחליק למעלה ומסך הבית נחשף מתחתיו */
+.phone-container.theme-ios.unlocking > *:not(.lockscreen-dim-backdrop):not(.fake-homescreen):not(.fake-call):not(.secret-peek) {
+  transition: transform 0.34s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.3s ease-in !important;
+  transform: translateY(-100vh) !important;
+  opacity: 0.4 !important;
+}
+.theme-ios .fake-homescreen { transform: none; transition: opacity 0.3s ease 0.06s; }
+
+/* ===================== מה חדש ===================== */
+.whats-new-card { max-width: 430px; max-height: 88vh; overflow-y: auto; color: #f1f5f9; text-align: start; }
+.whats-new-head { text-align: center; margin-bottom: 12px; }
+.whats-new-burst { font-size: 40px; line-height: 1; margin-bottom: 6px; animation: wnPop .6s cubic-bezier(.2,1.6,.4,1); }
+@keyframes wnPop { from { transform: scale(.3) rotate(-20deg); opacity: 0; } to { transform: none; opacity: 1; } }
+.whats-new-sub { font-size: 13px; color: #94a3b8; margin-top: 2px; }
+.whats-new-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
+.whats-new-item { display: grid; grid-template-columns: 42px 1fr; gap: 10px; align-items: start; padding: 12px; border-radius: 16px; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.07); animation: wnIn .4s ease both; }
+.whats-new-item:nth-child(2) { animation-delay: .07s; } .whats-new-item:nth-child(3) { animation-delay: .14s; } .whats-new-item:nth-child(4) { animation-delay: .21s; } .whats-new-item:nth-child(5) { animation-delay: .28s; } .whats-new-item:nth-child(6) { animation-delay: .35s; }
+@keyframes wnIn { from { transform: translateY(10px); opacity: 0; } to { transform: none; opacity: 1; } }
+.whats-new-icon { width: 42px; height: 42px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 22px; background: rgba(37,99,235,.18); }
+.whats-new-item-title { font-size: 15px; font-weight: 800; margin-bottom: 2px; }
+.whats-new-item-text { font-size: 13.5px; line-height: 1.5; color: #cbd5e1; }
+.whats-new-try { margin-top: 8px; border: none; border-radius: 10px; padding: 6px 12px; font-size: 13px; font-weight: 700; background: #2563eb; color: #fff; font-family: inherit; cursor: pointer; }
+.whats-new-flash { animation: wnFlash 1.6s ease; border-radius: 14px; }
+@keyframes wnFlash { 0%, 100% { box-shadow: 0 0 0 0 rgba(37,99,235,0); } 20%, 60% { box-shadow: 0 0 0 4px rgba(37,99,235,.7); } }
+
+/* ===================== מכירה: ניסיון ותשלום ===================== */
+.reg-terms-row { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; line-height: 1.5; color: #cbd5e1; margin: 4px 2px 10px; text-align: start; cursor: pointer; }
+.reg-terms-row input { margin-top: 3px; width: 18px; height: 18px; flex: 0 0 auto; accent-color: #22c55e; }
+.reg-terms-row a { color: #60a5fa; }
+.reg-trial-note { font-size: 13px; color: #4ade80; background: rgba(34,197,94,.1); border: 1px solid rgba(34,197,94,.3); border-radius: 12px; padding: 8px 10px; margin-bottom: 10px; line-height: 1.5; }
+.reg-pay-box { gap: 8px; }
+.reg-pay-price { font-size: 22px; font-weight: 800; color: #f8fafc; white-space: nowrap; }
+.reg-pay-how { font-size: 14px; line-height: 1.7; color: #cbd5e1; white-space: pre-line; text-align: center; }
+.trial-banner { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; padding: 10px 14px; border-radius: 16px; background: linear-gradient(135deg, rgba(34,197,94,.16), rgba(37,99,235,.14)); border: 1px solid rgba(34,197,94,.35); font-size: 14px; font-weight: 700; }
+.trial-banner-btn { border: none; border-radius: 10px; padding: 7px 14px; background: #22c55e; color: #052e16; font-weight: 800; font-family: inherit; cursor: pointer; }
+
+/* פאנל תשלום: מחיר, הוראות, כפתורי העתקה/תשלום, "שילמתי" */
+.pay-panel { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+.pay-was { font-size: 15px; font-weight: 600; color: #94a3b8; text-decoration: line-through; margin-inline-start: 6px; }
+.pay-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+.pay-action-btn { flex: 1 1 120px; min-height: 44px; border-radius: 12px; border: 1px solid rgba(255,255,255,.18); background: rgba(255,255,255,.08); color: #f8fafc; font-weight: 700; font-size: 14px; font-family: inherit; cursor: pointer; }
+.pay-action-btn.primary { background: linear-gradient(135deg, #2563eb, #1d4ed8); border-color: transparent; }
+.pay-payer-input { width: 100%; box-sizing: border-box; min-height: 42px; border-radius: 12px; border: 1px solid rgba(255,255,255,.18); background: rgba(0,0,0,.25); color: #f8fafc; padding: 0 12px; font-size: 14px; font-family: inherit; }
+.pay-status { font-size: 13px; color: #94a3b8; text-align: center; line-height: 1.5; min-height: 18px; }
+.reg-link-btn { background: none; border: none; color: #60a5fa; font-size: 13px; font-family: inherit; margin-top: 10px; cursor: pointer; text-decoration: underline; }
+#buyOverlay .secondary-btn { background: rgba(255,255,255,.1); color: #e2e8f0; }
+.reg-links { display: flex; justify-content: center; gap: 14px; flex-wrap: wrap; }

@@ -9,8 +9,18 @@
   var CONFIG_KEY = 'magic_lockscreen_config_v6';
   var lang = 'he';
   try {
-    var cfg = JSON.parse(localStorage.getItem(CONFIG_KEY) || '{}');
+    var raw = localStorage.getItem(CONFIG_KEY);
+    var cfg = JSON.parse(raw || '{}');
     if (cfg && cfg.uiLang === 'en') lang = 'en';
+    // התקנה ראשונה (עוד אין הגדרות שמורות) בטלפון שהשפה שלו לא עברית -> מתחילים באנגלית
+    // (הרבה ישראלים מחזיקים טלפון באנגלית - לכן גם אזור זמן של ישראל = עברית)
+    else if (!raw) {
+      var langs = [].concat(navigator.languages || [], navigator.language || []);
+      var tz = '';
+      try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch (e2) {}
+      var israeli = /^(Asia\/Jerusalem|Asia\/Tel_Aviv)$/.test(tz) || langs.some(function (l) { return /^(he|iw)/i.test(l); });
+      if (!israeli && langs.length) lang = 'en';
+    }
   } catch (e) {}
 
   var isEn = lang === 'en';
@@ -37,6 +47,8 @@
     'אין חיבור לאינטרנט, מנסה שוב...': 'No internet connection, retrying...',
     'אין חיבור לאינטרנט, נסה שוב': 'No internet connection, try again',
     'אנא הזן שם מלא': 'Please enter your full name',
+    'אנא הזן את קוד ההזמנה': 'Please enter your invite code',
+    'קוד ההזמנה לא נכון - בדוק אותו ונסה שוב': 'This invite code is not valid - check it and try again',
     'אנא הזן מספר טלפון תקין': 'Please enter a valid phone number',
     'שליחת הבקשה נכשלה, נסה שוב': 'Sending failed, try again',
     'שם מלא': 'Full name',
@@ -359,6 +371,20 @@
     'חיפוש': 'Search',
     'חיפושים אחרונים': 'Recent searches',
     '🧭 סיור היכרות בהגדרות': '🧭 Settings tour',
+    '🎉 מה חדש באפליקציה': "🎉 What's new",
+    '🧪 גרסת בטא - רק לבודקים': '🧪 Beta version - testers only',
+    // 6.0: מכירה
+    'קראתי ואני מסכים ל': 'I have read and agree to the ',
+    'תנאי השימוש': 'Terms of Use',
+    'ול': ' and the ',
+    'מדיניות הפרטיות': 'Privacy Policy',
+    '⏰ תקופת הניסיון הסתיימה': '⏰ Your free trial has ended',
+    'שילמתי ✓ שלח הודעה': 'I paid ✓ send a message',
+    'אחרי שהתשלום יאושר - האפליקציה תיפתח לבד.': 'Once the payment is confirmed, the app opens by itself.',
+    'ההודעה נשלחה ✓ האפליקציה תיפתח לבד ברגע שהתשלום יאושר.': 'Message sent ✓ The app opens as soon as the payment is confirmed.',
+    'השליחה נכשלה - בדוק חיבור לאינטרנט ונסה שוב': 'Sending failed - check your connection and try again',
+    'יש לאשר את תנאי השימוש ומדיניות הפרטיות': 'Please accept the Terms of Use and Privacy Policy',
+    'לרכישה': 'Buy',
     'דלג': 'Skip',
     'הסבר': 'Help',
     '💬 מה אומרים לקהל': '💬 What to say',
@@ -417,6 +443,7 @@
   var R = [
     [/^רשמי \((.+)\)$/, 'Official ($1)'],
     [/^(קוד|סיסמה|דפוס) · (.*)$/, function (m, k, t) { return KIND[k] + ' · ' + t; }],
+    [/^גרסה מותקנת: (\S+) · 🧪 בודק בטא$/, 'Installed version: $1 · 🧪 Beta tester'],
     [/^גרסה מותקנת: (.+)$/, 'Installed version: $1'],
     [/^גובה לאחרונה: (.+)$/, 'Last backup: $1'],
     [/^היום, (\d{1,2}:\d{2})$/, 'Today, $1'],

@@ -423,6 +423,8 @@ const DEFAULT_CONFIG = {
 };
 
 let config = loadConfig();
+// התקנה ראשונה בטלפון שאינו בעברית: i18n.js כבר בחר אנגלית - שומרים את זה גם בהגדרות
+if (window.MagicI18n && window.MagicI18n.isEn && config.uiLang !== 'en') config.uiLang = 'en';
 
 function loadConfig() {
   try {
@@ -2446,12 +2448,24 @@ phoneContainer.addEventListener('pointerleave', hideHoldPeek);
 // 17. הדמיית ביומטריה אמיתית: טביעת אצבע (Samsung) ו-Face ID (iPhone)
 // ----------------------------------------------------------------------------
 // ביטול אנימציית סגירת חלון באמצעות Translucent Theme ו-Fade מהיר (100ms) שמחקה פתיחת One UI
+// אנימציית שחרור נעילה כמו בטלפון אמיתי:
+// סמסונג (One UI) - מסך הנעילה מתקרב ונעלם. אייפון (iOS) - מסך הנעילה מחליק למעלה.
+const UNLOCK_ANIM_MS = { samsung: 230, ios: 300 };
+
 function triggerNativeUnlock() {
   const screen = document.body;
-  // התפוגגות והתרחבות קלה של המסך (100ms), שחושפת את מסך הבית שמתחת
-  screen.style.transition = 'opacity 0.1s ease-out, transform 0.1s ease-out';
-  screen.style.opacity = '0';
-  screen.style.transform = 'scale(1.03)';
+  const ios = config.osTheme === 'ios';
+  const ms = ios ? UNLOCK_ANIM_MS.ios : UNLOCK_ANIM_MS.samsung;
+  screen.style.willChange = 'transform, opacity';
+  if (ios) {
+    screen.style.transition = `transform ${ms}ms cubic-bezier(0.32, 0.72, 0, 1), opacity ${ms}ms ease-in`;
+    screen.style.transform = 'translateY(-100%)';
+    screen.style.opacity = '0.6';
+  } else {
+    screen.style.transition = `transform ${ms}ms cubic-bezier(0.2, 0.7, 0.3, 1), opacity ${ms}ms ease-out`;
+    screen.style.transform = 'scale(1.12)';
+    screen.style.opacity = '0';
+  }
 
   setTimeout(() => {
     if (window.AndroidNative && window.AndroidNative.forceUnlockAndExit) {
@@ -2461,9 +2475,14 @@ function triggerNativeUnlock() {
     } else if (window.Android && window.Android.unlockDevice) {
       window.Android.unlockDevice();
     } else {
-      window.location.href = "intent:#Intent;action=android.intent.action.MAIN;category=android.intent.category.HOME;end";
+      // גרסת האתר (אייפון): אי אפשר לצאת למסך הבית האמיתי, אז מציגים את מסך הבית המדומה
+      screen.style.transition = 'none';
+      screen.style.transform = '';
+      screen.style.opacity = '';
+      screen.style.willChange = '';
+      fakeHomescreen.classList.add('unlocked');
     }
-  }, 100);
+  }, Math.max(60, ms - 30));
 }
 
 function triggerUnlockHomescreen() {
@@ -2481,6 +2500,8 @@ function triggerUnlockHomescreen() {
     const minutes = String(now.getMinutes()).padStart(2, '0');
     notesDateLine.textContent = `היום, ${hours}:${minutes}`;
   }
+  // אנימציית שחרור על מסך הנעילה (מתחת למסך הבית שמופיע)
+  phoneContainer.classList.add('unlocking');
   const lastCode = localStorage.getItem(LAST_PIN_KEY) || '';
   if (config.unlockTargetScreen === 'notes' && config.notesReveal) {
     showNotesPrediction(lastCode);
@@ -2679,6 +2700,8 @@ const BACK_CLOSABLE_POPUPS = [
   ['updatePopupOverlay', () => hideUpdatePopup()],
   ['preShowOverlay', () => (document.getElementById('preShowOverlay').style.display = 'none')],
   ['tipOverlay', () => (document.getElementById('tipOverlay').style.display = 'none')],
+  ['whatsNewOverlay', () => closeWhatsNew()],
+  ['buyOverlay', () => closePayInfo()],
   ['tourLayer', () => endTour()]
 ];
 
@@ -2849,6 +2872,9 @@ function openSettingsSheet() {
   forceAttemptCount = 0;
   refreshSettingsLastCaptured();
   setTimeout(maybeShowAdminMessage, 600);
+  setTimeout(() => {
+    if (typeof maybeShowWhatsNew === 'function') maybeShowWhatsNew();
+  }, 900);
   if (typeof checkCloudAppUpdate === 'function') {
     checkCloudAppUpdate(false);
   }
@@ -3279,14 +3305,15 @@ function readLicenseCache() {
   }
 }
 
-function writeLicenseCache(status) {
+function writeLicenseCache(status, extra = {}) {
   try {
-    localStorage.setItem(LICENSE_CACHE_KEY, JSON.stringify({ status, checkedAt: Date.now() }));
+    localStorage.setItem(LICENSE_CACHE_KEY, JSON.stringify({ status, checkedAt: Date.now(), ...extra }));
   } catch (e) {}
 }
 
 function isCachedApprovalValid() {
   const cache = readLicenseCache();
+  if (cache && cache.status === 'trial') return Date.now() < Number(cache.trialEnd || 0); // ניסיון: עד סוף התקופה בלבד
   return Boolean(cache && cache.status === 'approved' && Date.now() - Number(cache.checkedAt || 0) < LICENSE_OFFLINE_GRACE_MS);
 }
 
@@ -3357,11 +3384,18 @@ function initDeviceLicenseGate() {
     if (errorEl) errorEl.textContent = msg || '';
   };
 
-  // מצבים: approved | form | pending | blocked | checking | config
+  // מצבים: approved | form | pending | blocked | checking | config | trialEnded
   function applyState(state) {
+    const trialEndBox = document.getElementById('regTrialEndBox');
+    if (trialEndBox) trialEndBox.style.display = state === 'trialEnded' ? 'flex' : 'none';
+    if (state === 'trialEnded') fillPayInfo();
+    const titleEl = overlay.querySelector('.license-lock-title');
+    if (titleEl) titleEl.textContent = state === 'trialEnded' ? 'Magic Lock' : 'הרשמה לאפליקציה';
+    if (state === 'form') updateRegTrialNote();
     if (state === 'approved') {
       overlay.style.display = 'none';
       setError('');
+      updateTrialBanner();
       if (typeof maybeShowUpdatePopup === 'function') maybeShowUpdatePopup();
       if (typeof maybeShowGuideFirstTime === 'function') maybeShowGuideFirstTime();
       return;
@@ -3399,7 +3433,22 @@ function initDeviceLicenseGate() {
     try {
       const status = await window.MagicCloud.device.getMyStatus();
       setError('');
-      if (status === 'approved') {
+      loadSaleConfig();
+      if (status === 'trial') {
+        // תקופת ניסיון: פתוח עד שהיא נגמרת, ואחר כך מסך תשלום
+        const end = getTrialEnd();
+        if (Date.now() < end) {
+          writeLicenseCache('trial', { trialEnd: end });
+          applyState('approved');
+          maybeReportUsage();
+          storeAdminMessage();
+          schedule(LICENSE_RECHECK_MS);
+        } else {
+          writeLicenseCache('trialEnded');
+          applyState('trialEnded');
+          schedule(LICENSE_RECHECK_MS);
+        }
+      } else if (status === 'approved') {
         writeLicenseCache('approved');
         applyState('approved');
         maybeReportUsage();
@@ -3440,6 +3489,11 @@ function initDeviceLicenseGate() {
         setError('אנא הזן שם מלא');
         return;
       }
+      const terms = document.getElementById('regTermsCheck');
+      if (terms && !terms.checked) {
+        setError('יש לאשר את תנאי השימוש ומדיניות הפרטיות');
+        return;
+      }
       if (phone.replace(/\D/g, '').length < 9 || phone.length > 20) {
         setError('אנא הזן מספר טלפון תקין');
         return;
@@ -3448,13 +3502,30 @@ function initDeviceLicenseGate() {
         applyState('config');
         return;
       }
+      const vipInput = document.getElementById('regVipInput');
+      const vipCode = regVipMode && vipInput ? vipInput.value.trim() : '';
+      if (regVipMode && vipCode.length < 4) {
+        setError('אנא הזן את קוד ההזמנה');
+        return;
+      }
       setError('');
       submitRegBtn.disabled = true;
       submitRegBtn.textContent = 'שולח בקשה...';
       try {
-        const status = await window.MagicCloud.device.submitRequest({ name, phone, deviceId: devId });
+        if (vipCode && !(await window.MagicCloud.device.checkVipCode(vipCode))) {
+          setError('קוד ההזמנה לא נכון - בדוק אותו ונסה שוב');
+          triggerHaptic([60, 80, 60]);
+          return;
+        }
+        const transfer = regTransferMode && !vipCode;
+        const trial = !transfer && !vipCode && getSaleConfig().trial_days > 0;
+        const status = await window.MagicCloud.device.submitRequest({ name, phone, deviceId: devId, trial, transfer, vipCode });
         triggerHaptic(40);
-        if (status === 'approved') {
+        if (status === 'trial') {
+          // נרשם לניסיון - נפתח מיד
+          checking = false;
+          await checkStatus();
+        } else if (status === 'approved') {
           writeLicenseCache('approved');
           applyState('approved');
           schedule(LICENSE_RECHECK_MS);
@@ -3471,10 +3542,12 @@ function initDeviceLicenseGate() {
         }
       } finally {
         submitRegBtn.disabled = false;
-        submitRegBtn.textContent = 'שלח בקשה';
+        updateRegTrialNote();
       }
     };
   }
+
+  loadSaleConfig().then(updateRegTrialNote);
 
   // פתיחה מהירה: מכשיר שאושר לאחרונה נפתח מיד, והבדיקה מול הענן רצה ברקע
   if (isCachedApprovalValid()) {
@@ -3497,7 +3570,7 @@ function initDeviceLicenseGate() {
 // החלון מוצג רק כשמסך ההגדרות פתוח (בפתיחת האפליקציה / בתפריט הסודי),
 // ולעולם לא מעל מסך הנעילה הפעיל מול קהל.
 // ============================================================================
-const APP_VERSION = '5.6';
+const APP_VERSION = '6.4';
 const DEFAULT_APK_URL = 'https://github.com/tzur2010/app-lockscreen/raw/main/Lockscreen.apk';
 const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 const UPDATE_DISMISS_KEY = 'magic_update_dismissed_version';
@@ -3530,6 +3603,32 @@ function compareSemver(verA, verB) {
 }
 
 let latestCloudAppConfig = null;
+
+// ערוץ בטא: גרסאות חדשות עולות קודם לתיקייה beta/ באתר. רק בודקי בטא (המנהל מסמן
+// באתר הניהול) ומי שפותח את גרסת האתר של הבטא מקבלים אותן. כל השאר - רק מה שפורסם.
+const BETA_BASE_URL = 'https://tzur2010.github.io/app-lockscreen/beta/';
+const BETA_APK_URL = 'https://github.com/tzur2010/app-lockscreen/raw/main/beta/Lockscreen.apk';
+
+function isOnBetaWeb() {
+  return !isNativeApk() && /\/beta\//.test(window.location.pathname);
+}
+
+function useBetaChannel() {
+  if (isOnBetaWeb()) return true;
+  try {
+    return Boolean(window.MagicCloud && window.MagicCloud.device.isTester && window.MagicCloud.device.isTester());
+  } catch (e) {
+    return false;
+  }
+}
+
+async function fetchBetaConfig() {
+  const res = await fetch(`${BETA_BASE_URL}version.json?t=${Date.now()}`, { cache: 'no-store' });
+  if (!res.ok) return null;
+  const data = await res.json();
+  if (!data || !data.latest_version) return null;
+  return { latest_version: String(data.latest_version), apk_url: BETA_APK_URL, message: '🧪 גרסת בטא - רק לבודקים', beta: true };
+}
 
 function hasPendingUpdate() {
   return Boolean(
@@ -3570,6 +3669,11 @@ function performAppUpdate() {
   const url = String(latestCloudAppConfig.apk_url || DEFAULT_APK_URL).trim();
 
   if (!isNativeApk()) {
+    // בודק בטא שפתח את האתר הרגיל - עובר לכתובת של הבטא
+    if (latestCloudAppConfig.beta && !isOnBetaWeb()) {
+      window.location.href = BETA_BASE_URL;
+      return;
+    }
     // גרסת אתר (PWA): העדכון = טעינה מחדש של הקבצים העדכניים
     reloadWebAppToLatest(ver);
     return;
@@ -3642,6 +3746,16 @@ async function checkCloudAppUpdate(isManualClick = false) {
     }
   } catch (e) {
     fetchFailed = true;
+  }
+  // בודק בטא: אם יש בבטא גרסה חדשה יותר ממה שפורסם - מקבלים אותה
+  if (useBetaChannel()) {
+    try {
+      const beta = await fetchBetaConfig();
+      if (beta && (!latestCloudAppConfig || compareSemver(beta.latest_version, latestCloudAppConfig.latest_version) >= 0)) {
+        latestCloudAppConfig = beta;
+      }
+    } catch (e) {}
+    if (installedVersionLabel) installedVersionLabel.textContent = `גרסה מותקנת: v${installedVer} · 🧪 בודק בטא`;
   }
 
   const hasNewer = hasPendingUpdate();
@@ -4434,6 +4548,7 @@ function restoreNotesTemplate() {
 
 // נועל מחדש את הטלפון המזויף (חוזר ממסך הבית/הפתקים למסך הנעילה)
 function relockFakePhone() {
+  phoneContainer.classList.remove('unlocking');
   fakeHomescreen.classList.remove('unlocked');
   if (lockIconTrigger) lockIconTrigger.classList.remove('faceid-unlocked');
   if (cameraPunchHole) cameraPunchHole.classList.remove('faceid-unlocked');
@@ -5737,6 +5852,8 @@ function endTour() {
   try {
     localStorage.setItem(TOUR_DONE_KEY, '1');
     localStorage.setItem(GUIDE_SEEN_KEY, '1');
+    // קוסם שעבר את הסיור כבר מכיר את כל מה שיש - לא מראים לו "מה חדש" על אותה גרסה
+    if (!localStorage.getItem(WHATS_NEW_SEEN_KEY)) localStorage.setItem(WHATS_NEW_SEEN_KEY, getInstalledAppVersion());
   } catch (e) {}
   if (typeof showSettingsTab === 'function') showSettingsTab('trick');
 }
@@ -5793,7 +5910,403 @@ function initTour() {
   });
 }
 
+// ============================================================================
+// 42. מסך "מה חדש": מופיע פעם אחת אחרי עדכון, עם כל מה שהתחדש מאז הגרסה הקודמת
+// ----------------------------------------------------------------------------
+// בכל גרסה מוסיפים כאן את החידושים (הכי חשובים קודם). target = האלמנט בהגדרות
+// שכפתור "נסה עכשיו" מוביל אליו.
+// ============================================================================
+const WHATS_NEW_SEEN_KEY = 'magic_whats_new_seen_v1';
+const WHATS_NEW_MAX_ITEMS = 6;
+const WHATS_NEW = [
+  { ver: '6.1', icon: '📋', target: '#openWhatsNewBtn', he: ['החידושים תמיד זמינים', 'פספסת משהו? בלשונית "עוד" יש כפתור "מה חדש" שמראה את כל החידושים האחרונים.'], en: ['What\'s new, any time', 'Missed something? The More tab has a "What\'s new" button with all the latest features.'] },
+  { ver: '5.9', icon: '🎉', target: null, he: ['מסך "מה חדש"', 'מעכשיו אחרי כל עדכון תראה בדיוק מה התחדש - עם כפתור שלוקח אותך ישר לנסות.'], en: ['"What\'s new" screen', 'After every update you\'ll see exactly what\'s new - with a button that takes you straight to it.'] },
+  { ver: '5.8', icon: '✨', target: '#unlockTargetSelector', he: ['אנימציית פתיחה אמיתית', 'כשהטלפון נפתח, מסך הנעילה מתקרב ונעלם (סמסונג) או מחליק למעלה (אייפון) - בדיוק כמו בטלפון אמיתי.'], en: ['Real unlock animation', 'When the phone unlocks, the lock screen zooms away (Samsung) or slides up (iPhone) - just like a real phone.'] },
+  { ver: '5.6', icon: '🔍', target: '#unlockTargetSelector', he: ['חשיפה בחיפוש', 'אחרי הפתיחה נפתח מסך חיפוש, והחיפוש האחרון "מאתמול" הוא הקוד של הצופה.'], en: ['Search reveal', 'After unlocking, a search screen opens and the last search "from yesterday" is the spectator\'s code.'] },
+  { ver: '5.6', icon: '❓', target: '#toggleForceUnlockMode', he: ['הסבר ליד כל קסם', 'כפתור ? ליד כל קסם: איך עושים אותו, ומה אומרים לקהל.'], en: ['Help next to every trick', 'A ? button next to every trick: how to do it and what to say.'] },
+  { ver: '5.5', icon: '✅', target: '#preShowCheckBtn', he: ['בדיקה לפני הופעה', 'לחיצה אחת בודקת אינטרנט, התראות, סוללה, טלפון שני ועוד - עם כפתור תיקון.'], en: ['Pre-show check', 'One tap checks internet, notifications, battery, second phone and more - with a fix button.'] },
+  { ver: '5.4', icon: '📞', target: '#toggleCallReveal', he: ['חשיפה בשיחה נכנסת', 'אחרי הפתיחה הטלפון מצלצל, ושם המתקשר הוא הקוד שהצופה בחר.'], en: ['Incoming call reveal', 'After unlocking the phone rings, and the caller name is the spectator\'s code.'] },
+  { ver: '5.4', icon: '🎛️', target: '#toggleRemotePeek', he: ['שלט רחוק מהטלפון השני', 'מהטלפון השני אפשר להדליק/לכבות "פתיחה בכל קוד", לבחור ניסיון ולהפעיל חשיפה - בלי לגעת בטלפון של הצופה.'], en: ['Remote control from a second phone', 'From the second phone: turn "any code" on/off, pick the attempt and trigger a reveal - without touching the spectator\'s phone.'] },
+  { ver: '5.4', icon: '🖼️', target: '#unlockTargetSelector', he: ['חשיפה בגלריה', 'התמונה האחרונה בגלריה היא פתק בכתב יד עם הקוד של הצופה.'], en: ['Gallery reveal', 'The latest photo in the gallery is a handwritten note with the spectator\'s code.'] },
+  { ver: '5.4', icon: '🎯', target: '#togglePracticeMode', he: ['מצב תרגול', 'מתרגלים את כל ההצצות בלי שזה נשמר בהיסטוריה.'], en: ['Practice mode', 'Practice all the peeks without saving to history.'] },
+  { ver: '5.2', icon: '📲', target: '#toggleRemotePeek', he: ['הצצה מטלפון שני', 'הקוד שהצופה מקליד מופיע מיד בגדול בטלפון אחר.'], en: ['Second-phone peek', 'The code the spectator types appears instantly, big, on another phone.'] },
+  { ver: '5.2', icon: '🌐', target: '#uiLangSelector', he: ['אנגלית', 'אפשר להעביר את כל האפליקציה לאנגלית (לשונית עוד).'], en: ['English', 'Switch the whole app to English (More tab).'] }
+];
+
+function whatsNewSince(fromVersion, toVersion) {
+  return WHATS_NEW.filter((it) => compareSemver(it.ver, fromVersion) > 0 && compareSemver(it.ver, toVersion) <= 0).slice(0, WHATS_NEW_MAX_ITEMS);
+}
+
+function getWhatsNewSeenVersion() {
+  try {
+    const seen = localStorage.getItem(WHATS_NEW_SEEN_KEY);
+    if (seen) return seen;
+    // קוסם ותיק שמעדכן מגרסה ישנה (לפני שהיה מסך כזה): מראים לו את החידושים הכי חשובים מהחודש האחרון
+    if (localStorage.getItem(CONFIG_STORAGE_KEY) && localStorage.getItem(GUIDE_SEEN_KEY)) return '5.1';
+  } catch (e) {}
+  return null; // קוסם חדש - לא מראים (הוא מקבל את הסיור)
+}
+
+function markWhatsNewSeen() {
+  try {
+    localStorage.setItem(WHATS_NEW_SEEN_KEY, getInstalledAppVersion());
+  } catch (e) {}
+}
+
+function maybeShowWhatsNew() {
+  const overlay = document.getElementById('whatsNewOverlay');
+  if (!overlay || overlay.style.display === 'flex') return;
+  if (!setupOverlay || !setupOverlay.classList.contains('open') || isLicenseOverlayVisible()) return;
+  const updatePopup = document.getElementById('updatePopupOverlay');
+  if (updatePopup && updatePopup.style.display === 'flex') return;
+  const tour = document.getElementById('tourLayer');
+  if (tour && tour.style.display === 'block') return;
+  const current = getInstalledAppVersion();
+  const seen = getWhatsNewSeenVersion();
+  if (!seen) return markWhatsNewSeen();
+  if (compareSemver(current, seen) <= 0) return;
+  const items = whatsNewSince(seen, current);
+  if (!items.length) return markWhatsNewSeen();
+  renderWhatsNew(items, current);
+  overlay.style.display = 'flex';
+}
+
+// פתיחה ידנית מלשונית "עוד": תמיד מראה את החידושים האחרונים, בלי קשר למה שכבר נראה
+function openWhatsNewManually() {
+  const overlay = document.getElementById('whatsNewOverlay');
+  if (!overlay) return;
+  renderWhatsNew(WHATS_NEW.slice(0, WHATS_NEW_MAX_ITEMS), getInstalledAppVersion(), true);
+  overlay.style.display = 'flex';
+}
+
+function renderWhatsNew(items, version, manual) {
+  const en = isEnglishUi();
+  document.getElementById('whatsNewTitle').textContent = en ? `What's new in v${version}` : `מה חדש בגרסה ${version}`;
+  document.getElementById('whatsNewSub').textContent = manual
+    ? en ? 'The latest features' : 'החידושים האחרונים באפליקציה'
+    : en ? `${items.length} new things since your last version` : `${items.length} דברים חדשים מאז הגרסה הקודמת שלך`;
+  document.getElementById('whatsNewDoneBtn').textContent = en ? "Great, let's go" : 'מעולה, בוא נתחיל';
+  const list = document.getElementById('whatsNewList');
+  list.innerHTML = '';
+  items.forEach((it) => {
+    const [title, text] = en ? it.en : it.he;
+    const row = document.createElement('div');
+    row.className = 'whats-new-item';
+    const icon = document.createElement('div');
+    icon.className = 'whats-new-icon';
+    icon.textContent = it.icon;
+    const body = document.createElement('div');
+    const t = document.createElement('div');
+    t.className = 'whats-new-item-title';
+    t.textContent = title;
+    const d = document.createElement('div');
+    d.className = 'whats-new-item-text';
+    d.textContent = text;
+    body.append(t, d);
+    if (it.target && document.querySelector(it.target)) {
+      const tryBtn = document.createElement('button');
+      tryBtn.type = 'button';
+      tryBtn.className = 'whats-new-try';
+      tryBtn.textContent = en ? 'Try it now →' : 'נסה עכשיו ←';
+      tryBtn.addEventListener('click', () => goToSetting(it.target));
+      body.appendChild(tryBtn);
+    }
+    row.append(icon, body);
+    list.appendChild(row);
+  });
+}
+
+function closeWhatsNew() {
+  document.getElementById('whatsNewOverlay').style.display = 'none';
+  markWhatsNewSeen();
+}
+
+// לוקח את הקוסם ישר להגדרה: פותח את הלשונית הנכונה, גולל אליה ומאיר אותה
+function goToSetting(selector) {
+  closeWhatsNew();
+  const el = document.querySelector(selector);
+  if (!el) return;
+  const panel = el.closest('.settings-panel');
+  if (panel && typeof showSettingsTab === 'function') showSettingsTab(panel.dataset.tab);
+  const row = el.closest('.clean-toggle-row, .oneui-field-block') || el;
+  setTimeout(() => {
+    row.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    row.classList.remove('whats-new-flash');
+    void row.offsetWidth;
+    row.classList.add('whats-new-flash');
+  }, 250);
+}
+
+function initWhatsNew() {
+  const done = document.getElementById('whatsNewDoneBtn');
+  if (done) done.addEventListener('click', closeWhatsNew);
+  const open = document.getElementById('openWhatsNewBtn');
+  if (open) open.addEventListener('click', openWhatsNewManually);
+}
+
+// ============================================================================
+// 43. מכירה: תקופת ניסיון, מחיר והוראות תשלום (נקבעים באתר הניהול)
+// ============================================================================
+// var: בדיקת הרישיון (שרצה מוקדם יותר בקובץ) משתמשת בהם
+var SALE_CFG_KEY = 'magic_sale_cfg_v1';
+var DAY_MS = 24 * 60 * 60 * 1000;
+
+function normalizeSaleConfig(c) {
+  const link = String((c && c.pay_link) || '');
+  return {
+    price: Number(c && c.price) || 0,
+    price_was: Number(c && c.price_was) || 0,
+    pay_phone: (c && c.pay_phone) || '',
+    pay_link: /^https:\/\/[^\s]+$/i.test(link) ? link : '',
+    pay_note: (c && c.pay_note) || '',
+    trial_days: Number(c && c.trial_days) || 0
+  };
+}
+
+function getSaleConfig() {
+  try {
+    const c = JSON.parse(localStorage.getItem(SALE_CFG_KEY) || 'null');
+    if (c) return normalizeSaleConfig(c);
+  } catch (e) {}
+  return normalizeSaleConfig(null);
+}
+
+async function loadSaleConfig() {
+  try {
+    if (!window.MagicCloud || !window.MagicCloud.isConfigured()) return getSaleConfig();
+    const cfg = await window.MagicCloud.getAppConfig();
+    if (cfg) localStorage.setItem(SALE_CFG_KEY, JSON.stringify(normalizeSaleConfig(cfg)));
+  } catch (e) {}
+  return getSaleConfig();
+}
+
+// סוף תקופת הניסיון = שעת ההרשמה (של השרת) + מספר ימי הניסיון
+function getTrialEnd() {
+  const rec = window.MagicCloud && window.MagicCloud.device.getMyRecord ? window.MagicCloud.device.getMyRecord() : null;
+  const created = rec && rec.createdAt ? new Date(rec.createdAt).getTime() : Date.now();
+  const days = getSaleConfig().trial_days || 3;
+  return created + days * DAY_MS;
+}
+
+function payInfoText() {
+  const s = getSaleConfig();
+  const en = isEnglishUi();
+  const lines = [];
+  if (s.pay_phone) lines.push(en ? `Pay with Bit / PayBox to:\n${s.pay_phone}` : `לתשלום בביט / פייבוקס למספר:\n${s.pay_phone}`);
+  else if (s.pay_link) lines.push(en ? 'Tap "Pay" to open the payment page.' : 'לוחצים "לתשלום" ונפתח עמוד התשלום.');
+  if (s.pay_note) lines.push(s.pay_note);
+  return lines.join('\n\n');
+}
+
+function priceText() {
+  const s = getSaleConfig();
+  if (!s.price) return '';
+  return isEnglishUi() ? `₪${s.price} · one-time payment` : `₪${s.price} · תשלום חד-פעמי`;
+}
+
+// פותח קישור חיצוני: באפליקציה (APK) הניווט נפתח בדפדפן של הטלפון, באתר בלשונית חדשה
+function openExternalLink(url) {
+  if (!/^https:\/\//i.test(url)) return;
+  if (window.AndroidNative) window.location.href = url;
+  else window.open(url, '_blank', 'noopener');
+}
+
+// פאנל תשלום אחד שמשמש גם את מסך "הניסיון הסתיים" וגם את כפתור "לרכישה"
+function renderPayPanel(container) {
+  if (!container) return;
+  const s = getSaleConfig();
+  const en = isEnglishUi();
+  // בדיקת הרישיון רצה שוב ושוב - לא בונים מחדש (וכך לא מוחקים מה שהקוסם הקליד) אם לא השתנה כלום
+  const sig = JSON.stringify(s) + en;
+  if (container.dataset.sig === sig && container.children.length) return;
+  container.dataset.sig = sig;
+  container.innerHTML = '';
+
+  const price = document.createElement('div');
+  price.className = 'reg-pay-price';
+  price.textContent = priceText();
+  if (s.price && s.price_was > s.price) {
+    const was = document.createElement('span');
+    was.className = 'pay-was';
+    was.textContent = `₪${s.price_was}`;
+    price.appendChild(was);
+  }
+  if (s.price) container.appendChild(price);
+
+  const how = document.createElement('div');
+  how.className = 'reg-pay-how';
+  how.textContent = payInfoText() || (en ? 'Payment details will appear here soon.' : 'פרטי התשלום יופיעו כאן בקרוב.');
+  container.appendChild(how);
+
+  const actions = document.createElement('div');
+  actions.className = 'pay-actions';
+  if (s.pay_link) {
+    const pay = document.createElement('button');
+    pay.type = 'button';
+    pay.className = 'pay-action-btn primary';
+    pay.textContent = en ? '💳 Pay' : '💳 לתשלום';
+    pay.addEventListener('click', () => openExternalLink(s.pay_link));
+    actions.appendChild(pay);
+  }
+  if (s.pay_phone) {
+    const copy = document.createElement('button');
+    copy.type = 'button';
+    copy.className = 'pay-action-btn';
+    copy.textContent = en ? '📋 Copy number' : '📋 העתק מספר';
+    copy.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(s.pay_phone.replace(/[^\d+]/g, ''));
+        copy.textContent = en ? 'Copied ✓' : 'הועתק ✓';
+      } catch (e) {
+        copy.textContent = s.pay_phone;
+      }
+    });
+    actions.appendChild(copy);
+  }
+  if (actions.children.length) container.appendChild(actions);
+
+  // שם המשלם עוזר למנהל למצוא את התשלום בביט כשהוא נעשה מחשבון של מישהו אחר (למשל הורה)
+  const payer = document.createElement('input');
+  payer.type = 'text';
+  payer.className = 'pay-payer-input';
+  payer.maxLength = 60;
+  payer.placeholder = en ? 'Name on the payment (if not yours)' : 'השם שמופיע בתשלום (אם לא שלך)';
+  container.appendChild(payer);
+
+  const paid = document.createElement('button');
+  paid.type = 'button';
+  paid.className = 'license-reg-submit-btn';
+  paid.textContent = en ? 'I paid ✓ Send' : 'שילמתי ✓ שלח הודעה';
+  container.appendChild(paid);
+
+  const status = document.createElement('div');
+  status.className = 'pay-status';
+  status.textContent = en ? 'Once the payment is confirmed the app stays open for good.' : 'ברגע שהתשלום מאושר - האפליקציה נשארת פתוחה לתמיד.';
+  container.appendChild(status);
+
+  paid.addEventListener('click', async () => {
+    paid.disabled = true;
+    const who = payer.value.trim();
+    const text = `💰 שילמתי${s.price ? ` ₪${s.price}` : ''} על Magic Lock - נא לאשר${who ? `\nשם בתשלום: ${who}` : ''}`;
+    try {
+      await window.MagicCloud.device.sendFeedback({ text, appVersion: getInstalledAppVersion(), os: config.osTheme, model: config.deviceModel, notify: 'paid' });
+      status.textContent = en ? 'Sent ✓ The app opens by itself as soon as the payment is confirmed.' : 'ההודעה נשלחה ✓ האפליקציה תיפתח לבד ברגע שהתשלום יאושר.';
+    } catch (e) {
+      paid.disabled = false;
+      status.textContent = en ? 'Sending failed - check the internet and try again' : 'השליחה נכשלה - בדוק חיבור לאינטרנט ונסה שוב';
+    }
+  });
+}
+
+function fillPayInfo() {
+  const title = document.getElementById('regTrialEndTitle');
+  if (title) title.textContent = isEnglishUi() ? '⏰ Your free trial has ended' : '⏰ תקופת הניסיון הסתיימה';
+  renderPayPanel(document.getElementById('regPayPanel'));
+}
+
+// מצב "עברתי לטלפון חדש": בלי ניסיון, הבקשה מגיעה למנהל כבקשת העברה
+var regTransferMode = false;
+// מצב "קוד הזמנה": קוסם שהמנהל הזמין נכנס מיד, בחינם לתמיד
+var regVipMode = false;
+
+function updateRegTrialNote() {
+  const note = document.getElementById('regTrialNote');
+  const btn = document.getElementById('submitRegBtn');
+  const toggle = document.getElementById('regTransferToggle');
+  const vipToggle = document.getElementById('regVipToggle');
+  const vipInput = document.getElementById('regVipInput');
+  const en = isEnglishUi();
+  const days = regTransferMode || regVipMode ? 0 : getSaleConfig().trial_days;
+  if (vipInput) {
+    vipInput.style.display = regVipMode ? '' : 'none';
+    vipInput.placeholder = en ? 'Invite code (VIP)' : 'קוד הזמנה (VIP)';
+  }
+  if (note) {
+    note.style.display = regTransferMode || regVipMode || days > 0 ? '' : 'none';
+    note.textContent = regVipMode
+      ? en ? '⭐ With an invite code you get in right away - free, for good' : '⭐ עם קוד הזמנה נכנסים מיד - בחינם, לתמיד'
+      : regTransferMode
+        ? en ? '🔁 Sign up with the same phone number you bought with - your license moves to this phone once approved' : '🔁 נרשמים עם אותו מספר טלפון שקנית איתו - הרישיון יעבור לטלפון הזה אחרי אישור'
+        : en ? `🎁 You get ${days} free trial days right after signing up` : `🎁 מקבלים ${days} ימי ניסיון חינם מיד אחרי ההרשמה`;
+  }
+  if (btn && !btn.disabled) {
+    btn.textContent = regVipMode
+      ? en ? 'Enter with code' : 'כניסה עם הקוד'
+      : regTransferMode
+        ? en ? 'Move my license' : 'העבר את הרישיון שלי'
+        : days > 0 ? (en ? 'Start free trial' : 'התחל ניסיון חינם') : en ? 'Send request' : 'שלח בקשה';
+  }
+  if (toggle) {
+    toggle.style.display = regVipMode ? 'none' : '';
+    toggle.textContent = regTransferMode
+      ? en ? 'New here? Back to sign up' : 'חדש כאן? חזרה להרשמה'
+      : en ? 'Already bought and got a new phone?' : 'קנית כבר ועברת לטלפון חדש?';
+  }
+  if (vipToggle) {
+    vipToggle.style.display = regTransferMode ? 'none' : '';
+    vipToggle.textContent = regVipMode ? (en ? 'No code? Back to sign up' : 'אין קוד? חזרה להרשמה') : en ? '⭐ Have an invite code?' : '⭐ יש לך קוד הזמנה?';
+  }
+}
+
+function updateTrialBanner() {
+  const banner = document.getElementById('trialBanner');
+  if (!banner) return;
+  const cache = readLicenseCache();
+  if (!cache || cache.status !== 'trial') {
+    banner.style.display = 'none';
+    return;
+  }
+  const left = Math.max(0, Math.ceil((Number(cache.trialEnd) - Date.now()) / DAY_MS));
+  const en = isEnglishUi();
+  document.getElementById('trialBannerText').textContent = en
+    ? `🎁 Free trial: ${left} day${left === 1 ? '' : 's'} left`
+    : left === 1 ? '🎁 ניסיון חינם: נשאר יום אחד' : `🎁 ניסיון חינם: נשארו ${left} ימים`;
+  document.getElementById('trialBuyBtn').textContent = en ? 'Buy' : 'לרכישה';
+  banner.style.display = 'flex';
+}
+
+function openPayInfo() {
+  const en = isEnglishUi();
+  document.getElementById('buyTitle').textContent = en ? '💰 Buy Magic Lock' : '💰 רכישת Magic Lock';
+  document.getElementById('buyCloseBtn').textContent = en ? 'Close' : 'סגור';
+  renderPayPanel(document.getElementById('buyPanel'));
+  document.getElementById('buyOverlay').style.display = 'flex';
+  loadSaleConfig().then(() => renderPayPanel(document.getElementById('buyPanel')));
+}
+
+function closePayInfo() {
+  document.getElementById('buyOverlay').style.display = 'none';
+}
+
+function initSale() {
+  const buy = document.getElementById('trialBuyBtn');
+  if (buy) buy.addEventListener('click', openPayInfo);
+  const close = document.getElementById('buyCloseBtn');
+  if (close) close.addEventListener('click', closePayInfo);
+  const overlay = document.getElementById('buyOverlay');
+  if (overlay) overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) closePayInfo();
+  });
+  const toggle = document.getElementById('regTransferToggle');
+  if (toggle) toggle.addEventListener('click', () => {
+    regTransferMode = !regTransferMode;
+    regVipMode = false;
+    updateRegTrialNote();
+  });
+  const vipToggle = document.getElementById('regVipToggle');
+  if (vipToggle) vipToggle.addEventListener('click', () => {
+    regVipMode = !regVipMode;
+    regTransferMode = false;
+    updateRegTrialNote();
+    const input = document.getElementById('regVipInput');
+    if (regVipMode && input) input.focus();
+  });
+  updateTrialBanner();
+}
+
 // אתחול ראשוני
+initSale();
+initWhatsNew();
 initTrickTips();
 initTour();
 initPreShowCheck();

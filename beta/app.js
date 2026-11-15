@@ -223,6 +223,94 @@ const MODEL_PRESETS = {
       )
     }
   ],
+  // Google Pixel: אנדרואיד "נקי" (Material You)
+  pixel: [
+    {
+      id: 'pixel7',
+      name: 'Pixel 7',
+      year: '2022',
+      cutout: 'punch',
+      defaultWallpaper: createSvgWallpaper(
+        [[0, '#10221b'], [45, '#1f4d3a'], [80, '#6fbf8e'], [100, '#d8f3dc']],
+        `<circle cx="300" cy="1500" r="520" fill="rgba(255,255,255,0.10)"/>
+         <circle cx="820" cy="760" r="360" fill="rgba(216,243,220,0.14)"/>`
+      )
+    },
+    {
+      id: 'pixel8',
+      name: 'Pixel 8',
+      year: '2023',
+      cutout: 'punch',
+      defaultWallpaper: createSvgWallpaper(
+        [[0, '#1b1a2e'], [42, '#3d3a6b'], [78, '#a59ad9'], [100, '#ece7ff']],
+        `<path d="M-60 1500 Q540 1050 1140 1500 L1140 2400 L-60 2400 Z" fill="rgba(255,255,255,0.12)"/>`
+      )
+    },
+    {
+      id: 'pixel9',
+      name: 'Pixel 9',
+      year: '2024',
+      cutout: 'punch',
+      defaultWallpaper: createSvgWallpaper(
+        [[0, '#2a1610'], [40, '#6b3420'], [78, '#e0905f'], [100, '#ffe4cf']],
+        `<ellipse cx="540" cy="1250" rx="520" ry="420" fill="rgba(255,228,207,0.14)"/>`
+      )
+    },
+    {
+      id: 'pixel10',
+      name: 'Pixel 10',
+      year: '2025',
+      cutout: 'punch',
+      defaultWallpaper: createSvgWallpaper(
+        [[0, '#0b1a2b'], [40, '#16426b'], [78, '#7fb3e6'], [100, '#e3f0ff']],
+        `<circle cx="540" cy="1100" r="460" fill="rgba(227,240,255,0.13)"/>
+         <circle cx="540" cy="1100" r="260" fill="rgba(255,255,255,0.08)"/>`
+      )
+    }
+  ],
+  // Xiaomi / Redmi: ממשק HyperOS
+  xiaomi: [
+    {
+      id: 'redmi13',
+      name: 'Redmi Note 13',
+      year: '2024',
+      cutout: 'punch',
+      defaultWallpaper: createSvgWallpaper(
+        [[0, '#0e1530'], [40, '#23377a'], [76, '#5b8def'], [100, '#cfe0ff']],
+        `<path d="M0 900 C360 1200, 720 600, 1080 900 L1080 2400 L0 2400 Z" fill="rgba(255,255,255,0.10)"/>`
+      )
+    },
+    {
+      id: 'redmi14',
+      name: 'Redmi Note 14',
+      year: '2025',
+      cutout: 'punch',
+      defaultWallpaper: createSvgWallpaper(
+        [[0, '#1a0f24'], [42, '#4a1d5e'], [78, '#c45ab3'], [100, '#ffd6f2']],
+        `<circle cx="760" cy="900" r="420" fill="rgba(255,214,242,0.14)"/>`
+      )
+    },
+    {
+      id: 'xiaomi14',
+      name: 'Xiaomi 14',
+      year: '2024',
+      cutout: 'punch',
+      defaultWallpaper: createSvgWallpaper(
+        [[0, '#111111'], [42, '#2d2d2d'], [78, '#ff6900'], [100, '#ffd2b0']],
+        `<circle cx="540" cy="1400" r="560" fill="rgba(255,105,0,0.14)"/>`
+      )
+    },
+    {
+      id: 'xiaomi15',
+      name: 'Xiaomi 15',
+      year: '2025',
+      cutout: 'punch',
+      defaultWallpaper: createSvgWallpaper(
+        [[0, '#06141c'], [40, '#0d3b4f'], [78, '#38a3c4'], [100, '#d6f5ff']],
+        `<ellipse cx="540" cy="1000" rx="480" ry="620" fill="rgba(214,245,255,0.12)"/>`
+      )
+    }
+  ],
   ios: [
     {
       id: 'iphone12',
@@ -378,7 +466,8 @@ function fillCodePlaceholder(template, code) {
 }
 
 const DEFAULT_CONFIG = {
-  osTheme: 'samsung',           // 'samsung' | 'ios'
+  osTheme: 'samsung',           // 'samsung' (כל טלפוני אנדרואיד) | 'ios'
+  androidBrand: 'samsung',      // סוג האנדרואיד: 'samsung' | 'pixel' | 'xiaomi' (משנה את המראה בלבד)
   deviceModel: 's26',           // 's20'..'s26' | 'iphone12'..'iphone18'
   unlockMode: 'pin',            // 'pin' | 'pattern' | 'words' | 'swipe'
   pinLength: 4,                 // 4 | 6 (אורך קוד PIN: 4 או 6 ספרות)
@@ -630,8 +719,17 @@ function initSplashScreen() {
 // ----------------------------------------------------------------------------
 // 6. מסך הגדרות מקדים (Setup / Onboarding) עם מעבר חלק וללא קפיצת מסך
 // ----------------------------------------------------------------------------
+// סוג האנדרואיד (סמסונג / פיקסל / שיאומי). כל טלפוני האנדרואיד עובדים באותו מנגנון - משתנה רק המראה
+const ANDROID_BRANDS = ['samsung', 'pixel', 'xiaomi'];
+const BRAND_LABELS = { samsung: 'Samsung', pixel: 'Google', xiaomi: '' };
+
+function currentAndroidBrand() {
+  return ANDROID_BRANDS.includes(config.androidBrand) ? config.androidBrand : 'samsung';
+}
+
 function getModelsForCurrentOs() {
-  return MODEL_PRESETS[config.osTheme] || MODEL_PRESETS.samsung;
+  if (config.osTheme === 'ios') return MODEL_PRESETS.ios;
+  return MODEL_PRESETS[currentAndroidBrand()] || MODEL_PRESETS.samsung;
 }
 
 function getCurrentModelObject() {
@@ -639,12 +737,13 @@ function getCurrentModelObject() {
   return list.find((m) => m.id === config.deviceModel) || list[list.length - 1];
 }
 
-function openDeviceConfigFor(osTheme) {
+function openDeviceConfigFor(osTheme, brand) {
   setTimeout(() => {
     if (typeof maybeStartTour === 'function') maybeStartTour();
   }, 700);
   config.osTheme = osTheme;
-  const models = MODEL_PRESETS[osTheme] || MODEL_PRESETS.samsung;
+  if (osTheme !== 'ios') config.androidBrand = ANDROID_BRANDS.includes(brand) ? brand : 'samsung';
+  const models = getModelsForCurrentOs();
   if (!models.some((m) => m.id === config.deviceModel)) {
     config.deviceModel = models[models.length - 1].id;
   }
@@ -661,7 +760,11 @@ function openDeviceConfigFor(osTheme) {
 }
 
 if (chooseSamsungBtn) {
-  chooseSamsungBtn.addEventListener('click', () => openDeviceConfigFor('samsung'));
+  // לחיצה על אחד מכפתורי המותג (סמסונג / פיקסל / שיאומי), או על החצי עצמו = סמסונג
+  chooseSamsungBtn.addEventListener('click', (e) => {
+    const chip = e.target.closest('[data-brand]');
+    openDeviceConfigFor('samsung', chip ? chip.dataset.brand : 'samsung');
+  });
 }
 if (chooseIosBtn) {
   chooseIosBtn.addEventListener('click', () => openDeviceConfigFor('ios'));
@@ -1467,6 +1570,10 @@ function applyConfigToUI() {
   // ערכת נושא Samsung One UI מול Apple iOS
   phoneContainer.classList.toggle('theme-samsung', config.osTheme === 'samsung');
   phoneContainer.classList.toggle('theme-ios', config.osTheme === 'ios');
+  // פיקסל ושיאומי: מבוססים על מסך האנדרואיד, עם שכבת עיצוב משלהם
+  const brand = config.osTheme === 'ios' ? '' : currentAndroidBrand();
+  phoneContainer.classList.toggle('theme-pixel', brand === 'pixel');
+  phoneContainer.classList.toggle('theme-xiaomi', brand === 'xiaomi');
 
   // דגמי Notch (iPhone 12 / 13) מול Dynamic Island (iPhone 14 - 18)
   const isNotch = config.osTheme === 'ios' && currentModel.cutout === 'notch';
@@ -1476,7 +1583,7 @@ function applyConfigToUI() {
 
   if (selectedDevicePill) {
     selectedDevicePill.textContent =
-      config.osTheme === 'ios' ? `Apple ${currentModel.name}` : `Samsung ${currentModel.name}`;
+      config.osTheme === 'ios' ? `Apple ${currentModel.name}` : `${BRAND_LABELS[brand] ? BRAND_LABELS[brand] + ' ' : ''}${currentModel.name}`;
   }
 
   renderModelPresetsGrid();
@@ -1649,16 +1756,18 @@ function updateHeaderTitles() {
     mainTitle.textContent = 'הזן סיסמה';
     subTitle.textContent = 'סיסמה חייבת להכיל לפחות 4 תווים, ביניהם אות אחת לפחות.';
   } else if (config.unlockMode === 'pattern') {
-    mainTitle.textContent = config.osTheme === 'ios' ? 'צייר דפוס לשחרור' : 'צייר דפוס';
+    const brand = config.osTheme === 'ios' ? 'ios' : currentAndroidBrand();
+    mainTitle.textContent = { ios: 'צייר דפוס לשחרור', pixel: 'יש לצייר את קו ביטול הנעילה', xiaomi: 'צייר את הדפוס' }[brand] || 'צייר דפוס';
     subTitle.textContent = '';
   } else if (config.unlockMode === 'swipe') {
     mainTitle.textContent = 'החלק לפתיחת המכשיר';
     subTitle.textContent = '';
   } else {
-    // מסך קוד ה-PIN הייעודי (סמסונג One UI מדויק): שתי שורות טקסט בדיוק מעל הנקודות ולוח המקשים
+    // מסך קוד ה-PIN: כל טלפון עם הנוסח שלו (בסמסונג יש גם שורה שנייה)
     const pinLen = Number(config.pinLength) === 6 ? 6 : 4;
-    mainTitle.textContent = config.osTheme === 'ios' ? 'הזן קוד גישה' : 'הזן קוד PIN';
-    subTitle.textContent = config.osTheme === 'ios' ? '' : `קוד ה-PIN שלך מכיל לפחות ${pinLen} ספרות`;
+    const brand = config.osTheme === 'ios' ? 'ios' : currentAndroidBrand();
+    mainTitle.textContent = { ios: 'הזן קוד גישה', pixel: 'יש להזין קוד אימות', xiaomi: 'הזן את קוד מסך הנעילה' }[brand] || 'הזן קוד PIN';
+    subTitle.textContent = brand === 'samsung' ? `קוד ה-PIN שלך מכיל לפחות ${pinLen} ספרות` : '';
   }
 }
 
@@ -1675,7 +1784,17 @@ function updateLiveClock() {
     statusTime.textContent = timeStr;
   }
   if (homeClock) homeClock.textContent = timeStr;
-  if (clockLockBigTime) clockLockBigTime.textContent = timeStr;
+  if (clockLockBigTime) {
+    // בפיקסל השעון הגדול בשתי שורות: שעות מעל דקות
+    if (config.osTheme !== 'ios' && currentAndroidBrand() === 'pixel') {
+      clockLockBigTime.replaceChildren(
+        Object.assign(document.createElement('span'), { textContent: hours }),
+        Object.assign(document.createElement('span'), { textContent: minutes })
+      );
+    } else {
+      clockLockBigTime.textContent = timeStr;
+    }
+  }
 
   const dateFormatter = new Intl.DateTimeFormat(window.MagicI18n && window.MagicI18n.isEn ? 'en-US' : 'he-IL', {
     weekday: 'long',
@@ -3570,7 +3689,7 @@ function initDeviceLicenseGate() {
 // החלון מוצג רק כשמסך ההגדרות פתוח (בפתיחת האפליקציה / בתפריט הסודי),
 // ולעולם לא מעל מסך הנעילה הפעיל מול קהל.
 // ============================================================================
-const APP_VERSION = '6.4';
+const APP_VERSION = '6.5';
 const DEFAULT_APK_URL = 'https://github.com/tzur2010/app-lockscreen/raw/main/Lockscreen.apk';
 const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 const UPDATE_DISMISS_KEY = 'magic_update_dismissed_version';
@@ -4808,7 +4927,7 @@ function getStatsForReport() {
   if (config.unlockTargetScreen === 'gallery') on.push('gallery');
   if (config.unlockTargetScreen === 'search') on.push('search');
   try {
-    return JSON.stringify({ e: s.e, since: s.since, os: config.osTheme, model: config.deviceModel, mode: config.unlockMode, on });
+    return JSON.stringify({ e: s.e, since: s.since, os: config.osTheme === 'ios' ? 'ios' : currentAndroidBrand(), model: config.deviceModel, mode: config.unlockMode, on });
   } catch (e) {
     return '';
   }
@@ -5919,6 +6038,7 @@ function initTour() {
 const WHATS_NEW_SEEN_KEY = 'magic_whats_new_seen_v1';
 const WHATS_NEW_MAX_ITEMS = 6;
 const WHATS_NEW = [
+  { ver: '6.5', icon: '📱', target: '#backToSplitBtn', he: ['Google Pixel ו-Xiaomi', 'מעכשיו יש גם מסך נעילה של פיקסל ושל שיאומי/רדמי - "החלף מכשיר" ובוחרים את הטלפון שלך.'], en: ['Google Pixel & Xiaomi', 'Now with Pixel and Xiaomi/Redmi lock screens too - "Switch device" and pick your phone.'] },
   { ver: '6.1', icon: '📋', target: '#openWhatsNewBtn', he: ['החידושים תמיד זמינים', 'פספסת משהו? בלשונית "עוד" יש כפתור "מה חדש" שמראה את כל החידושים האחרונים.'], en: ['What\'s new, any time', 'Missed something? The More tab has a "What\'s new" button with all the latest features.'] },
   { ver: '5.9', icon: '🎉', target: null, he: ['מסך "מה חדש"', 'מעכשיו אחרי כל עדכון תראה בדיוק מה התחדש - עם כפתור שלוקח אותך ישר לנסות.'], en: ['"What\'s new" screen', 'After every update you\'ll see exactly what\'s new - with a button that takes you straight to it.'] },
   { ver: '5.8', icon: '✨', target: '#unlockTargetSelector', he: ['אנימציית פתיחה אמיתית', 'כשהטלפון נפתח, מסך הנעילה מתקרב ונעלם (סמסונג) או מחליק למעלה (אייפון) - בדיוק כמו בטלפון אמיתי.'], en: ['Real unlock animation', 'When the phone unlocks, the lock screen zooms away (Samsung) or slides up (iPhone) - just like a real phone.'] },

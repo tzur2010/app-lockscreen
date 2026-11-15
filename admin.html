@@ -201,6 +201,27 @@
     .msg-actions .btn { flex: 1; justify-content: center; }
     .feedback-text { font-size: 14.5px; line-height: 1.6; white-space: pre-wrap; word-break: break-word; color: #e2e8f0; }
     /* לשוניות */
+    /* קופסאות מתקפלות בהגדרות */
+    .fold { padding: 0 !important; margin-bottom: 14px; }
+    .fold-sum { list-style: none; cursor: pointer; padding: 18px 22px; font-size: 16px; font-weight: 800; display: flex; align-items: center; gap: 8px; }
+    .fold-sum::-webkit-details-marker { display: none; }
+    .fold-sum::after { content: '▾'; margin-inline-start: auto; color: #64748b; transition: transform .2s; }
+    .fold[open] > .fold-sum::after { transform: rotate(180deg); }
+    .fold-state { font-size: 12px; font-weight: 700; color: #94a3b8; background: rgba(255,255,255,.06); padding: 3px 9px; border-radius: 999px; }
+    .fold-state.on { color: #4ade80; background: rgba(34,197,94,.12); }
+    .fold-body { padding: 0 22px 20px; display: flex; flex-direction: column; gap: 12px; }
+    .fold-body > .card { background: rgba(0,0,0,.18); }
+    .fold-body > .stats-grid { margin-bottom: 0; }
+    /* באנר ממתינים */
+    .pending-banner { padding: 14px 18px; margin-bottom: 14px; border-color: rgba(250,204,21,.4); background: rgba(250,204,21,.06); }
+    .pending-banner h3 { font-size: 15px; margin-bottom: 10px; color: #fde68a; }
+    .pending-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 8px 0; border-top: 1px solid rgba(255,255,255,.06); }
+    .pending-row:first-of-type { border-top: none; }
+    .pending-who b { font-size: 15px; }
+    .ver-badge { font-size: 11.5px; font-weight: 800; padding: 2px 8px; border-radius: 999px; direction: ltr; display: inline-block; }
+    .ver-ok { background: rgba(34,197,94,.12); color: #86efac; }
+    .ver-old-b { background: rgba(250,204,21,.14); color: #fde68a; }
+    .row-more { padding: 9px 12px !important; }
     .admin-tabs { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-bottom: 18px; padding: 6px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 18px; position: sticky; top: 8px; z-index: 10; backdrop-filter: blur(16px); }
     .admin-tab { border: none; background: transparent; color: #cbd5e1; border-radius: 13px; padding: 11px 6px; font-size: 14.5px; font-weight: 800; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; transition: background .2s, color .2s; }
     .admin-tab.active { background: #3888ff; color: #fff; box-shadow: 0 6px 16px rgba(56,136,255,.35); }
@@ -303,33 +324,31 @@
       <nav class="admin-tabs" id="adminTabs">
         <button type="button" class="admin-tab active" data-tab="users">👥 לקוחות <span class="tab-badge" id="badgePending" style="display:none;">0</span></button>
         <button type="button" class="admin-tab" data-tab="feedback">💬 שיחות <span class="tab-badge tab-badge-blue" id="badgeFeedback" style="display:none;">0</span></button>
-        <button type="button" class="admin-tab" data-tab="update">📢 עדכון <span class="tab-badge tab-badge-green" id="badgeUpdate" style="display:none;">!</span></button>
-        <button type="button" class="admin-tab" data-tab="sale">💰 מכירה <span class="tab-badge" id="badgeSale" style="display:none;">0</span></button>
+        <button type="button" class="admin-tab" data-tab="invite">✉️ הזמנות</button>
         <button type="button" class="admin-tab" data-tab="stats">📊 נתונים <span class="tab-badge" id="badgeErrors" style="display:none;">0</span></button>
-        <button type="button" class="admin-tab" data-tab="invite">✉️ הזמנה</button>
+        <button type="button" class="admin-tab" data-tab="update">⚙️ הגדרות <span class="tab-badge tab-badge-green" id="badgeUpdate" style="display:none;">!</span></button>
       </nav>
 
       <!-- ===================== לשונית: לקוחות ===================== -->
       <section class="admin-panel active" data-tab="users">
-      <div class="stats-grid">
-        <div class="card stat-card"><div class="stat-label">סה"כ</div><div class="stat-value" id="statTotal">0</div></div>
-        <div class="card stat-card"><div class="stat-label">ממתינים לאישור</div><div class="stat-value" id="statPending" style="color:#facc15;">0</div></div>
-        <div class="card stat-card"><div class="stat-label">מאושרים</div><div class="stat-value" id="statApproved" style="color:#4ade80;">0</div></div>
-        <div class="card stat-card"><div class="stat-label">גישה בוטלה</div><div class="stat-value" id="statBlocked" style="color:#fb7185;">0</div></div>
-      </div>
+      <!-- בקשות שמחכות לך: תמיד למעלה, עם אישור בלחיצה -->
+      <div class="card pending-banner" id="pendingBanner" style="display:none;"></div>
 
       <div class="card">
         <div class="table-header-bar">
           <div class="filter-tabs" id="filterTabs">
-            <button type="button" class="tab-pill active" data-filter="all">הכל</button>
-            <button type="button" class="tab-pill" data-filter="pending">ממתינים</button>
-            <button type="button" class="tab-pill" data-filter="approved">מאושרים</button>
-            <button type="button" class="tab-pill" data-filter="blocked">גישה בוטלה</button>
-            <button type="button" class="tab-pill" data-filter="outdated">⬆️ לא עודכנו <span class="pill-count" id="countOutdated"></span></button>
+            <button type="button" class="tab-pill active" data-filter="all">הכל <span class="pill-count" id="statTotal"></span></button>
+            <button type="button" class="tab-pill" data-filter="pending">⏳ ממתינים <span class="pill-count" id="statPending"></span></button>
+            <button type="button" class="tab-pill" data-filter="approved">✓ מאושרים <span class="pill-count" id="statApproved"></span></button>
+            <button type="button" class="tab-pill" data-filter="vip">⭐ VIP <span class="pill-count" id="countVip"></span></button>
+            <button type="button" class="tab-pill" data-filter="outdated">⬆️ גרסה ישנה <span class="pill-count" id="countOutdated"></span></button>
             <button type="button" class="tab-pill" data-filter="inactive">💤 לא פעילים <span class="pill-count" id="countInactive"></span></button>
-            <button type="button" class="tab-pill" data-filter="trial">🎁 בניסיון <span class="pill-count" id="countTrial"></span></button>
-            <button type="button" class="tab-pill" data-filter="trialEnded">⏰ ניסיון נגמר <span class="pill-count" id="countTrialEnded"></span></button>
-            <button type="button" class="tab-pill" data-filter="paid">💰 שילמו <span class="pill-count" id="countPaid"></span></button>
+            <button type="button" class="tab-pill" data-filter="blocked">🚫 חסומים <span class="pill-count" id="statBlocked"></span></button>
+            <span id="salePills" style="display:contents;">
+              <button type="button" class="tab-pill" data-filter="trial">🎁 בניסיון <span class="pill-count" id="countTrial"></span></button>
+              <button type="button" class="tab-pill" data-filter="trialEnded">⏰ ניסיון נגמר <span class="pill-count" id="countTrialEnded"></span></button>
+              <button type="button" class="tab-pill" data-filter="paid">💰 שילמו <span class="pill-count" id="countPaid"></span></button>
+            </span>
           </div>
           <div class="list-tools">
             <input type="text" id="searchInput" class="input-field" placeholder="חיפוש לפי שם, טלפון או הערה..." style="width: 240px;">
@@ -454,24 +473,9 @@
         </div>
 
 
-        <div class="card panel">
-          <h2>🔔 התראות לטלפון שלך</h2>
-          <div class="hint" style="line-height:1.7;">כשקוסם שולח בקשת גישה או הודעה - מגיעה לך התראה לטלפון מיד, גם כשהאתר סגור. ההתראה כוללת רק "בקשה חדשה" / "הודעה חדשה", בלי שמות ובלי פרטים.</div>
-          <ol class="setup-steps">
-            <li>מתקינים בטלפון את האפליקציה החינמית <b>ntfy</b> (מחנות האפליקציות).</li>
-            <li>פותחים אותה ← <b>+</b> (הירשם לנושא) ← מדביקים את השם הזה:</li>
-          </ol>
-          <div class="link-row"><span class="mono" id="ntfyTopic">—</span><button type="button" class="btn btn-ghost" id="ntfyCopyBtn">העתק</button></div>
-          <ol class="setup-steps" start="3">
-            <li>לוחצים כאן כדי לבדוק שזה עובד:</li>
-          </ol>
-          <button type="button" class="btn btn-whatsapp big-btn" id="ntfyTestBtn">🔔 שלח התראת בדיקה לטלפון שלי</button>
-          <div class="hint" id="ntfyStatus"></div>
-          <div class="hint">⚠️ ההתראות נשלחות מגרסה 5.8 ומעלה של האפליקציה - קוסמים בגרסה ישנה יותר יתחילו לשלוח התראות אחרי שתפרסם.</div>
-        </div>      </section>
-
-      <!-- ===================== לשונית: מכירה ===================== -->
-      <section class="admin-panel" data-tab="sale">
+        <details class="card panel fold" id="saleFold">
+          <summary class="fold-sum">💰 מכירה ותשלומים <span class="tab-badge" id="badgeSale" style="display:none;">0</span> <span class="fold-state" id="saleState"></span></summary>
+          <div class="fold-body">
         <div class="stats-grid">
           <div class="card stat-card"><div class="stat-label">💰 הכנסות</div><div class="stat-value" id="saleKpiRevenue" style="color:#facc15;">₪0</div></div>
           <div class="card stat-card"><div class="stat-label">✓ שילמו</div><div class="stat-value" id="saleKpiPaid" style="color:#4ade80;">0</div></div>
@@ -530,7 +534,28 @@
           <div class="hint" style="line-height:1.7;">על כל תשלום צריך להוציא קבלה מהעסק. אחרי שהוצאת - רשום את מספר הקבלה אצל הקוסם (לחיצה על השם ← תשלום), וכאן תראה למי עוד חסרה.</div>
           <div id="salesList" class="sale-list"></div>
         </div>
+                </div>
+        </details>
+        <details class="card panel fold">
+          <summary class="fold-sum">🔔 התראות לטלפון שלך</summary>
+          <div class="fold-body">
+          <div class="hint" style="line-height:1.7;">כשקוסם שולח בקשת גישה או הודעה - מגיעה לך התראה לטלפון מיד, גם כשהאתר סגור. ההתראה כוללת רק "בקשה חדשה" / "הודעה חדשה", בלי שמות ובלי פרטים.</div>
+          <ol class="setup-steps">
+            <li>מתקינים בטלפון את האפליקציה החינמית <b>ntfy</b> (מחנות האפליקציות).</li>
+            <li>פותחים אותה ← <b>+</b> (הירשם לנושא) ← מדביקים את השם הזה:</li>
+          </ol>
+          <div class="link-row"><span class="mono" id="ntfyTopic">—</span><button type="button" class="btn btn-ghost" id="ntfyCopyBtn">העתק</button></div>
+          <ol class="setup-steps" start="3">
+            <li>לוחצים כאן כדי לבדוק שזה עובד:</li>
+          </ol>
+          <button type="button" class="btn btn-whatsapp big-btn" id="ntfyTestBtn">🔔 שלח התראת בדיקה לטלפון שלי</button>
+          <div class="hint" id="ntfyStatus"></div>
+          <div class="hint">⚠️ ההתראות נשלחות מגרסה 5.8 ומעלה של האפליקציה. קוסם בגרסה ישנה יותר לא שולח התראה - אבל הבקשה שלו עדיין מגיעה לכאן.</div>
+          </div>
+        </details>
       </section>
+
+
 
       <!-- ===================== לשונית: הזמנה ===================== -->
       <section class="admin-panel" data-tab="invite">
@@ -830,7 +855,10 @@
     function usageHtml(u) {
       if (!u.lastSeen) return '<span class="muted">עוד לא השתמש</span>';
       const opens = Number(u.openCount) || 0;
-      const ver = u.appVersion ? ` · <span class="mono${isOutdated(u) ? ' ver-old' : ''}" title="${isOutdated(u) ? 'גרסה ישנה' : ''}">v${escapeHtml(u.appVersion)}${isOutdated(u) ? ' ⬆️' : ''}</span>` : '';
+      // הגרסה של כל קוסם - גם של מי שעוד על גרסה ישנה (ירוק = עדכני, צהוב = צריך לעדכן)
+      const ver = u.appVersion
+        ? ` <span class="ver-badge ${isOutdated(u) ? 'ver-old-b' : 'ver-ok'}" title="${isOutdated(u) ? 'גרסה ישנה - עוד לא עדכן' : 'גרסה עדכנית'}">v${escapeHtml(u.appVersion)}${isOutdated(u) ? ' ⬆️' : ' ✓'}</span>`
+        : '';
       const st = parseStats(u);
       let tricks = '';
       if (st) {
@@ -839,7 +867,7 @@
         tricks = `<div class="user-tricks">🎩 ${shows} הופעות · ${codes} קודים${st.on && st.on.includes('english') ? ' · 🇬🇧' : ''}</div>`;
       }
       return `<div style="font-weight:600; font-size:13.5px;">${timeAgo(u.lastSeen)}</div>` +
-        `<div class="muted">${opens} פתיחות${ver}</div>` + tricks;
+        `<div class="muted">${opens} פתיחות ${ver}</div>` + tricks;
     }
 
     // ---------------- נתונים (סטטיסטיקה ותקלות) ----------------
@@ -1215,12 +1243,41 @@
 
     let knownPendingIds = null;
 
+    // באנר "מחכים לך": כל בקשה חדשה עם אישור/דחייה בלחיצה, בלי לחפש ברשימה
+    function renderPendingBanner(pending) {
+      const box = $('pendingBanner');
+      if (!pending.length) {
+        box.style.display = 'none';
+        return;
+      }
+      const rows = pending
+        .slice()
+        .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')))
+        .map((u) => {
+          const id = escapeHtml(u.id);
+          const paidOld = findPaidByPhone(u);
+          return `<div class="pending-row">
+            <span class="pending-who"><b class="name-link" data-action="details" data-id="${id}">${escapeHtml(u.name) || '—'}</b>${userFlags(u)}
+              <span class="muted"> · <span class="mono" style="color:#cbd5e1;">${escapeHtml(u.phone) || ''}</span> · ${timeAgo(u.createdAt) || formatDate(u.createdAt)}</span></span>
+            <span class="actions-cell">
+              ${paidOld ? `<button type="button" class="btn btn-whatsapp" data-action="transfer" data-id="${id}">🔁 העבר רישיון</button>` : ''}
+              <button type="button" class="btn ${paidOld ? 'btn-wa-outline' : 'btn-whatsapp'}" data-action="approve" data-id="${id}">✓ אשר ושלח וואטסאפ</button>
+              <button type="button" class="btn btn-block" data-action="reject" data-id="${id}">דחה</button>
+            </span>
+          </div>`;
+        })
+        .join('');
+      box.innerHTML = `<h3>🔔 ${pending.length === 1 ? 'בקשה אחת מחכה לך' : `${pending.length} בקשות מחכות לך`}</h3>${rows}`;
+      box.style.display = '';
+    }
+
     function renderUsers() {
       const pending = allUsers.filter((u) => u.status === 'pending');
       $('statTotal').textContent = allUsers.length;
-      $('statPending').textContent = pending.length;
-      $('statApproved').textContent = allUsers.filter((u) => u.status === 'approved').length;
-      $('statBlocked').textContent = allUsers.filter((u) => u.status === 'blocked').length;
+      $('statPending').textContent = pending.length || '';
+      $('statApproved').textContent = allUsers.filter((u) => u.status === 'approved').length || '';
+      $('statBlocked').textContent = allUsers.filter((u) => u.status === 'blocked').length || '';
+      $('countVip').textContent = allUsers.filter((u) => u.vipCode).length || '';
 
       // ממתינים: מספר על הלשונית ובכותרת הדפדפן, והתראה כשמגיעה בקשה חדשה
       $('badgePending').textContent = pending.length;
@@ -1231,6 +1288,7 @@
         if (fresh.length) toast(`🔔 בקשה חדשה מ${fresh.map((u) => u.name).join(', ')}`);
       }
       knownPendingIds = new Set(pending.map((u) => u.id));
+      renderPendingBanner(pending);
 
       const q = searchQuery.toLowerCase();
       const order = { pending: 0, trial: 1, approved: 2, blocked: 3 };
@@ -1239,6 +1297,10 @@
       $('countTrial').textContent = allUsers.filter((u) => u.status === 'trial').length || '';
       $('countPaid').textContent = allUsers.filter((u) => u.paid).length || '';
       $('countTrialEnded').textContent = allUsers.filter(isTrialEnded).length || '';
+      // סינוני מכירה מופיעים רק כשהמכירה פעילה (או שיש כבר מישהו בניסיון / ששילם)
+      const saleVisible = saleCfg.trial_days > 0 || allUsers.some((u) => u.status === 'trial' || u.paid);
+      $('salePills').style.display = saleVisible ? 'contents' : 'none';
+      if (!saleVisible && ['trial', 'trialEnded', 'paid'].includes(currentFilter)) currentFilter = 'all';
       const time = (iso) => (iso ? new Date(iso).getTime() : 0);
       const sorters = {
         smart: (a, b) => (order[a.status] ?? 3) - (order[b.status] ?? 3) || time(b.createdAt) - time(a.createdAt),
@@ -1251,12 +1313,14 @@
           if (currentFilter === 'outdated') { if (!isOutdated(u)) return false; }
           else if (currentFilter === 'inactive') { if (!isInactive(u)) return false; }
           else if (currentFilter === 'paid') { if (!u.paid) return false; }
+          else if (currentFilter === 'vip') { if (!u.vipCode) return false; }
           else if (currentFilter === 'trialEnded') { if (!isTrialEnded(u)) return false; }
           else if (currentFilter !== 'all' && u.status !== currentFilter) return false;
           if (!q) return true;
           return [u.name, u.phone, u.deviceId, allNotes[u.id]].some((v) => String(v || '').toLowerCase().includes(q));
         })
         .sort(sorters[currentSort] || sorters.smart);
+      document.querySelectorAll('#filterTabs .tab-pill').forEach((p) => p.classList.toggle('active', p.dataset.filter === currentFilter));
 
       const tbody = $('usersTableBody');
       tbody.innerHTML = '';
@@ -1265,21 +1329,18 @@
       filtered.forEach((u) => {
         const id = escapeHtml(u.id);
         let statusHtml, actions;
+        // בשורה: רק הפעולה הכי שכיחה. כל השאר (וואטסאפ שוב, ביטול, מחיקה) - בכפתור "⋯"
         if (u.status === 'trial') {
           const left = trialDaysLeft(u);
           statusHtml = left > 0
             ? `<span class="status-badge status-trial">🎁 ניסיון · ${left === 1 ? 'יום אחרון' : `נשארו ${left} ימים`}</span>`
             : '<span class="status-badge status-trial-ended">⏰ הניסיון הסתיים</span>';
           actions = `
-            <button type="button" class="btn btn-whatsapp" data-action="paid" data-id="${id}">💰 שילם - אשר</button>
-            ${left <= 0 && u.phone ? `<button type="button" class="btn btn-wa-outline" data-action="remind" data-id="${id}">🟢 תזכורת תשלום</button>` : ''}
-            <button type="button" class="btn btn-ghost" data-action="free" data-id="${id}">🎁 חינם</button>
-            <button type="button" class="btn btn-block" data-action="revoke" data-id="${id}">בטל</button>`;
+            <button type="button" class="btn btn-whatsapp" data-action="paid" data-id="${id}">💰 שילם</button>
+            <button type="button" class="btn btn-ghost" data-action="free" data-id="${id}">🎁 חינם</button>`;
         } else if (u.status === 'approved') {
           statusHtml = '<span class="status-badge status-approved">מאושר ✓</span>';
-          actions = `
-            <button type="button" class="btn btn-wa-outline" data-action="whatsapp" data-id="${id}">שלח וואטסאפ שוב</button>
-            <button type="button" class="btn btn-block" data-action="revoke" data-id="${id}">בטל גישה</button>`;
+          actions = `<button type="button" class="btn btn-ghost" data-action="message" data-id="${id}">💬 הודעה</button>`;
         } else if (u.status === 'blocked') {
           statusHtml = '<span class="status-badge status-blocked">גישה בוטלה ✕</span>';
           actions = `<button type="button" class="btn btn-wa-outline" data-action="restore" data-id="${id}">החזר גישה</button>`;
@@ -1287,15 +1348,11 @@
           statusHtml = '<span class="status-badge status-pending">ממתין לאישור</span>';
           const paidOld = findPaidByPhone(u);
           actions = `
-            ${paidOld ? `<button type="button" class="btn btn-whatsapp" data-action="transfer" data-id="${id}">🔁 העבר רישיון מהטלפון הישן</button>` : ''}
-            <button type="button" class="btn ${paidOld ? 'btn-wa-outline' : 'btn-whatsapp'}" data-action="approve" data-id="${id}">אשר ושלח וואטסאפ</button>
+            ${paidOld ? `<button type="button" class="btn btn-whatsapp" data-action="transfer" data-id="${id}">🔁 העבר רישיון</button>` : ''}
+            <button type="button" class="btn ${paidOld ? 'btn-wa-outline' : 'btn-whatsapp'}" data-action="approve" data-id="${id}">✓ אשר</button>
             <button type="button" class="btn btn-block" data-action="reject" data-id="${id}">דחה</button>`;
         }
-        if (u.status !== 'pending') {
-          actions = `<button type="button" class="btn btn-ghost" data-action="message" data-id="${id}">💬 הודעה</button>` + actions;
-        }
-        actions += `<button type="button" class="btn btn-delete" data-action="delete" data-id="${id}">מחק</button>`;
-
+        actions += `<button type="button" class="btn btn-ghost row-more" data-action="details" data-id="${id}" title="עוד פעולות ופרטים">⋯</button>`;
         const tr = document.createElement('tr');
         tr.innerHTML = `
           <td class="name-cell" style="font-weight:700;"><span class="name-link" data-action="details" data-id="${id}">${escapeHtml(u.name) || '—'}</span>${allNotes[u.id] ? '<span class="note-dot" title="יש הערה">📝</span>' : ''}${u.tester ? '<span class="note-dot" title="בודק בטא">🧪</span>' : ''}${u.paid ? '<span class="note-dot" title="שילם">💰</span>' : ''}${userFlags(u)} ${statusHtml}${u.deviceId ? `<div class="muted">מכשיר <span class="mono">${escapeHtml(u.deviceId)}</span></div>` : ''}</td>
@@ -1428,9 +1485,12 @@
     // ---------------- לשוניות ----------------
     const ADMIN_TAB_KEY = 'magic_admin_tab_v1';
     function showAdminTab(tab) {
+      // לשוניות ישנות שאוחדו: "מכירה" נמצאת עכשיו בתוך "הגדרות"
+      if (tab === 'sale') tab = 'update';
+      if (!document.querySelector(`.admin-tab[data-tab="${tab}"]`)) tab = 'users';
       document.querySelectorAll('.admin-tab').forEach((b) => b.classList.toggle('active', b.dataset.tab === tab));
       document.querySelectorAll('.admin-panel').forEach((p) => p.classList.toggle('active', p.dataset.tab === tab));
-      localStorage.setItem(ADMIN_TAB_KEY, tab);
+      try { localStorage.setItem(ADMIN_TAB_KEY, tab); } catch (e) {}
       if (tab === 'update' && $('dashboardView').style.display === 'block') loadPublishedVersion();
     }
     document.querySelectorAll('.admin-tab').forEach((b) => b.addEventListener('click', () => showAdminTab(b.dataset.tab)));
@@ -1491,7 +1551,7 @@
       }
     }
 
-    $('usersTableBody').addEventListener('click', async (e) => {
+    const onUserAction = async (e) => {
       const btn = e.target.closest('[data-action]');
       if (!btn) return;
       const id = btn.getAttribute('data-id');
@@ -1542,7 +1602,10 @@
           btn.disabled = false;
         }
       }
-    });
+    };
+    $('usersTableBody').addEventListener('click', onUserAction);
+    $('pendingBanner').addEventListener('click', onUserAction);
+
 
     // ---------------- הערות פרטיות ----------------
     async function loadNotes() {
@@ -1560,7 +1623,7 @@
       const st = parseStats(user);
       const thread = buildThreads().find((x) => x.uid === user.id);
       const errs = allErrors.filter((x) => x.uid === user.id);
-      const statusText = { approved: 'מאושר ✓', blocked: 'גישה בוטלה', pending: 'ממתין לאישור' }[user.status] || user.status;
+      const statusText = { approved: 'מאושר ✓', blocked: 'גישה בוטלה', pending: 'ממתין לאישור', trial: '🎁 בניסיון' }[user.status] || user.status;
       const phoneDigits = formatPhoneForWhatsapp(user.phone);
       const used = st
         ? Object.entries(st.e)
@@ -1626,7 +1689,18 @@
           <h3>💬 שיחה (${thread ? thread.items.length : 0})</h3>
           ${thread ? `<div class="bubbles">${renderBubbles(thread)}</div>` : '<div class="muted">עוד אין הודעות</div>'}
         </div>
-        ${errs.length ? `<div class="drawer-sec"><h3>🐞 תקלות (${errs.length})</h3>${errs.map((x) => `<div class="mini-fb" dir="ltr" style="text-align:left;">${escapeHtml(x.msg)}</div>`).join('')}</div>` : ''}`;
+        ${errs.length ? `<div class="drawer-sec"><h3>🐞 תקלות (${errs.length})</h3>${errs.map((x) => `<div class="mini-fb" dir="ltr" style="text-align:left;">${escapeHtml(x.msg)}</div>`).join('')}</div>` : ''}
+        <div class="drawer-sec">
+          <h3>⚙️ פעולות</h3>
+          <div class="drawer-actions" style="flex-direction:column;">
+            ${user.phone && user.status === 'approved' ? `<button type="button" class="btn btn-wa-outline" data-act="guide">🟢 שלח לו שוב את המדריך בוואטסאפ</button>` : ''}
+            ${isTrialEnded(user) && user.phone ? `<button type="button" class="btn btn-wa-outline" data-act="remind">🟢 תזכורת תשלום בוואטסאפ</button>` : ''}
+            ${user.status === 'blocked'
+              ? `<button type="button" class="btn btn-wa-outline" data-act="restore">↩️ החזר גישה</button>`
+              : user.status !== 'pending' ? `<button type="button" class="btn btn-block" data-act="revoke">🚫 בטל גישה (האפליקציה תינעל אצלו)</button>` : ''}
+            <button type="button" class="btn btn-delete" data-act="delete">🗑️ מחק לגמרי</button>
+          </div>
+        </div>`;
 
       $('drawerOverlay').style.display = 'flex';
       $('drawerClose').addEventListener('click', closeDetails);
@@ -1637,6 +1711,22 @@
       });
       const paidBtnD = document.getElementById('drawerPaid');
       if (paidBtnD) paidBtnD.addEventListener('click', () => markPaid(user, paidBtnD));
+      // פעולות מהחלון: משתמשות באותן פעולות של הרשימה, ואז סוגרות/מרעננות את החלון
+      $('drawer').querySelectorAll('[data-act]').forEach((b) =>
+        b.addEventListener('click', async () => {
+          const act = b.dataset.act;
+          if (act === 'guide') return window.open(buildWhatsappUrl(user), '_blank', 'noopener');
+          if (act === 'remind') return sendPayReminder(user);
+          const map = { restore: 'restore', revoke: 'revoke', delete: 'delete' };
+          const fake = document.createElement('button');
+          fake.dataset.action = map[act];
+          fake.dataset.id = user.id;
+          await onUserAction({ target: fake });
+          const still = allUsers.find((u) => u.id === user.id);
+          if (still && $('drawerOverlay').style.display === 'flex') openDetails(still);
+          else closeDetails();
+        })
+      );
       const freeBtn = document.getElementById('drawerFree');
       if (freeBtn) freeBtn.addEventListener('click', () => giveFree(user, freeBtn));
       const rcptBtn = document.getElementById('drawerReceiptSave');
@@ -1922,6 +2012,9 @@
     const CHECK_KEY = 'admin_sale_checklist_v1';
     function renderSale() {
       if (!$('saleKpiRevenue')) return;
+      const saleOn = saleCfg.trial_days > 0;
+      $('saleState').textContent = saleOn ? `פעיל · ${saleCfg.trial_days} ימי ניסיון · ₪${saleCfg.price || 0}` : 'כבוי - האפליקציה בחינם';
+      $('saleState').classList.toggle('on', saleOn);
       const paid = allUsers.filter((u) => u.paid);
       const ended = allUsers.filter(isTrialEnded);
       const everTrial = allUsers.filter((u) => u.status === 'trial' || u.paid).length;

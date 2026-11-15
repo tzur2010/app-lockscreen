@@ -1201,6 +1201,7 @@
           actions = `
             <button type="button" class="btn btn-whatsapp" data-action="paid" data-id="${id}">💰 שילם - אשר</button>
             ${left <= 0 && u.phone ? `<button type="button" class="btn btn-wa-outline" data-action="remind" data-id="${id}">🟢 תזכורת תשלום</button>` : ''}
+            <button type="button" class="btn btn-ghost" data-action="free" data-id="${id}">🎁 חינם</button>
             <button type="button" class="btn btn-block" data-action="revoke" data-id="${id}">בטל</button>`;
         } else if (u.status === 'approved') {
           statusHtml = '<span class="status-badge status-approved">מאושר ✓</span>';
@@ -1432,6 +1433,8 @@
         openDetails(user);
       } else if (action === 'paid') {
         markPaid(user, btn);
+      } else if (action === 'free') {
+        giveFree(user, btn);
       } else if (action === 'remind') {
         sendPayReminder(user);
       } else if (action === 'transfer') {
@@ -1516,7 +1519,8 @@
             : user.refundedAt ? `<div class="muted">↩️ קיבל החזר כספי ב-${formatDate(user.refundedAt)}</div>`
             : user.transferredTo ? `<div class="muted">🔁 הרישיון הועבר לטלפון חדש</div>`
             : `<div class="muted" style="margin-bottom:8px;">${user.status === 'trial' ? (trialDaysLeft(user) > 0 ? `🎁 בניסיון - נשארו ${trialDaysLeft(user)} ימים` : '⏰ הניסיון הסתיים - מחכה לתשלום') : 'עוד לא סומן כמשלם'}</div>
-               <button type="button" class="btn btn-whatsapp" id="drawerPaid" style="width:100%; justify-content:center;">💰 סמן ששילם</button>`}
+               <button type="button" class="btn btn-whatsapp" id="drawerPaid" style="width:100%; justify-content:center;">💰 סמן ששילם</button>
+               ${user.status !== 'approved' ? '<button type="button" class="btn btn-ghost" id="drawerFree" style="width:100%; justify-content:center; margin-top:8px;">🎁 תן גישה חינם לתמיד</button>' : '<div class="muted" style="margin-top:8px;">🎁 יש לו גישה חינם (מאושר בלי תשלום)</div>'}`}
         </div>
         ${user.status === 'approved' ? `<div class="drawer-sec"><h3>🧪 ערוץ בטא</h3><button type="button" class="btn ${user.tester ? 'btn-whatsapp' : 'btn-ghost'}" id="drawerTester" style="width:100%; justify-content:center;">${user.tester ? '✓ בודק בטא - מקבל כל גרסה חדשה לפני כולם' : 'סמן כבודק בטא'}</button><div class="muted" style="margin-top:6px; line-height:1.5;">בודק בטא מקבל כל גרסה חדשה מיד כשהיא מוכנה, לפני שאתה מפרסם לכולם. מתאים לך ולקוסם או שניים שאתה סומך עליהם.</div></div>` : ''}
         <div class="drawer-sec">
@@ -1553,6 +1557,8 @@
       });
       const paidBtnD = document.getElementById('drawerPaid');
       if (paidBtnD) paidBtnD.addEventListener('click', () => markPaid(user, paidBtnD));
+      const freeBtn = document.getElementById('drawerFree');
+      if (freeBtn) freeBtn.addEventListener('click', () => giveFree(user, freeBtn));
       const rcptBtn = document.getElementById('drawerReceiptSave');
       if (rcptBtn) rcptBtn.addEventListener('click', async () => {
         const val = $('drawerReceipt').value.trim();
@@ -1695,6 +1701,16 @@
         .split('\n').map((l) => (l.includes('{קישור}') ? (saleCfg.pay_link ? l.split('{קישור}').join(saleCfg.pay_link) : null) : l))
         .filter((l) => l !== null).join('\n');
       window.open(`https://wa.me/${formatPhoneForWhatsapp(user.phone)}?text=${encodeURIComponent(msg)}`, '_blank', 'noopener');
+    }
+
+    // גישה חינם לתמיד (קוסם שהזמנת להתנסות): "מאושר" בלי תשלום = פתוח לתמיד, בלי מסך תשלום
+    async function giveFree(user, btn) {
+      if (!confirm(`לתת ל${user.name} גישה חינם לתמיד?\nהאפליקציה תיפתח לו מיד ולא יבקשו ממנו לשלם.`)) return;
+      if (user.phone && confirm('לשלוח לו עכשיו בוואטסאפ את המדריך המלא?')) window.open(buildWhatsappUrl(user), '_blank', 'noopener');
+      if (btn) btn.disabled = true;
+      const ok = await setStatus(user.id, 'approved', `🎁 ${user.name} קיבל גישה חינם לתמיד`);
+      if (ok && $('drawerOverlay').style.display === 'flex') openDetails(user);
+      if (!ok && btn) btn.disabled = false;
     }
 
     async function transferLicense(user, btn) {

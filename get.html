@@ -163,7 +163,12 @@
     const isAndroid = /Android/i.test(ua);
     // באייפון: דפדפן בתוך אפליקציה (וואטסאפ/אינסטגרם/פייסבוק) או דפדפן שאינו Safari
     const notSafari = isIOS && (/CriOS|FxiOS|EdgiOS|OPiOS|FBAN|FBAV|Instagram|Line\//i.test(ua) || !/Safari/i.test(ua));
-    let lang = params.get('lang') === 'en' || (!params.get('lang') && !/^he|^iw/i.test(navigator.language || 'he')) ? 'en' : 'he';
+    // שפה: לפי הקישור (?lang=en), אחרת עברית לכל מי שבישראל (גם אם הטלפון באנגלית)
+    let tz = '';
+    try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch (e) {}
+    const langs = [].concat(navigator.languages || [], navigator.language || []);
+    const israeli = /^(Asia\/Jerusalem|Asia\/Tel_Aviv)$/.test(tz) || langs.some((l) => /^(he|iw)/i.test(l));
+    let lang = params.get('lang') ? (params.get('lang') === 'en' ? 'en' : 'he') : israeli ? 'he' : 'en';
     const code = String(params.get('c') || '').trim().toUpperCase();
     const validCode = /^[A-Z0-9-]{4,40}$/.test(code) ? code : '';
 

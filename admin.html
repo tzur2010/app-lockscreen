@@ -546,10 +546,17 @@
               <label class="field-label" for="vipPhone">הטלפון שלו (לא חובה - לשליחה בוואטסאפ)</label>
               <input class="input-field" id="vipPhone" type="tel" dir="ltr" placeholder="050-0000000">
             </div>
+            <div style="max-width:150px;">
+              <label class="field-label" for="vipLang">שפת ההודעה</label>
+              <select class="input-field" id="vipLang">
+                <option value="he">🇮🇱 עברית</option>
+                <option value="en">🇬🇧 English</option>
+              </select>
+            </div>
           </div>
           <details class="advanced-box" style="margin-top:10px;">
             <summary>✏️ נוסח ההודעה ל-VIP (אפשר לערוך)</summary>
-            <div class="hint" style="margin:6px 0;">{שם} = השם הפרטי שלו · {קוד} = הקוד · {קישור} = עמוד ההתקנה (כבר עם הקוד בפנים)</div>
+            <div class="hint" style="margin:6px 0;">{שם} = השם הפרטי שלו · {קוד} = הקוד · {קישור} = עמוד ההתקנה (כבר עם הקוד בפנים). באנגלית: {name} · {code} · {link}. הנוסח שמוצג כאן הוא לפי "שפת ההודעה" למעלה.</div>
             <textarea class="input-field" id="vipTemplate" style="min-height:220px; width:100%; box-sizing:border-box;"></textarea>
             <div class="actions-cell" style="margin-top:8px;">
               <button type="button" class="btn btn-ghost" id="vipTplSave">שמור נוסח</button>
@@ -596,6 +603,10 @@
               <button type="button" class="btn btn-ghost" id="inviteCopyBtn">העתק הודעה</button>
               <button type="button" class="btn btn-ghost" id="inviteSaveBtn">שמור</button>
               <button type="button" class="btn btn-ghost" id="inviteResetBtn">ברירת מחדל</button>
+            </div>
+            <div class="actions-cell">
+              <button type="button" class="btn btn-wa-outline" id="inviteEnSendBtn">🇬🇧 שלח הזמנה באנגלית</button>
+              <button type="button" class="btn btn-ghost" id="inviteEnCopyBtn">🇬🇧 העתק באנגלית</button>
             </div>
             <div class="hint">בלי מספר טלפון: וואטסאפ נפתח ואתה בוחר למי לשלוח.</div>
           </div>
@@ -704,6 +715,23 @@
       '⭐ קוד ההזמנה האישי שלך: *{קוד}*\n' +
       '(בהרשמה לוחצים "יש לך קוד הזמנה?" - ונכנסים מיד)\n\n' +
       'כל שאלה - אני פה.';
+
+    // אותן הודעות באנגלית (לקוסמים מחו"ל). הקישור נפתח באנגלית (?lang=en)
+    const VIP_TPL_KEY_EN = 'admin_vip_template_en_v1';
+    const DEFAULT_VIP_TPL_EN =
+      'Hi {name}! 🙂\n' +
+      'I\'ve built an app for magicians called *Magic Lock* - a fake lock screen that looks exactly like your own phone\'s.\n' +
+      'The spectator types a secret passcode to unlock the phone - and you know it (even on a second phone in your pocket), reveal it in crazy ways, or make the phone unlock on exactly the code they chose.\n\n' +
+      'I\'d love for you to try it - *free, forever*, no strings attached. The opinion of a magician at your level means a lot to me 🙏\n\n' +
+      '📲 One-tap install (Android & iPhone):\n{link}\n\n' +
+      '⭐ Your personal invite code: *{code}*\n' +
+      '(At sign-up tap "Have an invite code?" - and you\'re in right away)\n\n' +
+      'Any questions - I\'m here.';
+    const INVITE_EN =
+      'Hi! 🪄 I\'d like to invite you to try Magic Lock - a lock screen app for magicians.\n\n' +
+      '📲 Install (Android & iPhone) - open the link and follow the steps:\n' + GET_LINK + '?lang=en\n\n' +
+      'After installing, enter your name and phone number and you\'re in 🙂\n' +
+      '(Tip: in the app, More tab → Language → English)';
 
     let allUsers = [];
     let allFeedback = [];
@@ -1436,6 +1464,12 @@
       $('inviteTemplate').value = DEFAULT_INVITE;
       toast('הוחזר לברירת מחדל');
     });
+    $('inviteEnCopyBtn').addEventListener('click', () => copyText(INVITE_EN, 'ההזמנה באנגלית הועתקה ✓'));
+    $('inviteEnSendBtn').addEventListener('click', () => {
+      const text = encodeURIComponent(INVITE_EN);
+      const phone = formatPhoneForWhatsapp($('invitePhone').value);
+      window.open(phone.length >= 11 ? `https://wa.me/${phone}?text=${text}` : `https://wa.me/?text=${text}`, '_blank', 'noopener');
+    });
     $('inviteSendBtn').addEventListener('click', () => {
       const text = encodeURIComponent($('inviteTemplate').value);
       const phone = formatPhoneForWhatsapp($('invitePhone').value);
@@ -1760,17 +1794,22 @@
     }
 
     // ההודעה לקוסם VIP: הקישור כולל את הקוד, כך שעמוד ההתקנה מציג לו אותו עם כפתור העתקה
-    const getVipTemplate = () => localStorage.getItem(VIP_TPL_KEY) || DEFAULT_VIP_TPL;
-    function vipMessage(label, code) {
+    const vipLang = () => ($('vipLang') && $('vipLang').value === 'en' ? 'en' : 'he');
+    const getVipTemplate = (lang) =>
+      lang === 'en' ? localStorage.getItem(VIP_TPL_KEY_EN) || DEFAULT_VIP_TPL_EN : localStorage.getItem(VIP_TPL_KEY) || DEFAULT_VIP_TPL;
+    function vipMessage(label, code, lang = 'he') {
       const first = String(label || '').trim().split(/\s+/)[0] || '';
-      return getVipTemplate()
-        .split('{שם}').join(first)
-        .split('{קוד}').join(code)
-        .split('{קישור}').join(`${GET_LINK}?c=${encodeURIComponent(code)}`);
+      const link = `${GET_LINK}?c=${encodeURIComponent(code)}${lang === 'en' ? '&lang=en' : ''}`;
+      return getVipTemplate(lang)
+        .split('{שם}').join(first).split('{name}').join(first)
+        .split('{קוד}').join(code).split('{code}').join(code)
+        .split('{קישור}').join(link).split('{link}').join(link);
     }
-    $('vipTemplate').value = getVipTemplate();
-    $('vipTplSave').addEventListener('click', () => { localStorage.setItem(VIP_TPL_KEY, $('vipTemplate').value); toast('הנוסח נשמר ✓'); });
-    $('vipTplReset').addEventListener('click', () => { localStorage.removeItem(VIP_TPL_KEY); $('vipTemplate').value = DEFAULT_VIP_TPL; toast('הוחזר לנוסח המקורי'); });
+    const fillVipTemplate = () => ($('vipTemplate').value = getVipTemplate(vipLang()));
+    fillVipTemplate();
+    $('vipLang').addEventListener('change', fillVipTemplate);
+    $('vipTplSave').addEventListener('click', () => { localStorage.setItem(vipLang() === 'en' ? VIP_TPL_KEY_EN : VIP_TPL_KEY, $('vipTemplate').value); toast('הנוסח נשמר ✓'); });
+    $('vipTplReset').addEventListener('click', () => { localStorage.removeItem(vipLang() === 'en' ? VIP_TPL_KEY_EN : VIP_TPL_KEY); fillVipTemplate(); toast('הוחזר לנוסח המקורי'); });
 
     function vipUsers(code) {
       return allUsers.filter((u) => u.vipCode === code);
@@ -1787,7 +1826,7 @@
         const used = vipUsers(v.id);
         const who = used.length ? `✓ נכנס: ${used.map((u) => escapeHtml(u.name)).join(', ')}` : 'עוד לא נכנס';
         return `<div class="sale-row">
-          <span><span class="mono" style="font-weight:800; color:#facc15;">${escapeHtml(v.id)}</span> <b>${escapeHtml(v.label || '')}</b><br><span class="meta">${formatDate(v.createdAt)} · ${who}</span></span>
+          <span><span class="mono" style="font-weight:800; color:#facc15;">${escapeHtml(v.id)}</span> <b>${escapeHtml(v.label || '')}</b>${v.lang === 'en' ? ' 🇬🇧' : ''}<br><span class="meta">${formatDate(v.createdAt)} · ${who}</span></span>
           <span class="actions-cell">
             <button type="button" class="btn btn-ghost" data-vip-copy="${escapeHtml(v.id)}">העתק הודעה</button>
             <button type="button" class="btn btn-delete" data-vip-del="${escapeHtml(v.id)}">מחק קוד</button>
@@ -1815,8 +1854,9 @@
       btn.disabled = true;
       $('vipStatus').textContent = 'יוצר קוד...';
       try {
-        const code = await Cloud.admin.createVipCode(newVipCode(), label);
-        const text = encodeURIComponent(vipMessage(label, code));
+        const lang = vipLang();
+        const code = await Cloud.admin.createVipCode(newVipCode(), label, lang);
+        const text = encodeURIComponent(vipMessage(label, code, lang));
         const url = phone.length >= 11 ? `https://wa.me/${phone}?text=${text}` : `https://wa.me/?text=${text}`;
         if (win) win.location.href = url;
         else window.open(url, '_blank', 'noopener');
@@ -1837,7 +1877,7 @@
       const del = e.target.closest('[data-vip-del]');
       if (copy) {
         const v = allVip.find((x) => x.id === copy.dataset.vipCopy);
-        if (v) copyText(vipMessage(v.label, v.id), 'ההודעה עם הקוד הועתקה ✓');
+        if (v) copyText(vipMessage(v.label, v.id, v.lang === 'en' ? 'en' : 'he'), 'ההודעה עם הקוד הועתקה ✓');
       } else if (del) {
         const code = del.dataset.vipDel;
         if (!confirm(`למחוק את הקוד ${code}?\nאף אחד חדש לא יוכל להיכנס איתו. מי שכבר נכנס - נשאר.`)) return;

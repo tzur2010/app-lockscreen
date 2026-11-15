@@ -3500,13 +3500,24 @@ function initDeviceLicenseGate() {
         applyState('config');
         return;
       }
+      const vipInput = document.getElementById('regVipInput');
+      const vipCode = regVipMode && vipInput ? vipInput.value.trim() : '';
+      if (regVipMode && vipCode.length < 4) {
+        setError('אנא הזן את קוד ההזמנה');
+        return;
+      }
       setError('');
       submitRegBtn.disabled = true;
       submitRegBtn.textContent = 'שולח בקשה...';
       try {
-        const transfer = regTransferMode;
-        const trial = !transfer && getSaleConfig().trial_days > 0;
-        const status = await window.MagicCloud.device.submitRequest({ name, phone, deviceId: devId, trial, transfer });
+        if (vipCode && !(await window.MagicCloud.device.checkVipCode(vipCode))) {
+          setError('קוד ההזמנה לא נכון - בדוק אותו ונסה שוב');
+          triggerHaptic([60, 80, 60]);
+          return;
+        }
+        const transfer = regTransferMode && !vipCode;
+        const trial = !transfer && !vipCode && getSaleConfig().trial_days > 0;
+        const status = await window.MagicCloud.device.submitRequest({ name, phone, deviceId: devId, trial, transfer, vipCode });
         triggerHaptic(40);
         if (status === 'trial') {
           // נרשם לניסיון - נפתח מיד
@@ -3557,7 +3568,7 @@ function initDeviceLicenseGate() {
 // החלון מוצג רק כשמסך ההגדרות פתוח (בפתיחת האפליקציה / בתפריט הסודי),
 // ולעולם לא מעל מסך הנעילה הפעיל מול קהל.
 // ============================================================================
-const APP_VERSION = '6.2';
+const APP_VERSION = '6.3';
 const DEFAULT_APK_URL = 'https://github.com/tzur2010/app-lockscreen/raw/main/Lockscreen.apk';
 const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 const UPDATE_DISMISS_KEY = 'magic_update_dismissed_version';
@@ -6193,28 +6204,45 @@ function fillPayInfo() {
 
 // מצב "עברתי לטלפון חדש": בלי ניסיון, הבקשה מגיעה למנהל כבקשת העברה
 var regTransferMode = false;
+// מצב "קוד הזמנה": קוסם שהמנהל הזמין נכנס מיד, בחינם לתמיד
+var regVipMode = false;
 
 function updateRegTrialNote() {
   const note = document.getElementById('regTrialNote');
   const btn = document.getElementById('submitRegBtn');
   const toggle = document.getElementById('regTransferToggle');
+  const vipToggle = document.getElementById('regVipToggle');
+  const vipInput = document.getElementById('regVipInput');
   const en = isEnglishUi();
-  const days = regTransferMode ? 0 : getSaleConfig().trial_days;
+  const days = regTransferMode || regVipMode ? 0 : getSaleConfig().trial_days;
+  if (vipInput) {
+    vipInput.style.display = regVipMode ? '' : 'none';
+    vipInput.placeholder = en ? 'Invite code (VIP)' : 'קוד הזמנה (VIP)';
+  }
   if (note) {
-    note.style.display = regTransferMode || days > 0 ? '' : 'none';
-    note.textContent = regTransferMode
-      ? en ? '🔁 Sign up with the same phone number you bought with - your license moves to this phone once approved' : '🔁 נרשמים עם אותו מספר טלפון שקנית איתו - הרישיון יעבור לטלפון הזה אחרי אישור'
-      : en ? `🎁 You get ${days} free trial days right after signing up` : `🎁 מקבלים ${days} ימי ניסיון חינם מיד אחרי ההרשמה`;
+    note.style.display = regTransferMode || regVipMode || days > 0 ? '' : 'none';
+    note.textContent = regVipMode
+      ? en ? '⭐ With an invite code you get in right away - free, for good' : '⭐ עם קוד הזמנה נכנסים מיד - בחינם, לתמיד'
+      : regTransferMode
+        ? en ? '🔁 Sign up with the same phone number you bought with - your license moves to this phone once approved' : '🔁 נרשמים עם אותו מספר טלפון שקנית איתו - הרישיון יעבור לטלפון הזה אחרי אישור'
+        : en ? `🎁 You get ${days} free trial days right after signing up` : `🎁 מקבלים ${days} ימי ניסיון חינם מיד אחרי ההרשמה`;
   }
   if (btn && !btn.disabled) {
-    btn.textContent = regTransferMode
-      ? en ? 'Move my license' : 'העבר את הרישיון שלי'
-      : days > 0 ? (en ? 'Start free trial' : 'התחל ניסיון חינם') : en ? 'Send request' : 'שלח בקשה';
+    btn.textContent = regVipMode
+      ? en ? 'Enter with code' : 'כניסה עם הקוד'
+      : regTransferMode
+        ? en ? 'Move my license' : 'העבר את הרישיון שלי'
+        : days > 0 ? (en ? 'Start free trial' : 'התחל ניסיון חינם') : en ? 'Send request' : 'שלח בקשה';
   }
   if (toggle) {
+    toggle.style.display = regVipMode ? 'none' : '';
     toggle.textContent = regTransferMode
       ? en ? 'New here? Back to sign up' : 'חדש כאן? חזרה להרשמה'
       : en ? 'Already bought and got a new phone?' : 'קנית כבר ועברת לטלפון חדש?';
+  }
+  if (vipToggle) {
+    vipToggle.style.display = regTransferMode ? 'none' : '';
+    vipToggle.textContent = regVipMode ? (en ? 'No code? Back to sign up' : 'אין קוד? חזרה להרשמה') : en ? '⭐ Have an invite code?' : '⭐ יש לך קוד הזמנה?';
   }
 }
 
@@ -6260,7 +6288,16 @@ function initSale() {
   const toggle = document.getElementById('regTransferToggle');
   if (toggle) toggle.addEventListener('click', () => {
     regTransferMode = !regTransferMode;
+    regVipMode = false;
     updateRegTrialNote();
+  });
+  const vipToggle = document.getElementById('regVipToggle');
+  if (vipToggle) vipToggle.addEventListener('click', () => {
+    regVipMode = !regVipMode;
+    regTransferMode = false;
+    updateRegTrialNote();
+    const input = document.getElementById('regVipInput');
+    if (regVipMode && input) input.focus();
   });
   updateTrialBanner();
 }

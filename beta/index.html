@@ -51,13 +51,26 @@
           autocomplete="tel"
           dir="ltr"
         />
+        <input
+          type="text"
+          id="regVipInput"
+          class="license-reg-input"
+          placeholder="קוד הזמנה (VIP)"
+          autocomplete="off"
+          autocapitalize="characters"
+          dir="ltr"
+          style="display: none;"
+        />
         <label class="reg-terms-row">
           <input type="checkbox" id="regTermsCheck">
           <span>קראתי ואני מסכים ל<a href="https://tzur2010.github.io/app-lockscreen/terms.html" target="_blank" rel="noopener">תנאי השימוש</a> ול<a href="https://tzur2010.github.io/app-lockscreen/privacy.html" target="_blank" rel="noopener">מדיניות הפרטיות</a></span>
         </label>
         <div class="reg-trial-note" id="regTrialNote" style="display: none;"></div>
         <button type="button" class="license-reg-submit-btn" id="submitRegBtn">שלח בקשה</button>
-        <button type="button" class="reg-link-btn" id="regTransferToggle">קנית כבר ועברת לטלפון חדש?</button>
+        <div class="reg-links">
+          <button type="button" class="reg-link-btn" id="regVipToggle">⭐ יש לך קוד הזמנה?</button>
+          <button type="button" class="reg-link-btn" id="regTransferToggle">קנית כבר ועברת לטלפון חדש?</button>
+        </div>
       </div>
 
       <!-- תקופת הניסיון הסתיימה: הוראות תשלום -->

@@ -3302,14 +3302,15 @@ function readLicenseCache() {
   }
 }
 
-function writeLicenseCache(status) {
+function writeLicenseCache(status, extra = {}) {
   try {
-    localStorage.setItem(LICENSE_CACHE_KEY, JSON.stringify({ status, checkedAt: Date.now() }));
+    localStorage.setItem(LICENSE_CACHE_KEY, JSON.stringify({ status, checkedAt: Date.now(), ...extra }));
   } catch (e) {}
 }
 
 function isCachedApprovalValid() {
   const cache = readLicenseCache();
+  if (cache && cache.status === 'trial') return Date.now() < Number(cache.trialEnd || 0); // ניסיון: עד סוף התקופה בלבד
   return Boolean(cache && cache.status === 'approved' && Date.now() - Number(cache.checkedAt || 0) < LICENSE_OFFLINE_GRACE_MS);
 }
 
@@ -3380,11 +3381,18 @@ function initDeviceLicenseGate() {
     if (errorEl) errorEl.textContent = msg || '';
   };
 
-  // מצבים: approved | form | pending | blocked | checking | config
+  // מצבים: approved | form | pending | blocked | checking | config | trialEnded
   function applyState(state) {
+    const trialEndBox = document.getElementById('regTrialEndBox');
+    if (trialEndBox) trialEndBox.style.display = state === 'trialEnded' ? 'flex' : 'none';
+    if (state === 'trialEnded') fillPayInfo();
+    const titleEl = overlay.querySelector('.license-lock-title');
+    if (titleEl) titleEl.textContent = state === 'trialEnded' ? 'Magic Lock' : 'הרשמה לאפליקציה';
+    if (state === 'form') updateRegTrialNote();
     if (state === 'approved') {
       overlay.style.display = 'none';
       setError('');
+      updateTrialBanner();
       if (typeof maybeShowUpdatePopup === 'function') maybeShowUpdatePopup();
       if (typeof maybeShowGuideFirstTime === 'function') maybeShowGuideFirstTime();
       return;
@@ -3422,7 +3430,22 @@ function initDeviceLicenseGate() {
     try {
       const status = await window.MagicCloud.device.getMyStatus();
       setError('');
-      if (status === 'approved') {
+      loadSaleConfig();
+      if (status === 'trial') {
+        // תקופת ניסיון: פתוח עד שהיא נגמרת, ואחר כך מסך תשלום
+        const end = getTrialEnd();
+        if (Date.now() < end) {
+          writeLicenseCache('trial', { trialEnd: end });
+          applyState('approved');
+          maybeReportUsage();
+          storeAdminMessage();
+          schedule(LICENSE_RECHECK_MS);
+        } else {
+          writeLicenseCache('trialEnded');
+          applyState('trialEnded');
+          schedule(LICENSE_RECHECK_MS);
+        }
+      } else if (status === 'approved') {
         writeLicenseCache('approved');
         applyState('approved');
         maybeReportUsage();
@@ -3463,6 +3486,11 @@ function initDeviceLicenseGate() {
         setError('אנא הזן שם מלא');
         return;
       }
+      const terms = document.getElementById('regTermsCheck');
+      if (terms && !terms.checked) {
+        setError('יש לאשר את תנאי השימוש ומדיניות הפרטיות');
+        return;
+      }
       if (phone.replace(/\D/g, '').length < 9 || phone.length > 20) {
         setError('אנא הזן מספר טלפון תקין');
         return;
@@ -3475,9 +3503,14 @@ function initDeviceLicenseGate() {
       submitRegBtn.disabled = true;
       submitRegBtn.textContent = 'שולח בקשה...';
       try {
-        const status = await window.MagicCloud.device.submitRequest({ name, phone, deviceId: devId });
+        const trial = getSaleConfig().trial_days > 0;
+        const status = await window.MagicCloud.device.submitRequest({ name, phone, deviceId: devId, trial });
         triggerHaptic(40);
-        if (status === 'approved') {
+        if (status === 'trial') {
+          // נרשם לניסיון - נפתח מיד
+          checking = false;
+          await checkStatus();
+        } else if (status === 'approved') {
           writeLicenseCache('approved');
           applyState('approved');
           schedule(LICENSE_RECHECK_MS);
@@ -3494,10 +3527,27 @@ function initDeviceLicenseGate() {
         }
       } finally {
         submitRegBtn.disabled = false;
-        submitRegBtn.textContent = 'שלח בקשה';
+        submitRegBtn.textContent = getSaleConfig().trial_days > 0 ? 'התחל ניסיון חינם' : 'שלח בקשה';
       }
     };
   }
+
+  // "שילמתי" - שולח הודעה למנהל (מגיעה לו גם התראה לטלפון)
+  const paidBtn = document.getElementById('regPaidBtn');
+  if (paidBtn) {
+    paidBtn.onclick = async () => {
+      const st = document.getElementById('regPaidStatus');
+      paidBtn.disabled = true;
+      try {
+        await window.MagicCloud.device.sendFeedback({ text: '💰 שילמתי על Magic Lock - נא לאשר', appVersion: getInstalledAppVersion(), os: config.osTheme, model: config.deviceModel });
+        if (st) st.textContent = 'ההודעה נשלחה ✓ האפליקציה תיפתח לבד ברגע שהתשלום יאושר.';
+      } catch (e) {
+        paidBtn.disabled = false;
+        if (st) st.textContent = 'השליחה נכשלה - בדוק חיבור לאינטרנט ונסה שוב';
+      }
+    };
+  }
+  loadSaleConfig().then(updateRegTrialNote);
 
   // פתיחה מהירה: מכשיר שאושר לאחרונה נפתח מיד, והבדיקה מול הענן רצה ברקע
   if (isCachedApprovalValid()) {
@@ -3520,7 +3570,7 @@ function initDeviceLicenseGate() {
 // החלון מוצג רק כשמסך ההגדרות פתוח (בפתיחת האפליקציה / בתפריט הסודי),
 // ולעולם לא מעל מסך הנעילה הפעיל מול קהל.
 // ============================================================================
-const APP_VERSION = '5.9';
+const APP_VERSION = '6.0';
 const DEFAULT_APK_URL = 'https://github.com/tzur2010/app-lockscreen/raw/main/Lockscreen.apk';
 const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 const UPDATE_DISMISS_KEY = 'magic_update_dismissed_version';
@@ -5981,7 +6031,109 @@ function initWhatsNew() {
   if (done) done.addEventListener('click', closeWhatsNew);
 }
 
+// ============================================================================
+// 43. מכירה: תקופת ניסיון, מחיר והוראות תשלום (נקבעים באתר הניהול)
+// ============================================================================
+// var: בדיקת הרישיון (שרצה מוקדם יותר בקובץ) משתמשת בהם
+var SALE_CFG_KEY = 'magic_sale_cfg_v1';
+var DAY_MS = 24 * 60 * 60 * 1000;
+
+function getSaleConfig() {
+  try {
+    const c = JSON.parse(localStorage.getItem(SALE_CFG_KEY) || 'null');
+    if (c) return { price: Number(c.price) || 0, pay_phone: c.pay_phone || '', pay_note: c.pay_note || '', trial_days: Number(c.trial_days) || 0 };
+  } catch (e) {}
+  return { price: 0, pay_phone: '', pay_note: '', trial_days: 0 };
+}
+
+async function loadSaleConfig() {
+  try {
+    if (!window.MagicCloud || !window.MagicCloud.isConfigured()) return getSaleConfig();
+    const cfg = await window.MagicCloud.getAppConfig();
+    if (cfg) {
+      localStorage.setItem(SALE_CFG_KEY, JSON.stringify({ price: cfg.price || 0, pay_phone: cfg.pay_phone || '', pay_note: cfg.pay_note || '', trial_days: cfg.trial_days || 0 }));
+    }
+  } catch (e) {}
+  return getSaleConfig();
+}
+
+// סוף תקופת הניסיון = שעת ההרשמה (של השרת) + מספר ימי הניסיון
+function getTrialEnd() {
+  const rec = window.MagicCloud && window.MagicCloud.device.getMyRecord ? window.MagicCloud.device.getMyRecord() : null;
+  const created = rec && rec.createdAt ? new Date(rec.createdAt).getTime() : Date.now();
+  const days = getSaleConfig().trial_days || 3;
+  return created + days * DAY_MS;
+}
+
+function payInfoText() {
+  const s = getSaleConfig();
+  const en = isEnglishUi();
+  const lines = [];
+  if (s.pay_phone) lines.push(en ? `Pay with Bit / PayBox to:\n${s.pay_phone}` : `לתשלום בביט / פייבוקס למספר:\n${s.pay_phone}`);
+  if (s.pay_note) lines.push(s.pay_note);
+  lines.push(en ? 'After paying tap "I paid" - the app opens as soon as the payment is confirmed.' : 'אחרי התשלום לוחצים "שילמתי" - האפליקציה נפתחת ברגע שהתשלום מאושר.');
+  return lines.join('\n\n');
+}
+
+function priceText() {
+  const s = getSaleConfig();
+  if (!s.price) return '';
+  return isEnglishUi() ? `₪${s.price} · one-time payment` : `₪${s.price} · תשלום חד-פעמי`;
+}
+
+function fillPayInfo() {
+  const price = document.getElementById('regPayPrice');
+  const how = document.getElementById('regPayHow');
+  if (price) price.textContent = priceText();
+  if (how) how.textContent = payInfoText();
+}
+
+function updateRegTrialNote() {
+  const note = document.getElementById('regTrialNote');
+  const btn = document.getElementById('submitRegBtn');
+  const days = getSaleConfig().trial_days;
+  if (note) {
+    note.style.display = days > 0 ? '' : 'none';
+    note.textContent = isEnglishUi() ? `🎁 You get ${days} free trial days right after signing up` : `🎁 מקבלים ${days} ימי ניסיון חינם מיד אחרי ההרשמה`;
+  }
+  if (btn && !btn.disabled) btn.textContent = days > 0 ? (isEnglishUi() ? 'Start free trial' : 'התחל ניסיון חינם') : isEnglishUi() ? 'Send request' : 'שלח בקשה';
+}
+
+function updateTrialBanner() {
+  const banner = document.getElementById('trialBanner');
+  if (!banner) return;
+  const cache = readLicenseCache();
+  if (!cache || cache.status !== 'trial') {
+    banner.style.display = 'none';
+    return;
+  }
+  const left = Math.max(0, Math.ceil((Number(cache.trialEnd) - Date.now()) / DAY_MS));
+  const en = isEnglishUi();
+  document.getElementById('trialBannerText').textContent = en
+    ? `🎁 Free trial: ${left} day${left === 1 ? '' : 's'} left`
+    : left === 1 ? '🎁 ניסיון חינם: נשאר יום אחד' : `🎁 ניסיון חינם: נשארו ${left} ימים`;
+  document.getElementById('trialBuyBtn').textContent = en ? 'Buy' : 'לרכישה';
+  banner.style.display = 'flex';
+}
+
+function openPayInfo() {
+  const en = isEnglishUi();
+  document.getElementById('tipTitle').textContent = en ? '💰 Buy Magic Lock' : '💰 רכישת Magic Lock';
+  document.getElementById('tipHow').textContent = [priceText(), payInfoText().replace(/\n\n[^\n]*"(שילמתי|I paid)"[^\n]*$/, '')].filter(Boolean).join('\n\n');
+  document.getElementById('tipPatterLabel').textContent = en ? '✅ After paying' : '✅ אחרי התשלום';
+  document.getElementById('tipPatter').textContent = en ? 'Send feedback "I paid" (More tab) and the app stays open for good.' : 'שלח משוב "שילמתי" (לשונית עוד) - והאפליקציה נשארת פתוחה לתמיד.';
+  document.getElementById('tipPatterWrap').style.display = '';
+  document.getElementById('tipOverlay').style.display = 'flex';
+}
+
+function initSale() {
+  const buy = document.getElementById('trialBuyBtn');
+  if (buy) buy.addEventListener('click', openPayInfo);
+  updateTrialBanner();
+}
+
 // אתחול ראשוני
+initSale();
 initWhatsNew();
 initTrickTips();
 initTour();

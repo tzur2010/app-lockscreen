@@ -574,6 +574,9 @@ function enforceRetiredFeatures(cfg) {
   cfg.faceTrick = false;
   cfg.notesReveal = false;
   cfg.unlockTargetScreen = 'homescreen';
+  // 7.8: הוסרו גם החשיפה בהתראה והשיחה הנכנסת
+  cfg.revealEnabled = false;
+  cfg.callReveal = false;
   return cfg;
 }
 
@@ -4194,7 +4197,7 @@ function initDeviceLicenseGate() {
 // החלון מוצג רק כשמסך ההגדרות פתוח (בפתיחת האפליקציה / בתפריט הסודי),
 // ולעולם לא מעל מסך הנעילה הפעיל מול קהל.
 // ============================================================================
-const APP_VERSION = '7.7';
+const APP_VERSION = '7.8';
 const DEFAULT_APK_URL = 'https://github.com/tzur2010/app-lockscreen/raw/main/Lockscreen.apk';
 const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 const UPDATE_DISMISS_KEY = 'magic_update_dismissed_version';
@@ -6177,11 +6180,8 @@ function handleRemoteCommand(cmd, val) {
     saveConfig();
   } else if (cmd === 'reset') {
     resetForNextShow();
-  } else if (cmd === 'call') {
-    showFakeCall(lastCode);
-  } else if (cmd === 'reveal') {
-    scheduleCodeReveal(lastCode, true, 0);
   }
+  // 7.8: "חשוף בהודעה" ו"צלצל עכשיו" הוסרו מהשלט - פקודות ישנות מטלפון שני לא עושות כלום
   trackEvent('remote_control');
   lastPublishedState = '';
   scheduleLiveStatePublish();
@@ -6373,7 +6373,7 @@ async function collectPreShowChecks() {
     if (config.chameleonClock) add('warn', 'הצצה בשעון לא זמינה באייפון', 'באייפון השעה למעלה היא של המערכת. השתמש בלחיצה ארוכה על המסך להצצה.');
     // באייפון אי אפשר לצאת למסך הבית האמיתי - מוצג צילום מסך הבית של הקוסם. בלי צילום = מסך ריק (פדיחה)
     if (!localStorage.getItem(HOMESCREEN_STORAGE_KEY)) {
-      add('bad', 'אין צילום של מסך הבית שלך', 'באייפון, אחרי הפתיחה הצופה רואה צילום של מסך הבית שלך. בלי צילום הוא יראה מסך ריק. במסך הבית: צד + עוצמה למעלה, ואז לשונית חשיפה ← "בחר צילום של מסך הבית שלך".');
+      add('bad', 'אין צילום של מסך הבית שלך', 'באייפון, אחרי הפתיחה הצופה רואה צילום של מסך הבית שלך. בלי צילום הוא יראה מסך ריק. במסך הבית: צד + עוצמה למעלה, ואז לשונית פתיחה ← "בחר צילום של מסך הבית שלך".');
     } else {
       add('ok', 'מסך הבית שלך מוכן', 'אחרי הפתיחה יופיע מסך הבית שלך, עם השעה והסוללה האמיתיות.');
     }
@@ -6625,7 +6625,7 @@ function initTrickTips() {
 // ============================================================================
 const TOUR_DONE_KEY = 'magic_tour_done_v1';
 const TOUR_STEPS = [
-  { target: '#settingsTabs', tab: 'trick', he: '👋 ברוך הבא ל-Lockscreen!\nההגדרות מחולקות ל-5 לשוניות:\n🎯 טריק - מה קורה בטלפון\n🎬 חשיפה - מה קורה אחרי הפתיחה\n👁️ הצצה - איך אתה יודע את הקוד\n📱 מראה - שהטלפון ייראה כמו שלך\n⚙️ עוד - עזרה, קוד אישי, גיבוי ושפה', en: '👋 Welcome to Lockscreen!\nSettings are split into 5 tabs:\n🎯 Trick - what happens on the phone\n🎬 Reveal - what happens after unlocking\n👁️ Peek - how you learn the code\n📱 Look - make it look like your phone\n⚙️ More - help, personal code, backup and language' },
+  { target: '#settingsTabs', tab: 'trick', he: '👋 ברוך הבא ל-Lockscreen!\nההגדרות מחולקות ל-5 לשוניות:\n🎯 טריק - מה קורה בטלפון\n🏠 פתיחה - מסך הבית אחרי הפתיחה\n👁️ הצצה - איך אתה יודע את הקוד\n📱 מראה - שהטלפון ייראה כמו שלך\n⚙️ עוד - עזרה, קוד אישי, גיבוי ושפה', en: '👋 Welcome to Lockscreen!\nSettings are split into 5 tabs:\n🎯 Trick - what happens on the phone\n🏠 Unlock - the home screen after unlocking\n👁️ Peek - how you learn the code\n📱 Look - make it look like your phone\n⚙️ More - help, personal code, backup and language' },
   { target: '.show-actions-bar', tab: 'trick', he: '🔄 שני הכפתורים האלה תמיד למעלה:\n"מוכן לצופה הבא" מאפס הכל בין צופים, ו"בדיקה לפני הופעה" מוודא שהכל מוכן.', en: '🔄 These two buttons are always at the top:\n"Ready for next spectator" resets everything between spectators, and "Pre-show check" makes sure everything is ready.' },
   { target: '#toggleForceUnlockMode', tab: 'trick', he: '🎯 פתיחה בכל קוד\nכשזה דולק, כל קוד שהצופה מקליד פותח את הטלפון.', en: '🎯 Unlock with any code\nWhen on, any code the spectator types unlocks the phone.' },
   { target: '#unlockAttemptModeSelector', tab: 'trick', he: '🔁 כאן בוחרים באיזה ניסיון הטלפון ייפתח.\nלמשל 2 = בפעם הראשונה "קוד שגוי", ובשנייה נפתח.', en: '🔁 Choose which attempt unlocks the phone.\nE.g. 2 = first try "wrong code", second try opens.' },
@@ -6727,9 +6727,10 @@ function initTour() {
 const WHATS_NEW_SEEN_KEY = 'magic_whats_new_seen_v1';
 const WHATS_NEW_MAX_ITEMS = 6;
 const WHATS_NEW = [
+  { ver: '7.8', icon: '✨', target: null, he: ['מראה חדש מהרגע הראשון', 'גם ההרשמה, בחירת הטלפון וכל החלונות בעיצוב החדש. האפליקציה ממוקדת: רק מה שעובד בצורה מושלמת.'], en: ['A new look from the first second', 'Sign-up, phone selection and every window now share the new design. The app is focused: only what works perfectly.'] },
   { ver: '7.6', icon: '🏠', target: '#homeTargetNote', he: ['רק מה שעובד - ומסך הבית האמיתי', 'אחרי הפתיחה הטלפון יוצא למסך הבית האמיתי. באייפון (שם אפל לא מאפשרת לצאת) מופיע צילום מסך הבית שלך עם השעה והסוללה האמיתיות. ו"תאריך לידה" מקבל הסבר מלא + "❌ לא תאריך".'], en: ['Only what works - and the real home screen', 'After unlocking the phone exits to the real home screen. On iPhone (where Apple doesn\'t allow exiting) a screenshot of your home screen appears with the real time and battery. And "Birthday" gets a full how-to + "❌ Not a date".'] },
   { ver: '7.5', icon: '🌌', target: null, he: ['עיצוב חדש: Aurora', 'הגדרות בעיצוב חדש לגמרי: זוהר צפוני ברקע, כרטיסי זכוכית זוהרים וכפתורים בגרדיאנט. יש גם גרסה בהירה (כפתור השמש למעלה).'], en: ['New design: Aurora', 'A brand-new settings design: northern lights in the background, glowing glass cards and gradient controls. There\'s a light version too (the sun button at the top).'] },
-  { ver: '7.4', icon: '🗂️', target: '#settingsTabs', he: ['הגדרות מסודרות מחדש', 'כל דבר במקום שלו: 🎯 טריק · 🎬 חשיפה · 👁️ הצצה · 📱 מראה · ⚙️ עוד. ו"מוכן לצופה הבא" + "בדיקה לפני הופעה" תמיד למעלה.'], en: ['Reorganized settings', 'Everything in its place: 🎯 Trick · 🎬 Reveal · 👁️ Peek · 📱 Look · ⚙️ More. And "Ready for next spectator" + "Pre-show check" are always at the top.'] },
+  { ver: '7.4', icon: '🗂️', target: '#settingsTabs', he: ['הגדרות מסודרות מחדש', 'כל דבר במקום שלו: 🎯 טריק · 🏠 פתיחה · 👁️ הצצה · 📱 מראה · ⚙️ עוד. ו"מוכן לצופה הבא" + "בדיקה לפני הופעה" תמיד למעלה.'], en: ['Reorganized settings', 'Everything in its place: 🎯 Trick · 🏠 Unlock · 👁️ Peek · 📱 Look · ⚙️ More. And "Ready for next spectator" + "Pre-show check" are always at the top.'] },
   { ver: '7.3', icon: '🎂', target: '#toggleBirthdayTrick', he: ['תאריך לידה', 'הצופה מקליד כקוד תאריך לידה של מישהו שהוא אוהב - ואתה יודע בסתר את המזל, הגיל, באיזה יום נולד ומי זה כנראה (ילד? הורה?).'], en: ['Birthday', 'The spectator types a loved one\'s birthday as the code - and you secretly know the star sign, age, the weekday they were born and who it probably is (child? parent?).'] },
   { ver: '7.1', icon: '🛡️', target: '#preShowCheckBtn', he: ['אמינות להופעות גדולות', 'רטט בכיס רק אחרי שהטלפון חוזר אליך, התראה אם "פתיחה בכל קוד" כבתה בטעות, ובדיקה לפני הופעה חכמה יותר.'], en: ['Rock-solid for big shows', 'Pocket buzz only after the phone is back with you, an alert if "unlock with any code" was turned off by mistake, and a smarter pre-show check.'] },
   { ver: '7.0', icon: '📱', target: '#carrierTextInput', he: ['מסך הנעילה שלך - אחד לאחד', 'מסך נעילה חדש של סמסונג (One UI 8): שעון ענק, שם הספק למעלה, טקסט פרטי קשר ושורת סטטוס בעברית. בחר את הטפט שלך מהגלריה - ואי אפשר להבדיל.'], en: ['Your lock screen - one to one', 'New Samsung lock screen (One UI 8): huge clock, carrier name, contact info text. Pick your own wallpaper from the gallery - impossible to tell apart.'] },
@@ -6739,7 +6740,6 @@ const WHATS_NEW = [
   { ver: '5.8', icon: '✨', target: null, he: ['אנימציית פתיחה אמיתית', 'כשהטלפון נפתח, מסך הנעילה מתקרב ונעלם (סמסונג) או מחליק למעלה (אייפון) - בדיוק כמו בטלפון אמיתי.'], en: ['Real unlock animation', 'When the phone unlocks, the lock screen zooms away (Samsung) or slides up (iPhone) - just like a real phone.'] },
   { ver: '5.6', icon: '❓', target: '#toggleForceUnlockMode', he: ['הסבר ליד כל קסם', 'כפתור ? ליד כל קסם: איך עושים אותו, ומה אומרים לקהל.'], en: ['Help next to every trick', 'A ? button next to every trick: how to do it and what to say.'] },
   { ver: '5.5', icon: '✅', target: '#preShowCheckBtn', he: ['בדיקה לפני הופעה', 'לחיצה אחת בודקת אינטרנט, התראות, סוללה, טלפון שני ועוד - עם כפתור תיקון.'], en: ['Pre-show check', 'One tap checks internet, notifications, battery, second phone and more - with a fix button.'] },
-  { ver: '5.4', icon: '📞', target: '#toggleCallReveal', he: ['חשיפה בשיחה נכנסת', 'אחרי הפתיחה הטלפון מצלצל, ושם המתקשר הוא הקוד שהצופה בחר.'], en: ['Incoming call reveal', 'After unlocking the phone rings, and the caller name is the spectator\'s code.'] },
   { ver: '5.4', icon: '🎛️', target: '#toggleRemotePeek', he: ['שלט רחוק מהטלפון השני', 'מהטלפון השני אפשר להדליק/לכבות "פתיחה בכל קוד", לבחור ניסיון ולהפעיל חשיפה - בלי לגעת בטלפון של הצופה.'], en: ['Remote control from a second phone', 'From the second phone: turn "any code" on/off, pick the attempt and trigger a reveal - without touching the spectator\'s phone.'] },
   { ver: '5.4', icon: '🎯', target: '#togglePracticeMode', he: ['מצב תרגול', 'מתרגלים את כל ההצצות בלי שזה נשמר בהיסטוריה.'], en: ['Practice mode', 'Practice all the peeks without saving to history.'] },
   { ver: '5.2', icon: '📲', target: '#toggleRemotePeek', he: ['הצצה מטלפון שני', 'הקוד שהצופה מקליד מופיע מיד בגדול בטלפון אחר.'], en: ['Second-phone peek', 'The code the spectator types appears instantly, big, on another phone.'] },

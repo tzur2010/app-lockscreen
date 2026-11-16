@@ -146,7 +146,7 @@ fit();addEventListener('resize',fit);addEventListener('orientationchange',functi
       <div class="guide-body">
         <details open>
           <summary>🚀 התחלה מהירה</summary>
-          <p>1. בוחרים Samsung או iPhone ואת הדגם.<br>2. מגדירים בהגדרות מה שרוצים.<br>3. לוחצים <b>"שמור וסגור"</b> ובוחרים סוג נעילה: קוד 4 או 6 ספרות, סיסמה, דפוס או החלקה.<br>4. מסך הנעילה מוכן. נותנים את הטלפון לצופה.</p>
+          <p>1. בוחרים את הטלפון שלך: Samsung, Pixel, Xiaomi או iPhone, ואת הדגם.<br>2. מגדירים בהגדרות מה שרוצים.<br>3. לוחצים <b>"שמור וסגור"</b> ובוחרים סוג נעילה: קוד 4 או 6 ספרות, סיסמה, דפוס או החלקה.<br>4. מסך הנעילה מוכן. נותנים את הטלפון לצופה.</p>
         </details>
         <details>
           <summary>🔐 איך חוזרים להגדרות (בסתר)</summary>
@@ -160,13 +160,13 @@ fit();addEventListener('resize',fit);addEventListener('orientationchange',functi
           <summary>👁️ איך רואים מה הצופה הקליד</summary>
           <p>• <b>לחיצה ארוכה בשטח ריק</b> במסך: מופיעה תיבה עם הקוד. בדפוס, הנקודות ממוספרות לפי הסדר (1 בירוק = התחלה).<br>• <b>הקשה אחת על השעון</b>: השעון מציג לשלוש שניות את הקוד כאילו הוא השעה.<br>• <b>רטט בכיס</b>: הטלפון רוטט את הספרות. מספר הרטטים = הספרה, רטט ארוך = 0.<br>• <b>שעון חכם</b>: מדליקים "שלח את הקוד לשעון", והקוד מופיע על השעון שביד.</p>
         </details>
-        <details>
+        <details style="display: none;">
           <summary>💬 חשיפה בהתראה</summary>
           <p>כמה שניות אחרי שהטלפון נפתח, מגיעה הודעה שבתוכה הקוד שהצופה בחר. בהגדרות בוחרים את שם השולח, את התמונה, את הטקסט (<b>{קוד}</b> מוחלף בקוד) ואחרי כמה שניות ההודעה מגיעה.</p>
         </details>
         <details>
           <summary>🏠 אחרי הפתיחה: מסך הבית</summary>
-          <p>באנדרואיד: הטלפון יוצא באמת למסך הבית האמיתי שלך.<br>באייפון: אפל לא מאפשרת לאף אפליקציה לצאת לבד למסך הבית, לכן מוצג צילום של מסך הבית שלך - עם השעה והסוללה האמיתיות למעלה.<br>פעם אחת: במסך הבית לוחצים צד + עוצמה למעלה, ואז לשונית חשיפה ← "בחר צילום של מסך הבית שלך".</p>
+          <p>באנדרואיד: הטלפון יוצא באמת למסך הבית האמיתי שלך.<br>באייפון: אפל לא מאפשרת לאף אפליקציה לצאת לבד למסך הבית, לכן מוצג צילום של מסך הבית שלך - עם השעה והסוללה האמיתיות למעלה.<br>פעם אחת: במסך הבית לוחצים צד + עוצמה למעלה, ואז לשונית פתיחה ← "בחר צילום של מסך הבית שלך".</p>
         </details>
         <details>
           <summary>🎂 תאריך לידה</summary>
@@ -428,10 +428,10 @@ fit();addEventListener('resize',fit);addEventListener('orientationchange',functi
           <button type="button" class="preshow-btn" id="preShowCheckBtn">✅ בדיקה לפני הופעה</button>
         </div>
 
-        <!-- לשוניות: טריק (מה קורה) · חשיפה (אחרי הפתיחה) · הצצה (איך אתה יודע) · מראה · עוד -->
+        <!-- לשוניות: טריק (מה קורה) · פתיחה (מסך הבית אחרי הפתיחה) · הצצה (איך אתה יודע) · מראה · עוד -->
         <nav class="settings-tabs" id="settingsTabs" role="tablist">
           <button type="button" class="settings-tab active" data-tab="trick" role="tab"><span class="tab-ico">🎯</span><span>טריק</span></button>
-          <button type="button" class="settings-tab" data-tab="reveal" role="tab"><span class="tab-ico">🎬</span><span>חשיפה</span></button>
+          <button type="button" class="settings-tab" data-tab="reveal" role="tab"><span class="tab-ico">🏠</span><span>פתיחה</span></button>
           <button type="button" class="settings-tab" data-tab="peek" role="tab"><span class="tab-ico">👁️</span><span>הצצה</span></button>
           <button type="button" class="settings-tab" data-tab="look" role="tab"><span class="tab-ico">📱</span><span>מראה</span></button>
           <button type="button" class="settings-tab" data-tab="more" role="tab"><span class="tab-ico">⚙️</span><span>עוד</span></button>
@@ -627,6 +627,8 @@ fit();addEventListener('resize',fit);addEventListener('orientationchange',functi
           </div>
         </div>
 
+        <!-- הוסתר בגרסה 7.8 (לא נמחק): חשיפה בהתראה + חשיפה בשיחה נכנסת -->
+        <div class="retired-feature" style="display: none;">
         <div class="oneui-section-header">💥 חשיפה בהפתעה</div>
         <div class="config-group oneui-card">
           <!-- חשיפה בהתראה -->
@@ -690,6 +692,7 @@ fit();addEventListener('resize',fit);addEventListener('orientationchange',functi
             <button type="button" class="media-upload-btn" id="callTestBtn" style="width: 100%; margin-top: 10px;">נסה עכשיו (עם הקוד 1234)</button>
             <div class="toggle-sub-desc" style="margin-top: 6px;">💡 עובד כשהטלפון נפתח בכל קוד. באנדרואיד האפליקציה נשארת פתוחה אחרי הפתיחה (במקום לצאת למסך הבית האמיתי) כדי שהשיחה תופיע.</div>
           </div>
+        </div>
         </div>
         </section>
 
@@ -781,7 +784,7 @@ fit();addEventListener('resize',fit);addEventListener('orientationchange',functi
               <button type="button" class="media-clear-btn" id="remotePeekNewBtn">קישור חדש</button>
             </div>
             <div class="toggle-sub-desc" id="remotePeekStatus" style="margin-top: 6px; min-height: 16px;">פתח את הקישור בטלפון השני והשאר את המסך דולק. הקישור סודי - מי שיש לו אותו רואה את הקודים.</div>
-            <div class="toggle-sub-desc" style="margin-top: 6px;">🎛️ <b>שלט רחוק:</b> בטלפון השני יש גם כפתורים: להדליק/לכבות "פתיחה בכל קוד", לבחור באיזה ניסיון הטלפון ייפתח, לאפס לצופה הבא, ולהפעיל את החשיפה או את השיחה הנכנסת ברגע שתבחר.</div>
+            <div class="toggle-sub-desc" style="margin-top: 6px;">🎛️ <b>שלט רחוק:</b> בטלפון השני יש גם כפתורים: להדליק/לכבות "פתיחה בכל קוד", לבחור באיזה ניסיון הטלפון ייפתח, ולאפס לצופה הבא - בלי לגעת בטלפון של הצופה.</div>
           </div>
         </div>
 

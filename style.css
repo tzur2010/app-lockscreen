@@ -4230,3 +4230,53 @@ html.real-ios .oneui-section-header:has(+ .config-group #pinQuickWidgetBtn) { di
 
 /* 🎂 "לא תאריך" בהצצה */
 .peek-birthday.not-date { color: #fca5a5; }
+
+/* ==========================================================================
+   7.8 - Aurora גם במסכים הראשונים: פתיחה, הרשמה, בחירת טלפון וכל החלונות הקופצים
+   (רושם ראשוני אחיד ויוקרתי)
+   ========================================================================== */
+/* מסך הפתיחה (ספלאש) */
+.splash-screen { background: radial-gradient(120% 70% at 85% 0%, rgba(139, 92, 246, .45) 0%, transparent 55%), radial-gradient(110% 70% at 0% 100%, rgba(6, 182, 212, .32) 0%, transparent 55%), #07060f; }
+.splash-lock-glow { background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 48%, #06b6d4 100%); border: 1px solid rgba(255, 255, 255, .28); box-shadow: 0 0 0 8px rgba(99, 102, 241, .12), 0 18px 50px rgba(99, 102, 241, .55); }
+.splash-title { background: linear-gradient(90deg, #e9d5ff, #ffffff 45%, #a5f3fc); -webkit-background-clip: text; background-clip: text; color: transparent; letter-spacing: 6px; font-size: 21px; }
+
+/* הרשמה / רישיון */
+.license-lock-overlay { background: radial-gradient(120% 60% at 90% 0%, rgba(139, 92, 246, .35) 0%, transparent 55%), radial-gradient(120% 60% at 0% 100%, rgba(6, 182, 212, .25) 0%, transparent 55%), #07060f; }
+.license-lock-card {
+  background: linear-gradient(rgba(22, 20, 44, .72), rgba(22, 20, 44, .72)) padding-box, linear-gradient(rgba(9, 8, 22, .6), rgba(9, 8, 22, .6)) padding-box, linear-gradient(145deg, rgba(167, 139, 250, .5), rgba(255, 255, 255, .05) 40%, rgba(34, 211, 238, .4)) border-box;
+  border: 1px solid transparent;
+  border-radius: 28px;
+  box-shadow: 0 28px 70px rgba(3, 2, 12, .7), inset 0 1px 0 rgba(255, 255, 255, .06);
+}
+.license-lock-icon { background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 48%, #06b6d4 100%); border: 0; color: #fff; box-shadow: 0 10px 28px rgba(99, 102, 241, .5); }
+.license-reg-input { border-radius: 16px !important; border: 1px solid rgba(167, 139, 250, .25) !important; background: rgba(255, 255, 255, .05) !important; }
+.license-reg-input:focus { outline: none; border-color: rgba(167, 139, 250, .7) !important; box-shadow: 0 0 0 3px rgba(139, 92, 246, .2); }
+.license-reg-submit-btn { background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 48%, #06b6d4 100%) !important; color: #fff !important; border: 0 !important; border-radius: 16px !important; box-shadow: 0 10px 28px rgba(99, 102, 241, .45); font-weight: 800 !important; }
+.license-reg-submit-btn:disabled { opacity: .55; box-shadow: none; }
+.reg-terms-row input { accent-color: #8b5cf6; }
+.reg-terms-row a, .reg-link-btn { color: #a5b4fc; }
+
+/* בחירת הטלפון: שני חצאים בצבעי Aurora */
+.split-samsung { background: radial-gradient(90% 80% at 85% 10%, rgba(255, 255, 255, .16) 0%, transparent 60%), linear-gradient(145deg, #4c1d95 0%, #6366f1 55%, #06b6d4 100%); }
+.split-ios { background: radial-gradient(90% 80% at 15% 90%, rgba(139, 92, 246, .28) 0%, transparent 60%), linear-gradient(145deg, #07060f 0%, #12102a 55%, #1e1b4b 100%); }
+.split-divider { background: linear-gradient(135deg, #8b5cf6, #06b6d4); color: #fff; box-shadow: 0 8px 26px rgba(99, 102, 241, .55); }
+.split-icon { background: rgba(255, 255, 255, .14); border-color: rgba(255, 255, 255, .3); box-shadow: 0 10px 30px rgba(0, 0, 0, .25); }
+.split-brand { background: rgba(255, 255, 255, .14); border-color: rgba(255, 255, 255, .35); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+
+/* כל החלונות הקופצים (מדריך, מה חדש, בדיקה לפני הופעה, עדכון, סוג נעילה) */
+.update-popup-overlay { background: rgba(4, 3, 12, .72); }
+.update-popup-card {
+  background: linear-gradient(#12102a, #12102a) padding-box, linear-gradient(145deg, rgba(167, 139, 250, .55), rgba(255, 255, 255, .05) 40%, rgba(34, 211, 238, .45)) border-box;
+  border: 1px solid transparent;
+  border-radius: 26px;
+  box-shadow: 0 26px 70px rgba(3, 2, 12, .7), 0 0 0 1px rgba(255, 255, 255, .02);
+}
+.update-popup-btn { background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 48%, #06b6d4 100%); border-radius: 16px; box-shadow: 0 10px 26px rgba(99, 102, 241, .45); }
+.update-popup-icon { background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 48%, #06b6d4 100%); box-shadow: 0 10px 26px rgba(99, 102, 241, .45); }
+.guide-body details { background: rgba(255, 255, 255, .04); border-color: rgba(167, 139, 250, .18); border-radius: 16px; }
+.tour-card { background: linear-gradient(#12102a, #12102a) padding-box, linear-gradient(145deg, rgba(167, 139, 250, .6), rgba(34, 211, 238, .45)) border-box; border: 1px solid transparent; border-radius: 20px; box-shadow: 0 20px 50px rgba(3, 2, 12, .7); }
+.lock-type-btn { border-radius: 18px; border-color: rgba(167, 139, 250, .2); background: rgba(255, 255, 255, .05); }
+.lock-type-btn.active { background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 48%, #06b6d4 100%); border-color: rgba(255, 255, 255, .25); box-shadow: 0 10px 26px rgba(99, 102, 241, .45); }
+.lock-type-btn.active span { color: rgba(255, 255, 255, .85); }
+/* צילום מסך הבית נחוץ רק באייפון (באנדרואיד יוצאים למסך הבית האמיתי) */
+html:not(.real-ios) .media-actions-row:has(#homescreenFileInput) { display: none; }

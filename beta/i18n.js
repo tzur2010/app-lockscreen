@@ -76,9 +76,10 @@
     'כמה פעמים זה "נכשל" לך לפני שמגישים לצופה': 'How many times it "fails" for you before handing it over',
     '🎂 תאריך לידה': '🎂 Birthday',
     'חשיפה': 'Reveal',
+    'פתיחה': 'Unlock',
     'באנדרואיד: הטלפון יוצא באמת למסך הבית האמיתי שלך.': 'On Android: the phone really exits to your real home screen.',
     'באייפון: אפל לא מאפשרת לאף אפליקציה לצאת לבד למסך הבית, לכן מוצג צילום של מסך הבית שלך - עם השעה והסוללה האמיתיות למעלה.': 'On iPhone: Apple doesn\'t let any app exit to the home screen by itself, so a screenshot of your home screen is shown - with the real time and battery on top.',
-    'פעם אחת: במסך הבית לוחצים צד + עוצמה למעלה, ואז לשונית חשיפה ← "בחר צילום של מסך הבית שלך".': 'Once: on your home screen press side + volume up, then Reveal tab → "Pick a screenshot of your home screen".',
+    'פעם אחת: במסך הבית לוחצים צד + עוצמה למעלה, ואז לשונית פתיחה ← "בחר צילום של מסך הבית שלך".': 'Once: on your home screen press side + volume up, then Unlock tab → "Pick a screenshot of your home screen".',
     '1. אומרים לצופה: "תחשוב על מישהו שאתה אוהב, ותקליד כקוד את תאריך הלידה שלו: יום, חודש ושנה - 6 ספרות. אל תגיד לי של מי." (15 במרץ 1992 = 150392)': '1. Tell the spectator: "Think of someone you love and type their birthday as the code: day, month and year - 6 digits. Don\'t tell me who." (March 15, 1992 = 150392)',
     '2. לחיצה ארוכה במסך: מתחת לקוד מופיעים מזל, גיל ויום בשבוע.': '2. Long-press the screen: under the code you see star sign, age and weekday.',
     '3. אם כתוב "❌ לא תאריך" - הצופה לא הקליד תאריך: עוברים לחשיפה רגילה של הקוד.': '3. If it says "❌ Not a date" - they didn\'t type a date: reveal the code normally.',
@@ -92,7 +93,7 @@
     'אין צילום של מסך הבית שלך': 'No screenshot of your home screen',
     'מסך הבית שלך מוכן': 'Your home screen is ready',
     'אחרי הפתיחה יופיע מסך הבית שלך, עם השעה והסוללה האמיתיות.': 'After unlocking your home screen appears, with the real time and battery.',
-    'באייפון, אחרי הפתיחה הצופה רואה צילום של מסך הבית שלך. בלי צילום הוא יראה מסך ריק. במסך הבית: צד + עוצמה למעלה, ואז לשונית חשיפה ← "בחר צילום של מסך הבית שלך".': 'On iPhone, after unlocking the spectator sees a screenshot of your home screen. Without it they see an empty screen. On your home screen press side + volume up, then Reveal tab → "Pick a screenshot of your home screen".',
+    'באייפון, אחרי הפתיחה הצופה רואה צילום של מסך הבית שלך. בלי צילום הוא יראה מסך ריק. במסך הבית: צד + עוצמה למעלה, ואז לשונית פתיחה ← "בחר צילום של מסך הבית שלך".': 'On iPhone, after unlocking the spectator sees a screenshot of your home screen. Without it they see an empty screen. On your home screen press side + volume up, then Unlock tab → "Pick a screenshot of your home screen".',
     '🏠 אחרי הפתיחה: מסך הבית': '🏠 After unlocking: the home screen',
     '🎂 תאריך לידה': '🎂 Birthday',
     '🏠 מסך בית': '🏠 Home screen',
@@ -139,7 +140,7 @@
     // מדריך
     '📖 מדריך מהיר': '📖 Quick Guide',
     '🚀 התחלה מהירה': '🚀 Quick start',
-    '1. בוחרים Samsung או iPhone ואת הדגם.': '1. Choose Samsung or iPhone and the model.',
+    '1. בוחרים את הטלפון שלך: Samsung, Pixel, Xiaomi או iPhone, ואת הדגם.': '1. Choose your phone: Samsung, Pixel, Xiaomi or iPhone, and the model.',
     '2. מגדירים בהגדרות מה שרוצים.': '2. Set up whatever you want in the settings.',
     '3. לוחצים': '3. Tap',
     '"שמור וסגור"': '"Save & Close"',
@@ -515,7 +516,7 @@
     'כמעט מוכן - דבר אחד לבדוק': 'Almost ready - 1 thing to check',
     'הבדיקה נכשלה, נסה שוב': 'The check failed, try again',
     'שלט רחוק:': 'Remote control:',
-    'בטלפון השני יש גם כפתורים: להדליק/לכבות "פתיחה בכל קוד", לבחור באיזה ניסיון הטלפון ייפתח, לאפס לצופה הבא, ולהפעיל את החשיפה או את השיחה הנכנסת ברגע שתבחר.': 'the second phone also has buttons: turn "unlock with any code" on/off, choose which attempt unlocks, reset for the next spectator, and trigger the reveal or the incoming call whenever you want.'
+    'בטלפון השני יש גם כפתורים: להדליק/לכבות "פתיחה בכל קוד", לבחור באיזה ניסיון הטלפון ייפתח, ולאפס לצופה הבא - בלי לגעת בטלפון של הצופה.': 'the second phone also has buttons: turn "unlock with any code" on/off, choose which attempt unlocks, and reset for the next spectator - without touching the spectator\'s phone.'
   };
 
   var ORD = { 'הראשון': '1st', 'השני': '2nd', 'השלישי': '3rd', 'הרביעי': '4th', 'החמישי': '5th' };

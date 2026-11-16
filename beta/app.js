@@ -457,7 +457,8 @@ const REVEAL_TEXT_DEFAULT_EN = "Don't forget, the gate code is {code} 😊";
 // באנדרואיד, אחרי "פתיחה בכל קוד" האפליקציה יוצאת למסך הבית האמיתי -
 // חוץ מכשיש חשיפה שקורית בתוך האפליקציה (פתקים, גלריה, שיחה נכנסת).
 function staysInAppAfterUnlock() {
-  return ['notes', 'gallery', 'search'].includes(config.unlockTargetScreen) || Boolean(config.callReveal) || Boolean(config.faceTrick);
+  // (בקסם "תחליף לי את הסיסמה" אחרי שהמסך כבה, הטלפון האמיתי נעול - לכן נשארים במסך הבית שבאפליקציה)
+  return ['notes', 'gallery', 'search'].includes(config.unlockTargetScreen) || Boolean(config.callReveal) || Boolean(config.faceTrick) || Boolean(typeof settingsTrickPin !== 'undefined' && settingsTrickPin);
 }
 
 // מחליף את {קוד} / {code} בקוד שהוקלד
@@ -503,6 +504,8 @@ const DEFAULT_CONFIG = {
   notesAge: '60',               // לפני כמה דקות "נכתב" הפתק ('yesterday' = אתמול)
   galleryText: isEnglishUi() ? '{code}' : '{קוד}', // מה כתוב על הפתק בתמונה בגלריה
   searchText: isEnglishUi() ? '{code}' : '{קוד}', // החיפוש האחרון בחשיפה בחיפוש
+  settingsTrick: false,         // "תחליף לי את הסיסמה": הגדרות סמסונג מזויפות, הצופה קובע PIN חדש
+  settingsTrickName: '',        // השם שמופיע בראש ההגדרות המזויפות
   faceTrick: false,             // "הטלפון מזהה את הצופה": נכשל לקוסם, נפתח לצופה + סלפי שלו כטפט
   faceTrickFails: 1,            // כמה פעמים הזיהוי נכשל לקוסם לפני שמגישים לצופה
   callReveal: false,            // חשיפה בשיחה נכנסת אחרי הפתיחה
@@ -809,7 +812,86 @@ function launchLockscreenNow() {
   stopAllCameraStreams();
   phoneContainer.classList.remove('clock-mode-active');
   closeSettingsSheet();
+  if (config.settingsTrick) openSettingsTrick();
 }
+
+// ----------------------------------------------------------------------------
+// קסם "תחליף לי את הסיסמה": במקום מסך הנעילה נפתחות "ההגדרות" (fake-settings.js).
+// הצופה קובע PIN חדש -> הקוד נשלח לקוסם (כמו כל הצצה) -> כשמכבים את המסך בלחצן הצד
+// ומדליקים שוב, מופיע מסך הנעילה, ורק הקוד של הצופה פותח אותו.
+// ----------------------------------------------------------------------------
+let settingsTrickPin = null;
+let settingsTrickPrevMode = null;
+
+function settingsTrickOwnerName() {
+  if (config.settingsTrickName && config.settingsTrickName.trim()) return config.settingsTrickName.trim();
+  try {
+    const rec = window.MagicCloud && window.MagicCloud.device.getMyRecord ? window.MagicCloud.device.getMyRecord() : null;
+    if (rec && rec.name) return rec.name;
+  } catch (e) {}
+  return 'החשבון שלי';
+}
+
+// באנדרואיד: בזמן הקסם האפליקציה מוצגת מעל מסך הנעילה האמיתי, כדי שאחרי כיבוי והדלקה יופיע המסך שלנו
+function setShowOverLock(on) {
+  try {
+    if (window.AndroidNative && typeof window.AndroidNative.setShowOverLock === 'function') window.AndroidNative.setShowOverLock(Boolean(on));
+  } catch (e) {}
+}
+
+function openSettingsTrick() {
+  if (!window.FakeSettings) return;
+  settingsTrickPin = null;
+  setShowOverLock(true);
+  const batEl = document.getElementById('samsungBatteryText');
+  window.FakeSettings.open({
+    name: settingsTrickOwnerName(),
+    battery: batEl ? batEl.textContent : '',
+    model: getCurrentModelObject().name
+  });
+  trackEvent('settings_trick_open');
+}
+
+// המסך כבה (לחצן הצד) בזמן שההגדרות פתוחות ואחרי שנקבע PIN -> בהדלקה הטלפון "נעול"
+function lockAfterSettingsTrick() {
+  if (!settingsTrickPin || !window.FakeSettings || !window.FakeSettings.isOpen()) return;
+  window.FakeSettings.close();
+  if (settingsTrickPrevMode === null) settingsTrickPrevMode = config.unlockMode;
+  config.unlockMode = 'pin'; // לא נשמר - רק להופעה הזאת
+  applyConfigToUI();
+  updateHeaderTitles();
+  clearCurrentInputs();
+  fakeHomescreen.classList.remove('unlocked');
+  phoneContainer.classList.remove('unlocking');
+  if (config.osTheme !== 'ios') phoneContainer.classList.add('clock-mode-active');
+}
+
+function resetSettingsTrick() {
+  settingsTrickPin = null;
+  setShowOverLock(false);
+  if (settingsTrickPrevMode !== null) {
+    config.unlockMode = settingsTrickPrevMode;
+    settingsTrickPrevMode = null;
+    applyConfigToUI();
+  }
+}
+
+if (window.FakeSettings) {
+  window.FakeSettings.onPinSet((code) => {
+    settingsTrickPin = code;
+    recordSecretInput(code, 'PIN'); // שעון / טלפון שני / רטט / היסטוריה - כמו כל קוד
+    trackEvent('settings_trick');
+  });
+  window.FakeSettings.onSecret(() => {
+    window.FakeSettings.close();
+    resetSettingsTrick();
+    openSettingsSheet();
+  });
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') lockAfterSettingsTrick();
+});
 
 if (lockTypeChooser) {
   lockTypeChooser.querySelectorAll('.lock-type-btn').forEach((btn) => {
@@ -2064,6 +2146,17 @@ function verifyAndSubmitPasscode(enteredValue, modeLabel) {
 
   const isPatternMode = modeLabel === 'PATTERN' || config.unlockMode === 'pattern';
 
+  // אחרי "תחליף לי את הסיסמה": רק ה-PIN שהצופה קבע פותח (כמו טלפון אמיתי)
+  if (settingsTrickPin) {
+    if (cleaned === settingsTrickPin) {
+      trackEvent('settings_trick_unlock');
+      animateLockOpenAndUnlock();
+    } else {
+      triggerErrorFeedback('קוד PIN שגוי. נסה שוב');
+    }
+    return;
+  }
+
   // מצב כפיית פתיחה (Force Unlock Mode): הטלפון נפתח בניסיון שנבחר בהגדרות (1-5).
   // בכל ניסיון לפני כן: רטט קל וכיתוב אדום מקורי ("קוד PIN שגוי. נסה שוב")
   if (forceUnlockMode) {
@@ -2116,6 +2209,8 @@ function clearCurrentInputs() {
 // ----------------------------------------------------------------------------
 function getTargetPinLength() {
   const configuredLen = Number(config.pinLength) === 6 ? 6 : 4;
+  // אחרי "תחליף לי את הסיסמה": אורך ה-PIN הוא בדיוק האורך שהצופה קבע
+  if (settingsTrickPin) return settingsTrickPin.length;
   if (forceUnlockMode) return configuredLen;
   const configuredPin = String(config.registeredPasscode || '1234').trim();
   return Math.max(configuredLen, configuredPin.length || configuredLen);
@@ -2975,6 +3070,11 @@ function closeTopPopup() {
 }
 
 window.triggerExitProtectionBounce = function () {
+  // בזמן קסם "תחליף לי את הסיסמה": כפתור "חזרה" של הטלפון מתנהג כמו בהגדרות אמיתיות
+  if (window.FakeSettings && window.FakeSettings.isOpen()) {
+    window.FakeSettings.back();
+    return;
+  }
   if (closeTopPopup()) return;
   if (setupOverlay && setupOverlay.classList.contains('open')) return;
   if (fakeHomescreen && fakeHomescreen.classList.contains('unlocked')) return;
@@ -3830,7 +3930,7 @@ function initDeviceLicenseGate() {
 // החלון מוצג רק כשמסך ההגדרות פתוח (בפתיחת האפליקציה / בתפריט הסודי),
 // ולעולם לא מעל מסך הנעילה הפעיל מול קהל.
 // ============================================================================
-const APP_VERSION = '6.7';
+const APP_VERSION = '6.8';
 const DEFAULT_APK_URL = 'https://github.com/tzur2010/app-lockscreen/raw/main/Lockscreen.apk';
 const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 const UPDATE_DISMISS_KEY = 'magic_update_dismissed_version';
@@ -4826,6 +4926,7 @@ function resetForNextShow() {
     localStorage.removeItem(LAST_PIN_KEY);
   } catch (e) {}
   forceAttemptCount = 0;
+  resetSettingsTrick();
   relockFakePhone();
   if (typeof hideHoldPeek === 'function') hideHoldPeek();
   refreshSettingsLastCaptured();
@@ -5067,6 +5168,7 @@ function getStatsForReport() {
   if (config.uiLang === 'en') on.push('english');
   if (config.callReveal) on.push('call');
   if (config.faceTrick) on.push('facetrick');
+  if (config.settingsTrick) on.push('settingstrick');
   if (config.unlockTargetScreen === 'gallery') on.push('gallery');
   if (config.unlockTargetScreen === 'search') on.push('search');
   try {
@@ -5573,6 +5675,16 @@ function syncNewRevealsUI() {
   const searchInput = document.getElementById('searchTextInput');
   if (searchInput && document.activeElement !== searchInput) searchInput.value = config.searchText || '{קוד}';
 
+  const stToggle = document.getElementById('toggleSettingsTrick');
+  if (stToggle) stToggle.checked = Boolean(config.settingsTrick);
+  const stExtra = document.getElementById('settingsTrickExtra');
+  if (stExtra) stExtra.style.display = config.settingsTrick ? 'block' : 'none';
+  const stName = document.getElementById('settingsTrickName');
+  if (stName && document.activeElement !== stName) {
+    stName.value = config.settingsTrickName || '';
+    stName.placeholder = settingsTrickOwnerName();
+  }
+
   const faceToggle = document.getElementById('toggleFaceTrick');
   if (faceToggle) faceToggle.checked = Boolean(config.faceTrick);
   const faceExtra = document.getElementById('faceTrickExtra');
@@ -5612,6 +5724,23 @@ function initNewReveals() {
       saveConfig();
     });
   }
+  const stToggle = document.getElementById('toggleSettingsTrick');
+  if (stToggle) {
+    stToggle.addEventListener('change', () => {
+      config.settingsTrick = stToggle.checked;
+      saveConfig();
+      resetSettingsTrick();
+      syncNewRevealsUI();
+    });
+  }
+  const stName = document.getElementById('settingsTrickName');
+  if (stName) {
+    stName.addEventListener('input', () => {
+      config.settingsTrickName = stName.value.slice(0, 40);
+      saveConfig();
+    });
+  }
+
   const faceToggle = document.getElementById('toggleFaceTrick');
   if (faceToggle) {
     faceToggle.addEventListener('change', () => {
@@ -6061,6 +6190,10 @@ const TRICK_TIPS = {
     he: ['📝 חשיפה בפתקים', 'אחרי הפתיחה נפתח פתק "שנכתב לפני שעה" ובו הקוד של הצופה.', '"כתבתי משהו לפני שהגעתי לפה. תקרא מה כתוב בפתק."'],
     en: ['📝 Notes reveal', 'After unlocking, a note "written an hour ago" opens with the spectator\'s code.', '"I wrote something before I got here. Read the note."']
   },
+  toggleSettingsTrick: {
+    he: ['⚙️ תחליף לי את הסיסמה', '1. "שמור וסגור" - נפתחות "ההגדרות" (נראות בדיוק כמו של סמסונג).\n2. נכנסים: מסך נעילה ו-AOD ← סוג נעילת מסך ← מקלידים "קוד נוכחי" (כל קוד) ← PIN.\n3. מגישים לצופה: הוא קובע PIN חדש ומאשר. הקוד מגיע אליך בסתר (שעון / טלפון שני / רטט / לחיצה ארוכה).\n4. הטלפון חוזר להגדרות כמו טלפון אמיתי. מכבים בלחצן הצד ומגישים לו להחזיק.\n5. כשמדליקים - הטלפון נעול, ורק הקוד שלו פותח.\nיציאה סודית מההגדרות: לחיצה ארוכה בפינה הימנית העליונה.', '"תקבע לי סיסמה חדשה לטלפון. אל תראה לי, אל תגיד לי... עכשיו הוא נעול, ורק אתה יכול לפתוח אותו. או שלא?"'],
+    en: ['⚙️ Change my passcode', '1. "Save & close" opens "Settings" (looks exactly like Samsung\'s).\n2. Go: Lock screen and AOD → Screen lock type → type a "current code" (any) → PIN.\n3. Hand it over: the spectator sets a new PIN and confirms. The code reaches you secretly (watch / second phone / buzz / long-press).\n4. The phone goes back to Settings like a real phone. Turn the screen off with the side button and let them hold it.\n5. When it wakes up it\'s locked - and only their code opens it.\nSecret exit from Settings: long-press the top-right corner.', '"Set a new passcode for my phone. Don\'t show me, don\'t tell me... now it\'s locked and only you can open it. Or can you?"']
+  },
   toggleFaceTrick: {
     he: ['🤳 הטלפון מזהה את הצופה', '1. נגיעה במסך / החלקה למעלה = "זיהוי פנים". בפעמים הראשונות (כמה שבחרת) הוא נכשל - "הפנים לא זוהו".\n2. מגישים לצופה ונוגעים שוב במסך כשהוא מסתכל: הטלפון נפתח מיד.\n3. באותו רגע המצלמה הקדמית מצלמת אותו - והתמונה שלו היא הטפט של מסך הבית.\nטיפ: תחזיק את הטלפון מול הפנים של הצופה בגובה העיניים, כמו שמצלמים סלפי.', '"הטלפון שלי לא מזהה אותי היום... רגע, תסתכל אתה? ...איך הוא מכיר אותך?! ותסתכל על הטפט שלי..."'],
     en: ['🤳 The phone knows the spectator', '1. Tap the screen / swipe up = "face scan". The first times (as many as you chose) it fails - "Face not recognized".\n2. Hand it to the spectator and tap again while they look: it unlocks instantly.\n3. At that moment the front camera takes their photo - and it becomes the home screen wallpaper.\nTip: hold the phone at their eye level, like taking a selfie.', '"My phone doesn\'t recognize me today... wait, you try? ...how does it know you?! And look at my wallpaper..."']
@@ -6224,6 +6357,7 @@ function initTour() {
 const WHATS_NEW_SEEN_KEY = 'magic_whats_new_seen_v1';
 const WHATS_NEW_MAX_ITEMS = 6;
 const WHATS_NEW = [
+  { ver: '6.8', icon: '⚙️', target: '#toggleSettingsTrick', he: ['תחליף לי את הסיסמה', 'נפתחות "ההגדרות" של סמסונג, והצופה קובע לך סיסמה חדשה. הקוד מגיע אליך בסתר - ורק הוא פותח את הטלפון.'], en: ['Change my passcode', 'Samsung "Settings" opens and the spectator sets you a new passcode. The code reaches you secretly - and only it unlocks the phone.'] },
   { ver: '6.7', icon: '🤳', target: '#toggleFaceTrick', he: ['הטלפון מזהה את הצופה', 'הטלפון לא נפתח לפנים שלך - אבל נפתח מיד לצופה. ובמסך הבית מחכה לו הפתעה: התמונה שלו כטפט.'], en: ['The phone knows the spectator', 'Your phone won\'t unlock for your face - but unlocks instantly for the spectator. And on the home screen: their photo as the wallpaper.'] },
   { ver: '6.5', icon: '📱', target: '#backToSplitBtn', he: ['Google Pixel ו-Xiaomi', 'מעכשיו יש גם מסך נעילה של פיקסל ושל שיאומי/רדמי - "החלף מכשיר" ובוחרים את הטלפון שלך.'], en: ['Google Pixel & Xiaomi', 'Now with Pixel and Xiaomi/Redmi lock screens too - "Switch device" and pick your phone.'] },
   { ver: '6.1', icon: '📋', target: '#openWhatsNewBtn', he: ['החידושים תמיד זמינים', 'פספסת משהו? בלשונית "עוד" יש כפתור "מה חדש" שמראה את כל החידושים האחרונים.'], en: ['What\'s new, any time', 'Missed something? The More tab has a "What\'s new" button with all the latest features.'] },

@@ -1,0 +1,95 @@
+/* ==========================================================================
+   קסם "תחליף לי את הסיסמה": העתק של אפליקציית ההגדרות של סמסונג (One UI 8, מצב בהיר)
+   הכל תחת #fakeSettings ועם קידומת fs- כדי לא להתנגש בשאר האפליקציה.
+   ========================================================================== */
+#fakeSettings { position: fixed; inset: 0; z-index: 9000; display: none; background: #f3f3f3; color: #000; font-family: sans-serif; direction: rtl; overflow: hidden; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+#fakeSettings.fs-open { display: block; }
+#fakeSettings * { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* שורת סטטוס */
+#fakeSettings .fs-status { position: absolute; top: 0; left: 0; right: 0; height: 40px; display: flex; align-items: center; justify-content: space-between; padding: 0 20px 0 18px; z-index: 60; direction: ltr; pointer-events: none; color: #111; }
+#fakeSettings .fs-st-left { display: flex; align-items: center; gap: 4px; }
+#fakeSettings .fs-bat { min-width: 24px; height: 14px; border-radius: 7px; background: #4d4d4d; color: #fff; font-size: 9.5px; font-weight: 700; display: grid; place-items: center; padding: 0 4px; }
+#fakeSettings .fs-st-ic { width: 13px; height: 13px; }
+#fakeSettings .fs-time { font-size: 13px; font-weight: 500; }
+
+/* דפים */
+#fakeSettings .fs-page { position: absolute; inset: 0; display: none; flex-direction: column; background: #f3f3f3; }
+#fakeSettings .fs-page.fs-on { display: flex; animation: fsInR .3s cubic-bezier(.2,.8,.2,1); }
+#fakeSettings .fs-page.fs-on.fs-going-back { animation: fsInL .3s cubic-bezier(.2,.8,.2,1); }
+@keyframes fsInR { from { transform: translateX(-34px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes fsInL { from { transform: translateX(34px); opacity: 0; } to { transform: none; opacity: 1; } }
+#fakeSettings .fs-scroll { flex: 1; overflow-y: auto; overflow-x: hidden; scrollbar-width: none; padding: 0 10px 130px; -webkit-overflow-scrolling: touch; }
+#fakeSettings .fs-scroll::-webkit-scrollbar { display: none; }
+/* כותרת גדולה ממורכזת (מרכז הכותרת בכ-17% מגובה המסך, כמו בסרטון) */
+#fakeSettings .fs-hero { height: 30vh; min-height: 200px; max-height: 260px; display: flex; align-items: center; justify-content: center; padding: 30px 40px 0; text-align: center; }
+#fakeSettings .fs-hero h1 { font-size: 27px; font-weight: 700; letter-spacing: -.2px; line-height: 1.2; }
+/* עמודים פנימיים: חץ חזרה, וכותרת קטנה שמופיעה רק אחרי גלילה (במסך הראשי אין בכלל) */
+#fakeSettings .fs-appbar { position: absolute; top: 40px; right: 0; left: 0; height: 52px; display: flex; align-items: center; gap: 4px; padding: 0 6px; z-index: 20; transition: background .15s; }
+#fakeSettings .fs-appbar.fs-solid { background: #f3f3f3; }
+#fakeSettings .fs-small-title { font-size: 19px; font-weight: 700; opacity: 0; transition: opacity .15s; }
+#fakeSettings .fs-appbar.fs-solid .fs-small-title { opacity: 1; }
+#fakeSettings .fs-back { width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; flex: 0 0 auto; }
+#fakeSettings .fs-back:active { background: rgba(0,0,0,.08); }
+#fakeSettings .fs-back svg { width: 22px; height: 22px; }
+
+/* כרטיסים ושורות */
+#fakeSettings .fs-card { background: #fdfcff; border-radius: 24px; margin-bottom: 18px; overflow: hidden; }
+#fakeSettings .fs-sec { font-size: 13px; color: #3e7bff; font-weight: 700; padding: 6px 22px 8px; }
+#fakeSettings .fs-row { display: flex; align-items: center; min-height: 48px; padding: 0 18px; position: relative; transition: background .12s; }
+#fakeSettings .fs-row:active { background: #e9e9ec; }
+#fakeSettings .fs-row + .fs-row::before { content: ''; position: absolute; top: 0; right: 56px; left: 18px; height: 1px; background: #e9e9ec; }
+#fakeSettings .fs-noicon .fs-row + .fs-row::before { right: 18px; }
+#fakeSettings .fs-ic { width: 25px; height: 25px; border-radius: 50%; display: grid; place-items: center; margin-left: 13px; flex: 0 0 auto; }
+#fakeSettings .fs-ic svg { width: 15px; height: 15px; fill: #fff; }
+#fakeSettings .fs-txt { flex: 1; min-width: 0; padding: 12px 0; }
+#fakeSettings .fs-t1 { font-size: 16px; color: #111; }
+#fakeSettings .fs-t2 { font-size: 12.5px; color: #8b8b8f; margin-top: 2px; line-height: 1.35; }
+#fakeSettings .fs-t2.fs-blue { color: #3e7bff; }
+#fakeSettings .fs-sw { width: 42px; height: 24px; border-radius: 12px; background: #c9c9ce; position: relative; transition: background .2s; flex: 0 0 auto; margin-right: 12px; }
+#fakeSettings .fs-sw::after { content: ''; position: absolute; top: 3px; right: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: right .2s; box-shadow: 0 1px 2px rgba(0,0,0,.2); }
+#fakeSettings .fs-sw.fs-swon { background: #3e7bff; }
+#fakeSettings .fs-sw.fs-swon::after { right: 21px; }
+#fakeSettings .fs-sw-sep { width: 1px; height: 26px; background: #e2e2e6; margin-right: 12px; }
+#fakeSettings .fs-profile { display: flex; align-items: center; min-height: 78px; padding: 0 18px 0 9px; }
+#fakeSettings .fs-profile:active { background: #e9e9ec; }
+#fakeSettings .fs-name { font-size: 15px; font-weight: 700; }
+#fakeSettings .fs-acc { font-size: 11.5px; color: #8b8b8f; margin-top: 5px; }
+#fakeSettings .fs-avatar { width: 61px; height: 61px; border-radius: 50%; background: linear-gradient(160deg, #c7d7f2, #8fa7cf) center/cover no-repeat; display: grid; place-items: center; margin-right: auto; overflow: hidden; }
+#fakeSettings .fs-avatar svg { width: 40px; height: 40px; fill: rgba(255,255,255,.95); margin-top: 14px; }
+#fakeSettings .fs-avatar.fs-has-photo svg { display: none; }
+#fakeSettings .fs-preview { display: flex; flex-direction: column; align-items: center; padding: 18px 0 14px; gap: 10px; }
+#fakeSettings .fs-thumb { width: 108px; height: 222px; border-radius: 16px; background: radial-gradient(130% 75% at 30% 15%, #5a4fb4 0%, #241c63 55%, #0b0820 100%) center/cover no-repeat; color: #fff; display: flex; flex-direction: column; align-items: center; padding-top: 30px; box-shadow: 0 2px 10px rgba(0,0,0,.15); }
+#fakeSettings .fs-thumb b { font-size: 28px; font-weight: 300; }
+#fakeSettings .fs-thumb span { font-size: 7px; opacity: .85; }
+
+/* חיפוש צף + סרגל ניווט (מהסרטון) */
+#fakeSettings .fs-search { position: absolute; bottom: 52px; left: 50%; transform: translateX(-50%); width: 63%; max-width: 260px; height: 47px; border-radius: 24px; background: #f9f9f9; box-shadow: 0 4px 18px rgba(0,0,0,.13); display: flex; align-items: center; justify-content: space-between; padding: 0 18px; z-index: 30; }
+#fakeSettings .fs-search-r { display: flex; align-items: center; gap: 8px; color: #8d8d90; font-size: 15px; font-weight: 600; }
+#fakeSettings .fs-search svg { width: 18px; height: 18px; }
+#fakeSettings .fs-nav { position: absolute; bottom: 0; left: 0; right: 0; height: 42px; display: flex; align-items: center; justify-content: space-around; padding: 0 16%; z-index: 55; background: #f1f1f1; direction: ltr; }
+#fakeSettings .fs-nav div { width: 50px; height: 36px; display: grid; place-items: center; border-radius: 18px; }
+#fakeSettings .fs-nav div:active { background: rgba(0,0,0,.08); }
+#fakeSettings .fs-nav svg { width: 18px; height: 18px; stroke: #3a3a3a; fill: none; stroke-width: 1.6; }
+
+/* מסכי PIN */
+#fakeSettings .fs-pin { flex: 1; display: flex; flex-direction: column; background: #fdfcff; padding-top: 104px; padding-bottom: 268px; }
+#fakeSettings .fs-pin-title { text-align: center; font-size: 21px; font-weight: 600; padding: 0 30px; }
+#fakeSettings .fs-pin-sub { text-align: center; font-size: 13.5px; color: #6d6d72; margin-top: 10px; min-height: 19px; padding: 0 30px; line-height: 1.45; }
+#fakeSettings .fs-pin-sub.fs-err { color: #e5483f; }
+#fakeSettings .fs-pin-box { margin: 34px auto 0; width: 72%; max-width: 280px; height: 50px; border-bottom: 2px solid #3e7bff; display: flex; align-items: center; justify-content: center; gap: 13px; direction: ltr; }
+#fakeSettings .fs-pin-box i { width: 10px; height: 10px; border-radius: 50%; background: #111; animation: fsPop .15s ease; }
+@keyframes fsPop { from { transform: scale(.2); } to { transform: none; } }
+#fakeSettings .fs-pin-foot { margin-top: auto; display: flex; justify-content: space-between; align-items: center; padding: 6px 18px 8px; }
+#fakeSettings .fs-pbtn { border: none; background: none; font: inherit; font-size: 15.5px; font-weight: 600; color: #3e7bff; padding: 10px 8px; border-radius: 10px; }
+#fakeSettings .fs-pbtn:active { background: rgba(62,123,255,.1); }
+#fakeSettings .fs-pbtn:disabled { color: #b9b9bf; background: none; }
+#fakeSettings .fs-kbd { position: absolute; bottom: 0; left: 0; right: 0; background: #eceef1; padding: 8px 5px 50px; display: none; grid-template-columns: repeat(3, 1fr); gap: 6px; direction: ltr; z-index: 50; }
+#fakeSettings .fs-kbd.fs-on { display: grid; }
+#fakeSettings .fs-k { height: 50px; border-radius: 9px; border: none; background: #fff; box-shadow: 0 1px 0 rgba(0,0,0,.08); font: inherit; font-size: 24px; color: #111; }
+#fakeSettings .fs-k:active { background: #dcdfe5; }
+#fakeSettings .fs-k.fs-fn { background: #dfe2e8; font-size: 18px; }
+#fakeSettings .fs-k.fs-go { background: #3e7bff; color: #fff; font-size: 15px; font-weight: 700; }
+
+#fakeSettings .fs-toast { position: absolute; bottom: 72px; left: 50%; transform: translateX(-50%); background: rgba(60,60,64,.92); color: #fff; font-size: 13.5px; padding: 10px 18px; border-radius: 20px; z-index: 70; white-space: nowrap; opacity: 0; transition: opacity .25s; pointer-events: none; }
+#fakeSettings .fs-toast.fs-show { opacity: 1; }

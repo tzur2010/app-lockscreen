@@ -1,11 +1,13 @@
 // להעלות את המספר בכל עדכון כדי לנקות מטמון ישן
-const CACHE_NAME = 'magic-lockscreen-v6.7';
+const CACHE_NAME = 'magic-lockscreen-v6.8';
 const ASSETS = [
   './',
   './index.html',
   './style.css',
   './i18n.js',
   './app.js',
+  './fake-settings.js',
+  './fake-settings.css',
   './firebase-config.js',
   './manifest.json',
   './p1.png'

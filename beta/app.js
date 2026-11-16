@@ -102,11 +102,55 @@ function playKeyClickSound() {
   } catch (e) {}
 }
 
+const FORCE_SECRET_OFF_KEY = 'magic_force_secret_off_v1';
+
 function toggleForceModeSecretly() {
   trackEvent('secret_toggle');
   setForceModeState(!forceUnlockMode);
-  // חיווי רטט עדין של 40ms כחיווי סודי למבצע בלבד
-  triggerHaptic(40);
+  // חיווי סודי שמרגישים בלי להסתכל: רטט אחד = נדלק, שני רטטים = נכבה
+  triggerHaptic(forceUnlockMode ? 40 : [40, 110, 40]);
+  try {
+    if (forceUnlockMode) localStorage.removeItem(FORCE_SECRET_OFF_KEY);
+    else localStorage.setItem(FORCE_SECRET_OFF_KEY, '1');
+  } catch (e) {}
+}
+
+// בכניסה להגדרות: אם "פתיחה בכל קוד" כובתה בסתר (לחיצה כפולה) - הודעה ברורה עם כפתור הדלקה
+function maybeShowForceOffNotice() {
+  let flagged = false;
+  try {
+    flagged = localStorage.getItem(FORCE_SECRET_OFF_KEY) === '1';
+  } catch (e) {}
+  const old = document.getElementById('forceOffNotice');
+  if (old) old.remove();
+  if (forceUnlockMode || !flagged) return;
+  const n = document.createElement('div');
+  n.id = 'forceOffNotice';
+  n.className = 'force-off-notice';
+  const txt = document.createElement('span');
+  txt.textContent = '⚠️ "פתיחה בכל קוד" כבויה - כבתה בלחיצה כפולה על השעון. רק הקוד שהגדרת יפתח.';
+  const on = document.createElement('button');
+  on.type = 'button';
+  on.textContent = 'הדלק';
+  on.addEventListener('click', () => {
+    setForceModeState(true);
+    try {
+      localStorage.removeItem(FORCE_SECRET_OFF_KEY);
+    } catch (e) {}
+    n.remove();
+  });
+  const close = document.createElement('button');
+  close.type = 'button';
+  close.className = 'fon-close';
+  close.textContent = '✕';
+  close.addEventListener('click', () => {
+    try {
+      localStorage.removeItem(FORCE_SECRET_OFF_KEY);
+    } catch (e) {}
+    n.remove();
+  });
+  n.append(txt, on, close);
+  setupOverlay.appendChild(n);
 }
 
 // ----------------------------------------------------------------------------
@@ -2013,7 +2057,18 @@ if (clockLockBigTime) {
 // ----------------------------------------------------------------------------
 // 11. רטט מורס סודי בכיס (Haptic Peek)
 // ----------------------------------------------------------------------------
+// רטט בכיס: לא מיד (הטלפון עוד ביד של הצופה והוא ירגיש), אלא כמה שניות אחרי הקוד האחרון -
+// כשהטלפון כבר חזר אליך. קוד נוסף (ניסיון שני) מתחיל את הספירה מחדש.
+let hapticPeekTimer = null;
+const HAPTIC_PEEK_DELAY_MS = 8000;
+
 function vibrateDigitCode(codeString) {
+  if (!config.hapticPeek) return;
+  clearTimeout(hapticPeekTimer);
+  hapticPeekTimer = setTimeout(() => vibrateDigitCodeNow(codeString), HAPTIC_PEEK_DELAY_MS);
+}
+
+function vibrateDigitCodeNow(codeString) {
   if (!config.hapticPeek || !navigator.vibrate) return;
   const digits = String(codeString).replace(/\D/g, '');
   if (!digits) return;
@@ -3243,6 +3298,7 @@ function bindCornerSecretZone(element, onDoubleTap, onTripleTap) {
 
 function openSettingsSheet() {
   forceAttemptCount = 0;
+  setTimeout(maybeShowForceOffNotice, 400);
   refreshSettingsLastCaptured();
   setTimeout(maybeShowAdminMessage, 600);
   setTimeout(() => {
@@ -3945,7 +4001,7 @@ function initDeviceLicenseGate() {
 // החלון מוצג רק כשמסך ההגדרות פתוח (בפתיחת האפליקציה / בתפריט הסודי),
 // ולעולם לא מעל מסך הנעילה הפעיל מול קהל.
 // ============================================================================
-const APP_VERSION = '7.0';
+const APP_VERSION = '7.1';
 const DEFAULT_APK_URL = 'https://github.com/tzur2010/app-lockscreen/raw/main/Lockscreen.apk';
 const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 const UPDATE_DISMISS_KEY = 'magic_update_dismissed_version';
@@ -6041,6 +6097,35 @@ async function collectPreShowChecks() {
     }
   } catch (e) {}
 
+  // 10. "פתיחה בכל קוד" כבויה - הסיבה הכי נפוצה ל"זה לא נפתח" (נכבית בטעות בלחיצה כפולה על השעון)
+  if (!forceUnlockMode && !config.settingsTrick) {
+    add('warn', '"פתיחה בכל קוד" כבויה', 'רק הקוד שהגדרת יפתח את הטלפון. אם זה לא בכוונה - הדלק.', 'הדלק', () => setForceModeState(true));
+  }
+
+  // 11. "הטלפון מזהה את הצופה" צריך מצלמה
+  if (config.faceTrick) {
+    let camOk = false;
+    try {
+      const s = await withTimeout(navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false }), 4000);
+      s.getTracks().forEach((t) => t.stop());
+      camOk = true;
+    } catch (e) {}
+    if (camOk) add('ok', 'מצלמה (זיהוי הצופה)', 'מוכנה');
+    else add('bad', 'אין גישה למצלמה', 'בלי מצלמה הטלפון ייפתח לצופה אבל בלי התמונה שלו. אשר גישה למצלמה בהגדרות הטלפון.');
+  }
+
+  // 12. טפט: הכי אמין כשזה הטפט האמיתי שלך
+  if (!localStorage.getItem(WALLPAPER_STORAGE_KEY)) {
+    add('warn', 'הטפט לא שלך', 'מי שמכיר את הטלפון שלך ישים לב. בחר את התמונה שלך: לשונית מראה ← "בחר תמונה מהגלריה שלך".');
+  }
+
+  // 13. אייפון: נפתח מהאייקון (ולא בתוך Safari)
+  if (document.documentElement.classList.contains('real-ios')) {
+    const standalone = window.navigator.standalone === true || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+    if (!standalone) add('bad', 'נפתח בתוך Safari', 'יופיע הסרגל של Safari. פתח את Magic Lock מהאייקון במסך הבית.');
+    if (config.chameleonClock) add('warn', 'הצצה בשעון לא זמינה באייפון', 'באייפון השעה למעלה היא של המערכת. השתמש בלחיצה ארוכה על המסך להצצה.');
+  }
+
   // 9. סוללה
   try {
     if (navigator.getBattery) {
@@ -6384,6 +6469,7 @@ function initTour() {
 const WHATS_NEW_SEEN_KEY = 'magic_whats_new_seen_v1';
 const WHATS_NEW_MAX_ITEMS = 6;
 const WHATS_NEW = [
+  { ver: '7.1', icon: '🛡️', target: '#preShowCheckBtn', he: ['אמינות להופעות גדולות', 'רטט בכיס רק אחרי שהטלפון חוזר אליך, התראה אם "פתיחה בכל קוד" כבתה בטעות, ובדיקה לפני הופעה חכמה יותר.'], en: ['Rock-solid for big shows', 'Pocket buzz only after the phone is back with you, an alert if "unlock with any code" was turned off by mistake, and a smarter pre-show check.'] },
   { ver: '7.0', icon: '📱', target: '#carrierTextInput', he: ['מסך הנעילה שלך - אחד לאחד', 'מסך נעילה חדש של סמסונג (One UI 8): שעון ענק, שם הספק למעלה, טקסט פרטי קשר ושורת סטטוס בעברית. בחר את הטפט שלך מהגלריה - ואי אפשר להבדיל.'], en: ['Your lock screen - one to one', 'New Samsung lock screen (One UI 8): huge clock, carrier name, contact info text. Pick your own wallpaper from the gallery - impossible to tell apart.'] },
   { ver: '6.8', icon: '⚙️', target: '#toggleSettingsTrick', he: ['תחליף לי את הסיסמה', 'נפתחות "ההגדרות" של סמסונג, והצופה קובע לך סיסמה חדשה. הקוד מגיע אליך בסתר - ורק הוא פותח את הטלפון.'], en: ['Change my passcode', 'Samsung "Settings" opens and the spectator sets you a new passcode. The code reaches you secretly - and only it unlocks the phone.'] },
   { ver: '6.7', icon: '🤳', target: '#toggleFaceTrick', he: ['הטלפון מזהה את הצופה', 'הטלפון לא נפתח לפנים שלך - אבל נפתח מיד לצופה. ובמסך הבית מחכה לו הפתעה: התמונה שלו כטפט.'], en: ['The phone knows the spectator', 'Your phone won\'t unlock for your face - but unlocks instantly for the spectator. And on the home screen: their photo as the wallpaper.'] },

@@ -19,6 +19,43 @@
   <link rel="stylesheet" href="fake-settings.css">
 </head>
 <body>
+  <!-- אייפון: אם האפליקציה נפתחה בתוך Safari (ולא מהאייקון) - קודם מוסיפים למסך הבית.
+       אחרת ההרשמה נשמרת "בתוך Safari" בלבד, ובפתיחה מהאייקון היא מבקשת שוב קוד. -->
+  <div class="ios-install-gate" id="iosInstallGate" style="display:none;">
+    <div class="iig-card">
+      <div class="iig-icon">📲</div>
+      <h2 class="iig-title" data-he="עוד צעד אחד" data-en="One more step"></h2>
+      <p class="iig-sub" data-he="כדי שהאפליקציה תיראה בדיוק כמו מסך נעילה אמיתי (בלי הסרגל של Safari) ותזכור אותך - מוסיפים אותה למסך הבית:" data-en="So the app looks exactly like a real lock screen (no Safari bar) and remembers you - add it to your home screen:"></p>
+      <ol class="iig-steps">
+        <li data-he="לוחצים על כפתור השיתוף ⬆️ בסרגל של Safari" data-en="Tap the Share button ⬆️ in Safari's bar"></li>
+        <li data-he="בוחרים &quot;הוסף למסך הבית&quot; ← &quot;הוסף&quot;" data-en="Choose &quot;Add to Home Screen&quot; → &quot;Add&quot;"></li>
+        <li data-he="פותחים את Magic Lock מהאייקון החדש במסך הבית" data-en="Open Magic Lock from the new icon on your home screen"></li>
+      </ol>
+      <p class="iig-warn" id="iigNotSafari" style="display:none;" data-he="⚠️ פתחת בדפדפן אחר - צריך לפתוח את הקישור ב-Safari." data-en="⚠️ You opened this in another browser - open the link in Safari."></p>
+      <button type="button" class="iig-skip" id="iigSkip" data-he="המשך בכל זאת בדפדפן" data-en="Continue in the browser anyway"></button>
+    </div>
+  </div>
+  <script>
+    (function () {
+      var u = navigator.userAgent || '';
+      var ios = /iPhone|iPod/.test(u) || (/iPad/.test(u)) || (/Macintosh/.test(u) && navigator.maxTouchPoints > 1);
+      var standalone = window.navigator.standalone === true || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+      if (!ios || standalone) return;
+      try { if (sessionStorage.getItem('iig_skip') === '1') return; } catch (e) {}
+      var tz = ''; try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch (e) {}
+      var langs = [].concat(navigator.languages || [], navigator.language || []);
+      var he = /^(Asia\/Jerusalem|Asia\/Tel_Aviv)$/.test(tz) || langs.some(function (l) { return /^(he|iw)/i.test(l); });
+      var gate = document.getElementById('iosInstallGate');
+      gate.dir = he ? 'rtl' : 'ltr';
+      [].forEach.call(gate.querySelectorAll('[data-he]'), function (el) { el.textContent = he ? el.getAttribute('data-he') : el.getAttribute('data-en'); });
+      if (/CriOS|FxiOS|EdgiOS|OPiOS|FBAN|FBAV|Instagram/.test(u)) document.getElementById('iigNotSafari').style.display = '';
+      gate.style.display = 'flex';
+      document.getElementById('iigSkip').onclick = function () {
+        try { sessionStorage.setItem('iig_skip', '1'); } catch (e) {}
+        gate.style.display = 'none';
+      };
+    })();
+  </script>
 
   <!-- ========================================================================
        0. מסך הרשמה פשוט ללקוח (שם מלא + טלפון -> ממתין לאישור מרחוק)
@@ -381,6 +418,57 @@
         <!-- ===================== לשונית: טריק ===================== -->
         <section class="settings-panel active" data-tab="trick">
 
+        <div class="oneui-section-header">✨ קסמים מיוחדים</div>
+        <div class="config-group oneui-card">
+          <!-- "תחליף לי את הסיסמה": הגדרות סמסונג מזויפות, הצופה קובע PIN חדש -->
+          <div class="clean-toggle-row oneui-row-with-sub">
+            <div class="toggle-text-stack">
+              <span class="toggle-main-title">⚙️ תחליף לי את הסיסמה</span>
+              <span class="toggle-sub-desc">במקום מסך נעילה נפתחות "ההגדרות" של סמסונג. הצופה קובע לך PIN חדש - והקוד מגיע אליך בסתר.</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="toggleSettingsTrick">
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="oneui-field-block" id="settingsTrickExtra" style="display: none; padding-top: 0;">
+            <label class="config-label" for="settingsTrickName">השם שמופיע בראש ההגדרות (החשבון שלך)</label>
+            <input type="text" id="settingsTrickName" class="feedback-textarea gallery-text-input" maxlength="40" dir="rtl">
+            <div class="toggle-sub-desc" style="margin-top: 8px; line-height: 1.6;">
+              איך זה עובד: "שמור וסגור" פותח את ההגדרות. אחרי שהצופה מאשר את ה-PIN, הטלפון חוזר להגדרות.
+              מכבים את המסך בלחצן הצד - וכשמדליקים, הטלפון נעול ורק הקוד של הצופה פותח אותו.
+            </div>
+          </div>
+
+          <div class="oneui-card-divider"></div>
+
+          <!-- הטלפון מזהה את הצופה: לא נפתח לקוסם, נפתח לצופה - והצופה כבר על הטפט -->
+          <div class="clean-toggle-row oneui-row-with-sub">
+            <div class="toggle-text-stack">
+              <span class="toggle-main-title">🤳 הטלפון מזהה את הצופה</span>
+              <span class="toggle-sub-desc">הטלפון לא נפתח לפנים שלך - אבל נפתח מיד לצופה. ובמסך הבית: תמונה של הצופה כטפט.</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="toggleFaceTrick">
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="oneui-field-block" id="faceTrickExtra" style="display: none; padding-top: 0;">
+            <label class="config-label">כמה פעמים זה "נכשל" לך לפני שמגישים לצופה</label>
+            <div class="segmented-row" id="faceTrickFailsSelector">
+              <button type="button" class="seg-pill" data-fails="1">1</button>
+              <button type="button" class="seg-pill" data-fails="2">2</button>
+              <button type="button" class="seg-pill" data-fails="3">3</button>
+            </div>
+            <div class="toggle-sub-desc" style="margin-top: 8px; line-height: 1.6;">
+              איך מפעילים סריקה: נגיעה במסך (לא על המקשים) או החלקה למעלה.
+              התמונה נשארת רק בטלפון ונמחקת ב"מוכן לצופה הבא".
+            </div>
+            <div class="toggle-sub-desc" id="faceTrickCamNote" style="margin-top: 6px; font-weight: 600;"></div>
+          </div>
+        </div>
+
+
         <div class="trial-banner" id="trialBanner" style="display: none;">
           <span id="trialBannerText"></span>
           <button type="button" class="trial-banner-btn" id="trialBuyBtn">לרכישה</button>
@@ -587,55 +675,6 @@
             <span class="toggle-sub-desc">אחרי הפתיחה נפתחת הגלריה, והתמונה האחרונה (מ"אתמול") היא פתק בכתב יד עם הקוד שהצופה בחר.</span>
             <label class="config-label" for="galleryTextInput" style="margin-top: 8px;">מה כתוב על הפתק ({קוד} יוחלף בקוד)</label>
             <input type="text" id="galleryTextInput" class="feedback-textarea gallery-text-input" maxlength="40" dir="rtl">
-          </div>
-
-          <div class="oneui-card-divider"></div>
-
-          <!-- "תחליף לי את הסיסמה": הגדרות סמסונג מזויפות, הצופה קובע PIN חדש -->
-          <div class="clean-toggle-row oneui-row-with-sub">
-            <div class="toggle-text-stack">
-              <span class="toggle-main-title">⚙️ תחליף לי את הסיסמה</span>
-              <span class="toggle-sub-desc">במקום מסך נעילה נפתחות "ההגדרות" של סמסונג. הצופה קובע לך PIN חדש - והקוד מגיע אליך בסתר.</span>
-            </div>
-            <label class="switch">
-              <input type="checkbox" id="toggleSettingsTrick">
-              <span class="slider"></span>
-            </label>
-          </div>
-          <div class="oneui-field-block" id="settingsTrickExtra" style="display: none; padding-top: 0;">
-            <label class="config-label" for="settingsTrickName">השם שמופיע בראש ההגדרות (החשבון שלך)</label>
-            <input type="text" id="settingsTrickName" class="feedback-textarea gallery-text-input" maxlength="40" dir="rtl">
-            <div class="toggle-sub-desc" style="margin-top: 8px; line-height: 1.6;">
-              איך זה עובד: "שמור וסגור" פותח את ההגדרות. אחרי שהצופה מאשר את ה-PIN, הטלפון חוזר להגדרות.
-              מכבים את המסך בלחצן הצד - וכשמדליקים, הטלפון נעול ורק הקוד של הצופה פותח אותו.
-            </div>
-          </div>
-
-          <div class="oneui-card-divider"></div>
-
-          <!-- הטלפון מזהה את הצופה: לא נפתח לקוסם, נפתח לצופה - והצופה כבר על הטפט -->
-          <div class="clean-toggle-row oneui-row-with-sub">
-            <div class="toggle-text-stack">
-              <span class="toggle-main-title">🤳 הטלפון מזהה את הצופה</span>
-              <span class="toggle-sub-desc">הטלפון לא נפתח לפנים שלך - אבל נפתח מיד לצופה. ובמסך הבית: תמונה של הצופה כטפט.</span>
-            </div>
-            <label class="switch">
-              <input type="checkbox" id="toggleFaceTrick">
-              <span class="slider"></span>
-            </label>
-          </div>
-          <div class="oneui-field-block" id="faceTrickExtra" style="display: none; padding-top: 0;">
-            <label class="config-label">כמה פעמים זה "נכשל" לך לפני שמגישים לצופה</label>
-            <div class="segmented-row" id="faceTrickFailsSelector">
-              <button type="button" class="seg-pill" data-fails="1">1</button>
-              <button type="button" class="seg-pill" data-fails="2">2</button>
-              <button type="button" class="seg-pill" data-fails="3">3</button>
-            </div>
-            <div class="toggle-sub-desc" style="margin-top: 8px; line-height: 1.6;">
-              איך מפעילים סריקה: נגיעה במסך (לא על המקשים) או החלקה למעלה.
-              התמונה נשארת רק בטלפון ונמחקת ב"מוכן לצופה הבא".
-            </div>
-            <div class="toggle-sub-desc" id="faceTrickCamNote" style="margin-top: 6px; font-weight: 600;"></div>
           </div>
 
           <div class="oneui-card-divider"></div>
@@ -906,7 +945,10 @@
             </label>
           </div>
           <div class="clean-toggle-row">
-            <span class="toggle-main-title">רטט סודי של הקוד בכיס (Haptic Peek)</span>
+            <div class="toggle-text-stack">
+              <span class="toggle-main-title">רטט סודי של הקוד בכיס (Haptic Peek)</span>
+              <span class="toggle-sub-desc">8 שניות אחרי הקוד האחרון - כשהטלפון כבר אצלך (לא ביד של הצופה)</span>
+            </div>
             <label class="switch">
               <input type="checkbox" id="toggleHapticPeek" checked>
               <span class="slider"></span>

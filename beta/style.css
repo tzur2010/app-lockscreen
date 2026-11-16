@@ -3963,3 +3963,239 @@ html[dir="ltr"] .oneui-section-header { border-right: 0; border-left: 3px solid 
 .help-btn-grid .hb-ico { font-size: 20px; line-height: 1; }
 #unlockTargetSelector { grid-template-columns: 1fr 1fr !important; }
 .code-history-list { max-height: 228px; overflow-y: auto; overscroll-behavior: contain; }
+
+/* ==========================================================================
+   ✨ MAGIC LOCK AURORA (7.5) - עיצוב חדש להגדרות
+   רקע לילה עם זוהר צפוני נע, כרטיסי זכוכית עם מסגרת זוהרת,
+   שפה אחת של גרדיאנט (סגול ← אינדיגו ← טורקיז) לכל מה שדולק/נבחר.
+   ========================================================================== */
+.device-config-sheet {
+  --mg-a: #a78bfa;
+  --mg-b: #6366f1;
+  --mg-c: #22d3ee;
+  --mg-grad: linear-gradient(135deg, #8b5cf6 0%, #6366f1 48%, #06b6d4 100%);
+  --mg-glow: 0 8px 26px rgba(99, 102, 241, .45);
+  --mg-card: rgba(22, 20, 44, .62);
+  --mg-card-base: rgba(9, 8, 22, .55);
+  --mg-card-edge: linear-gradient(145deg, rgba(167, 139, 250, .42), rgba(255, 255, 255, .05) 38%, rgba(255, 255, 255, .03) 62%, rgba(34, 211, 238, .32));
+  --mg-track: rgba(8, 7, 20, .55);
+  --cfg-bg: #07060f;
+  --cfg-text-main: #f5f3ff;
+  --cfg-text-sub: #a5a3c4;
+  --cfg-text-muted: #a5a3c4;
+  --cfg-divider: rgba(167, 139, 250, .12);
+  --cfg-subbox-bg: rgba(255, 255, 255, .045);
+  --cfg-subbox-border: rgba(167, 139, 250, .16);
+  --cfg-seg-track: var(--mg-track);
+  --cfg-seg-border: rgba(167, 139, 250, .14);
+  --cfg-btn-surface: rgba(255, 255, 255, .07);
+  --cfg-btn-border: rgba(167, 139, 250, .22);
+  --cfg-switch-off: rgba(255, 255, 255, .14);
+  --cfg-header-bg: rgba(10, 9, 24, .55);
+  --cfg-header-border: rgba(167, 139, 250, .14);
+  --cfg-footer-grad: linear-gradient(180deg, rgba(7, 6, 15, 0) 0%, rgba(7, 6, 15, .88) 38%, #07060f 100%);
+  overflow: hidden;
+}
+.device-config-sheet.light-mode {
+  --mg-card: rgba(255, 255, 255, .78);
+  --mg-card-base: rgba(255, 255, 255, .5);
+  --mg-card-edge: linear-gradient(145deg, rgba(139, 92, 246, .38), rgba(255, 255, 255, .6) 40%, rgba(255, 255, 255, .6) 60%, rgba(6, 182, 212, .32));
+  --mg-track: rgba(99, 102, 241, .07);
+  --mg-glow: 0 8px 22px rgba(99, 102, 241, .3);
+  --cfg-bg: #f6f4ff;
+  --cfg-text-main: #1e1b4b;
+  --cfg-text-sub: #6b6890;
+  --cfg-text-muted: #6b6890;
+  --cfg-divider: rgba(99, 102, 241, .12);
+  --cfg-subbox-bg: rgba(99, 102, 241, .05);
+  --cfg-subbox-border: rgba(99, 102, 241, .16);
+  --cfg-seg-border: rgba(99, 102, 241, .14);
+  --cfg-btn-surface: rgba(255, 255, 255, .8);
+  --cfg-btn-border: rgba(99, 102, 241, .2);
+  --cfg-switch-off: rgba(30, 27, 75, .16);
+  --cfg-header-bg: rgba(246, 244, 255, .7);
+  --cfg-header-border: rgba(99, 102, 241, .14);
+  --cfg-footer-grad: linear-gradient(180deg, rgba(246, 244, 255, 0) 0%, rgba(246, 244, 255, .9) 38%, #f6f4ff 100%);
+}
+
+/* זוהר צפוני: שלושה כתמי אור רכים שזזים לאט (בלי filter - קל על הסוללה) */
+.device-config-sheet::before,
+.device-config-sheet::after {
+  content: '';
+  position: absolute;
+  pointer-events: none;
+  z-index: 0;
+  border-radius: 50%;
+  will-change: transform;
+}
+.device-config-sheet::before {
+  width: 140vw; height: 140vw; max-width: 760px; max-height: 760px;
+  top: -42vw; right: -46vw;
+  background: radial-gradient(circle at 50% 50%, rgba(139, 92, 246, .38) 0%, rgba(99, 102, 241, .16) 38%, rgba(7, 6, 15, 0) 68%);
+  animation: mgAuroraA 18s ease-in-out infinite alternate;
+}
+.device-config-sheet::after {
+  width: 130vw; height: 130vw; max-width: 700px; max-height: 700px;
+  bottom: -30vw; left: -50vw;
+  background: radial-gradient(circle at 50% 50%, rgba(6, 182, 212, .28) 0%, rgba(219, 39, 119, .1) 40%, rgba(7, 6, 15, 0) 68%);
+  animation: mgAuroraB 22s ease-in-out infinite alternate;
+}
+.device-config-sheet.light-mode::before { background: radial-gradient(circle, rgba(167, 139, 250, .35) 0%, rgba(167, 139, 250, .08) 42%, rgba(246, 244, 255, 0) 68%); }
+.device-config-sheet.light-mode::after { background: radial-gradient(circle, rgba(34, 211, 238, .26) 0%, rgba(244, 114, 182, .08) 42%, rgba(246, 244, 255, 0) 68%); }
+@keyframes mgAuroraA { from { transform: translate(0, 0) scale(1); } to { transform: translate(-14vw, 18vh) scale(1.15); } }
+@keyframes mgAuroraB { from { transform: translate(0, 0) scale(1.05); } to { transform: translate(18vw, -22vh) scale(.92); } }
+
+/* אבק כוכבים עדין */
+.device-config-sheet .config-body {
+  position: relative;
+  z-index: 1;
+  background-image:
+    radial-gradient(1px 1px at 12% 18%, rgba(255, 255, 255, .55), transparent 60%),
+    radial-gradient(1px 1px at 78% 9%, rgba(255, 255, 255, .4), transparent 60%),
+    radial-gradient(1.4px 1.4px at 61% 36%, rgba(196, 181, 253, .55), transparent 60%),
+    radial-gradient(1px 1px at 30% 64%, rgba(255, 255, 255, .35), transparent 60%),
+    radial-gradient(1.2px 1.2px at 88% 72%, rgba(165, 243, 252, .5), transparent 60%),
+    radial-gradient(1px 1px at 45% 90%, rgba(255, 255, 255, .3), transparent 60%);
+  background-attachment: local;
+}
+.device-config-sheet.light-mode .config-body { background-image: none; }
+.device-config-sheet .config-header { position: relative; z-index: 3; border-bottom-color: var(--cfg-header-border); }
+
+/* כרטיסי זכוכית עם מסגרת זוהרת */
+.device-config-sheet .config-group,
+.device-config-sheet .oneui-card {
+  background: linear-gradient(var(--mg-card), var(--mg-card)) padding-box, linear-gradient(var(--mg-card-base), var(--mg-card-base)) padding-box, var(--mg-card-edge) border-box;
+  border: 1px solid transparent;
+  border-radius: 26px;
+  box-shadow: 0 18px 40px rgba(3, 2, 12, .45), inset 0 1px 0 rgba(255, 255, 255, .06);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  padding: 8px 18px;
+}
+.device-config-sheet.light-mode .config-group,
+.device-config-sheet.light-mode .oneui-card { box-shadow: 0 14px 34px rgba(76, 29, 149, .1), inset 0 1px 0 rgba(255, 255, 255, .9); }
+
+/* כותרות קטעים: אייקון + כותרת + קו זוהר */
+.device-config-sheet .oneui-section-header,
+html[dir="ltr"] .device-config-sheet .oneui-section-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 0;
+  padding: 0 4px;
+  margin: 10px 2px 12px;
+  font-size: 15.5px;
+  font-weight: 800;
+  letter-spacing: .1px;
+  color: var(--cfg-text-main);
+}
+.device-config-sheet .oneui-section-header::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  border-radius: 1px;
+  background: linear-gradient(90deg, rgba(167, 139, 250, 0), rgba(167, 139, 250, .5) 60%, rgba(34, 211, 238, .7));
+}
+html[dir="rtl"] .device-config-sheet .oneui-section-header::after { background: linear-gradient(270deg, rgba(167, 139, 250, 0), rgba(167, 139, 250, .5) 60%, rgba(34, 211, 238, .7)); }
+
+/* לשוניות: "דוק" זכוכית צף, הלשונית הפעילה זוהרת */
+.device-config-sheet .settings-tabs {
+  background: linear-gradient(rgba(14, 12, 32, .78), rgba(14, 12, 32, .78)) padding-box, var(--mg-card-edge) border-box;
+  border: 1px solid transparent;
+  border-radius: 24px;
+  padding: 6px;
+  gap: 4px;
+  box-shadow: 0 14px 34px rgba(3, 2, 12, .5);
+}
+.device-config-sheet.light-mode .settings-tabs { background: linear-gradient(rgba(255, 255, 255, .86), rgba(255, 255, 255, .86)) padding-box, var(--mg-card-edge) border-box; box-shadow: 0 10px 26px rgba(76, 29, 149, .12); }
+.device-config-sheet .settings-tab { border-radius: 18px; padding: 8px 2px 7px; color: var(--cfg-text-sub); font-weight: 700; }
+.device-config-sheet .settings-tab .tab-ico { font-size: 20px; filter: saturate(.75); }
+.device-config-sheet .settings-tab.active {
+  background: var(--mg-grad);
+  color: #fff;
+  box-shadow: var(--mg-glow), inset 0 1px 0 rgba(255, 255, 255, .25);
+}
+.device-config-sheet .settings-tab.active .tab-ico { filter: none; transform: scale(1.15) translateY(-1px); }
+
+/* כפתורי הופעה */
+.device-config-sheet .show-actions-bar .reset-show-btn {
+  background: linear-gradient(135deg, #10b981 0%, #059669 55%, #0d9488 100%);
+  box-shadow: 0 10px 26px rgba(16, 185, 129, .38), inset 0 1px 0 rgba(255, 255, 255, .25);
+  border-radius: 18px;
+}
+.device-config-sheet .show-actions-bar .preshow-btn {
+  background: linear-gradient(rgba(16, 185, 129, .1), rgba(16, 185, 129, .1)) padding-box, linear-gradient(#0c0b1c, #0c0b1c) padding-box, linear-gradient(135deg, rgba(52, 211, 153, .75), rgba(34, 211, 238, .45)) border-box;
+  border: 1px solid transparent;
+  color: #6ee7b7;
+  border-radius: 18px;
+}
+.device-config-sheet.light-mode .show-actions-bar .preshow-btn { background: linear-gradient(rgba(16, 185, 129, .08), rgba(16, 185, 129, .08)) padding-box, linear-gradient(#fff, #fff) padding-box, linear-gradient(135deg, rgba(16, 185, 129, .6), rgba(6, 182, 212, .4)) border-box; }
+.device-config-sheet.light-mode .show-actions-bar .preshow-btn { color: #047857; }
+
+/* מתגים: גרדיאנט וזוהר כשדולק */
+.device-config-sheet .switch { width: 50px; height: 30px; }
+.device-config-sheet .slider { background: var(--cfg-switch-off); border: 1px solid rgba(255, 255, 255, .08); }
+.device-config-sheet .slider:before { width: 24px; height: 24px; left: 2px; bottom: 2px; box-shadow: 0 3px 8px rgba(0, 0, 0, .35); }
+.device-config-sheet .switch input:checked + .slider { background: var(--mg-grad); border-color: rgba(255, 255, 255, .18); box-shadow: 0 0 0 3px rgba(99, 102, 241, .16), 0 6px 18px rgba(99, 102, 241, .45); }
+.device-config-sheet .switch input:checked + .slider:before { transform: translateX(20px); }
+
+/* בוררים */
+.device-config-sheet .segmented-row { background: var(--mg-track); border-color: var(--cfg-seg-border); border-radius: 18px; padding: 5px; }
+.device-config-sheet .seg-pill { border-radius: 13px; font-weight: 600; }
+.device-config-sheet .seg-pill.active { background: var(--mg-grad); border-color: rgba(255, 255, 255, .18); box-shadow: var(--mg-glow); color: #fff; }
+
+/* דגמי טלפון */
+.device-config-sheet .model-preset-btn,
+.device-config-sheet .model-preset-chip { border-radius: 16px; background: var(--cfg-subbox-bg); border-color: var(--cfg-subbox-border); }
+.device-config-sheet .model-preset-btn.active,
+.device-config-sheet .model-preset-chip.active,
+.device-config-sheet:not(.light-mode) .model-preset-btn.active,
+.device-config-sheet:not(.light-mode) .model-preset-chip.active { background: var(--mg-grad); border-color: rgba(255, 255, 255, .2); color: #fff; box-shadow: var(--mg-glow); }
+.device-config-sheet .model-preset-btn.active .model-preset-sub,
+.device-config-sheet:not(.light-mode) .model-preset-btn.active .model-preset-sub { color: rgba(255, 255, 255, .8); }
+
+/* כפתורים משניים */
+.device-config-sheet .media-upload-btn { border: 1px solid var(--cfg-btn-border); background: var(--cfg-btn-surface); border-radius: 16px; font-weight: 600; }
+.device-config-sheet .bio-enroll-toggle-btn { background: var(--mg-grad); color: #fff; border: 0; box-shadow: var(--mg-glow); }
+.device-config-sheet .guide-open-btn { background: linear-gradient(var(--mg-card), var(--mg-card)) padding-box, var(--mg-card-edge) border-box; border: 1px solid transparent; color: var(--cfg-text-main); border-radius: 20px; }
+.device-config-sheet .trick-tip-btn { border: 0; background: var(--mg-grad); color: #fff; box-shadow: 0 3px 10px rgba(99, 102, 241, .4); }
+.device-config-sheet .last-captured-pill strong,
+.device-config-sheet:not(.light-mode) .last-captured-pill strong { background: var(--mg-grad); -webkit-background-clip: text; background-clip: text; color: transparent; font-size: 20px; }
+.device-config-sheet .feedback-textarea { border-radius: 16px; }
+.device-config-sheet .oneui-card-divider { background: linear-gradient(90deg, transparent, var(--cfg-divider) 15%, var(--cfg-divider) 85%, transparent); }
+
+/* "שמור וסגור": גרדיאנט עם ברק שעובר */
+.device-config-sheet .config-footer { z-index: 25; }
+.device-config-sheet .launch-lockscreen-btn {
+  position: relative;
+  overflow: hidden;
+  background: var(--mg-grad);
+  box-shadow: 0 12px 32px rgba(99, 102, 241, .5), inset 0 1px 0 rgba(255, 255, 255, .28);
+  font-weight: 800;
+  font-size: 16.5px;
+  letter-spacing: .2px;
+  color: #fff;
+}
+.device-config-sheet .launch-lockscreen-btn::after {
+  content: '';
+  position: absolute;
+  top: 0; bottom: 0; width: 40%;
+  left: -60%;
+  background: linear-gradient(100deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, .35) 50%, rgba(255, 255, 255, 0) 100%);
+  animation: mgShine 4.5s ease-in-out infinite;
+}
+@keyframes mgShine { 0%, 60% { left: -60%; } 85%, 100% { left: 130%; } }
+
+/* כניסה מדורגת של הכרטיסים בכל מעבר לשונית */
+.device-config-sheet .settings-panel.active > * { animation: mgRise .5s cubic-bezier(.22, 1, .36, 1) both; }
+.device-config-sheet .settings-panel.active > *:nth-child(2) { animation-delay: .04s; }
+.device-config-sheet .settings-panel.active > *:nth-child(3) { animation-delay: .08s; }
+.device-config-sheet .settings-panel.active > *:nth-child(4) { animation-delay: .12s; }
+.device-config-sheet .settings-panel.active > *:nth-child(5) { animation-delay: .16s; }
+.device-config-sheet .settings-panel.active > *:nth-child(n+6) { animation-delay: .2s; }
+@keyframes mgRise { from { opacity: 0; transform: translateY(14px) scale(.985); } to { opacity: 1; transform: none; } }
+.device-config-sheet .settings-panel.active { animation: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .device-config-sheet::before, .device-config-sheet::after, .device-config-sheet .launch-lockscreen-btn::after, .device-config-sheet .settings-panel.active > * { animation: none !important; }
+}

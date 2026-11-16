@@ -4132,7 +4132,7 @@ function initDeviceLicenseGate() {
 // החלון מוצג רק כשמסך ההגדרות פתוח (בפתיחת האפליקציה / בתפריט הסודי),
 // ולעולם לא מעל מסך הנעילה הפעיל מול קהל.
 // ============================================================================
-const APP_VERSION = '7.4';
+const APP_VERSION = '7.5';
 const DEFAULT_APK_URL = 'https://github.com/tzur2010/app-lockscreen/raw/main/Lockscreen.apk';
 const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 const UPDATE_DISMISS_KEY = 'magic_update_dismissed_version';
@@ -6658,6 +6658,7 @@ function initTour() {
 const WHATS_NEW_SEEN_KEY = 'magic_whats_new_seen_v1';
 const WHATS_NEW_MAX_ITEMS = 6;
 const WHATS_NEW = [
+  { ver: '7.5', icon: '🌌', target: null, he: ['עיצוב חדש: Aurora', 'הגדרות בעיצוב חדש לגמרי: זוהר צפוני ברקע, כרטיסי זכוכית זוהרים וכפתורים בגרדיאנט. יש גם גרסה בהירה (כפתור השמש למעלה).'], en: ['New design: Aurora', 'A brand-new settings design: northern lights in the background, glowing glass cards and gradient controls. There\'s a light version too (the sun button at the top).'] },
   { ver: '7.4', icon: '🗂️', target: '#settingsTabs', he: ['הגדרות מסודרות מחדש', 'כל דבר במקום שלו: 🎯 טריק · 🎬 חשיפה · 👁️ הצצה · 📱 מראה · ⚙️ עוד. ו"מוכן לצופה הבא" + "בדיקה לפני הופעה" תמיד למעלה.'], en: ['Reorganized settings', 'Everything in its place: 🎯 Trick · 🎬 Reveal · 👁️ Peek · 📱 Look · ⚙️ More. And "Ready for next spectator" + "Pre-show check" are always at the top.'] },
   { ver: '7.3', icon: '🎂', target: '#toggleBirthdayTrick', he: ['תאריך לידה', 'הצופה מקליד כקוד תאריך לידה של מישהו שהוא אוהב - ואתה יודע בסתר את המזל, הגיל, באיזה יום נולד ומי זה כנראה (ילד? הורה?).'], en: ['Birthday', 'The spectator types a loved one\'s birthday as the code - and you secretly know the star sign, age, the weekday they were born and who it probably is (child? parent?).'] },
   { ver: '7.1', icon: '🛡️', target: '#preShowCheckBtn', he: ['אמינות להופעות גדולות', 'רטט בכיס רק אחרי שהטלפון חוזר אליך, התראה אם "פתיחה בכל קוד" כבתה בטעות, ובדיקה לפני הופעה חכמה יותר.'], en: ['Rock-solid for big shows', 'Pocket buzz only after the phone is back with you, an alert if "unlock with any code" was turned off by mistake, and a smarter pre-show check.'] },

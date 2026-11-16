@@ -3903,8 +3903,7 @@ html[dir="ltr"] body.practice-on .settings-tabs::after { content: '🎯 Practice
    אייפון אמיתי (Safari / מסך הבית): שורת הסטטוס וה-Dynamic Island האמיתיים תמיד מוצגים
    - לכן מסתירים את המזויפים (אחרת יש שתי שורות סטטוס), וממלאים את כל גובה המסך
    ========================================================================== */
-html.real-ios, html.real-ios body { background-color: #000; height: 100%; min-height: 100%; }
-html.real-ios .phone-container { height: 100vh; height: 100lvh; max-height: none; }
+
 html.real-ios .phone-container .status-bar { visibility: hidden !important; }
 html.real-ios .phone-container .camera-punch-hole { visibility: hidden !important; }html.real-ios .phone-container.theme-ios .lock-icon { visibility: hidden !important; }
 
@@ -3923,3 +3922,12 @@ html.real-ios .phone-container .camera-punch-hole { visibility: hidden !importan
 .force-off-notice span { flex: 1; }
 .force-off-notice button { border: none; border-radius: 10px; padding: 8px 14px; background: #facc15; color: #1f1500; font: inherit; font-weight: 800; cursor: pointer; flex: 0 0 auto; }
 .force-off-notice .fon-close { background: transparent; color: #fde68a; padding: 6px; }
+/* אייפון אמיתי: המסך "מוצמד" לארבעת הקצוות (בלי למדוד גובה) - כך הוא תמיד ממלא את כל המסך,
+   כולל מתחת לפס הבית ולשורת הסטטוס, בכל דגם ובכל מצב (Safari או מסך הבית) */
+html.real-ios, html.real-ios body { background-color: #000; position: fixed; top: 0; left: 0; right: 0; bottom: auto; width: auto; height: var(--ios-h, 100%); min-height: 0; }
+html.real-ios .phone-container { position: fixed; top: 0; right: 0; left: 0; bottom: auto; width: auto; height: var(--ios-h, 100%); max-width: none; margin: 0; }
+html.real-ios .phone-container > .fake-call,
+html.real-ios #fakeSettings,
+html.real-ios .splash-screen { bottom: auto; height: var(--ios-h, 100%); }
+/* פס הבית האמיתי של האייפון תמיד מוצג - לא מציירים עוד אחד מזויף (שומרים את המקום שלו) */
+html.real-ios .ios-home-indicator { visibility: hidden; }

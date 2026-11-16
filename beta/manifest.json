@@ -1,7 +1,7 @@
 {
   "name": "One UI Lockscreen",
   "short_name": "Lockscreen",
-  "description": "Native-Ready Magic Lockscreen App for Magicians & Mentalists",
+  "description": "Native-Ready Lockscreen App for Magicians & Mentalists",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

@@ -3899,3 +3899,11 @@ html[dir="ltr"] body.practice-on .settings-tabs::after { content: '🎯 Practice
 /* כפתור "בחר תמונה מהגלריה שלך" - גדול וברור */
 .own-photo-btn { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 46px; border-radius: 14px; background: linear-gradient(135deg, #2563eb, #1d4ed8); color: #fff; font-weight: 700; font-size: 14.5px; cursor: pointer; text-align: center; padding: 8px 12px; box-sizing: border-box; }
 .own-photo-btn:active { transform: scale(.98); }
+/* ==========================================================================
+   אייפון אמיתי (Safari / מסך הבית): שורת הסטטוס וה-Dynamic Island האמיתיים תמיד מוצגים
+   - לכן מסתירים את המזויפים (אחרת יש שתי שורות סטטוס), וממלאים את כל גובה המסך
+   ========================================================================== */
+html.real-ios, html.real-ios body { background-color: #000; height: 100%; min-height: 100%; }
+html.real-ios .phone-container { height: 100vh; height: 100lvh; max-height: none; }
+html.real-ios .phone-container .status-bar { visibility: hidden !important; }
+html.real-ios .phone-container .camera-punch-hole { visibility: hidden !important; }html.real-ios .phone-container.theme-ios .lock-icon { visibility: hidden !important; }

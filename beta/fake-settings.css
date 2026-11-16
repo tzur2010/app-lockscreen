@@ -96,3 +96,5 @@
 
 #fakeSettings .fs-toast { position: absolute; bottom: 72px; left: 50%; transform: translateX(-50%); background: rgba(60,60,64,.92); color: #fff; font-size: 13.5px; padding: 10px 18px; border-radius: 20px; z-index: 70; white-space: nowrap; opacity: 0; transition: opacity .25s; pointer-events: none; }
 #fakeSettings .fs-toast.fs-show { opacity: 1; }
+
+html.real-ios #fakeSettings .fs-status { visibility: hidden; }

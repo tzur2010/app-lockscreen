@@ -4014,7 +4014,7 @@ function initDeviceLicenseGate() {
     if (trialEndBox) trialEndBox.style.display = state === 'trialEnded' ? 'flex' : 'none';
     if (state === 'trialEnded') fillPayInfo();
     const titleEl = overlay.querySelector('.license-lock-title');
-    if (titleEl) titleEl.textContent = state === 'trialEnded' ? 'Magic Lock' : 'הרשמה לאפליקציה';
+    if (titleEl) titleEl.textContent = state === 'trialEnded' ? 'Lockscreen' : 'הרשמה לאפליקציה';
     if (state === 'form') updateRegTrialNote();
     if (state === 'approved') {
       overlay.style.display = 'none';
@@ -4194,7 +4194,7 @@ function initDeviceLicenseGate() {
 // החלון מוצג רק כשמסך ההגדרות פתוח (בפתיחת האפליקציה / בתפריט הסודי),
 // ולעולם לא מעל מסך הנעילה הפעיל מול קהל.
 // ============================================================================
-const APP_VERSION = '7.6';
+const APP_VERSION = '7.7';
 const DEFAULT_APK_URL = 'https://github.com/tzur2010/app-lockscreen/raw/main/Lockscreen.apk';
 const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 const UPDATE_DISMISS_KEY = 'magic_update_dismissed_version';
@@ -6369,7 +6369,7 @@ async function collectPreShowChecks() {
   // 13. אייפון: נפתח מהאייקון (ולא בתוך Safari)
   if (document.documentElement.classList.contains('real-ios')) {
     const standalone = window.navigator.standalone === true || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
-    if (!standalone) add('bad', 'נפתח בתוך Safari', 'יופיע הסרגל של Safari. פתח את Magic Lock מהאייקון במסך הבית.');
+    if (!standalone) add('bad', 'נפתח בתוך Safari', 'יופיע הסרגל של Safari. פתח את Lockscreen מהאייקון במסך הבית.');
     if (config.chameleonClock) add('warn', 'הצצה בשעון לא זמינה באייפון', 'באייפון השעה למעלה היא של המערכת. השתמש בלחיצה ארוכה על המסך להצצה.');
     // באייפון אי אפשר לצאת למסך הבית האמיתי - מוצג צילום מסך הבית של הקוסם. בלי צילום = מסך ריק (פדיחה)
     if (!localStorage.getItem(HOMESCREEN_STORAGE_KEY)) {
@@ -6625,7 +6625,7 @@ function initTrickTips() {
 // ============================================================================
 const TOUR_DONE_KEY = 'magic_tour_done_v1';
 const TOUR_STEPS = [
-  { target: '#settingsTabs', tab: 'trick', he: '👋 ברוך הבא ל-Magic Lock!\nההגדרות מחולקות ל-5 לשוניות:\n🎯 טריק - מה קורה בטלפון\n🎬 חשיפה - מה קורה אחרי הפתיחה\n👁️ הצצה - איך אתה יודע את הקוד\n📱 מראה - שהטלפון ייראה כמו שלך\n⚙️ עוד - עזרה, קוד אישי, גיבוי ושפה', en: '👋 Welcome to Magic Lock!\nSettings are split into 5 tabs:\n🎯 Trick - what happens on the phone\n🎬 Reveal - what happens after unlocking\n👁️ Peek - how you learn the code\n📱 Look - make it look like your phone\n⚙️ More - help, personal code, backup and language' },
+  { target: '#settingsTabs', tab: 'trick', he: '👋 ברוך הבא ל-Lockscreen!\nההגדרות מחולקות ל-5 לשוניות:\n🎯 טריק - מה קורה בטלפון\n🎬 חשיפה - מה קורה אחרי הפתיחה\n👁️ הצצה - איך אתה יודע את הקוד\n📱 מראה - שהטלפון ייראה כמו שלך\n⚙️ עוד - עזרה, קוד אישי, גיבוי ושפה', en: '👋 Welcome to Lockscreen!\nSettings are split into 5 tabs:\n🎯 Trick - what happens on the phone\n🎬 Reveal - what happens after unlocking\n👁️ Peek - how you learn the code\n📱 Look - make it look like your phone\n⚙️ More - help, personal code, backup and language' },
   { target: '.show-actions-bar', tab: 'trick', he: '🔄 שני הכפתורים האלה תמיד למעלה:\n"מוכן לצופה הבא" מאפס הכל בין צופים, ו"בדיקה לפני הופעה" מוודא שהכל מוכן.', en: '🔄 These two buttons are always at the top:\n"Ready for next spectator" resets everything between spectators, and "Pre-show check" makes sure everything is ready.' },
   { target: '#toggleForceUnlockMode', tab: 'trick', he: '🎯 פתיחה בכל קוד\nכשזה דולק, כל קוד שהצופה מקליד פותח את הטלפון.', en: '🎯 Unlock with any code\nWhen on, any code the spectator types unlocks the phone.' },
   { target: '#unlockAttemptModeSelector', tab: 'trick', he: '🔁 כאן בוחרים באיזה ניסיון הטלפון ייפתח.\nלמשל 2 = בפעם הראשונה "קוד שגוי", ובשנייה נפתח.', en: '🔁 Choose which attempt unlocks the phone.\nE.g. 2 = first try "wrong code", second try opens.' },
@@ -7000,7 +7000,7 @@ function renderPayPanel(container) {
   paid.addEventListener('click', async () => {
     paid.disabled = true;
     const who = payer.value.trim();
-    const text = `💰 שילמתי${s.price ? ` ₪${s.price}` : ''} על Magic Lock - נא לאשר${who ? `\nשם בתשלום: ${who}` : ''}`;
+    const text = `💰 שילמתי${s.price ? ` ₪${s.price}` : ''} על Lockscreen - נא לאשר${who ? `\nשם בתשלום: ${who}` : ''}`;
     try {
       await window.MagicCloud.device.sendFeedback({ text, appVersion: getInstalledAppVersion(), os: config.osTheme, model: config.deviceModel, notify: 'paid' });
       status.textContent = en ? 'Sent ✓ The app opens by itself as soon as the payment is confirmed.' : 'ההודעה נשלחה ✓ האפליקציה תיפתח לבד ברגע שהתשלום יאושר.';
@@ -7080,7 +7080,7 @@ function updateTrialBanner() {
 
 function openPayInfo() {
   const en = isEnglishUi();
-  document.getElementById('buyTitle').textContent = en ? '💰 Buy Magic Lock' : '💰 רכישת Magic Lock';
+  document.getElementById('buyTitle').textContent = en ? '💰 Buy Lockscreen' : '💰 רכישת Lockscreen';
   document.getElementById('buyCloseBtn').textContent = en ? 'Close' : 'סגור';
   renderPayPanel(document.getElementById('buyPanel'));
   document.getElementById('buyOverlay').style.display = 'flex';

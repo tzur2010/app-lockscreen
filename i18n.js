@@ -64,7 +64,7 @@
     'אין גישה למצלמה': 'No camera access',
     'הטפט לא שלך': 'The wallpaper isn\'t yours',
     'נפתח בתוך Safari': 'Opened inside Safari',
-    'יופיע הסרגל של Safari. פתח את Magic Lock מהאייקון במסך הבית.': 'The Safari bar will show. Open Magic Lock from the home screen icon.',
+    'יופיע הסרגל של Safari. פתח את Lockscreen מהאייקון במסך הבית.': 'The Safari bar will show. Open Lockscreen from the home screen icon.',
     'הצצה בשעון לא זמינה באייפון': 'Clock peek isn\'t available on iPhone',
     'באייפון השעה למעלה היא של המערכת. השתמש בלחיצה ארוכה על המסך להצצה.': 'On iPhone the top clock belongs to the system. Use a long-press on the screen to peek.',
     '8 שניות אחרי הקוד האחרון - כשהטלפון כבר אצלך (לא ביד של הצופה)': '8 seconds after the last code - when the phone is already back with you (not in the spectator\'s hand)',

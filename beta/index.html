@@ -165,6 +165,14 @@ fit();addEventListener('resize',fit);addEventListener('orientationchange',functi
           <p>כמה שניות אחרי שהטלפון נפתח, מגיעה הודעה שבתוכה הקוד שהצופה בחר. בהגדרות בוחרים את שם השולח, את התמונה, את הטקסט (<b>{קוד}</b> מוחלף בקוד) ואחרי כמה שניות ההודעה מגיעה.</p>
         </details>
         <details>
+          <summary>🏠 אחרי הפתיחה: מסך הבית</summary>
+          <p>באנדרואיד: הטלפון יוצא באמת למסך הבית האמיתי שלך.<br>באייפון: אפל לא מאפשרת לאף אפליקציה לצאת לבד למסך הבית, לכן מוצג צילום של מסך הבית שלך - עם השעה והסוללה האמיתיות למעלה.<br>פעם אחת: במסך הבית לוחצים צד + עוצמה למעלה, ואז לשונית חשיפה ← "בחר צילום של מסך הבית שלך".</p>
+        </details>
+        <details>
+          <summary>🎂 תאריך לידה</summary>
+          <p>1. אומרים לצופה: "תחשוב על מישהו שאתה אוהב, ותקליד כקוד את תאריך הלידה שלו: יום, חודש ושנה - 6 ספרות. אל תגיד לי של מי." (15 במרץ 1992 = 150392)<br>2. לחיצה ארוכה במסך: מתחת לקוד מופיעים מזל, גיל ויום בשבוע.<br>3. אם כתוב "❌ לא תאריך" - הצופה לא הקליד תאריך: עוברים לחשיפה רגילה של הקוד.<br>4. סדר החשיפה: קודם מי זה לפי הגיל ("מישהו צעיר... הילד שלך?"), אחר כך המזל, ובסוף היום שבו נולד.<br>💡 לעולם לא חושפים את התאריך עצמו - ככה זה קריאת מחשבות ולא "ראית את הקוד".</p>
+        </details>
+        <details style="display: none;">
           <summary>📝 חשיפה בפתקים</summary>
           <p>בלשונית <b>מראה</b> מדליקים "חשיפה בפתקים". אחרי שהטלפון נפתח מופיע פתק שבו כבר כתוב הקוד שהצופה בחר, עם שעה מוקדמת ("לפני שעה" / "אתמול"), כאילו חזית אותו מראש. במקום שבו המספר צריך להופיע כותבים <b>{קוד}</b>.</p>
         </details>
@@ -462,6 +470,8 @@ fit();addEventListener('resize',fit);addEventListener('orientationchange',functi
 
         <div class="oneui-section-header">✨ קסמים מיוחדים</div>
         <div class="config-group oneui-card">
+          <!-- הוסתר בגרסה 7.6 (לא נמחק): תחליף לי את הסיסמה + הטלפון מזהה את הצופה -->
+          <div class="retired-feature" style="display: none;">
           <!-- "תחליף לי את הסיסמה": הגדרות סמסונג מזויפות, הצופה קובע PIN חדש -->
           <div class="clean-toggle-row oneui-row-with-sub">
             <div class="toggle-text-stack">
@@ -509,7 +519,7 @@ fit();addEventListener('resize',fit);addEventListener('orientationchange',functi
             <div class="toggle-sub-desc" id="faceTrickCamNote" style="margin-top: 6px; font-weight: 600;"></div>
           </div>
 
-          <div class="oneui-card-divider"></div>
+          </div>
 
           <!-- תאריך לידה: הצופה מקליד כקוד תאריך לידה של מישהו קרוב - הקוסם יודע מזל, גיל ועוד -->
           <div class="clean-toggle-row oneui-row-with-sub">
@@ -537,7 +547,7 @@ fit();addEventListener('resize',fit);addEventListener('orientationchange',functi
             </div>
             <div class="toggle-sub-desc" style="margin-top: 8px; line-height: 1.6;">
               איפה רואים: לחיצה ארוכה על המסך (מתחת לקוד), לשונית "הצצה" (פירוט מלא) ושעון חכם.
-              קוד שאינו תאריך אמיתי - פשוט לא מציג כלום נוסף.
+              אם הצופה הקליד משהו שאינו תאריך - יופיע "❌ לא תאריך", ואז חושפים את הקוד כרגיל. הסבר מלא ומה אומרים לצופה: כפתור ה-?
             </div>
           </div>
         </div>
@@ -556,8 +566,15 @@ fit();addEventListener('resize',fit);addEventListener('orientationchange',functi
         </section>
 
         <section class="settings-panel" data-tab="reveal">
-        <div class="oneui-section-header">📲 מה נפתח אחרי הפתיחה</div>
+        <div class="oneui-section-header">🏠 אחרי הפתיחה</div>
         <div class="config-group oneui-card">
+          <div class="oneui-field-block">
+            <span class="toggle-main-title">הטלפון נפתח למסך הבית האמיתי</span>
+            <span class="toggle-sub-desc" id="homeTargetNote">באנדרואיד הטלפון יוצא באמת למסך הבית שלך.</span>
+            <div class="home-shot-warn" id="homeShotWarn" style="display: none;">⚠️ באייפון חובה: צלם את מסך הבית שלך (צד + עוצמה למעלה) ובחר אותו כאן. בלי זה הצופה יראה מסך ריק.</div>
+          </div>
+          <!-- הוסתר בגרסה 7.6 (לא נמחק): יעדים חלופיים אחרי הפתיחה - פתקים / גלריה / חיפוש / תחזית בפתקים -->
+          <div class="retired-feature" style="display: none;">
           <div class="oneui-field-block">
             <label class="config-label">מה הצופה רואה כשהטלפון נפתח</label>
             <div class="segmented-row" id="unlockTargetSelector">
@@ -600,10 +617,10 @@ fit();addEventListener('resize',fit);addEventListener('orientationchange',functi
               <button type="button" class="seg-pill" data-age="yesterday">אתמול</button>
             </div>
           </div>
-          <div class="oneui-card-divider"></div>
+          </div>
           <div class="media-actions-row">
             <label class="media-upload-btn">
-              <span>צילום מסך בית אישי</span>
+              <span>📷 בחר צילום של מסך הבית שלך</span>
               <input type="file" id="homescreenFileInput" accept="image/*" hidden>
             </label>
             <button type="button" class="media-clear-btn" id="clearHomescreenBtn" style="display: none;">איפוס מסך בית</button>

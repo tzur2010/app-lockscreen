@@ -4199,3 +4199,34 @@ html[dir="rtl"] .device-config-sheet .oneui-section-header::after { background: 
 @media (prefers-reduced-motion: reduce) {
   .device-config-sheet::before, .device-config-sheet::after, .device-config-sheet .launch-lockscreen-btn::after, .device-config-sheet .settings-panel.active > * { animation: none !important; }
 }
+
+/* ==========================================================================
+   7.6 - גרסה לקוסמים: רק מה שעובד
+   ========================================================================== */
+/* אייפון: מסך הבית = צילום מסך הבית של הקוסם, מיושר למעלה בדיוק כמו המסך האמיתי */
+html.real-ios .fake-homescreen.has-custom-image { background-position: top center; background-size: cover; background-repeat: no-repeat; }
+.home-status-mask { display: none; }
+/* השעה/הסוללה שבתוך הצילום "נמרחות" לצבע הטפט - ומעליהן מופיעה שורת הסטטוס האמיתית והחיה של האייפון */
+html.real-ios .fake-homescreen.has-custom-image .home-status-mask {
+  display: block;
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: max(env(safe-area-inset-top, 0px), 47px);
+  overflow: hidden;
+  z-index: 3;
+  pointer-events: none;
+}
+html.real-ios .fake-homescreen.has-custom-image .home-status-mask { background-size: 100% 100%; background-repeat: no-repeat; -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 84%, transparent 100%); mask-image: linear-gradient(180deg, #000 0%, #000 84%, transparent 100%); }
+.home-shot-warn { margin-top: 6px; padding: 10px 12px; border-radius: 14px; background: rgba(239, 68, 68, .14); border: 1px solid rgba(239, 68, 68, .45); color: #fca5a5; font-size: 13px; font-weight: 700; line-height: 1.5; }
+.device-config-sheet.light-mode .home-shot-warn { color: #b91c1c; }
+
+/* אייפון: מסתירים מה שאפל לא מאפשרת (רטט מאתר, שעון חכם, ווידג'ט) - שהקוסם לא ינסה ויחשוב שזה תקול */
+html.real-ios .clean-toggle-row:has(#toggleHapticPeek),
+html.real-ios .clean-toggle-row:has(#toggleWatchPeek),
+html.real-ios #watchPeekExtra,
+html.real-ios #watchPeekExtra + .oneui-card-divider,
+html.real-ios .config-group:has(#pinQuickWidgetBtn),
+html.real-ios .oneui-section-header:has(+ .config-group #pinQuickWidgetBtn) { display: none !important; }
+
+/* 🎂 "לא תאריך" בהצצה */
+.peek-birthday.not-date { color: #fca5a5; }

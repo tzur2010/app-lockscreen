@@ -566,14 +566,25 @@ let config = loadConfig();
 // התקנה ראשונה בטלפון שאינו בעברית: i18n.js כבר בחר אנגלית - שומרים את זה גם בהגדרות
 if (window.MagicI18n && window.MagicI18n.isEn && config.uiLang !== 'en') config.uiLang = 'en';
 
+// 7.6: פיצ'רים שהוסתרו מהגרסה לקוסמים (הקוד נשאר) - תמיד כבויים, גם אם נשמרו דולקים ברוטינה/גיבוי ישן.
+// אחרי הפתיחה: רק מסך הבית האמיתי.
+function enforceRetiredFeatures(cfg) {
+  if (!cfg) return cfg;
+  cfg.settingsTrick = false;
+  cfg.faceTrick = false;
+  cfg.notesReveal = false;
+  cfg.unlockTargetScreen = 'homescreen';
+  return cfg;
+}
+
 function loadConfig() {
   try {
     const raw = localStorage.getItem(CONFIG_STORAGE_KEY);
-    if (!raw) return { ...DEFAULT_CONFIG };
+    if (!raw) return enforceRetiredFeatures({ ...DEFAULT_CONFIG });
     const parsed = JSON.parse(raw);
-    return { ...DEFAULT_CONFIG, ...parsed };
+    return enforceRetiredFeatures({ ...DEFAULT_CONFIG, ...parsed });
   } catch (e) {
-    return { ...DEFAULT_CONFIG };
+    return enforceRetiredFeatures({ ...DEFAULT_CONFIG });
   }
 }
 
@@ -585,6 +596,7 @@ function getUnlockOnAttempt() {
 }
 
 function saveConfig() {
+  enforceRetiredFeatures(config);
   try {
     localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(config));
   } catch (e) {
@@ -2230,21 +2242,28 @@ function birthdayDetailLines(info) {
 }
 
 function refreshBirthdayPeek(value) {
-  const info = config.birthdayTrick && config.unlockMode !== 'pattern' ? decodeBirthday(value != null ? value : localStorage.getItem(LAST_PIN_KEY)) : null;
+  const active = config.birthdayTrick && config.unlockMode !== 'pattern';
+  const code = String(value != null ? value : localStorage.getItem(LAST_PIN_KEY) || '').trim();
+  const info = active ? decodeBirthday(code) : null;
+  // הוקלד קוד שאינו תאריך אמיתי: אומרים את זה במפורש - כדי שהקוסם לא יחשוף מזל/גיל בטעות
+  const notDate = active && !info && /\d/.test(code);
+  const isEn = Boolean(window.MagicI18n && window.MagicI18n.isEn);
   const peekLine = document.getElementById('peekBirthday');
   if (peekLine) {
-    peekLine.textContent = birthdaySummary(info);
-    peekLine.style.display = info ? 'block' : 'none';
+    peekLine.textContent = info ? birthdaySummary(info) : notDate ? (isEn ? '❌ Not a date - reveal the code normally' : '❌ לא תאריך - חשיפה רגילה של הקוד') : '';
+    peekLine.classList.toggle('not-date', notDate);
+    peekLine.style.display = info || notDate ? 'block' : 'none';
   }
   const box = document.getElementById('settingsBirthdayInfo');
   if (box) {
     box.textContent = '';
-    birthdayDetailLines(info).forEach((t) => {
+    const lines = info ? birthdayDetailLines(info) : notDate ? [isEn ? '❌ This code is not a real date - reveal the code itself, not a star sign.' : '❌ הקוד הזה הוא לא תאריך אמיתי - חושפים את הקוד עצמו, לא מזל.'] : [];
+    lines.forEach((t) => {
       const row = document.createElement('div');
       row.textContent = t;
       box.appendChild(row);
     });
-    box.style.display = info ? 'block' : 'none';
+    box.style.display = lines.length ? 'block' : 'none';
   }
 }
 
@@ -3769,14 +3788,57 @@ function loadCustomMedia() {
   applyWallpaperToContainer();
 
   const savedHome = localStorage.getItem(HOMESCREEN_STORAGE_KEY);
+  // באייפון: פס מטושטש מעל השעה שבתוך הצילום - השעה והסוללה האמיתיות של המערכת מופיעות במקומן
+  let statusMask = fakeHomescreen.querySelector('.home-status-mask');
+  if (!statusMask) {
+    statusMask = document.createElement('div');
+    statusMask.className = 'home-status-mask';
+    fakeHomescreen.appendChild(statusMask);
+  }
   if (savedHome) {
     fakeHomescreen.style.backgroundImage = `url("${savedHome}")`;
+    fakeHomescreen.style.setProperty('--home-img', `url("${savedHome}")`);
+    // השורה העליונה של הצילום (מעל השעה) = טפט נקי. מותחים אותה על כל שורת הסטטוס -
+    // כך לא נשאר שום זכר לשעה הישנה שבצילום, והשעה האמיתית של האייפון מופיעה מעליה
+    const stripImg = new Image();
+    stripImg.onload = () => {
+      try {
+        const cv = document.createElement('canvas');
+        cv.width = Math.max(1, Math.min(stripImg.width, 400));
+        cv.height = 1;
+        cv.getContext('2d').drawImage(stripImg, 0, 2, stripImg.width, 1, 0, 0, cv.width, 1);
+        statusMask.style.backgroundImage = `url("${cv.toDataURL('image/png')}")`;
+      } catch (e) {}
+    };
+    stripImg.src = savedHome;
     fakeHomescreen.classList.add('has-custom-home', 'has-custom-image');
     if (clearHomescreenBtn) clearHomescreenBtn.style.display = 'inline-flex';
   } else {
     fakeHomescreen.style.backgroundImage = '';
+    fakeHomescreen.style.removeProperty('--home-img');
     fakeHomescreen.classList.remove('has-custom-home', 'has-custom-image');
     if (clearHomescreenBtn) clearHomescreenBtn.style.display = 'none';
+  }
+  syncHomeTargetNote();
+}
+
+// הסבר "אחרי הפתיחה" לפי הטלפון: באנדרואיד יציאה אמיתית, באייפון צילום מסך הבית (חובה)
+function syncHomeTargetNote() {
+  const note = document.getElementById('homeTargetNote');
+  const warn = document.getElementById('homeShotWarn');
+  const realIos = document.documentElement.classList.contains('real-ios');
+  const isEn = Boolean(window.MagicI18n && window.MagicI18n.isEn);
+  const hasHome = Boolean(localStorage.getItem(HOMESCREEN_STORAGE_KEY));
+  if (note) {
+    note.textContent = realIos
+      ? (isEn
+        ? 'On iPhone, Apple doesn\'t let any app exit to the home screen by itself - so a screenshot of YOUR home screen is shown, with the real time and battery on top.'
+        : 'באייפון אפל לא מאפשרת לאף אפליקציה לצאת לבד למסך הבית - לכן מוצג צילום של מסך הבית שלך, עם השעה והסוללה האמיתיות למעלה.')
+      : (isEn ? 'On Android the phone really exits to your real home screen.' : 'באנדרואיד הטלפון יוצא באמת למסך הבית שלך.');
+  }
+  if (warn) {
+    warn.style.display = realIos && !hasHome ? 'block' : 'none';
+    if (isEn) warn.textContent = '⚠️ Required on iPhone: screenshot your home screen (side + volume up) and pick it here. Without it the spectator sees an empty screen.';
   }
 }
 
@@ -4132,7 +4194,7 @@ function initDeviceLicenseGate() {
 // החלון מוצג רק כשמסך ההגדרות פתוח (בפתיחת האפליקציה / בתפריט הסודי),
 // ולעולם לא מעל מסך הנעילה הפעיל מול קהל.
 // ============================================================================
-const APP_VERSION = '7.5';
+const APP_VERSION = '7.6';
 const DEFAULT_APK_URL = 'https://github.com/tzur2010/app-lockscreen/raw/main/Lockscreen.apk';
 const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 const UPDATE_DISMISS_KEY = 'magic_update_dismissed_version';
@@ -4409,6 +4471,7 @@ function sendCodeToWatch(code, mode) {
   // "תאריך לידה": על השעון מופיעים גם המזל, הגיל והיום שבו נולד
   const bInfo = config.birthdayTrick && m !== 'PATTERN' ? decodeBirthday(code) : null;
   if (bInfo) label = birthdaySummary(bInfo);
+  else if (config.birthdayTrick && m !== 'PATTERN') label = window.MagicI18n && window.MagicI18n.isEn ? '❌ Not a date' : '❌ לא תאריך';
   try {
     window.AndroidNative.sendWatchPeek(formatCodeForDisplay(code, m), label);
     trackEvent('watch');
@@ -6308,6 +6371,12 @@ async function collectPreShowChecks() {
     const standalone = window.navigator.standalone === true || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
     if (!standalone) add('bad', 'נפתח בתוך Safari', 'יופיע הסרגל של Safari. פתח את Magic Lock מהאייקון במסך הבית.');
     if (config.chameleonClock) add('warn', 'הצצה בשעון לא זמינה באייפון', 'באייפון השעה למעלה היא של המערכת. השתמש בלחיצה ארוכה על המסך להצצה.');
+    // באייפון אי אפשר לצאת למסך הבית האמיתי - מוצג צילום מסך הבית של הקוסם. בלי צילום = מסך ריק (פדיחה)
+    if (!localStorage.getItem(HOMESCREEN_STORAGE_KEY)) {
+      add('bad', 'אין צילום של מסך הבית שלך', 'באייפון, אחרי הפתיחה הצופה רואה צילום של מסך הבית שלך. בלי צילום הוא יראה מסך ריק. במסך הבית: צד + עוצמה למעלה, ואז לשונית חשיפה ← "בחר צילום של מסך הבית שלך".');
+    } else {
+      add('ok', 'מסך הבית שלך מוכן', 'אחרי הפתיחה יופיע מסך הבית שלך, עם השעה והסוללה האמיתיות.');
+    }
   }
 
   // 9. סוללה
@@ -6495,8 +6564,8 @@ const TRICK_TIPS = {
     en: ['🤳 The phone knows the spectator', '1. Tap the screen / swipe up = "face scan". The first times (as many as you chose) it fails - "Face not recognized".\n2. Hand it to the spectator and tap again while they look: it unlocks instantly.\n3. At that moment the front camera takes their photo - and it becomes the home screen wallpaper.\nTip: hold the phone at their eye level, like taking a selfie.', '"My phone doesn\'t recognize me today... wait, you try? ...how does it know you?! And look at my wallpaper..."']
   },
   toggleBirthdayTrick: {
-    he: ['🎂 תאריך לידה', '1. מבקשים: "תחשוב על מישהו שאתה אוהב ותקליד כקוד את תאריך הלידה שלו. אל תגיד לי של מי."\n2. הוא מקליד (למשל 150392 = 15 במרץ 1992).\n3. בלחיצה ארוכה על המסך (או בשעון החכם) מופיעים בסתר: מזל, גיל ובאיזה יום בשבוע נולד. בלשונית "הצצה" יש גם כמה ימים חי ועוד כמה ימים יום ההולדת.\n4. לפי הגיל מבינים מי זה: גיל קרוב לצופה = הוא עצמו, צעיר בהרבה = ילד, מבוגר בהרבה = הורה.\nטיפ: אל תחשוף את התאריך עצמו - חשוף את המזל ואת הקשר. ככה זה נראה כמו קריאת מחשבות ולא כמו "ראית את הקוד".', '"אני מרגיש שזה מישהו צעיר... הילד שלך? והוא מזל דגים... ונולד ביום ראשון, נכון?"'],
-    en: ['🎂 Birthday', '1. Ask: "Think of someone you love and type their birthday as the code. Don\'t tell me who."\n2. They type it (e.g. 150392 = March 15, 1992).\n3. Long-press the screen (or check your watch) to secretly see: star sign, age and the weekday they were born. The Peek tab also shows days lived and days until the next birthday.\n4. The age tells you who it is: close to the spectator = themselves, much younger = a child, much older = a parent.\nTip: never reveal the date itself - reveal the sign and the relationship. It looks like mind reading, not "you saw the code".', '"I feel it\'s someone young... your child? A Pisces... born on a Sunday, right?"']
+    he: ['🎂 תאריך לידה', 'הכנה: מדליקים, בוחרים "6 ספרות" ו"יום ואז חודש". נעילה: קוד PIN.\n\n1. מה אומרים לצופה (מילה במילה):\n"תחשוב על מישהו שאתה אוהב. תקליד כקוד את תאריך הלידה שלו - יום, חודש ושנה, 6 ספרות. למשל 15 במרץ 1992 זה 150392. אל תגיד לי של מי."\n\n2. לחיצה ארוכה במסך (או השעון החכם): מתחת לקוד מופיעים מזל, גיל ויום בשבוע. בלשונית "הצצה" יש גם כמה ימים חי ועוד כמה ימים יום ההולדת.\n\n3. אם כתוב "❌ לא תאריך" - הצופה לא הקליד תאריך. לא חושפים מזל! עוברים לחשיפה רגילה של הקוד.\n\n4. סדר החשיפה:\n• קודם מי זה, לפי הגיל: קרוב לגיל הצופה = הוא עצמו, צעיר בהרבה = ילד, מבוגר בהרבה = הורה.\n• אחר כך המזל.\n• בסוף היום בשבוע שבו נולד - זה הרגע ש"אי אפשר לדעת".\n\n💡 לעולם לא אומרים את התאריך עצמו - ככה זה קריאת מחשבות ולא "ראית את הקוד".', '"אני מרגיש שזה מישהו צעיר... הילד שלך? הוא מזל דגים... ונולד ביום ראשון, נכון?"'],
+    en: ['🎂 Birthday', 'Setup: turn it on, pick "6 digits" and "Day then month". Lock type: PIN.\n\n1. What to tell the spectator (word for word):\n"Think of someone you love. Type their birthday as the code - day, month and year, 6 digits. For example March 15, 1992 is 150392. Don\'t tell me who it is."\n\n2. Long-press the screen (or check your watch): under the code you see star sign, age and weekday. The Peek tab also shows days lived and days until the next birthday.\n\n3. If it says "❌ Not a date" - they didn\'t type a date. Don\'t reveal a sign! Reveal the code normally.\n\n4. Reveal order:\n• First who it is, by age: close to the spectator\'s age = themselves, much younger = a child, much older = a parent.\n• Then the star sign.\n• Last, the weekday they were born - the "impossible" moment.\n\n💡 Never say the date itself - that way it\'s mind reading, not "you saw the code".', '"I feel it\'s someone young... your child? A Pisces... born on a Sunday, right?"']
   },
   toggleCallReveal: {
     he: ['📞 חשיפה בשיחה נכנסת', 'אחרי הפתיחה הטלפון מצלצל, ושם המתקשר הוא הקוד. אפשר גם להפעיל מהשלט בטלפון השני.', '"מישהו מתקשר אליי... תגיד לי מי זה?"'],
@@ -6658,23 +6727,20 @@ function initTour() {
 const WHATS_NEW_SEEN_KEY = 'magic_whats_new_seen_v1';
 const WHATS_NEW_MAX_ITEMS = 6;
 const WHATS_NEW = [
+  { ver: '7.6', icon: '🏠', target: '#homeTargetNote', he: ['רק מה שעובד - ומסך הבית האמיתי', 'אחרי הפתיחה הטלפון יוצא למסך הבית האמיתי. באייפון (שם אפל לא מאפשרת לצאת) מופיע צילום מסך הבית שלך עם השעה והסוללה האמיתיות. ו"תאריך לידה" מקבל הסבר מלא + "❌ לא תאריך".'], en: ['Only what works - and the real home screen', 'After unlocking the phone exits to the real home screen. On iPhone (where Apple doesn\'t allow exiting) a screenshot of your home screen appears with the real time and battery. And "Birthday" gets a full how-to + "❌ Not a date".'] },
   { ver: '7.5', icon: '🌌', target: null, he: ['עיצוב חדש: Aurora', 'הגדרות בעיצוב חדש לגמרי: זוהר צפוני ברקע, כרטיסי זכוכית זוהרים וכפתורים בגרדיאנט. יש גם גרסה בהירה (כפתור השמש למעלה).'], en: ['New design: Aurora', 'A brand-new settings design: northern lights in the background, glowing glass cards and gradient controls. There\'s a light version too (the sun button at the top).'] },
   { ver: '7.4', icon: '🗂️', target: '#settingsTabs', he: ['הגדרות מסודרות מחדש', 'כל דבר במקום שלו: 🎯 טריק · 🎬 חשיפה · 👁️ הצצה · 📱 מראה · ⚙️ עוד. ו"מוכן לצופה הבא" + "בדיקה לפני הופעה" תמיד למעלה.'], en: ['Reorganized settings', 'Everything in its place: 🎯 Trick · 🎬 Reveal · 👁️ Peek · 📱 Look · ⚙️ More. And "Ready for next spectator" + "Pre-show check" are always at the top.'] },
   { ver: '7.3', icon: '🎂', target: '#toggleBirthdayTrick', he: ['תאריך לידה', 'הצופה מקליד כקוד תאריך לידה של מישהו שהוא אוהב - ואתה יודע בסתר את המזל, הגיל, באיזה יום נולד ומי זה כנראה (ילד? הורה?).'], en: ['Birthday', 'The spectator types a loved one\'s birthday as the code - and you secretly know the star sign, age, the weekday they were born and who it probably is (child? parent?).'] },
   { ver: '7.1', icon: '🛡️', target: '#preShowCheckBtn', he: ['אמינות להופעות גדולות', 'רטט בכיס רק אחרי שהטלפון חוזר אליך, התראה אם "פתיחה בכל קוד" כבתה בטעות, ובדיקה לפני הופעה חכמה יותר.'], en: ['Rock-solid for big shows', 'Pocket buzz only after the phone is back with you, an alert if "unlock with any code" was turned off by mistake, and a smarter pre-show check.'] },
   { ver: '7.0', icon: '📱', target: '#carrierTextInput', he: ['מסך הנעילה שלך - אחד לאחד', 'מסך נעילה חדש של סמסונג (One UI 8): שעון ענק, שם הספק למעלה, טקסט פרטי קשר ושורת סטטוס בעברית. בחר את הטפט שלך מהגלריה - ואי אפשר להבדיל.'], en: ['Your lock screen - one to one', 'New Samsung lock screen (One UI 8): huge clock, carrier name, contact info text. Pick your own wallpaper from the gallery - impossible to tell apart.'] },
-  { ver: '6.8', icon: '⚙️', target: '#toggleSettingsTrick', he: ['תחליף לי את הסיסמה', 'נפתחות "ההגדרות" של סמסונג, והצופה קובע לך סיסמה חדשה. הקוד מגיע אליך בסתר - ורק הוא פותח את הטלפון.'], en: ['Change my passcode', 'Samsung "Settings" opens and the spectator sets you a new passcode. The code reaches you secretly - and only it unlocks the phone.'] },
-  { ver: '6.7', icon: '🤳', target: '#toggleFaceTrick', he: ['הטלפון מזהה את הצופה', 'הטלפון לא נפתח לפנים שלך - אבל נפתח מיד לצופה. ובמסך הבית מחכה לו הפתעה: התמונה שלו כטפט.'], en: ['The phone knows the spectator', 'Your phone won\'t unlock for your face - but unlocks instantly for the spectator. And on the home screen: their photo as the wallpaper.'] },
   { ver: '6.5', icon: '📱', target: '#backToSplitBtn', he: ['Google Pixel ו-Xiaomi', 'מעכשיו יש גם מסך נעילה של פיקסל ושל שיאומי/רדמי - "החלף מכשיר" ובוחרים את הטלפון שלך.'], en: ['Google Pixel & Xiaomi', 'Now with Pixel and Xiaomi/Redmi lock screens too - "Switch device" and pick your phone.'] },
   { ver: '6.1', icon: '📋', target: '#openWhatsNewBtn', he: ['החידושים תמיד זמינים', 'פספסת משהו? בלשונית "עוד" יש כפתור "מה חדש" שמראה את כל החידושים האחרונים.'], en: ['What\'s new, any time', 'Missed something? The More tab has a "What\'s new" button with all the latest features.'] },
   { ver: '5.9', icon: '🎉', target: null, he: ['מסך "מה חדש"', 'מעכשיו אחרי כל עדכון תראה בדיוק מה התחדש - עם כפתור שלוקח אותך ישר לנסות.'], en: ['"What\'s new" screen', 'After every update you\'ll see exactly what\'s new - with a button that takes you straight to it.'] },
-  { ver: '5.8', icon: '✨', target: '#unlockTargetSelector', he: ['אנימציית פתיחה אמיתית', 'כשהטלפון נפתח, מסך הנעילה מתקרב ונעלם (סמסונג) או מחליק למעלה (אייפון) - בדיוק כמו בטלפון אמיתי.'], en: ['Real unlock animation', 'When the phone unlocks, the lock screen zooms away (Samsung) or slides up (iPhone) - just like a real phone.'] },
-  { ver: '5.6', icon: '🔍', target: '#unlockTargetSelector', he: ['חשיפה בחיפוש', 'אחרי הפתיחה נפתח מסך חיפוש, והחיפוש האחרון "מאתמול" הוא הקוד של הצופה.'], en: ['Search reveal', 'After unlocking, a search screen opens and the last search "from yesterday" is the spectator\'s code.'] },
+  { ver: '5.8', icon: '✨', target: null, he: ['אנימציית פתיחה אמיתית', 'כשהטלפון נפתח, מסך הנעילה מתקרב ונעלם (סמסונג) או מחליק למעלה (אייפון) - בדיוק כמו בטלפון אמיתי.'], en: ['Real unlock animation', 'When the phone unlocks, the lock screen zooms away (Samsung) or slides up (iPhone) - just like a real phone.'] },
   { ver: '5.6', icon: '❓', target: '#toggleForceUnlockMode', he: ['הסבר ליד כל קסם', 'כפתור ? ליד כל קסם: איך עושים אותו, ומה אומרים לקהל.'], en: ['Help next to every trick', 'A ? button next to every trick: how to do it and what to say.'] },
   { ver: '5.5', icon: '✅', target: '#preShowCheckBtn', he: ['בדיקה לפני הופעה', 'לחיצה אחת בודקת אינטרנט, התראות, סוללה, טלפון שני ועוד - עם כפתור תיקון.'], en: ['Pre-show check', 'One tap checks internet, notifications, battery, second phone and more - with a fix button.'] },
   { ver: '5.4', icon: '📞', target: '#toggleCallReveal', he: ['חשיפה בשיחה נכנסת', 'אחרי הפתיחה הטלפון מצלצל, ושם המתקשר הוא הקוד שהצופה בחר.'], en: ['Incoming call reveal', 'After unlocking the phone rings, and the caller name is the spectator\'s code.'] },
   { ver: '5.4', icon: '🎛️', target: '#toggleRemotePeek', he: ['שלט רחוק מהטלפון השני', 'מהטלפון השני אפשר להדליק/לכבות "פתיחה בכל קוד", לבחור ניסיון ולהפעיל חשיפה - בלי לגעת בטלפון של הצופה.'], en: ['Remote control from a second phone', 'From the second phone: turn "any code" on/off, pick the attempt and trigger a reveal - without touching the spectator\'s phone.'] },
-  { ver: '5.4', icon: '🖼️', target: '#unlockTargetSelector', he: ['חשיפה בגלריה', 'התמונה האחרונה בגלריה היא פתק בכתב יד עם הקוד של הצופה.'], en: ['Gallery reveal', 'The latest photo in the gallery is a handwritten note with the spectator\'s code.'] },
   { ver: '5.4', icon: '🎯', target: '#togglePracticeMode', he: ['מצב תרגול', 'מתרגלים את כל ההצצות בלי שזה נשמר בהיסטוריה.'], en: ['Practice mode', 'Practice all the peeks without saving to history.'] },
   { ver: '5.2', icon: '📲', target: '#toggleRemotePeek', he: ['הצצה מטלפון שני', 'הקוד שהצופה מקליד מופיע מיד בגדול בטלפון אחר.'], en: ['Second-phone peek', 'The code the spectator types appears instantly, big, on another phone.'] },
   { ver: '5.2', icon: '🌐', target: '#uiLangSelector', he: ['אנגלית', 'אפשר להעביר את כל האפליקציה לאנגלית (לשונית עוד).'], en: ['English', 'Switch the whole app to English (More tab).'] }

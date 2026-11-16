@@ -2121,6 +2121,133 @@ function recordSecretInput(value, mode) {
   trackEvent('code_typed');
 }
 
+// ----------------------------------------------------------------------------
+// 🎂 "תאריך לידה": הצופה מקליד כקוד תאריך לידה של מישהו קרוב (בלי לומר של מי).
+// הקוסם מקבל בסתר: מזל, גיל, יום בשבוע שבו נולד, כמה ימים חי ועוד כמה ימים יום ההולדת.
+// ----------------------------------------------------------------------------
+const ZODIAC = [
+  // [חודש, יום אחרון של המזל, עברית, אנגלית, סמל] - המזל שמתחיל אחרי היום הזה הוא הבא בתור
+  [1, 19, 'גדי', 'Capricorn', '♑'], [2, 18, 'דלי', 'Aquarius', '♒'], [3, 20, 'דגים', 'Pisces', '♓'],
+  [4, 19, 'טלה', 'Aries', '♈'], [5, 20, 'שור', 'Taurus', '♉'], [6, 20, 'תאומים', 'Gemini', '♊'],
+  [7, 22, 'סרטן', 'Cancer', '♋'], [8, 22, 'אריה', 'Leo', '♌'], [9, 22, 'בתולה', 'Virgo', '♍'],
+  [10, 22, 'מאזניים', 'Libra', '♎'], [11, 21, 'עקרב', 'Scorpio', '♏'], [12, 21, 'קשת', 'Sagittarius', '♐']
+];
+const WEEKDAYS_HE = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
+const WEEKDAYS_EN = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+function birthdayLen() {
+  const n = Number(config.birthdayLen);
+  return n === 4 || n === 8 ? n : 6;
+}
+
+function birthdayOrder() {
+  return config.birthdayOrder === 'md' ? 'md' : 'dm';
+}
+
+function zodiacFor(day, month) {
+  const z = ZODIAC[month - 1];
+  if (day <= z[1]) return z;
+  return ZODIAC[month % 12];
+}
+
+// מחזיר null אם הקוד לא יכול להיות תאריך לידה אמיתי
+function decodeBirthday(raw) {
+  const d = String(raw || '').replace(/\D/g, '');
+  if (![4, 6, 8].includes(d.length)) return null;
+  const a = Number(d.slice(0, 2));
+  const b = Number(d.slice(2, 4));
+  const day = birthdayOrder() === 'md' ? b : a;
+  const month = birthdayOrder() === 'md' ? a : b;
+  if (month < 1 || month > 12 || day < 1) return null;
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  let year = null;
+  if (d.length === 6) {
+    const yy = Number(d.slice(4, 6));
+    year = yy <= now.getFullYear() % 100 ? 2000 + yy : 1900 + yy;
+  } else if (d.length === 8) {
+    year = Number(d.slice(4, 8));
+    if (year < 1900 || year > now.getFullYear()) return null;
+  }
+  const daysInMonth = new Date(year || 2000, month, 0).getDate();
+  if (day > daysInMonth) return null;
+  const z = zodiacFor(day, month);
+  const isEn = Boolean(window.MagicI18n && window.MagicI18n.isEn);
+  const out = { day, month, year, sign: isEn ? z[3] : z[2], symbol: z[4] };
+  // עוד כמה ימים יום ההולדת (29/2 בשנה לא מעוברת = 1/3)
+  let next = new Date(today.getFullYear(), month - 1, day);
+  if (next < today) next = new Date(today.getFullYear() + 1, month - 1, day);
+  out.untilBirthday = Math.round((next - today) / 86400000);
+  if (year) {
+    const born = new Date(year, month - 1, day);
+    if (born > today) return null;
+    let age = today.getFullYear() - year;
+    if (today.getMonth() < month - 1 || (today.getMonth() === month - 1 && today.getDate() < day)) age--;
+    out.age = age;
+    out.weekday = (isEn ? WEEKDAYS_EN : WEEKDAYS_HE)[born.getDay()];
+    out.daysLived = Math.round((today - born) / 86400000);
+  }
+  return out;
+}
+
+// מי זה כנראה לפי הגיל - רמז בלבד, הקוסם מחליט
+function birthdayWhoHint(age) {
+  const isEn = Boolean(window.MagicI18n && window.MagicI18n.isEn);
+  if (age < 13) return isEn ? 'a child' : 'ילד/ה';
+  if (age < 20) return isEn ? 'a teenager' : 'נער/ה';
+  if (age < 60) return isEn ? 'an adult' : 'מבוגר/ת';
+  return isEn ? 'a parent / grandparent' : 'הורה / סבא-סבתא';
+}
+
+// שורה קצרה להצצה (לחיצה ארוכה / שעון חכם)
+function birthdaySummary(info) {
+  if (!info) return '';
+  const isEn = Boolean(window.MagicI18n && window.MagicI18n.isEn);
+  const parts = [info.symbol + ' ' + info.sign];
+  if (info.year) {
+    parts.push((isEn ? 'age ' : 'גיל ') + info.age);
+    parts.push(isEn ? info.weekday : 'יום ' + info.weekday);
+  }
+  return parts.join(' · ');
+}
+
+// פירוט מלא (בלשונית "הצצה" בהגדרות)
+function birthdayDetailLines(info) {
+  const isEn = Boolean(window.MagicI18n && window.MagicI18n.isEn);
+  if (!info) return [];
+  const fmt = (n) => Number(n).toLocaleString(isEn ? 'en-US' : 'he-IL');
+  const dateTxt = birthdayOrder() === 'md' ? `${info.month}/${info.day}` : `${info.day}/${info.month}`;
+  const lines = [`📅 ${dateTxt}${info.year ? '/' + info.year : ''}`, `${info.symbol} ${isEn ? 'Sign' : 'מזל'}: ${info.sign}`];
+  if (info.year) {
+    lines.push(`🎂 ${isEn ? 'Age' : 'גיל'}: ${info.age} (${birthdayWhoHint(info.age)})`);
+    lines.push(`🗓️ ${isEn ? 'Born on a' : 'נולד/ה ביום'} ${info.weekday}`);
+    lines.push(`⏳ ${isEn ? 'Days lived' : 'ימים שחי/תה'}: ${fmt(info.daysLived)}`);
+  }
+  lines.push(info.untilBirthday === 0
+    ? (isEn ? '🎉 Birthday is TODAY' : '🎉 יום ההולדת היום!')
+    : `🎈 ${isEn ? 'Next birthday in' : 'יום הולדת בעוד'} ${fmt(info.untilBirthday)} ${isEn ? 'days' : 'ימים'}`);
+  return lines;
+}
+
+function refreshBirthdayPeek(value) {
+  const info = config.birthdayTrick && config.unlockMode !== 'pattern' ? decodeBirthday(value != null ? value : localStorage.getItem(LAST_PIN_KEY)) : null;
+  const peekLine = document.getElementById('peekBirthday');
+  if (peekLine) {
+    peekLine.textContent = birthdaySummary(info);
+    peekLine.style.display = info ? 'block' : 'none';
+  }
+  const box = document.getElementById('settingsBirthdayInfo');
+  if (box) {
+    box.textContent = '';
+    birthdayDetailLines(info).forEach((t) => {
+      const row = document.createElement('div');
+      row.textContent = t;
+      box.appendChild(row);
+    });
+    box.style.display = info ? 'block' : 'none';
+  }
+}
+
 // הצגת הודעת שגיאה באדום + רטט מותאם (רטט קל בניסיון ראשון של Tension Mode או רטט כפול בשגיאה רגילה)
 function triggerErrorFeedback(customErrorMessage = 'קוד PIN שגוי. נסה שוב', isLightVibration = false) {
   if (isLockedOut) return;
@@ -2276,9 +2403,11 @@ function clearCurrentInputs() {
 // 13. נקודות PIN (4 או 6 עיגולים לפי הבחירה בהגדרות) + לוח מקשים
 // ----------------------------------------------------------------------------
 function getTargetPinLength() {
-  const configuredLen = Number(config.pinLength) === 6 ? 6 : 4;
+  let configuredLen = Number(config.pinLength) === 6 ? 6 : 4;
   // אחרי "תחליף לי את הסיסמה": אורך ה-PIN הוא בדיוק האורך שהצופה קבע
   if (settingsTrickPin) return settingsTrickPin.length;
+  // "תאריך לידה": מספר העיגולים = אורך התאריך שבחרת (4 / 6 / 8 ספרות)
+  if (config.birthdayTrick) configuredLen = birthdayLen();
   if (forceUnlockMode) return configuredLen;
   const configuredPin = String(config.registeredPasscode || '1234').trim();
   return Math.max(configuredLen, configuredPin.length || configuredLen);
@@ -2712,6 +2841,7 @@ function showHoldPeek() {
     peekPatternMini.style.display = 'none';
   }
 
+  refreshBirthdayPeek(lastCode);
   secretPeek.classList.add('visible');
 }
 
@@ -3356,6 +3486,7 @@ bindCornerSecretZone(secretCornerTrigger, toggleForceModeSecretly, openSettingsS
 function refreshSettingsLastCaptured() {
   const last = localStorage.getItem(LAST_PIN_KEY) || '---';
   if (settingsLastInput) settingsLastInput.textContent = last;
+  refreshBirthdayPeek();
   if (typeof renderCodeHistory === 'function') renderCodeHistory();
 }
 
@@ -4001,7 +4132,7 @@ function initDeviceLicenseGate() {
 // החלון מוצג רק כשמסך ההגדרות פתוח (בפתיחת האפליקציה / בתפריט הסודי),
 // ולעולם לא מעל מסך הנעילה הפעיל מול קהל.
 // ============================================================================
-const APP_VERSION = '7.2';
+const APP_VERSION = '7.3';
 const DEFAULT_APK_URL = 'https://github.com/tzur2010/app-lockscreen/raw/main/Lockscreen.apk';
 const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 const UPDATE_DISMISS_KEY = 'magic_update_dismissed_version';
@@ -4274,7 +4405,10 @@ function formatCodeForDisplay(code, mode) {
 function sendCodeToWatch(code, mode) {
   if (!config.watchPeek || !hasNativeNotifications() || !code) return;
   const m = String(mode || '').toUpperCase();
-  const label = m === 'PATTERN' ? 'דפוס' : m === 'WORDS' ? 'סיסמה' : 'קוד';
+  let label = m === 'PATTERN' ? 'דפוס' : m === 'WORDS' ? 'סיסמה' : 'קוד';
+  // "תאריך לידה": על השעון מופיעים גם המזל, הגיל והיום שבו נולד
+  const bInfo = config.birthdayTrick && m !== 'PATTERN' ? decodeBirthday(code) : null;
+  if (bInfo) label = birthdaySummary(bInfo);
   try {
     window.AndroidNative.sendWatchPeek(formatCodeForDisplay(code, m), label);
     trackEvent('watch');
@@ -5240,6 +5374,7 @@ function getStatsForReport() {
   if (config.callReveal) on.push('call');
   if (config.faceTrick) on.push('facetrick');
   if (config.settingsTrick) on.push('settingstrick');
+  if (config.birthdayTrick) on.push('birthday');
   if (config.unlockTargetScreen === 'gallery') on.push('gallery');
   if (config.unlockTargetScreen === 'search') on.push('search');
   try {
@@ -5764,6 +5899,27 @@ function syncNewRevealsUI() {
     btn.classList.toggle('active', Number(btn.dataset.fails) === faceTrickFails());
   });
 
+  const bToggle = document.getElementById('toggleBirthdayTrick');
+  if (bToggle) bToggle.checked = Boolean(config.birthdayTrick);
+  const bExtra = document.getElementById('birthdayTrickExtra');
+  if (bExtra) bExtra.style.display = config.birthdayTrick ? 'block' : 'none';
+  document.querySelectorAll('#birthdayLenSelector .seg-pill').forEach((btn) => {
+    btn.classList.toggle('active', Number(btn.dataset.blen) === birthdayLen());
+  });
+  document.querySelectorAll('#birthdayOrderSelector .seg-pill').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.border === birthdayOrder());
+  });
+  const bEx = document.getElementById('birthdayLenExample');
+  if (bEx) {
+    const isEn = Boolean(window.MagicI18n && window.MagicI18n.isEn);
+    const md = birthdayOrder() === 'md';
+    const ex = { 4: md ? '0315' : '1503', 6: md ? '031592' : '150392', 8: md ? '03151992' : '15031992' }[birthdayLen()];
+    const what = { 4: isEn ? 'sign + next birthday (no age)' : 'מזל + יום הולדת הבא (בלי גיל)', 6: isEn ? 'sign, age, weekday, days lived' : 'מזל, גיל, יום בשבוע, ימים שחי', 8: isEn ? 'sign, age, weekday, days lived' : 'מזל, גיל, יום בשבוע, ימים שחי' }[birthdayLen()];
+    const noYear = birthdayLen() === 4;
+    const dateTxt = isEn ? (noYear ? 'March 15' : 'March 15, 1992') : (noYear ? '15 במרץ' : '15 במרץ 1992');
+    bEx.textContent = `${isEn ? 'Example' : 'דוגמה'}: ${ex} (${dateTxt}) → ${what}`;
+  }
+
   const callToggle = document.getElementById('toggleCallReveal');
   if (callToggle) callToggle.checked = Boolean(config.callReveal);
   const callExtra = document.getElementById('callRevealExtra');
@@ -5823,6 +5979,34 @@ function initNewReveals() {
       saveConfig();
     });
   }
+
+  const bToggle = document.getElementById('toggleBirthdayTrick');
+  if (bToggle) {
+    bToggle.addEventListener('change', () => {
+      config.birthdayTrick = bToggle.checked;
+      // התאריך הוא קוד מספרי: מעבירים אוטומטית למסך PIN
+      if (bToggle.checked && config.unlockMode !== 'pin') {
+        config.unlockMode = 'pin';
+        if (typeof showToast === 'function') showToast(window.MagicI18n && window.MagicI18n.isEn ? 'Lock type switched to PIN' : 'סוג הנעילה הועבר לקוד PIN');
+      }
+      saveConfig();
+      applyConfigToUI();
+      syncNewRevealsUI();
+      refreshBirthdayPeek();
+    });
+  }
+  document.querySelectorAll('#birthdayLenSelector .seg-pill').forEach((btn) => btn.addEventListener('click', () => {
+    config.birthdayLen = Number(btn.dataset.blen);
+    saveConfig();
+    applyConfigToUI();
+    syncNewRevealsUI();
+  }));
+  document.querySelectorAll('#birthdayOrderSelector .seg-pill').forEach((btn) => btn.addEventListener('click', () => {
+    config.birthdayOrder = btn.dataset.border;
+    saveConfig();
+    syncNewRevealsUI();
+    refreshBirthdayPeek();
+  }));
 
   const faceToggle = document.getElementById('toggleFaceTrick');
   if (faceToggle) {
@@ -6310,6 +6494,10 @@ const TRICK_TIPS = {
     he: ['🤳 הטלפון מזהה את הצופה', '1. נגיעה במסך / החלקה למעלה = "זיהוי פנים". בפעמים הראשונות (כמה שבחרת) הוא נכשל - "הפנים לא זוהו".\n2. מגישים לצופה ונוגעים שוב במסך כשהוא מסתכל: הטלפון נפתח מיד.\n3. באותו רגע המצלמה הקדמית מצלמת אותו - והתמונה שלו היא הטפט של מסך הבית.\nטיפ: תחזיק את הטלפון מול הפנים של הצופה בגובה העיניים, כמו שמצלמים סלפי.', '"הטלפון שלי לא מזהה אותי היום... רגע, תסתכל אתה? ...איך הוא מכיר אותך?! ותסתכל על הטפט שלי..."'],
     en: ['🤳 The phone knows the spectator', '1. Tap the screen / swipe up = "face scan". The first times (as many as you chose) it fails - "Face not recognized".\n2. Hand it to the spectator and tap again while they look: it unlocks instantly.\n3. At that moment the front camera takes their photo - and it becomes the home screen wallpaper.\nTip: hold the phone at their eye level, like taking a selfie.', '"My phone doesn\'t recognize me today... wait, you try? ...how does it know you?! And look at my wallpaper..."']
   },
+  toggleBirthdayTrick: {
+    he: ['🎂 תאריך לידה', '1. מבקשים: "תחשוב על מישהו שאתה אוהב ותקליד כקוד את תאריך הלידה שלו. אל תגיד לי של מי."\n2. הוא מקליד (למשל 150392 = 15 במרץ 1992).\n3. בלחיצה ארוכה על המסך (או בשעון החכם) מופיעים בסתר: מזל, גיל ובאיזה יום בשבוע נולד. בלשונית "הצצה" יש גם כמה ימים חי ועוד כמה ימים יום ההולדת.\n4. לפי הגיל מבינים מי זה: גיל קרוב לצופה = הוא עצמו, צעיר בהרבה = ילד, מבוגר בהרבה = הורה.\nטיפ: אל תחשוף את התאריך עצמו - חשוף את המזל ואת הקשר. ככה זה נראה כמו קריאת מחשבות ולא כמו "ראית את הקוד".', '"אני מרגיש שזה מישהו צעיר... הילד שלך? והוא מזל דגים... ונולד ביום ראשון, נכון?"'],
+    en: ['🎂 Birthday', '1. Ask: "Think of someone you love and type their birthday as the code. Don\'t tell me who."\n2. They type it (e.g. 150392 = March 15, 1992).\n3. Long-press the screen (or check your watch) to secretly see: star sign, age and the weekday they were born. The Peek tab also shows days lived and days until the next birthday.\n4. The age tells you who it is: close to the spectator = themselves, much younger = a child, much older = a parent.\nTip: never reveal the date itself - reveal the sign and the relationship. It looks like mind reading, not "you saw the code".', '"I feel it\'s someone young... your child? A Pisces... born on a Sunday, right?"']
+  },
   toggleCallReveal: {
     he: ['📞 חשיפה בשיחה נכנסת', 'אחרי הפתיחה הטלפון מצלצל, ושם המתקשר הוא הקוד. אפשר גם להפעיל מהשלט בטלפון השני.', '"מישהו מתקשר אליי... תגיד לי מי זה?"'],
     en: ['📞 Incoming call reveal', 'After unlocking the phone rings and the caller name is the code. Can also be triggered from the remote.', '"Someone is calling me... who is it?"']
@@ -6469,6 +6657,7 @@ function initTour() {
 const WHATS_NEW_SEEN_KEY = 'magic_whats_new_seen_v1';
 const WHATS_NEW_MAX_ITEMS = 6;
 const WHATS_NEW = [
+  { ver: '7.3', icon: '🎂', target: '#toggleBirthdayTrick', he: ['תאריך לידה', 'הצופה מקליד כקוד תאריך לידה של מישהו שהוא אוהב - ואתה יודע בסתר את המזל, הגיל, באיזה יום נולד ומי זה כנראה (ילד? הורה?).'], en: ['Birthday', 'The spectator types a loved one\'s birthday as the code - and you secretly know the star sign, age, the weekday they were born and who it probably is (child? parent?).'] },
   { ver: '7.1', icon: '🛡️', target: '#preShowCheckBtn', he: ['אמינות להופעות גדולות', 'רטט בכיס רק אחרי שהטלפון חוזר אליך, התראה אם "פתיחה בכל קוד" כבתה בטעות, ובדיקה לפני הופעה חכמה יותר.'], en: ['Rock-solid for big shows', 'Pocket buzz only after the phone is back with you, an alert if "unlock with any code" was turned off by mistake, and a smarter pre-show check.'] },
   { ver: '7.0', icon: '📱', target: '#carrierTextInput', he: ['מסך הנעילה שלך - אחד לאחד', 'מסך נעילה חדש של סמסונג (One UI 8): שעון ענק, שם הספק למעלה, טקסט פרטי קשר ושורת סטטוס בעברית. בחר את הטפט שלך מהגלריה - ואי אפשר להבדיל.'], en: ['Your lock screen - one to one', 'New Samsung lock screen (One UI 8): huge clock, carrier name, contact info text. Pick your own wallpaper from the gallery - impossible to tell apart.'] },
   { ver: '6.8', icon: '⚙️', target: '#toggleSettingsTrick', he: ['תחליף לי את הסיסמה', 'נפתחות "ההגדרות" של סמסונג, והצופה קובע לך סיסמה חדשה. הקוד מגיע אליך בסתר - ורק הוא פותח את הטלפון.'], en: ['Change my passcode', 'Samsung "Settings" opens and the spectator sets you a new passcode. The code reaches you secretly - and only it unlocks the phone.'] },

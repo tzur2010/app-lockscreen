@@ -3931,3 +3931,8 @@ html.real-ios #fakeSettings,
 html.real-ios .splash-screen { bottom: auto; height: var(--ios-h, 100%); }
 /* פס הבית האמיתי של האייפון תמיד מוצג - לא מציירים עוד אחד מזויף (שומרים את המקום שלו) */
 html.real-ios .ios-home-indicator { visibility: hidden; }
+/* 🎂 תאריך לידה: שורה קטנה מתחת לקוד בהצצה + פירוט בלשונית "הצצה" */
+.secret-peek { flex-wrap: wrap; }
+.peek-birthday { flex-basis: 100%; font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif; font-size: 16px; font-weight: 600; letter-spacing: 0; direction: rtl; text-align: right; color: #fde68a; word-break: normal; line-height: 1.4; }
+html[dir="ltr"] .peek-birthday { direction: ltr; text-align: left; }
+.birthday-info-box { margin: 6px 0 4px; padding: 10px 14px; border-radius: 14px; background: rgba(250, 204, 21, .10); border: 1px solid rgba(250, 204, 21, .35); font-size: 14px; font-weight: 600; line-height: 1.75; }

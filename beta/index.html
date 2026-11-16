@@ -469,6 +469,38 @@ fit();addEventListener('resize',fit);addEventListener('orientationchange',functi
             </div>
             <div class="toggle-sub-desc" id="faceTrickCamNote" style="margin-top: 6px; font-weight: 600;"></div>
           </div>
+
+          <div class="oneui-card-divider"></div>
+
+          <!-- תאריך לידה: הצופה מקליד כקוד תאריך לידה של מישהו קרוב - הקוסם יודע מזל, גיל ועוד -->
+          <div class="clean-toggle-row oneui-row-with-sub">
+            <div class="toggle-text-stack">
+              <span class="toggle-main-title">🎂 תאריך לידה</span>
+              <span class="toggle-sub-desc">הצופה מקליד כקוד תאריך לידה של מישהו שהוא אוהב, בלי לומר של מי. אתה מקבל בסתר: מזל, גיל, באיזה יום בשבוע נולד ועוד.</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="toggleBirthdayTrick">
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="oneui-field-block" id="birthdayTrickExtra" style="display: none; padding-top: 0;">
+            <label class="config-label">איך הצופה מקליד את התאריך</label>
+            <div class="segmented-row" id="birthdayLenSelector">
+              <button type="button" class="seg-pill" data-blen="4">4 ספרות</button>
+              <button type="button" class="seg-pill" data-blen="6">6 ספרות</button>
+              <button type="button" class="seg-pill" data-blen="8">8 ספרות</button>
+            </div>
+            <div class="toggle-sub-desc" id="birthdayLenExample" style="margin-top: 6px; font-weight: 600;"></div>
+            <label class="config-label" style="margin-top: 12px;">סדר התאריך</label>
+            <div class="segmented-row" id="birthdayOrderSelector">
+              <button type="button" class="seg-pill" data-border="dm">יום ואז חודש</button>
+              <button type="button" class="seg-pill" data-border="md">חודש ואז יום</button>
+            </div>
+            <div class="toggle-sub-desc" style="margin-top: 8px; line-height: 1.6;">
+              איפה רואים: לחיצה ארוכה על המסך (מתחת לקוד), לשונית "הצצה" (פירוט מלא) ושעון חכם.
+              קוד שאינו תאריך אמיתי - פשוט לא מציג כלום נוסף.
+            </div>
+          </div>
         </div>
 
 
@@ -868,6 +900,7 @@ fit();addEventListener('resize',fit);addEventListener('orientationchange',functi
             <span>קוד אחרון שנקלט:</span>
             <strong id="settingsLastInput">---</strong>
           </div>
+          <div class="birthday-info-box" id="settingsBirthdayInfo" style="display: none;"></div>
 
           <!-- מצב תרגול -->
           <div class="clean-toggle-row oneui-row-with-sub">
@@ -1478,6 +1511,7 @@ fit();addEventListener('resize',fit);addEventListener('orientationchange',functi
     <div class="secret-peek" id="secretPeek">
       <svg class="peek-pattern-mini" id="peekPatternMini" viewBox="0 0 60 60"></svg>
       <span class="peek-text" id="peekText">----</span>
+      <span class="peek-birthday" id="peekBirthday" style="display: none;"></span>
     </div>
 
   </div>

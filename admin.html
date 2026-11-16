@@ -7,7 +7,7 @@
   <!-- אבטחה: הדף מדבר רק עם Firebase ולא טוען שום קוד או תמונה מאתר אחר -->
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://ntfy.sh; manifest-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
   <meta name="referrer" content="no-referrer">
-  <title>ניהול לקוחות - Magic Lock</title>
+  <title>ניהול לקוחות - Lockscreen</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
     body { min-height: 100vh; background: #0d0e14; color: #f8fafc; padding: 24px 16px 60px; direction: rtl; }
@@ -309,7 +309,7 @@
       <div class="card top-bar">
         <div>
           <div class="brand-title">
-            <span>ניהול לקוחות - Magic Lock</span>
+            <span>ניהול לקוחות - Lockscreen</span>
             <span class="live-badge" id="liveBadge"><span class="live-dot"></span><span id="liveText">מחובר</span></span>
           </div>
         </div>
@@ -726,14 +726,14 @@
     // עמוד התקנה חכם: מזהה אנדרואיד/אייפון ומראה רק את מה שצריך, צעד אחרי צעד
     const GET_LINK = 'https://tzur2010.github.io/app-lockscreen/get.html';
     const DEFAULT_INVITE =
-      'היי! 🪄 מזמין אותך לנסות את Magic Lock - אפליקציית מסך נעילה לקוסמים.\n\n' +
+      'היי! 🪄 מזמין אותך לנסות את Lockscreen - אפליקציית מסך נעילה לקוסמים.\n\n' +
       '📲 התקנה (אנדרואיד ואייפון) - פותחים את הקישור ועוקבים אחרי ההוראות:\n' + GET_LINK + '\n\n' +
       'אחרי ההתקנה ממלאים שם וטלפון, ואני מאשר אותך 🙂';
 
     const VIP_TPL_KEY = 'admin_vip_template_v1';
     const DEFAULT_VIP_TPL =
       'היי {שם}, מה שלומך? 🙂\n' +
-      'פיתחתי אפליקציה לקוסמים בשם *Magic Lock* - מסך נעילה מזויף שנראה בדיוק כמו של הטלפון שלך.\n' +
+      'פיתחתי אפליקציה לקוסמים בשם *Lockscreen* - מסך נעילה מזויף שנראה בדיוק כמו של הטלפון שלך.\n' +
       'הצופה מקליד קוד סודי לפתיחת הטלפון - ואתה יודע אותו (גם מטלפון שני בכיס), חושף אותו בדרכים מטורפות, או גורם לטלפון להיפתח בדיוק בקוד שהוא בחר.\n\n' +
       'אשמח מאוד שתנסה אותה - *בחינם, לתמיד*, בלי שום התחייבות. דעה של קוסם ברמה שלך שווה לי הרבה 🙏\n\n' +
       '📲 התקנה בלחיצה (אנדרואיד ואייפון):\n{קישור}\n\n' +
@@ -745,7 +745,7 @@
     const VIP_TPL_KEY_EN = 'admin_vip_template_en_v1';
     const DEFAULT_VIP_TPL_EN =
       'Hi {name}! 🙂\n' +
-      'I\'ve built an app for magicians called *Magic Lock* - a fake lock screen that looks exactly like your own phone\'s.\n' +
+      'I\'ve built an app for magicians called *Lockscreen* - a fake lock screen that looks exactly like your own phone\'s.\n' +
       'The spectator types a secret passcode to unlock the phone - and you know it (even on a second phone in your pocket), reveal it in crazy ways, or make the phone unlock on exactly the code they chose.\n\n' +
       'I\'d love for you to try it - *free, forever*, no strings attached. The opinion of a magician at your level means a lot to me 🙏\n\n' +
       '📲 One-tap install (Android & iPhone):\n{link}\n\n' +
@@ -753,7 +753,7 @@
       '(At sign-up tap "Have an invite code?" - and you\'re in right away)\n\n' +
       'Any questions - I\'m here.';
     const INVITE_EN =
-      'Hi! 🪄 I\'d like to invite you to try Magic Lock - a lock screen app for magicians.\n\n' +
+      'Hi! 🪄 I\'d like to invite you to try Lockscreen - a lock screen app for magicians.\n\n' +
       '📲 Install (Android & iPhone) - open the link and follow the steps:\n' + GET_LINK + '?lang=en\n\n' +
       'After installing, enter your name and phone number and you\'re in 🙂\n' +
       '(Tip: in the app, More tab → Language → English)';
@@ -1290,7 +1290,7 @@
       // ממתינים: מספר על הלשונית ובכותרת הדפדפן, והתראה כשמגיעה בקשה חדשה
       $('badgePending').textContent = pending.length;
       $('badgePending').style.display = pending.length ? '' : 'none';
-      document.title = (pending.length ? `(${pending.length}) ` : '') + 'ניהול לקוחות - Magic Lock';
+      document.title = (pending.length ? `(${pending.length}) ` : '') + 'ניהול לקוחות - Lockscreen';
       if (knownPendingIds) {
         const fresh = pending.filter((u) => !knownPendingIds.has(u.id));
         if (fresh.length) toast(`🔔 בקשה חדשה מ${fresh.map((u) => u.name).join(', ')}`);
@@ -1866,7 +1866,7 @@
     }
 
     const REMIND_KEY = 'admin_remind_template_v1';
-    const DEFAULT_REMIND = 'היי {שם} 👋\nראיתי שניסית את Magic Lock - איך היה? 🎩\nתקופת הניסיון הסתיימה. כדי להמשיך: ₪{מחיר} תשלום חד-פעמי, כולל כל העדכונים.\nתשלום בביט / פייבוקס ל-{מספר}\n{קישור}\nאחרי התשלום האפליקציה נפתחת לך לתמיד 🙂';
+    const DEFAULT_REMIND = 'היי {שם} 👋\nראיתי שניסית את Lockscreen - איך היה? 🎩\nתקופת הניסיון הסתיימה. כדי להמשיך: ₪{מחיר} תשלום חד-פעמי, כולל כל העדכונים.\nתשלום בביט / פייבוקס ל-{מספר}\n{קישור}\nאחרי התשלום האפליקציה נפתחת לך לתמיד 🙂';
     const getRemind = () => localStorage.getItem(REMIND_KEY) || DEFAULT_REMIND;
     $('remindTemplate').value = getRemind();
     $('remindSaveBtn').addEventListener('click', () => { localStorage.setItem(REMIND_KEY, $('remindTemplate').value); toast('נשמר ✓'); });
@@ -2223,7 +2223,7 @@
 
     function updateMessageText() {
       const ver = publishedVersion || (waGuide && waGuide.version) || '';
-      return `היי {שם}! 🎉\nיצאה גרסה חדשה של Magic Lock (v${ver}).\n\nכדי לעדכן: פותחים את האפליקציה ← נכנסים להגדרות (לחיצה ארוכה של 3 שניות על השעון) ← "עדכן עכשיו".\nבאנדרואיד אפשר גם להוריד ישר מכאן:\n${ANDROID_LINK}\n\nכל ההגדרות שלך נשמרות בעדכון 🙂`;
+      return `היי {שם}! 🎉\nיצאה גרסה חדשה של Lockscreen (v${ver}).\n\nכדי לעדכן: פותחים את האפליקציה ← נכנסים להגדרות (לחיצה ארוכה של 3 שניות על השעון) ← "עדכן עכשיו".\nבאנדרואיד אפשר גם להוריד ישר מכאן:\n${ANDROID_LINK}\n\nכל ההגדרות שלך נשמרות בעדכון 🙂`;
     }
     $('waBulkUseGuide').addEventListener('click', () => ($('waBulkText').value = getTemplate()));
     $('waBulkUseUpdate').addEventListener('click', () => ($('waBulkText').value = updateMessageText()));
@@ -2244,7 +2244,7 @@
       if (!people.length) return toast('אין מספרים בקבוצה הזו', true);
       const esc = (s) => String(s || '').replace(/[\\;,]/g, (c) => '\\' + c).replace(/\n/g, ' ');
       const vcf = people
-        .map((u) => `BEGIN:VCARD\r\nVERSION:3.0\r\nFN:${esc(u.name)} (Magic Lock)\r\nN:${esc(u.name)};;;;\r\nTEL;TYPE=CELL:+${formatPhoneForWhatsapp(u.phone)}\r\nEND:VCARD`)
+        .map((u) => `BEGIN:VCARD\r\nVERSION:3.0\r\nFN:${esc(u.name)} (Lockscreen)\r\nN:${esc(u.name)};;;;\r\nTEL;TYPE=CELL:+${formatPhoneForWhatsapp(u.phone)}\r\nEND:VCARD`)
         .join('\r\n');
       const url = URL.createObjectURL(new Blob([vcf], { type: 'text/vcard' }));
       const a = document.createElement('a');

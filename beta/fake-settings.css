@@ -7,7 +7,7 @@
 #fakeSettings * { box-sizing: border-box; margin: 0; padding: 0; }
 
 /* שורת סטטוס */
-#fakeSettings .fs-status { position: absolute; top: 0; left: 0; right: 0; height: 40px; display: flex; align-items: center; justify-content: space-between; padding: 0 20px 0 18px; z-index: 60; direction: ltr; pointer-events: none; color: #111; }
+#fakeSettings .fs-status { position: absolute; top: 0; left: 0; right: 0; height: 40px; display: flex; align-items: center; justify-content: space-between; padding: 0 20px 0 18px; z-index: 60; direction: ltr; pointer-events: none; color: #111; background: #f3f3f3; }
 #fakeSettings .fs-st-left { display: flex; align-items: center; gap: 4px; }
 #fakeSettings .fs-bat { min-width: 24px; height: 14px; border-radius: 7px; background: #4d4d4d; color: #fff; font-size: 9.5px; font-weight: 700; display: grid; place-items: center; padding: 0 4px; }
 #fakeSettings .fs-st-ic { width: 13px; height: 13px; }
@@ -19,13 +19,16 @@
 #fakeSettings .fs-page.fs-on.fs-going-back { animation: fsInL .3s cubic-bezier(.2,.8,.2,1); }
 @keyframes fsInR { from { transform: translateX(-34px); opacity: 0; } to { transform: none; opacity: 1; } }
 @keyframes fsInL { from { transform: translateX(34px); opacity: 0; } to { transform: none; opacity: 1; } }
-#fakeSettings .fs-scroll { flex: 1; overflow-y: auto; overflow-x: hidden; scrollbar-width: none; padding: 0 10px 130px; -webkit-overflow-scrolling: touch; }
+/* התוכן גולל רק מתחת לשורת הסטטוס (ובעמודים פנימיים - גם מתחת לסרגל עם החץ), כמו בטלפון אמיתי */
+#fakeSettings .fs-scroll { position: absolute; top: 40px; bottom: 0; left: 0; right: 0; overflow-y: auto; overflow-x: hidden; scrollbar-width: none; padding: 0 10px 130px; -webkit-overflow-scrolling: touch; }
+#fakeSettings .fs-page:not([data-fs-page="main"]) .fs-scroll { top: 92px; }
+#fakeSettings .fs-page:not([data-fs-page="main"]) .fs-hero { height: calc(30vh - 52px); min-height: 150px; padding-top: 0; }
 #fakeSettings .fs-scroll::-webkit-scrollbar { display: none; }
 /* כותרת גדולה ממורכזת (מרכז הכותרת בכ-17% מגובה המסך, כמו בסרטון) */
 #fakeSettings .fs-hero { height: 30vh; min-height: 200px; max-height: 260px; display: flex; align-items: center; justify-content: center; padding: 30px 40px 0; text-align: center; }
 #fakeSettings .fs-hero h1 { font-size: 27px; font-weight: 700; letter-spacing: -.2px; line-height: 1.2; }
 /* עמודים פנימיים: חץ חזרה, וכותרת קטנה שמופיעה רק אחרי גלילה (במסך הראשי אין בכלל) */
-#fakeSettings .fs-appbar { position: absolute; top: 40px; right: 0; left: 0; height: 52px; display: flex; align-items: center; gap: 4px; padding: 0 6px; z-index: 20; transition: background .15s; }
+#fakeSettings .fs-appbar { position: absolute; top: 40px; right: 0; left: 0; height: 52px; display: flex; align-items: center; gap: 4px; padding: 0 6px; z-index: 20; background: #f3f3f3; }
 #fakeSettings .fs-appbar.fs-solid { background: #f3f3f3; }
 #fakeSettings .fs-small-title { font-size: 19px; font-weight: 700; opacity: 0; transition: opacity .15s; }
 #fakeSettings .fs-appbar.fs-solid .fs-small-title { opacity: 1; }

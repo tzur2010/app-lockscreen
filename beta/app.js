@@ -469,6 +469,8 @@ function fillCodePlaceholder(template, code) {
 const DEFAULT_CONFIG = {
   osTheme: 'samsung',           // 'samsung' (כל טלפוני אנדרואיד) | 'ios'
   androidBrand: 'samsung',      // סוג האנדרואיד: 'samsung' | 'pixel' | 'xiaomi' (משנה את המראה בלבד)
+  carrierText: '',              // שם הספק שמופיע למעלה במסך הנעילה (למשל Pelephone)
+  lockOwnerInfo: '',            // טקסט אישי במסך הנעילה (כמו "פרטי קשר" בסמסונג)
   deviceModel: 's26',           // 's20'..'s26' | 'iphone12'..'iphone18'
   unlockMode: 'pin',            // 'pin' | 'pattern' | 'words' | 'swipe'
   pinLength: 4,                 // 4 | 6 (אורך קוד PIN: 4 או 6 ספרות)
@@ -1658,6 +1660,17 @@ function applyConfigToUI() {
   const brand = config.osTheme === 'ios' ? '' : currentAndroidBrand();
   phoneContainer.classList.toggle('theme-pixel', brand === 'pixel');
   phoneContainer.classList.toggle('theme-xiaomi', brand === 'xiaomi');
+  // סמסונג: מסך הנעילה של One UI (שעון ענק, שם ספק, טקסט אישי, קיצור לטלפון)
+  phoneContainer.classList.toggle('samsung-oneui-lock', brand === 'samsung');
+  // One UI 7/8 (S25 ומעלה): סוללה בתוך גלולה עם מספר
+  phoneContainer.classList.toggle('oneui-pill', brand === 'samsung' && ['s25', 's26'].includes(currentModel.id));
+  // אנדרואיד בעברית: שורת הסטטוס הפוכה
+  phoneContainer.classList.toggle('rtl-status', Boolean(brand) && !isEnglishUi());
+  const carrierEl = document.getElementById('statusCarrier');
+  if (carrierEl) carrierEl.textContent = (config.carrierText || '').trim();
+  phoneContainer.classList.toggle('has-carrier', Boolean((config.carrierText || '').trim()));
+  const ownerEl = document.getElementById('clockOwnerInfo');
+  if (ownerEl) ownerEl.textContent = (config.lockOwnerInfo || '').trim();
 
   // דגמי Notch (iPhone 12 / 13) מול Dynamic Island (iPhone 14 - 18)
   const isNotch = config.osTheme === 'ios' && currentModel.cutout === 'notch';
@@ -3633,6 +3646,8 @@ if ('getBattery' in navigator) {
         const iosFill = document.getElementById('iosBatteryFill');
 
         if (samText) samText.textContent = `${level}%`;
+        const samPill = document.getElementById('samsungBatteryPill');
+        if (samPill) samPill.textContent = `${level}`;
         if (samFill) samFill.style.height = `${level}%`;
         if (iosText) iosText.textContent = `${level}`;
         if (iosFill) iosFill.style.width = `${level}%`;
@@ -3930,7 +3945,7 @@ function initDeviceLicenseGate() {
 // החלון מוצג רק כשמסך ההגדרות פתוח (בפתיחת האפליקציה / בתפריט הסודי),
 // ולעולם לא מעל מסך הנעילה הפעיל מול קהל.
 // ============================================================================
-const APP_VERSION = '6.9';
+const APP_VERSION = '7.0';
 const DEFAULT_APK_URL = 'https://github.com/tzur2010/app-lockscreen/raw/main/Lockscreen.apk';
 const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 const UPDATE_DISMISS_KEY = 'magic_update_dismissed_version';
@@ -5733,6 +5748,18 @@ function initNewReveals() {
       syncNewRevealsUI();
     });
   }
+  // מסך הנעילה האישי: שם הספק וטקסט פרטי קשר (מתעדכן מיד על המסך)
+  [['carrierTextInput', 'carrierText', 40], ['lockOwnerInfoInput', 'lockOwnerInfo', 60]].forEach(([id, key, max]) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.value = config[key] || '';
+    el.addEventListener('input', () => {
+      config[key] = el.value.slice(0, max);
+      saveConfig();
+      applyConfigToUI();
+    });
+  });
+
   const stName = document.getElementById('settingsTrickName');
   if (stName) {
     stName.addEventListener('input', () => {
@@ -6357,6 +6384,7 @@ function initTour() {
 const WHATS_NEW_SEEN_KEY = 'magic_whats_new_seen_v1';
 const WHATS_NEW_MAX_ITEMS = 6;
 const WHATS_NEW = [
+  { ver: '7.0', icon: '📱', target: '#carrierTextInput', he: ['מסך הנעילה שלך - אחד לאחד', 'מסך נעילה חדש של סמסונג (One UI 8): שעון ענק, שם הספק למעלה, טקסט פרטי קשר ושורת סטטוס בעברית. בחר את הטפט שלך מהגלריה - ואי אפשר להבדיל.'], en: ['Your lock screen - one to one', 'New Samsung lock screen (One UI 8): huge clock, carrier name, contact info text. Pick your own wallpaper from the gallery - impossible to tell apart.'] },
   { ver: '6.8', icon: '⚙️', target: '#toggleSettingsTrick', he: ['תחליף לי את הסיסמה', 'נפתחות "ההגדרות" של סמסונג, והצופה קובע לך סיסמה חדשה. הקוד מגיע אליך בסתר - ורק הוא פותח את הטלפון.'], en: ['Change my passcode', 'Samsung "Settings" opens and the spectator sets you a new passcode. The code reaches you secretly - and only it unlocks the phone.'] },
   { ver: '6.7', icon: '🤳', target: '#toggleFaceTrick', he: ['הטלפון מזהה את הצופה', 'הטלפון לא נפתח לפנים שלך - אבל נפתח מיד לצופה. ובמסך הבית מחכה לו הפתעה: התמונה שלו כטפט.'], en: ['The phone knows the spectator', 'Your phone won\'t unlock for your face - but unlocks instantly for the spectator. And on the home screen: their photo as the wallpaper.'] },
   { ver: '6.5', icon: '📱', target: '#backToSplitBtn', he: ['Google Pixel ו-Xiaomi', 'מעכשיו יש גם מסך נעילה של פיקסל ושל שיאומי/רדמי - "החלף מכשיר" ובוחרים את הטלפון שלך.'], en: ['Google Pixel & Xiaomi', 'Now with Pixel and Xiaomi/Redmi lock screens too - "Switch device" and pick your phone.'] },

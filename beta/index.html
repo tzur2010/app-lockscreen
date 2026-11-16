@@ -502,6 +502,20 @@
 
           <div class="wallpaper-gallery-row" id="wallpaperGalleryRow"></div>
 
+          <!-- הכי חשוב למראה אמיתי: הטפט שלך מהגלריה -->
+          <div class="oneui-field-block" style="padding-top: 4px;">
+            <label for="wallpaperFileInput" class="own-photo-btn">📷 בחר תמונה מהגלריה שלך (הטפט האמיתי שלך)</label>
+          </div>
+
+          <div class="oneui-field-block">
+            <label class="config-label" for="carrierTextInput">שם הספק בפינה למעלה (כמו אצלך במסך הנעילה)</label>
+            <input type="text" id="carrierTextInput" class="feedback-textarea gallery-text-input" maxlength="40" dir="ltr" placeholder="למשל: Pelephone">
+          </div>
+          <div class="oneui-field-block">
+            <label class="config-label" for="lockOwnerInfoInput">טקסט במסך הנעילה (פרטי קשר - אם יש לך כזה)</label>
+            <input type="text" id="lockOwnerInfoInput" class="feedback-textarea gallery-text-input" maxlength="60" dir="rtl" placeholder="למשל: אם נמצא, נא להתקשר...">
+          </div>
+
           <div class="oneui-card-divider"></div>
 
           <!-- בחירת מצב נעילה: הועברה לחלון שקופץ אחרי "שמור וסגור" (lockTypeChooser). נשאר מוסתר לתאימות. -->
@@ -1055,6 +1069,8 @@
     <div class="status-bar" id="statusBar">
       <div class="status-left">
         <span class="status-time" id="statusTime">14:22</span>
+        <!-- מסך נעילה של One UI: במקום השעה מופיע שם הספק (למשל Pelephone) -->
+        <span class="status-carrier" id="statusCarrier"></span>
       </div>
 
       <div class="camera-punch-hole" id="cameraPunchHole">
@@ -1080,6 +1096,8 @@
       <div class="status-right" id="statusRightIcons">
         <!-- אייקונים של Samsung -->
         <div class="status-icons-samsung">
+          <!-- One UI 7/8: סוללה בתוך "גלולה" עם המספר -->
+          <span class="samsung-battery-pill" id="samsungBatteryPill">88</span>
           <svg class="status-svg wifi-svg" viewBox="0 0 24 24">
             <path d="M12 4.5C7.3 4.5 3.1 6.4 0 9.5l12 12 12-12C20.9 6.4 16.7 4.5 12 4.5z"/>
           </svg>
@@ -1135,6 +1153,11 @@
         <div class="clock-lock-date" id="clockLockDate">יום שבת, 31 באוקטובר</div>
       </div>
       <div class="clock-lock-swipe-prompt">החלק או הקש להזנת סיסמה</div>
+      <!-- טקסט אישי במסך הנעילה (כמו "פרטי קשר" בסמסונג) + קיצור דרך לטלפון בפינה -->
+      <div class="clock-owner-info" id="clockOwnerInfo"></div>
+      <div class="clock-shortcut" id="clockShortcutPhone" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><path d="M6.6 10.8a15.2 15.2 0 0 0 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1A17 17 0 0 1 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1z"/></svg>
+      </div>
     </div>
 
     <!-- כותרת עליונה, כיתוב משני והודעת שגיאה באדום -->

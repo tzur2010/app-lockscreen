@@ -3768,3 +3768,13 @@ html[dir="ltr"] body.practice-on .settings-tabs::after { content: '🎯 Practice
 .reg-link-btn { background: none; border: none; color: #60a5fa; font-size: 13px; font-family: inherit; margin-top: 10px; cursor: pointer; text-decoration: underline; }
 #buyOverlay .secondary-btn { background: rgba(255,255,255,.1); color: #e2e8f0; }
 .reg-links { display: flex; justify-content: center; gap: 14px; flex-wrap: wrap; }
+
+/* ==========================================================================
+   אייפון אמיתי (Safari / מסך הבית): שורת הסטטוס וה-Dynamic Island האמיתיים תמיד מוצגים
+   - לכן מסתירים את המזויפים (אחרת יש שתי שורות סטטוס), וממלאים את כל גובה המסך
+   ========================================================================== */
+html.real-ios, html.real-ios body { background-color: #000; height: 100%; min-height: 100%; }
+html.real-ios .phone-container { height: 100vh; height: 100lvh; max-height: none; }
+html.real-ios .phone-container .status-bar { visibility: hidden !important; }
+html.real-ios .phone-container .camera-punch-hole { visibility: hidden !important; }
+html.real-ios .phone-container.theme-ios .lock-icon { visibility: hidden !important; }

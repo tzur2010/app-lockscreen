@@ -3770,11 +3770,463 @@ html[dir="ltr"] body.practice-on .settings-tabs::after { content: '🎯 Practice
 .reg-links { display: flex; justify-content: center; gap: 14px; flex-wrap: wrap; }
 
 /* ==========================================================================
+   בחירת סוג אנדרואיד במסך הפתיחה
+   ========================================================================== */
+.split-brands { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 12px; }
+.split-brand { border: 1px solid rgba(255,255,255,.28); background: rgba(255,255,255,.1); color: inherit; font: inherit; font-size: 14px; font-weight: 800; padding: 9px 16px; border-radius: 999px; cursor: pointer; min-width: 84px; }
+.split-brand:active { transform: scale(.96); background: rgba(255,255,255,.22); }
+
+/* ==========================================================================
+   Google Pixel (Material You) - נבנה על מסך האנדרואיד
+   ========================================================================== */
+.phone-container.theme-pixel { font-family: "Google Sans", Roboto, "Segoe UI", system-ui, sans-serif; }
+.phone-container.theme-pixel.mode-pin-active .title,
+.phone-container.theme-pixel .title { font-size: 22px; font-weight: 400; color: #e6e1e5; letter-spacing: 0; }
+.phone-container.theme-pixel .subtitle { display: none; }
+.phone-container.theme-pixel .pin-dots { gap: 12px; }
+.phone-container.theme-pixel .pin-dynamic-dot { width: 12px; height: 12px; border: none; background: rgba(230,225,229,.35); }
+.phone-container.theme-pixel .pin-dynamic-dot.filled { background: #e6e1e5; box-shadow: none; }
+.phone-container.theme-pixel .keypad { gap: 14px 22px; max-width: 300px; }
+.phone-container.theme-pixel .key-btn { width: 74px; height: 74px; background: rgba(214,222,255,.16); border: none; }
+.phone-container.theme-pixel .key-btn.is-pressed { background: rgba(214,222,255,.38) !important; border-radius: 24px; }
+.phone-container.theme-pixel .key-number { font-size: 32px; font-weight: 400; color: #e6e1e5; }
+.phone-container.theme-pixel .key-letters { display: none; }
+/* מחיקה: בלי עיגול. אישור: עיגול בצבע הראשי עם חץ */
+.phone-container.theme-pixel #keypadBackspaceBtn { background: transparent; }
+.phone-container.theme-pixel #keypadOkBtn { background: #a8c7fa; }
+.phone-container.theme-pixel #keypadOkBtn .key-action { font-size: 0; }
+.phone-container.theme-pixel #keypadOkBtn .key-action::after { content: '→'; font-size: 28px; font-weight: 500; color: #062e6f; }
+.phone-container.theme-pixel .emergency-btn { background: transparent; border: none; color: #e6e1e5; font-size: 14px; font-weight: 500; }
+.phone-container.theme-pixel .clock-lock-big-time { font-size: 118px; font-weight: 400; line-height: .88; letter-spacing: -2px; display: flex; flex-direction: column; align-items: center; color: #e8f0ff; }
+.phone-container.theme-pixel .clock-lock-date { font-size: 15px; margin-top: 14px; }
+.phone-container.theme-pixel .pattern-node-dot { width: 10px; height: 10px; background: #e6e1e5; }
+.phone-container.theme-pixel .pattern-line { stroke: #a8c7fa; stroke-width: 6; }
+
+/* ==========================================================================
+   Xiaomi / Redmi (HyperOS) - נבנה על מסך האנדרואיד
+   ========================================================================== */
+.phone-container.theme-xiaomi { font-family: "MiSans", Roboto, "Segoe UI", system-ui, sans-serif; }
+.phone-container.theme-xiaomi.mode-pin-active .title,
+.phone-container.theme-xiaomi .title { font-size: 17px; font-weight: 400; color: rgba(255,255,255,.92); }
+.phone-container.theme-xiaomi .subtitle { display: none; }
+.phone-container.theme-xiaomi .pin-dots { gap: 18px; }
+.phone-container.theme-xiaomi .pin-dynamic-dot { width: 11px; height: 11px; border: 1.2px solid rgba(255,255,255,.8); }
+.phone-container.theme-xiaomi .pin-dynamic-dot.filled { box-shadow: none; }
+.phone-container.theme-xiaomi .keypad { gap: 8px 26px; max-width: 300px; }
+.phone-container.theme-xiaomi .key-btn { width: 76px; height: 76px; background: transparent; border: none; }
+.phone-container.theme-xiaomi .key-btn.is-pressed { background: rgba(255,255,255,.16) !important; }
+.phone-container.theme-xiaomi .key-number { font-size: 36px; font-weight: 300; }
+.phone-container.theme-xiaomi .key-letters { font-size: 9px; font-weight: 500; letter-spacing: 1.5px; color: rgba(255,255,255,.6); }
+/* בשיאומי הקוד נשלח לבד כשמגיעים למספר הספרות - אין כפתור אישור */
+.phone-container.theme-xiaomi #keypadOkBtn { visibility: hidden; pointer-events: none; }
+.phone-container.theme-xiaomi .emergency-btn { background: transparent; border: none; color: rgba(255,255,255,.88); font-size: 15px; font-weight: 400; }
+.phone-container.theme-xiaomi .clock-lock-screen { justify-content: space-between; }
+.phone-container.theme-xiaomi .clock-lock-center { text-align: left; direction: ltr; align-self: stretch; padding: 0 30px; }
+.phone-container.theme-xiaomi .clock-lock-big-time { font-size: 92px; font-weight: 500; letter-spacing: -1px; }
+.phone-container.theme-xiaomi .clock-lock-date { font-size: 15px; margin-top: 6px; opacity: .85; }
+.phone-container.theme-xiaomi .clock-lock-swipe-prompt { background: transparent; }
+/* ==========================================================================
+   ליטוש פיקסל / שיאומי: טביעת אצבע, דפוס, סיסמה ושורת סטטוס
+   ========================================================================== */
+.fp-drawn { display: none; width: 44px; height: 44px; position: relative; z-index: 1; pointer-events: none; transition: transform .18s ease, color .18s ease; }
+.phone-container.theme-pixel .fingerprint-img,
+.phone-container.theme-xiaomi .fingerprint-img { display: none; }
+.phone-container.theme-pixel .fp-drawn,
+.phone-container.theme-xiaomi .fp-drawn { display: block; }
+.phone-container.theme-pixel .fp-drawn { color: #e6e1e5; }
+.phone-container.theme-pixel .fingerprint-halo { background: radial-gradient(circle, rgba(230,225,229,.18) 0%, transparent 70%); }
+.phone-container.theme-pixel .fingerprint-ripple { border-color: rgba(168,199,250,.8); box-shadow: none; }
+.phone-container.theme-pixel .fingerprint-container.pressing .fp-drawn { color: #a8c7fa; transform: scale(1.1); }
+.phone-container.theme-xiaomi .fp-drawn { color: rgba(255,255,255,.95); width: 46px; height: 46px; }
+.phone-container.theme-xiaomi .fingerprint-halo { background: radial-gradient(circle, rgba(255,255,255,.14) 0%, transparent 70%); animation: none; }
+.phone-container.theme-xiaomi .fingerprint-ripple { border-color: rgba(255,255,255,.7); box-shadow: none; }
+.phone-container.theme-xiaomi .fingerprint-container.pressing .fp-drawn { transform: scale(1.12); }
+
+/* דפוס בשיאומי: עיגולים חלולים וקו לבן דק */
+.phone-container.theme-xiaomi .pattern-node-dot { width: 14px; height: 14px; background: transparent; border: 1.5px solid rgba(255,255,255,.9); }
+.phone-container.theme-xiaomi .pattern-wrapper:not(.stealth-mode) .pattern-node.active .pattern-node-dot { background: #ffffff; transform: scale(1.15); box-shadow: none; }
+.phone-container.theme-xiaomi .pattern-line { stroke-width: 3; stroke: rgba(255,255,255,.85); }
+.phone-container.theme-pixel .pattern-wrapper:not(.stealth-mode) .pattern-node.active .pattern-node-dot { box-shadow: 0 0 0 12px rgba(168,199,250,.22); background: #a8c7fa; }
+
+/* שדה הסיסמה: בפיקסל מלבן מעוגל עם מסגרת, בשיאומי קפסולה שקופה יותר */
+.phone-container.theme-pixel .oneui-password-pill { border-radius: 14px; background: rgba(214,222,255,.12); border: 1.5px solid rgba(168,199,250,.6); height: 52px; backdrop-filter: none; -webkit-backdrop-filter: none; }
+.phone-container.theme-xiaomi .oneui-password-pill { border-radius: 26px; background: rgba(255,255,255,.12); border: none; }
+
+/* שורת סטטוס: בפיקסל בלי אחוזי סוללה ליד הסמל */
+.phone-container.theme-pixel .samsung-battery-text { display: none; }
+
+/* מסך השעון: בפיקסל ובשיאומי אין "קפסולה" סביב ההוראה למטה */
+.phone-container.theme-pixel .clock-lock-swipe-prompt { background: transparent; font-size: 13px; opacity: .75; }
+/* טביעת אצבע (פיקסל/שיאומי) - הסמל הסטנדרטי של אנדרואיד, בלי "הילה" שמנה */
+.fp-drawn { width: 40px; height: 40px; }
+.phone-container.theme-pixel .fingerprint-halo,
+.phone-container.theme-xiaomi .fingerprint-halo { display: none; }
+.phone-container.theme-pixel .fp-drawn { width: 38px; height: 38px; color: rgba(230,225,229,.92); }
+.phone-container.theme-xiaomi .fp-drawn { width: 40px; height: 40px; color: #ffffff; filter: drop-shadow(0 0 6px rgba(255,255,255,.25)); }
+.phone-container.theme-pixel .fingerprint-container.pressing .fp-drawn { color: #a8c7fa; transform: scale(1.06); }
+.phone-container.theme-xiaomi .fingerprint-container.pressing .fp-drawn { transform: scale(1.08); filter: drop-shadow(0 0 12px rgba(255,255,255,.55)); }
+/* קסם "הטלפון מזהה את הצופה": אנימציית סריקה על המנעול (באנדרואיד אין "אי" כמו באייפון) */
+@keyframes faceScanPulse { 0%,100% { scale: 1; opacity: 1; } 50% { scale: 1.18; opacity: .6; } }
+.phone-container.face-scanning:not(.theme-ios) .lock-icon { animation: faceScanPulse .7s ease-in-out infinite; }
+.clock-lock-swipe-prompt.face-fail { color: #ffb4ab; animation: textShakeFace .35s ease; }
+@keyframes textShakeFace { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
+.fake-homescreen.face-wallpaper { background-repeat: no-repeat; }
+/* ==========================================================================
+   מסך הנעילה של סמסונג (One UI 7/8) - לפי צילום מסך אמיתי
+   שעון ענק ומודגש, תאריך מודגש, שם הספק למעלה, טקסט אישי וקיצור לטלפון בפינה
+   ========================================================================== */
+.samsung-battery-pill, .status-carrier, .clock-owner-info, .clock-shortcut { display: none; }
+.phone-container.oneui-pill .samsung-battery-pill { display: inline-grid; place-items: center; min-width: 24px; height: 15px; padding: 0 4px; border-radius: 8px; background: rgba(60,60,60,.82); color: #fff; font-size: 10px; font-weight: 700; order: -1; line-height: 1; }
+.phone-container.oneui-pill .samsung-battery-text,
+.phone-container.oneui-pill .samsung-battery-icon { display: none; }
+/* טלפון בעברית: שורת הסטטוס הפוכה (סמלים משמאל, שעה/ספק מימין) כמו באנדרואיד בעברית */
+.phone-container.rtl-status .status-bar { flex-direction: row-reverse; }
+.phone-container.samsung-oneui-lock.clock-mode-active.has-carrier .status-time { display: none; }
+.phone-container.samsung-oneui-lock.clock-mode-active.has-carrier .status-carrier { display: inline; font-size: 13px; font-weight: 500; white-space: nowrap; }
+
+.phone-container.samsung-oneui-lock .clock-lock-screen { position: absolute; inset: 0; padding: 0; z-index: 5; }
+.phone-container.samsung-oneui-lock .clock-lock-center { position: absolute; top: 11.5%; left: 0; right: 0; text-align: center; }
+.phone-container.samsung-oneui-lock .clock-lock-big-time { font-size: min(27vw, 132px); font-weight: 700; letter-spacing: -0.02em; line-height: .92; color: rgba(255,255,255,.94); text-shadow: 0 1px 14px rgba(0,0,0,.16); }
+.phone-container.samsung-oneui-lock .clock-lock-date { font-size: min(4.4vw, 18px); font-weight: 700; margin-top: 1.4vh; opacity: 1; text-shadow: 0 1px 6px rgba(0,0,0,.35); }
+.phone-container.samsung-oneui-lock .clock-lock-swipe-prompt { display: none; }
+.phone-container.samsung-oneui-lock .clock-lock-swipe-prompt.face-fail { display: block; position: absolute; bottom: 22%; left: 50%; transform: translateX(-50%); white-space: nowrap; }
+.phone-container.samsung-oneui-lock .clock-owner-info { display: block; position: absolute; bottom: 14.5%; left: 6%; right: 6%; text-align: center; font-size: min(4.3vw, 17px); color: #fff; text-shadow: 0 1px 6px rgba(0,0,0,.5); }
+.phone-container.samsung-oneui-lock .clock-owner-info:empty { display: none; }
+.phone-container.samsung-oneui-lock .clock-shortcut { display: grid; place-items: center; position: absolute; bottom: 4.5%; right: 7%; width: min(13.5vw, 56px); height: min(13.5vw, 56px); border-radius: 50%; background: rgba(55,55,65,.55); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
+.phone-container.samsung-oneui-lock .clock-shortcut svg { width: 42%; height: 42%; fill: #fff; }
+.phone-container.samsung-oneui-lock.clock-mode-active .lock-icon { top: 44px; }
+.phone-container.samsung-oneui-lock.clock-mode-active .fingerprint-container { visibility: hidden; }
+/* כפתור "בחר תמונה מהגלריה שלך" - גדול וברור */
+.own-photo-btn { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 46px; border-radius: 14px; background: linear-gradient(135deg, #2563eb, #1d4ed8); color: #fff; font-weight: 700; font-size: 14.5px; cursor: pointer; text-align: center; padding: 8px 12px; box-sizing: border-box; }
+.own-photo-btn:active { transform: scale(.98); }
+/* ==========================================================================
    אייפון אמיתי (Safari / מסך הבית): שורת הסטטוס וה-Dynamic Island האמיתיים תמיד מוצגים
    - לכן מסתירים את המזויפים (אחרת יש שתי שורות סטטוס), וממלאים את כל גובה המסך
    ========================================================================== */
-html.real-ios, html.real-ios body { background-color: #000; height: 100%; min-height: 100%; }
-html.real-ios .phone-container { height: 100vh; height: 100lvh; max-height: none; }
+
 html.real-ios .phone-container .status-bar { visibility: hidden !important; }
-html.real-ios .phone-container .camera-punch-hole { visibility: hidden !important; }
-html.real-ios .phone-container.theme-ios .lock-icon { visibility: hidden !important; }
+html.real-ios .phone-container .camera-punch-hole { visibility: hidden !important; }html.real-ios .phone-container.theme-ios .lock-icon { visibility: hidden !important; }
+
+/* ===================== אייפון בתוך Safari: "הוסף למסך הבית" לפני הכל ===================== */
+.ios-install-gate { position: fixed; inset: 0; z-index: 100000; background: radial-gradient(120% 70% at 50% 0%, #2a2470 0%, #0d0b24 60%, #05040f 100%); color: #fff; align-items: center; justify-content: center; padding: 24px; font-family: -apple-system, system-ui, sans-serif; }
+.iig-card { max-width: 380px; width: 100%; text-align: center; }
+.iig-icon { font-size: 54px; margin-bottom: 10px; }
+.iig-title { font-size: 26px; font-weight: 800; margin: 0 0 10px; }
+.iig-sub { font-size: 15.5px; line-height: 1.6; color: rgba(255,255,255,.85); margin: 0 0 18px; }
+.iig-steps { text-align: start; margin: 0 0 18px; padding-inline-start: 24px; font-size: 16px; line-height: 1.55; }
+.iig-steps li { margin-bottom: 12px; background: rgba(255,255,255,.08); border-radius: 14px; padding: 10px 12px; }
+.iig-warn { font-size: 14px; color: #fde68a; background: rgba(250,204,21,.12); border-radius: 12px; padding: 8px 10px; margin: 0 0 14px; }
+.iig-skip { background: none; border: none; color: rgba(255,255,255,.55); font: inherit; font-size: 13px; text-decoration: underline; cursor: pointer; padding: 8px; }
+/* הודעה: "פתיחה בכל קוד" כבתה בסתר */
+.force-off-notice { position: fixed; left: 12px; right: 12px; bottom: calc(env(safe-area-inset-bottom, 0px) + 86px); z-index: 9500; display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: 16px; background: #3b2a06; border: 1px solid rgba(250,204,21,.55); color: #fde68a; font-size: 13.5px; font-weight: 600; line-height: 1.45; box-shadow: 0 10px 30px rgba(0,0,0,.4); direction: rtl; }
+.force-off-notice span { flex: 1; }
+.force-off-notice button { border: none; border-radius: 10px; padding: 8px 14px; background: #facc15; color: #1f1500; font: inherit; font-weight: 800; cursor: pointer; flex: 0 0 auto; }
+.force-off-notice .fon-close { background: transparent; color: #fde68a; padding: 6px; }
+/* אייפון אמיתי: המסך "מוצמד" לארבעת הקצוות (בלי למדוד גובה) - כך הוא תמיד ממלא את כל המסך,
+   כולל מתחת לפס הבית ולשורת הסטטוס, בכל דגם ובכל מצב (Safari או מסך הבית) */
+html.real-ios, html.real-ios body { background-color: #000; position: fixed; top: 0; left: 0; right: 0; bottom: auto; width: auto; height: var(--ios-h, 100%); min-height: 0; }
+html.real-ios .phone-container { position: fixed; top: 0; right: 0; left: 0; bottom: auto; width: auto; height: var(--ios-h, 100%); max-width: none; margin: 0; }
+html.real-ios .phone-container > .fake-call,
+html.real-ios #fakeSettings,
+html.real-ios .splash-screen { bottom: auto; height: var(--ios-h, 100%); }
+/* פס הבית האמיתי של האייפון תמיד מוצג - לא מציירים עוד אחד מזויף (שומרים את המקום שלו) */
+html.real-ios .ios-home-indicator { visibility: hidden; }
+/* 🎂 תאריך לידה: שורה קטנה מתחת לקוד בהצצה + פירוט בלשונית "הצצה" */
+.secret-peek { flex-wrap: wrap; }
+.peek-birthday { flex-basis: 100%; font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif; font-size: 16px; font-weight: 600; letter-spacing: 0; direction: rtl; text-align: right; color: #fde68a; word-break: normal; line-height: 1.4; }
+html[dir="ltr"] .peek-birthday { direction: ltr; text-align: left; }
+.birthday-info-box { margin: 6px 0 4px; padding: 10px 14px; border-radius: 14px; background: rgba(250, 204, 21, .10); border: 1px solid rgba(250, 204, 21, .35); font-size: 14px; font-weight: 600; line-height: 1.75; }
+
+/* ==========================================================================
+   סידור ההגדרות (7.4): כפתורי הופעה למעלה, כותרות ברורות, כרטיסים אחידים
+   ========================================================================== */
+.show-actions-bar { display: grid; grid-template-columns: 1.15fr 1fr; gap: 8px; margin: -6px 0 12px; }
+.show-actions-bar .reset-show-btn,
+.show-actions-bar .preshow-btn { width: 100%; min-height: 48px; margin: 0; padding: 8px 6px; border-radius: 16px; font-size: 14px; font-weight: 800; line-height: 1.25; }
+.settings-tabs { top: -22px; margin-bottom: 18px; }
+.oneui-section-header { font-size: 16.5px; font-weight: 800; color: var(--cfg-text-main); letter-spacing: 0; padding: 2px 10px 0; margin: 6px 4px 10px; border-right: 3px solid #2C75FF; line-height: 1.3; }
+html[dir="ltr"] .oneui-section-header { border-right: 0; border-left: 3px solid #2C75FF; }
+.config-group, .oneui-card { margin-bottom: 18px; padding: 6px 16px; gap: 6px; border-radius: 22px; }
+.clean-toggle-row { min-height: 52px; }
+.oneui-row-with-sub { padding-top: 10px; padding-bottom: 10px; }
+.toggle-main-title { font-weight: 700; }
+.toggle-sub-desc { font-size: 12.5px; line-height: 1.5; }
+.config-label { font-weight: 700; color: var(--cfg-text-main); opacity: .85; }
+.help-btn-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 18px; }
+.help-btn-grid .guide-open-btn { margin: 0; min-height: 64px; padding: 8px 6px; font-size: 12.5px; line-height: 1.3; border-radius: 16px; }
+.settings-panel > .oneui-section-header:first-child { margin-top: 0; }
+@media (max-width: 360px) {
+  .show-actions-bar .reset-show-btn, .show-actions-bar .preshow-btn { font-size: 13px; }
+  .settings-tab { font-size: 11px; }
+}
+.help-btn-grid .guide-open-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; }
+.help-btn-grid .hb-ico { font-size: 20px; line-height: 1; }
+#unlockTargetSelector { grid-template-columns: 1fr 1fr !important; }
+.code-history-list { max-height: 228px; overflow-y: auto; overscroll-behavior: contain; }
+
+/* ==========================================================================
+   ✨ MAGIC LOCK AURORA (7.5) - עיצוב חדש להגדרות
+   רקע לילה עם זוהר צפוני נע, כרטיסי זכוכית עם מסגרת זוהרת,
+   שפה אחת של גרדיאנט (סגול ← אינדיגו ← טורקיז) לכל מה שדולק/נבחר.
+   ========================================================================== */
+.device-config-sheet {
+  --mg-a: #a78bfa;
+  --mg-b: #6366f1;
+  --mg-c: #22d3ee;
+  --mg-grad: linear-gradient(135deg, #8b5cf6 0%, #6366f1 48%, #06b6d4 100%);
+  --mg-glow: 0 8px 26px rgba(99, 102, 241, .45);
+  --mg-card: rgba(22, 20, 44, .62);
+  --mg-card-base: rgba(9, 8, 22, .55);
+  --mg-card-edge: linear-gradient(145deg, rgba(167, 139, 250, .42), rgba(255, 255, 255, .05) 38%, rgba(255, 255, 255, .03) 62%, rgba(34, 211, 238, .32));
+  --mg-track: rgba(8, 7, 20, .55);
+  --cfg-bg: #07060f;
+  --cfg-text-main: #f5f3ff;
+  --cfg-text-sub: #a5a3c4;
+  --cfg-text-muted: #a5a3c4;
+  --cfg-divider: rgba(167, 139, 250, .12);
+  --cfg-subbox-bg: rgba(255, 255, 255, .045);
+  --cfg-subbox-border: rgba(167, 139, 250, .16);
+  --cfg-seg-track: var(--mg-track);
+  --cfg-seg-border: rgba(167, 139, 250, .14);
+  --cfg-btn-surface: rgba(255, 255, 255, .07);
+  --cfg-btn-border: rgba(167, 139, 250, .22);
+  --cfg-switch-off: rgba(255, 255, 255, .14);
+  --cfg-header-bg: rgba(10, 9, 24, .55);
+  --cfg-header-border: rgba(167, 139, 250, .14);
+  --cfg-footer-grad: linear-gradient(180deg, rgba(7, 6, 15, 0) 0%, rgba(7, 6, 15, .88) 38%, #07060f 100%);
+  overflow: hidden;
+}
+.device-config-sheet.light-mode {
+  --mg-card: rgba(255, 255, 255, .78);
+  --mg-card-base: rgba(255, 255, 255, .5);
+  --mg-card-edge: linear-gradient(145deg, rgba(139, 92, 246, .38), rgba(255, 255, 255, .6) 40%, rgba(255, 255, 255, .6) 60%, rgba(6, 182, 212, .32));
+  --mg-track: rgba(99, 102, 241, .07);
+  --mg-glow: 0 8px 22px rgba(99, 102, 241, .3);
+  --cfg-bg: #f6f4ff;
+  --cfg-text-main: #1e1b4b;
+  --cfg-text-sub: #6b6890;
+  --cfg-text-muted: #6b6890;
+  --cfg-divider: rgba(99, 102, 241, .12);
+  --cfg-subbox-bg: rgba(99, 102, 241, .05);
+  --cfg-subbox-border: rgba(99, 102, 241, .16);
+  --cfg-seg-border: rgba(99, 102, 241, .14);
+  --cfg-btn-surface: rgba(255, 255, 255, .8);
+  --cfg-btn-border: rgba(99, 102, 241, .2);
+  --cfg-switch-off: rgba(30, 27, 75, .16);
+  --cfg-header-bg: rgba(246, 244, 255, .7);
+  --cfg-header-border: rgba(99, 102, 241, .14);
+  --cfg-footer-grad: linear-gradient(180deg, rgba(246, 244, 255, 0) 0%, rgba(246, 244, 255, .9) 38%, #f6f4ff 100%);
+}
+
+/* זוהר צפוני: שלושה כתמי אור רכים שזזים לאט (בלי filter - קל על הסוללה) */
+.device-config-sheet::before,
+.device-config-sheet::after {
+  content: '';
+  position: absolute;
+  pointer-events: none;
+  z-index: 0;
+  border-radius: 50%;
+  will-change: transform;
+}
+.device-config-sheet::before {
+  width: 140vw; height: 140vw; max-width: 760px; max-height: 760px;
+  top: -42vw; right: -46vw;
+  background: radial-gradient(circle at 50% 50%, rgba(139, 92, 246, .38) 0%, rgba(99, 102, 241, .16) 38%, rgba(7, 6, 15, 0) 68%);
+  animation: mgAuroraA 18s ease-in-out infinite alternate;
+}
+.device-config-sheet::after {
+  width: 130vw; height: 130vw; max-width: 700px; max-height: 700px;
+  bottom: -30vw; left: -50vw;
+  background: radial-gradient(circle at 50% 50%, rgba(6, 182, 212, .28) 0%, rgba(219, 39, 119, .1) 40%, rgba(7, 6, 15, 0) 68%);
+  animation: mgAuroraB 22s ease-in-out infinite alternate;
+}
+.device-config-sheet.light-mode::before { background: radial-gradient(circle, rgba(167, 139, 250, .35) 0%, rgba(167, 139, 250, .08) 42%, rgba(246, 244, 255, 0) 68%); }
+.device-config-sheet.light-mode::after { background: radial-gradient(circle, rgba(34, 211, 238, .26) 0%, rgba(244, 114, 182, .08) 42%, rgba(246, 244, 255, 0) 68%); }
+@keyframes mgAuroraA { from { transform: translate(0, 0) scale(1); } to { transform: translate(-14vw, 18vh) scale(1.15); } }
+@keyframes mgAuroraB { from { transform: translate(0, 0) scale(1.05); } to { transform: translate(18vw, -22vh) scale(.92); } }
+
+/* אבק כוכבים עדין */
+.device-config-sheet .config-body {
+  position: relative;
+  z-index: 1;
+  background-image:
+    radial-gradient(1px 1px at 12% 18%, rgba(255, 255, 255, .55), transparent 60%),
+    radial-gradient(1px 1px at 78% 9%, rgba(255, 255, 255, .4), transparent 60%),
+    radial-gradient(1.4px 1.4px at 61% 36%, rgba(196, 181, 253, .55), transparent 60%),
+    radial-gradient(1px 1px at 30% 64%, rgba(255, 255, 255, .35), transparent 60%),
+    radial-gradient(1.2px 1.2px at 88% 72%, rgba(165, 243, 252, .5), transparent 60%),
+    radial-gradient(1px 1px at 45% 90%, rgba(255, 255, 255, .3), transparent 60%);
+  background-attachment: local;
+}
+.device-config-sheet.light-mode .config-body { background-image: none; }
+.device-config-sheet .config-header { position: relative; z-index: 3; border-bottom-color: var(--cfg-header-border); }
+
+/* כרטיסי זכוכית עם מסגרת זוהרת */
+.device-config-sheet .config-group,
+.device-config-sheet .oneui-card {
+  background: linear-gradient(var(--mg-card), var(--mg-card)) padding-box, linear-gradient(var(--mg-card-base), var(--mg-card-base)) padding-box, var(--mg-card-edge) border-box;
+  border: 1px solid transparent;
+  border-radius: 26px;
+  box-shadow: 0 18px 40px rgba(3, 2, 12, .45), inset 0 1px 0 rgba(255, 255, 255, .06);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  padding: 8px 18px;
+}
+.device-config-sheet.light-mode .config-group,
+.device-config-sheet.light-mode .oneui-card { box-shadow: 0 14px 34px rgba(76, 29, 149, .1), inset 0 1px 0 rgba(255, 255, 255, .9); }
+
+/* כותרות קטעים: אייקון + כותרת + קו זוהר */
+.device-config-sheet .oneui-section-header,
+html[dir="ltr"] .device-config-sheet .oneui-section-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 0;
+  padding: 0 4px;
+  margin: 10px 2px 12px;
+  font-size: 15.5px;
+  font-weight: 800;
+  letter-spacing: .1px;
+  color: var(--cfg-text-main);
+}
+.device-config-sheet .oneui-section-header::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  border-radius: 1px;
+  background: linear-gradient(90deg, rgba(167, 139, 250, 0), rgba(167, 139, 250, .5) 60%, rgba(34, 211, 238, .7));
+}
+html[dir="rtl"] .device-config-sheet .oneui-section-header::after { background: linear-gradient(270deg, rgba(167, 139, 250, 0), rgba(167, 139, 250, .5) 60%, rgba(34, 211, 238, .7)); }
+
+/* לשוניות: "דוק" זכוכית צף, הלשונית הפעילה זוהרת */
+.device-config-sheet .settings-tabs {
+  background: linear-gradient(rgba(14, 12, 32, .78), rgba(14, 12, 32, .78)) padding-box, var(--mg-card-edge) border-box;
+  border: 1px solid transparent;
+  border-radius: 24px;
+  padding: 6px;
+  gap: 4px;
+  box-shadow: 0 14px 34px rgba(3, 2, 12, .5);
+}
+.device-config-sheet.light-mode .settings-tabs { background: linear-gradient(rgba(255, 255, 255, .86), rgba(255, 255, 255, .86)) padding-box, var(--mg-card-edge) border-box; box-shadow: 0 10px 26px rgba(76, 29, 149, .12); }
+.device-config-sheet .settings-tab { border-radius: 18px; padding: 8px 2px 7px; color: var(--cfg-text-sub); font-weight: 700; }
+.device-config-sheet .settings-tab .tab-ico { font-size: 20px; filter: saturate(.75); }
+.device-config-sheet .settings-tab.active {
+  background: var(--mg-grad);
+  color: #fff;
+  box-shadow: var(--mg-glow), inset 0 1px 0 rgba(255, 255, 255, .25);
+}
+.device-config-sheet .settings-tab.active .tab-ico { filter: none; transform: scale(1.15) translateY(-1px); }
+
+/* כפתורי הופעה */
+.device-config-sheet .show-actions-bar .reset-show-btn {
+  background: linear-gradient(135deg, #10b981 0%, #059669 55%, #0d9488 100%);
+  box-shadow: 0 10px 26px rgba(16, 185, 129, .38), inset 0 1px 0 rgba(255, 255, 255, .25);
+  border-radius: 18px;
+}
+.device-config-sheet .show-actions-bar .preshow-btn {
+  background: linear-gradient(rgba(16, 185, 129, .1), rgba(16, 185, 129, .1)) padding-box, linear-gradient(#0c0b1c, #0c0b1c) padding-box, linear-gradient(135deg, rgba(52, 211, 153, .75), rgba(34, 211, 238, .45)) border-box;
+  border: 1px solid transparent;
+  color: #6ee7b7;
+  border-radius: 18px;
+}
+.device-config-sheet.light-mode .show-actions-bar .preshow-btn { background: linear-gradient(rgba(16, 185, 129, .08), rgba(16, 185, 129, .08)) padding-box, linear-gradient(#fff, #fff) padding-box, linear-gradient(135deg, rgba(16, 185, 129, .6), rgba(6, 182, 212, .4)) border-box; }
+.device-config-sheet.light-mode .show-actions-bar .preshow-btn { color: #047857; }
+
+/* מתגים: גרדיאנט וזוהר כשדולק */
+.device-config-sheet .switch { width: 50px; height: 30px; }
+.device-config-sheet .slider { background: var(--cfg-switch-off); border: 1px solid rgba(255, 255, 255, .08); }
+.device-config-sheet .slider:before { width: 24px; height: 24px; left: 2px; bottom: 2px; box-shadow: 0 3px 8px rgba(0, 0, 0, .35); }
+.device-config-sheet .switch input:checked + .slider { background: var(--mg-grad); border-color: rgba(255, 255, 255, .18); box-shadow: 0 0 0 3px rgba(99, 102, 241, .16), 0 6px 18px rgba(99, 102, 241, .45); }
+.device-config-sheet .switch input:checked + .slider:before { transform: translateX(20px); }
+
+/* בוררים */
+.device-config-sheet .segmented-row { background: var(--mg-track); border-color: var(--cfg-seg-border); border-radius: 18px; padding: 5px; }
+.device-config-sheet .seg-pill { border-radius: 13px; font-weight: 600; }
+.device-config-sheet .seg-pill.active { background: var(--mg-grad); border-color: rgba(255, 255, 255, .18); box-shadow: var(--mg-glow); color: #fff; }
+
+/* דגמי טלפון */
+.device-config-sheet .model-preset-btn,
+.device-config-sheet .model-preset-chip { border-radius: 16px; background: var(--cfg-subbox-bg); border-color: var(--cfg-subbox-border); }
+.device-config-sheet .model-preset-btn.active,
+.device-config-sheet .model-preset-chip.active,
+.device-config-sheet:not(.light-mode) .model-preset-btn.active,
+.device-config-sheet:not(.light-mode) .model-preset-chip.active { background: var(--mg-grad); border-color: rgba(255, 255, 255, .2); color: #fff; box-shadow: var(--mg-glow); }
+.device-config-sheet .model-preset-btn.active .model-preset-sub,
+.device-config-sheet:not(.light-mode) .model-preset-btn.active .model-preset-sub { color: rgba(255, 255, 255, .8); }
+
+/* כפתורים משניים */
+.device-config-sheet .media-upload-btn { border: 1px solid var(--cfg-btn-border); background: var(--cfg-btn-surface); border-radius: 16px; font-weight: 600; }
+.device-config-sheet .bio-enroll-toggle-btn { background: var(--mg-grad); color: #fff; border: 0; box-shadow: var(--mg-glow); }
+.device-config-sheet .guide-open-btn { background: linear-gradient(var(--mg-card), var(--mg-card)) padding-box, var(--mg-card-edge) border-box; border: 1px solid transparent; color: var(--cfg-text-main); border-radius: 20px; }
+.device-config-sheet .trick-tip-btn { border: 0; background: var(--mg-grad); color: #fff; box-shadow: 0 3px 10px rgba(99, 102, 241, .4); }
+.device-config-sheet .last-captured-pill strong,
+.device-config-sheet:not(.light-mode) .last-captured-pill strong { background: var(--mg-grad); -webkit-background-clip: text; background-clip: text; color: transparent; font-size: 20px; }
+.device-config-sheet .feedback-textarea { border-radius: 16px; }
+.device-config-sheet .oneui-card-divider { background: linear-gradient(90deg, transparent, var(--cfg-divider) 15%, var(--cfg-divider) 85%, transparent); }
+
+/* "שמור וסגור": גרדיאנט עם ברק שעובר */
+.device-config-sheet .config-footer { z-index: 25; }
+.device-config-sheet .launch-lockscreen-btn {
+  position: relative;
+  overflow: hidden;
+  background: var(--mg-grad);
+  box-shadow: 0 12px 32px rgba(99, 102, 241, .5), inset 0 1px 0 rgba(255, 255, 255, .28);
+  font-weight: 800;
+  font-size: 16.5px;
+  letter-spacing: .2px;
+  color: #fff;
+}
+.device-config-sheet .launch-lockscreen-btn::after {
+  content: '';
+  position: absolute;
+  top: 0; bottom: 0; width: 40%;
+  left: -60%;
+  background: linear-gradient(100deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, .35) 50%, rgba(255, 255, 255, 0) 100%);
+  animation: mgShine 4.5s ease-in-out infinite;
+}
+@keyframes mgShine { 0%, 60% { left: -60%; } 85%, 100% { left: 130%; } }
+
+/* כניסה מדורגת של הכרטיסים בכל מעבר לשונית */
+.device-config-sheet .settings-panel.active > * { animation: mgRise .5s cubic-bezier(.22, 1, .36, 1) both; }
+.device-config-sheet .settings-panel.active > *:nth-child(2) { animation-delay: .04s; }
+.device-config-sheet .settings-panel.active > *:nth-child(3) { animation-delay: .08s; }
+.device-config-sheet .settings-panel.active > *:nth-child(4) { animation-delay: .12s; }
+.device-config-sheet .settings-panel.active > *:nth-child(5) { animation-delay: .16s; }
+.device-config-sheet .settings-panel.active > *:nth-child(n+6) { animation-delay: .2s; }
+@keyframes mgRise { from { opacity: 0; transform: translateY(14px) scale(.985); } to { opacity: 1; transform: none; } }
+.device-config-sheet .settings-panel.active { animation: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .device-config-sheet::before, .device-config-sheet::after, .device-config-sheet .launch-lockscreen-btn::after, .device-config-sheet .settings-panel.active > * { animation: none !important; }
+}
+
+/* ==========================================================================
+   7.6 - גרסה לקוסמים: רק מה שעובד
+   ========================================================================== */
+/* אייפון: מסך הבית = צילום מסך הבית של הקוסם, מיושר למעלה בדיוק כמו המסך האמיתי */
+html.real-ios .fake-homescreen.has-custom-image { background-position: top center; background-size: cover; background-repeat: no-repeat; }
+.home-status-mask { display: none; }
+/* השעה/הסוללה שבתוך הצילום "נמרחות" לצבע הטפט - ומעליהן מופיעה שורת הסטטוס האמיתית והחיה של האייפון */
+html.real-ios .fake-homescreen.has-custom-image .home-status-mask {
+  display: block;
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: max(env(safe-area-inset-top, 0px), 47px);
+  overflow: hidden;
+  z-index: 3;
+  pointer-events: none;
+}
+html.real-ios .fake-homescreen.has-custom-image .home-status-mask { background-size: 100% 100%; background-repeat: no-repeat; -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 84%, transparent 100%); mask-image: linear-gradient(180deg, #000 0%, #000 84%, transparent 100%); }
+.home-shot-warn { margin-top: 6px; padding: 10px 12px; border-radius: 14px; background: rgba(239, 68, 68, .14); border: 1px solid rgba(239, 68, 68, .45); color: #fca5a5; font-size: 13px; font-weight: 700; line-height: 1.5; }
+.device-config-sheet.light-mode .home-shot-warn { color: #b91c1c; }
+
+/* אייפון: מסתירים מה שאפל לא מאפשרת (רטט מאתר, שעון חכם, ווידג'ט) - שהקוסם לא ינסה ויחשוב שזה תקול */
+html.real-ios .clean-toggle-row:has(#toggleHapticPeek),
+html.real-ios .clean-toggle-row:has(#toggleWatchPeek),
+html.real-ios #watchPeekExtra,
+html.real-ios #watchPeekExtra + .oneui-card-divider,
+html.real-ios .config-group:has(#pinQuickWidgetBtn),
+html.real-ios .oneui-section-header:has(+ .config-group #pinQuickWidgetBtn) { display: none !important; }
+
+/* 🎂 "לא תאריך" בהצצה */
+.peek-birthday.not-date { color: #fca5a5; }

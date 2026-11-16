@@ -8,7 +8,10 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Lockscreen">
   <!-- אייפון אמיתי: שורת הסטטוס וה-Dynamic Island האמיתיים תמיד מוצגים - לכן לא מציירים מזויפים מתחתם -->
-  <script>(function(){var u=navigator.userAgent||'';if(/iPhone|iPad|iPod/.test(u)||(/Macintosh/.test(u)&&navigator.maxTouchPoints>1))document.documentElement.classList.add('real-ios');})();</script>
+  <script>(function(){var u=navigator.userAgent||'';if(/iPhone|iPad|iPod/.test(u)||(/Macintosh/.test(u)&&navigator.maxTouchPoints>1)){var d=document.documentElement;d.classList.add('real-ios');
+/* באג ידוע של iOS באפליקציה מהמסך הבית: הגובה נחתך מעל פס הבית - מותחים לגובה המסך הפיזי */
+var fit=function(){var st=navigator.standalone||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);var h=window.innerHeight;if(st){var p=window.innerWidth<window.innerHeight;var sh=p?Math.max(screen.width,screen.height):Math.min(screen.width,screen.height);if(sh>h)h=sh;}d.style.setProperty('--ios-h',h+'px');};
+fit();addEventListener('resize',fit);addEventListener('orientationchange',function(){setTimeout(fit,300);});}})();</script>
   <meta name="mobile-web-app-capable" content="yes">
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
@@ -16,8 +19,46 @@
   <title>Lockscreen</title>
   <link rel="manifest" href="manifest.json">
   <link id="mainStylesheet" rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="fake-settings.css">
 </head>
 <body>
+  <!-- אייפון: אם האפליקציה נפתחה בתוך Safari (ולא מהאייקון) - קודם מוסיפים למסך הבית.
+       אחרת ההרשמה נשמרת "בתוך Safari" בלבד, ובפתיחה מהאייקון היא מבקשת שוב קוד. -->
+  <div class="ios-install-gate" id="iosInstallGate" style="display:none;">
+    <div class="iig-card">
+      <div class="iig-icon">📲</div>
+      <h2 class="iig-title" data-he="עוד צעד אחד" data-en="One more step"></h2>
+      <p class="iig-sub" data-he="כדי שהאפליקציה תיראה בדיוק כמו מסך נעילה אמיתי (בלי הסרגל של Safari) ותזכור אותך - מוסיפים אותה למסך הבית:" data-en="So the app looks exactly like a real lock screen (no Safari bar) and remembers you - add it to your home screen:"></p>
+      <ol class="iig-steps">
+        <li data-he="לוחצים על כפתור השיתוף ⬆️ בסרגל של Safari" data-en="Tap the Share button ⬆️ in Safari's bar"></li>
+        <li data-he="בוחרים &quot;הוסף למסך הבית&quot; ← &quot;הוסף&quot;" data-en="Choose &quot;Add to Home Screen&quot; → &quot;Add&quot;"></li>
+        <li data-he="פותחים את Magic Lock מהאייקון החדש במסך הבית" data-en="Open Magic Lock from the new icon on your home screen"></li>
+      </ol>
+      <p class="iig-warn" id="iigNotSafari" style="display:none;" data-he="⚠️ פתחת בדפדפן אחר - צריך לפתוח את הקישור ב-Safari." data-en="⚠️ You opened this in another browser - open the link in Safari."></p>
+      <button type="button" class="iig-skip" id="iigSkip" data-he="המשך בכל זאת בדפדפן" data-en="Continue in the browser anyway"></button>
+    </div>
+  </div>
+  <script>
+    (function () {
+      var u = navigator.userAgent || '';
+      var ios = /iPhone|iPod/.test(u) || (/iPad/.test(u)) || (/Macintosh/.test(u) && navigator.maxTouchPoints > 1);
+      var standalone = window.navigator.standalone === true || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+      if (!ios || standalone) return;
+      try { if (sessionStorage.getItem('iig_skip') === '1') return; } catch (e) {}
+      var tz = ''; try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch (e) {}
+      var langs = [].concat(navigator.languages || [], navigator.language || []);
+      var he = /^(Asia\/Jerusalem|Asia\/Tel_Aviv)$/.test(tz) || langs.some(function (l) { return /^(he|iw)/i.test(l); });
+      var gate = document.getElementById('iosInstallGate');
+      gate.dir = he ? 'rtl' : 'ltr';
+      [].forEach.call(gate.querySelectorAll('[data-he]'), function (el) { el.textContent = he ? el.getAttribute('data-he') : el.getAttribute('data-en'); });
+      if (/CriOS|FxiOS|EdgiOS|OPiOS|FBAN|FBAV|Instagram/.test(u)) document.getElementById('iigNotSafari').style.display = '';
+      gate.style.display = 'flex';
+      document.getElementById('iigSkip').onclick = function () {
+        try { sessionStorage.setItem('iig_skip', '1'); } catch (e) {}
+        gate.style.display = 'none';
+      };
+    })();
+  </script>
 
   <!-- ========================================================================
        0. מסך הרשמה פשוט ללקוח (שם מלא + טלפון -> ממתין לאישור מרחוק)
@@ -124,6 +165,14 @@
           <p>כמה שניות אחרי שהטלפון נפתח, מגיעה הודעה שבתוכה הקוד שהצופה בחר. בהגדרות בוחרים את שם השולח, את התמונה, את הטקסט (<b>{קוד}</b> מוחלף בקוד) ואחרי כמה שניות ההודעה מגיעה.</p>
         </details>
         <details>
+          <summary>🏠 אחרי הפתיחה: מסך הבית</summary>
+          <p>באנדרואיד: הטלפון יוצא באמת למסך הבית האמיתי שלך.<br>באייפון: אפל לא מאפשרת לאף אפליקציה לצאת לבד למסך הבית, לכן מוצג צילום של מסך הבית שלך - עם השעה והסוללה האמיתיות למעלה.<br>פעם אחת: במסך הבית לוחצים צד + עוצמה למעלה, ואז לשונית חשיפה ← "בחר צילום של מסך הבית שלך".</p>
+        </details>
+        <details>
+          <summary>🎂 תאריך לידה</summary>
+          <p>1. אומרים לצופה: "תחשוב על מישהו שאתה אוהב, ותקליד כקוד את תאריך הלידה שלו: יום, חודש ושנה - 6 ספרות. אל תגיד לי של מי." (15 במרץ 1992 = 150392)<br>2. לחיצה ארוכה במסך: מתחת לקוד מופיעים מזל, גיל ויום בשבוע.<br>3. אם כתוב "❌ לא תאריך" - הצופה לא הקליד תאריך: עוברים לחשיפה רגילה של הקוד.<br>4. סדר החשיפה: קודם מי זה לפי הגיל ("מישהו צעיר... הילד שלך?"), אחר כך המזל, ובסוף היום שבו נולד.<br>💡 לעולם לא חושפים את התאריך עצמו - ככה זה קריאת מחשבות ולא "ראית את הקוד".</p>
+        </details>
+        <details style="display: none;">
           <summary>📝 חשיפה בפתקים</summary>
           <p>בלשונית <b>מראה</b> מדליקים "חשיפה בפתקים". אחרי שהטלפון נפתח מופיע פתק שבו כבר כתוב הקוד שהצופה בחר, עם שעה מוקדמת ("לפני שעה" / "אתמול"), כאילו חזית אותו מראש. במקום שבו המספר צריך להופיע כותבים <b>{קוד}</b>.</p>
         </details>
@@ -284,7 +333,7 @@
       <!-- חצי עליון: Samsung Galaxy (One UI) -->
       <div class="split-half split-samsung" id="chooseSamsungBtn">
         <div class="split-half-inner">
-          <div class="split-badge">ONE UI</div>
+          <div class="split-badge">ANDROID</div>
           <div class="split-icon">
             <svg viewBox="0 0 48 48" width="46" height="46" fill="none">
               <rect x="11" y="4" width="26" height="40" rx="5.5" stroke="currentColor" stroke-width="2.5"/>
@@ -292,8 +341,12 @@
               <circle cx="24" cy="36.5" r="3.2" stroke="currentColor" stroke-width="1.8" stroke-dasharray="2 2"/>
             </svg>
           </div>
-          <h2 class="split-title">Samsung Galaxy</h2>
-          <p class="split-subtitle">ממשק One UI מדויק 1:1</p>
+          <h2 class="split-title">אנדרואיד</h2>
+          <div class="split-brands">
+            <button type="button" class="split-brand" data-brand="samsung">Samsung</button>
+            <button type="button" class="split-brand" data-brand="pixel">Pixel</button>
+            <button type="button" class="split-brand" data-brand="xiaomi">Xiaomi</button>
+          </div>
         </div>
       </div>
 
@@ -365,40 +418,26 @@
         </div>
 
         <!-- לשוניות ההגדרות: כל לשונית מציגה רק את מה ששייך אליה (פחות גלילה) -->
-        <nav class="settings-tabs" id="settingsTabs" role="tablist">
-          <button type="button" class="settings-tab active" data-tab="trick" role="tab"><span class="tab-ico">🎯</span><span>טריק</span></button>
-          <button type="button" class="settings-tab" data-tab="peek" role="tab"><span class="tab-ico">👁️</span><span>הצצה</span></button>
-          <button type="button" class="settings-tab" data-tab="look" role="tab"><span class="tab-ico">🎨</span><span>מראה</span></button>
-          <button type="button" class="settings-tab" data-tab="security" role="tab"><span class="tab-ico">🔐</span><span>אבטחה</span></button>
-          <button type="button" class="settings-tab" data-tab="more" role="tab"><span class="tab-ico">⚙️</span><span>עוד</span></button>
-        </nav>
-
-        <!-- ===================== לשונית: טריק ===================== -->
-        <section class="settings-panel active" data-tab="trick">
-
+        <!-- כפתורי הופעה: תמיד זמינים בראש ההגדרות -->
         <div class="trial-banner" id="trialBanner" style="display: none;">
           <span id="trialBannerText"></span>
           <button type="button" class="trial-banner-btn" id="trialBuyBtn">לרכישה</button>
         </div>
-        <button type="button" class="reset-show-btn" id="resetShowBtn">🔄 מוכן לצופה הבא</button>
-        <button type="button" class="preshow-btn" id="preShowCheckBtn">✅ בדיקה לפני הופעה</button>
-
-        <div class="oneui-section-header">רוטינות שמורות</div>
-        <div class="config-group oneui-card">
-          <div class="oneui-field-block">
-            <div class="toggle-sub-desc" style="margin-bottom: 8px;">שומרים את כל ההגדרות הנוכחיות בשם, ועוברים בין טריקים בלחיצה אחת.</div>
-            <div class="routine-save-row">
-              <input type="text" id="routineNameInput" class="feedback-textarea routine-name-input" maxlength="30" placeholder="שם הרוטינה, למשל: PIN בניסיון שני" dir="rtl">
-              <button type="button" class="media-upload-btn routine-save-btn" id="routineSaveBtn">שמור</button>
-            </div>
-            <div class="routine-list" id="routineList"></div>
-          </div>
+        <div class="show-actions-bar">
+          <button type="button" class="reset-show-btn" id="resetShowBtn">🔄 מוכן לצופה הבא</button>
+          <button type="button" class="preshow-btn" id="preShowCheckBtn">✅ בדיקה לפני הופעה</button>
         </div>
 
-        <!-- ================================================================
-             קטגוריה 1: מצבי מנטליזם וקסמים (Mentalism Controls)
-             ================================================================ -->
-        <div class="oneui-section-header">מצבי מנטליזם וקסמים</div>
+        <!-- לשוניות: טריק (מה קורה) · חשיפה (אחרי הפתיחה) · הצצה (איך אתה יודע) · מראה · עוד -->
+        <nav class="settings-tabs" id="settingsTabs" role="tablist">
+          <button type="button" class="settings-tab active" data-tab="trick" role="tab"><span class="tab-ico">🎯</span><span>טריק</span></button>
+          <button type="button" class="settings-tab" data-tab="reveal" role="tab"><span class="tab-ico">🎬</span><span>חשיפה</span></button>
+          <button type="button" class="settings-tab" data-tab="peek" role="tab"><span class="tab-ico">👁️</span><span>הצצה</span></button>
+          <button type="button" class="settings-tab" data-tab="look" role="tab"><span class="tab-ico">📱</span><span>מראה</span></button>
+          <button type="button" class="settings-tab" data-tab="more" role="tab"><span class="tab-ico">⚙️</span><span>עוד</span></button>
+        </nav>
+        <section class="settings-panel active" data-tab="trick">
+        <div class="oneui-section-header">🔓 הבסיס</div>
         <div class="config-group oneui-card">
           <div class="clean-toggle-row oneui-row-with-sub">
             <div class="toggle-text-stack">
@@ -427,9 +466,169 @@
               הטלפון נפתח כבר בניסיון הראשון.
             </div>
           </div>
+        </div>
+
+        <div class="oneui-section-header">✨ קסמים מיוחדים</div>
+        <div class="config-group oneui-card">
+          <!-- הוסתר בגרסה 7.6 (לא נמחק): תחליף לי את הסיסמה + הטלפון מזהה את הצופה -->
+          <div class="retired-feature" style="display: none;">
+          <!-- "תחליף לי את הסיסמה": הגדרות סמסונג מזויפות, הצופה קובע PIN חדש -->
+          <div class="clean-toggle-row oneui-row-with-sub">
+            <div class="toggle-text-stack">
+              <span class="toggle-main-title">⚙️ תחליף לי את הסיסמה</span>
+              <span class="toggle-sub-desc">במקום מסך נעילה נפתחות "ההגדרות" של סמסונג. הצופה קובע לך PIN חדש - והקוד מגיע אליך בסתר.</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="toggleSettingsTrick">
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="oneui-field-block" id="settingsTrickExtra" style="display: none; padding-top: 0;">
+            <label class="config-label" for="settingsTrickName">השם שמופיע בראש ההגדרות (החשבון שלך)</label>
+            <input type="text" id="settingsTrickName" class="feedback-textarea gallery-text-input" maxlength="40" dir="rtl">
+            <div class="toggle-sub-desc" style="margin-top: 8px; line-height: 1.6;">
+              איך זה עובד: "שמור וסגור" פותח את ההגדרות. אחרי שהצופה מאשר את ה-PIN, הטלפון חוזר להגדרות.
+              מכבים את המסך בלחצן הצד - וכשמדליקים, הטלפון נעול ורק הקוד של הצופה פותח אותו.
+            </div>
+          </div>
 
           <div class="oneui-card-divider"></div>
 
+          <!-- הטלפון מזהה את הצופה: לא נפתח לקוסם, נפתח לצופה - והצופה כבר על הטפט -->
+          <div class="clean-toggle-row oneui-row-with-sub">
+            <div class="toggle-text-stack">
+              <span class="toggle-main-title">🤳 הטלפון מזהה את הצופה</span>
+              <span class="toggle-sub-desc">הטלפון לא נפתח לפנים שלך - אבל נפתח מיד לצופה. ובמסך הבית: תמונה של הצופה כטפט.</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="toggleFaceTrick">
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="oneui-field-block" id="faceTrickExtra" style="display: none; padding-top: 0;">
+            <label class="config-label">כמה פעמים זה "נכשל" לך לפני שמגישים לצופה</label>
+            <div class="segmented-row" id="faceTrickFailsSelector">
+              <button type="button" class="seg-pill" data-fails="1">1</button>
+              <button type="button" class="seg-pill" data-fails="2">2</button>
+              <button type="button" class="seg-pill" data-fails="3">3</button>
+            </div>
+            <div class="toggle-sub-desc" style="margin-top: 8px; line-height: 1.6;">
+              איך מפעילים סריקה: נגיעה במסך (לא על המקשים) או החלקה למעלה.
+              התמונה נשארת רק בטלפון ונמחקת ב"מוכן לצופה הבא".
+            </div>
+            <div class="toggle-sub-desc" id="faceTrickCamNote" style="margin-top: 6px; font-weight: 600;"></div>
+          </div>
+
+          </div>
+
+          <!-- תאריך לידה: הצופה מקליד כקוד תאריך לידה של מישהו קרוב - הקוסם יודע מזל, גיל ועוד -->
+          <div class="clean-toggle-row oneui-row-with-sub">
+            <div class="toggle-text-stack">
+              <span class="toggle-main-title">🎂 תאריך לידה</span>
+              <span class="toggle-sub-desc">הצופה מקליד כקוד תאריך לידה של מישהו שהוא אוהב, בלי לומר של מי. אתה מקבל בסתר: מזל, גיל, באיזה יום בשבוע נולד ועוד.</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="toggleBirthdayTrick">
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="oneui-field-block" id="birthdayTrickExtra" style="display: none; padding-top: 0;">
+            <label class="config-label">איך הצופה מקליד את התאריך</label>
+            <div class="segmented-row" id="birthdayLenSelector">
+              <button type="button" class="seg-pill" data-blen="4">4 ספרות</button>
+              <button type="button" class="seg-pill" data-blen="6">6 ספרות</button>
+              <button type="button" class="seg-pill" data-blen="8">8 ספרות</button>
+            </div>
+            <div class="toggle-sub-desc" id="birthdayLenExample" style="margin-top: 6px; font-weight: 600;"></div>
+            <label class="config-label" style="margin-top: 12px;">סדר התאריך</label>
+            <div class="segmented-row" id="birthdayOrderSelector">
+              <button type="button" class="seg-pill" data-border="dm">יום ואז חודש</button>
+              <button type="button" class="seg-pill" data-border="md">חודש ואז יום</button>
+            </div>
+            <div class="toggle-sub-desc" style="margin-top: 8px; line-height: 1.6;">
+              איפה רואים: לחיצה ארוכה על המסך (מתחת לקוד), לשונית "הצצה" (פירוט מלא) ושעון חכם.
+              אם הצופה הקליד משהו שאינו תאריך - יופיע "❌ לא תאריך", ואז חושפים את הקוד כרגיל. הסבר מלא ומה אומרים לצופה: כפתור ה-?
+            </div>
+          </div>
+        </div>
+
+        <div class="oneui-section-header">💾 רוטינות שמורות</div>
+        <div class="config-group oneui-card">
+          <div class="oneui-field-block">
+            <div class="toggle-sub-desc" style="margin-bottom: 8px;">שומרים את כל ההגדרות הנוכחיות בשם, ועוברים בין טריקים בלחיצה אחת.</div>
+            <div class="routine-save-row">
+              <input type="text" id="routineNameInput" class="feedback-textarea routine-name-input" maxlength="30" placeholder="שם הרוטינה, למשל: PIN בניסיון שני" dir="rtl">
+              <button type="button" class="media-upload-btn routine-save-btn" id="routineSaveBtn">שמור</button>
+            </div>
+            <div class="routine-list" id="routineList"></div>
+          </div>
+        </div>
+        </section>
+
+        <section class="settings-panel" data-tab="reveal">
+        <div class="oneui-section-header">🏠 אחרי הפתיחה</div>
+        <div class="config-group oneui-card">
+          <div class="oneui-field-block">
+            <span class="toggle-main-title">הטלפון נפתח למסך הבית האמיתי</span>
+            <span class="toggle-sub-desc" id="homeTargetNote">באנדרואיד הטלפון יוצא באמת למסך הבית שלך.</span>
+            <div class="home-shot-warn" id="homeShotWarn" style="display: none;">⚠️ באייפון חובה: צלם את מסך הבית שלך (צד + עוצמה למעלה) ובחר אותו כאן. בלי זה הצופה יראה מסך ריק.</div>
+          </div>
+          <!-- הוסתר בגרסה 7.6 (לא נמחק): יעדים חלופיים אחרי הפתיחה - פתקים / גלריה / חיפוש / תחזית בפתקים -->
+          <div class="retired-feature" style="display: none;">
+          <div class="oneui-field-block">
+            <label class="config-label">מה הצופה רואה כשהטלפון נפתח</label>
+            <div class="segmented-row" id="unlockTargetSelector">
+              <button type="button" class="seg-pill active" data-target="homescreen">🏠 מסך בית</button>
+              <button type="button" class="seg-pill" data-target="notes">📝 פתקים</button>
+              <button type="button" class="seg-pill" data-target="gallery">🖼️ גלריה</button>
+              <button type="button" class="seg-pill" data-target="search">🔍 חיפוש</button>
+            </div>
+          </div>
+          <div class="oneui-field-block" id="searchRevealExtra" style="display: none; padding-top: 0;">
+            <span class="toggle-sub-desc">אחרי הפתיחה נפתח מסך חיפוש, והחיפוש האחרון (מ"אתמול") הוא הקוד או המילה שהצופה בחר.</span>
+            <label class="config-label" for="searchTextInput" style="margin-top: 8px;">מה חיפשת "אתמול" ({קוד} יוחלף בקוד)</label>
+            <input type="text" id="searchTextInput" class="feedback-textarea gallery-text-input" maxlength="60" dir="rtl">
+          </div>
+          <div class="oneui-field-block" id="galleryRevealExtra" style="display: none; padding-top: 0;">
+            <span class="toggle-sub-desc">אחרי הפתיחה נפתחת הגלריה, והתמונה האחרונה (מ"אתמול") היא פתק בכתב יד עם הקוד שהצופה בחר.</span>
+            <label class="config-label" for="galleryTextInput" style="margin-top: 8px;">מה כתוב על הפתק ({קוד} יוחלף בקוד)</label>
+            <input type="text" id="galleryTextInput" class="feedback-textarea gallery-text-input" maxlength="40" dir="rtl">
+          </div>
+          <div class="oneui-card-divider"></div>
+          <!-- חשיפה בפתקים: "תחזית" שכאילו נכתבה מראש -->
+          <div class="clean-toggle-row oneui-row-with-sub">
+            <div class="toggle-text-stack">
+              <span class="toggle-main-title">📝 חשיפה בפתקים (תחזית)</span>
+              <span class="toggle-sub-desc">אחרי הפתיחה נפתח פתק שבו כבר כתוב הקוד שהצופה בחר, עם שעה מוקדמת, כאילו חזית אותו מראש.</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="toggleNotesReveal">
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="oneui-field-block" id="notesRevealExtra" style="display: none; padding-top: 0;">
+            <label class="config-label" for="notesTemplateInput">תוכן הפתק ({קוד} יוחלף בקוד שהוקלד)</label>
+            <textarea id="notesTemplateInput" class="feedback-textarea" rows="5" maxlength="600" dir="rtl"></textarea>
+            <label class="config-label" style="margin-top: 8px;">הפתק "נכתב"</label>
+            <div class="segmented-row notes-age-row" id="notesAgeSelector">
+              <button type="button" class="seg-pill" data-age="15">לפני רבע שעה</button>
+              <button type="button" class="seg-pill active" data-age="60">לפני שעה</button>
+              <button type="button" class="seg-pill" data-age="180">לפני 3 שעות</button>
+              <button type="button" class="seg-pill" data-age="yesterday">אתמול</button>
+            </div>
+          </div>
+          </div>
+          <div class="media-actions-row">
+            <label class="media-upload-btn">
+              <span>📷 בחר צילום של מסך הבית שלך</span>
+              <input type="file" id="homescreenFileInput" accept="image/*" hidden>
+            </label>
+            <button type="button" class="media-clear-btn" id="clearHomescreenBtn" style="display: none;">איפוס מסך בית</button>
+          </div>
+        </div>
+
+        <div class="oneui-section-header">💥 חשיפה בהפתעה</div>
+        <div class="config-group oneui-card">
           <!-- חשיפה בהתראה -->
           <div class="clean-toggle-row oneui-row-with-sub">
             <div class="toggle-text-stack">
@@ -466,112 +665,7 @@
             <button type="button" class="media-upload-btn" id="revealTestBtn" style="width: 100%; margin-top: 10px;">נסה עכשיו (עם הקוד 1234)</button>
             <div class="toggle-sub-desc" id="revealStatus" style="margin-top: 6px; min-height: 16px;"></div>
           </div>
-        </div>
-
-        </section>
-
-        <!-- ===================== לשונית: מראה ===================== -->
-        <section class="settings-panel" data-tab="look">
-
-        <!-- ================================================================
-             קטגוריה 2: התאמה חזותית של מסך הנעילה (Lockscreen Appearance)
-             ================================================================ -->
-        <div class="oneui-section-header">התאמה חזותית של מסך הנעילה</div>
-        <div class="config-group oneui-card">
-          <!-- בחירת טפט עם תצוגה מקדימה עגולה וקטנה של הטפט הנוכחי -->
-          <div class="oneui-wallpaper-picker-row">
-            <div class="toggle-text-stack">
-              <span class="toggle-main-title">בחירת טפט</span>
-              <span class="toggle-sub-desc">טפט מובנה של הדגם או העלאת תמונה מהגלריה</span>
-            </div>
-            <div class="wallpaper-actions-inline">
-              <button type="button" class="wallpaper-preview-pill-btn" id="cycleWallpaperBtn" title="החלף טפט">
-                <span class="wp-circle-preview" id="currentWallpaperCirclePreview"></span>
-                <span>החלף טפט</span>
-              </button>
-              <label class="wallpaper-upload-icon-btn" title="העלה טפט אישי">
-                <span>גלריה</span>
-                <input type="file" id="wallpaperFileInput" accept="image/*" hidden>
-              </label>
-              <button type="button" class="media-clear-btn" id="clearWallpaperBtn" style="display: none;">איפוס</button>
-            </div>
-          </div>
-
-          <div class="wallpaper-gallery-row" id="wallpaperGalleryRow"></div>
-
           <div class="oneui-card-divider"></div>
-
-          <!-- בחירת מצב נעילה: הועברה לחלון שקופץ אחרי "שמור וסגור" (lockTypeChooser). נשאר מוסתר לתאימות. -->
-          <div class="oneui-field-block" style="display: none;">
-            <label class="config-label">בחירת מצב נעילה</label>
-            <div class="segmented-row" id="modeSelector">
-              <button type="button" class="seg-pill active" data-mode="pin">PIN</button>
-              <button type="button" class="seg-pill" data-mode="words">סיסמה</button>
-              <button type="button" class="seg-pill" data-mode="pattern">דפוס</button>
-              <button type="button" class="seg-pill" data-mode="swipe">החלקה</button>
-            </div>
-          </div>
-
-          <!-- בורר אורך קוד PIN: 4 ספרות או 6 ספרות (פתיחה מיידית בהקשת הספרה האחרונה ללא OK) -->
-          <div id="pinLengthGroup">
-            <div class="oneui-card-divider"></div>
-            <div class="oneui-field-block">
-              <label class="config-label">אורך קוד PIN (פתיחה אוטומטית ללא צורך ב-OK)</label>
-              <div class="segmented-row" id="pinLengthSelector">
-                <button type="button" class="seg-pill active" data-pinlen="4">4 ספרות</button>
-                <button type="button" class="seg-pill" data-pinlen="6">6 ספרות</button>
-              </div>
-            </div>
-          </div>
-
-          <!-- דפוס בלתי נראה (מוצג רק במצב Pattern) -->
-          <div id="stealthPatternGroup" style="display: none;">
-            <div class="oneui-card-divider"></div>
-            <div class="clean-toggle-row">
-              <span class="toggle-main-title">דפוס בלתי נראה (ללא קו מצויר)</span>
-              <label class="switch">
-                <input type="checkbox" id="toggleStealthPattern">
-                <span class="slider"></span>
-              </label>
-            </div>
-          </div>
-
-          <div class="oneui-card-divider"></div>
-
-          <!-- בחירת דגם מכשיר -->
-          <div class="oneui-field-block">
-            <label class="config-label">דגם מכשיר</label>
-            <div class="model-presets-grid" id="modelPresetsGrid"></div>
-          </div>
-        </div>
-
-        <!-- ================================================================
-             קטגוריה 3: לאחר הפתיחה (Post Unlock Destination)
-             ================================================================ -->
-        <div class="oneui-section-header">לאחר הפתיחה</div>
-        <div class="config-group oneui-card">
-          <div class="oneui-field-block">
-            <label class="config-label">יעד מיד לאחר שחרור הנעילה</label>
-            <div class="segmented-row" id="unlockTargetSelector">
-              <button type="button" class="seg-pill active" data-target="homescreen">מסך בית סמסונג</button>
-              <button type="button" class="seg-pill" data-target="notes">דף פתקים מדומה (Notes)</button>
-              <button type="button" class="seg-pill" data-target="gallery">🖼️ גלריה (תחזית בתמונה)</button>
-              <button type="button" class="seg-pill" data-target="search">🔍 חיפוש (תחזית בחיפוש)</button>
-            </div>
-          </div>
-          <div class="oneui-field-block" id="searchRevealExtra" style="display: none; padding-top: 0;">
-            <span class="toggle-sub-desc">אחרי הפתיחה נפתח מסך חיפוש, והחיפוש האחרון (מ"אתמול") הוא הקוד או המילה שהצופה בחר.</span>
-            <label class="config-label" for="searchTextInput" style="margin-top: 8px;">מה חיפשת "אתמול" ({קוד} יוחלף בקוד)</label>
-            <input type="text" id="searchTextInput" class="feedback-textarea gallery-text-input" maxlength="60" dir="rtl">
-          </div>
-          <div class="oneui-field-block" id="galleryRevealExtra" style="display: none; padding-top: 0;">
-            <span class="toggle-sub-desc">אחרי הפתיחה נפתחת הגלריה, והתמונה האחרונה (מ"אתמול") היא פתק בכתב יד עם הקוד שהצופה בחר.</span>
-            <label class="config-label" for="galleryTextInput" style="margin-top: 8px;">מה כתוב על הפתק ({קוד} יוחלף בקוד)</label>
-            <input type="text" id="galleryTextInput" class="feedback-textarea gallery-text-input" maxlength="40" dir="rtl">
-          </div>
-
-          <div class="oneui-card-divider"></div>
-
           <!-- חשיפה בשיחה נכנסת -->
           <div class="clean-toggle-row oneui-row-with-sub">
             <div class="toggle-text-stack">
@@ -596,52 +690,251 @@
             <button type="button" class="media-upload-btn" id="callTestBtn" style="width: 100%; margin-top: 10px;">נסה עכשיו (עם הקוד 1234)</button>
             <div class="toggle-sub-desc" style="margin-top: 6px;">💡 עובד כשהטלפון נפתח בכל קוד. באנדרואיד האפליקציה נשארת פתוחה אחרי הפתיחה (במקום לצאת למסך הבית האמיתי) כדי שהשיחה תופיע.</div>
           </div>
+        </div>
+        </section>
 
+        <section class="settings-panel" data-tab="peek">
+        <div class="oneui-section-header">📋 מה הצופה הקליד</div>
+        <div class="config-group oneui-card">
+          <!-- תצוגה נקייה של הקוד האחרון שנקלט -->
+          <div class="last-captured-pill">
+            <span>קוד אחרון שנקלט:</span>
+            <strong id="settingsLastInput">---</strong>
+          </div>
+          <div class="birthday-info-box" id="settingsBirthdayInfo" style="display: none;"></div>
           <div class="oneui-card-divider"></div>
+          <!-- היסטוריית קודים: כל מה שהוקלד, מהחדש לישן -->
+          <div class="history-head">
+            <span class="toggle-main-title">היסטוריית קודים</span>
+            <button type="button" class="routine-del-btn history-clear-btn" id="historyClearBtn">נקה</button>
+          </div>
+          <div class="code-history-list" id="codeHistoryList"></div>
+        </div>
 
-          <!-- חשיפה בפתקים: "תחזית" שכאילו נכתבה מראש -->
-          <div class="clean-toggle-row oneui-row-with-sub">
-            <div class="toggle-text-stack">
-              <span class="toggle-main-title">📝 חשיפה בפתקים (תחזית)</span>
-              <span class="toggle-sub-desc">אחרי הפתיחה נפתח פתק שבו כבר כתוב הקוד שהצופה בחר, עם שעה מוקדמת, כאילו חזית אותו מראש.</span>
-            </div>
+        <div class="oneui-section-header">👆 הצצה בטלפון עצמו</div>
+        <div class="config-group oneui-card">
+          <div class="clean-toggle-row">
+            <span class="toggle-main-title">הצצה בלחיצה ממושכת בשטח ריק (Hold Peek)</span>
             <label class="switch">
-              <input type="checkbox" id="toggleNotesReveal">
+              <input type="checkbox" id="toggleHoldPeek" checked>
               <span class="slider"></span>
             </label>
           </div>
-          <div class="oneui-field-block" id="notesRevealExtra" style="display: none; padding-top: 0;">
-            <label class="config-label" for="notesTemplateInput">תוכן הפתק ({קוד} יוחלף בקוד שהוקלד)</label>
-            <textarea id="notesTemplateInput" class="feedback-textarea" rows="5" maxlength="600" dir="rtl"></textarea>
-            <label class="config-label" style="margin-top: 8px;">הפתק "נכתב"</label>
-            <div class="segmented-row notes-age-row" id="notesAgeSelector">
-              <button type="button" class="seg-pill" data-age="15">לפני רבע שעה</button>
-              <button type="button" class="seg-pill active" data-age="60">לפני שעה</button>
-              <button type="button" class="seg-pill" data-age="180">לפני 3 שעות</button>
-              <button type="button" class="seg-pill" data-age="yesterday">אתמול</button>
-            </div>
-          </div>
-
-          <div class="oneui-card-divider"></div>
-
-          <div class="media-actions-row">
-            <label class="media-upload-btn">
-              <span>צילום מסך בית אישי</span>
-              <input type="file" id="homescreenFileInput" accept="image/*" hidden>
+          <div class="clean-toggle-row">
+            <span class="toggle-main-title">הצגה בשעון העליון בלחיצה (Clock Peek)</span>
+            <label class="switch">
+              <input type="checkbox" id="toggleChameleonClock" checked>
+              <span class="slider"></span>
             </label>
-            <button type="button" class="media-clear-btn" id="clearHomescreenBtn" style="display: none;">איפוס מסך בית</button>
+          </div>
+          <div class="clean-toggle-row">
+            <div class="toggle-text-stack">
+              <span class="toggle-main-title">רטט סודי של הקוד בכיס (Haptic Peek)</span>
+              <span class="toggle-sub-desc">8 שניות אחרי הקוד האחרון - כשהטלפון כבר אצלך (לא ביד של הצופה)</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="toggleHapticPeek" checked>
+              <span class="slider"></span>
+            </label>
           </div>
         </div>
 
+        <div class="oneui-section-header">📡 הצצה מרחוק</div>
+        <div class="config-group oneui-card">
+          <!-- הצצה לשעון החכם -->
+          <div class="clean-toggle-row oneui-row-with-sub">
+            <div class="toggle-text-stack">
+              <span class="toggle-main-title">⌚ שלח את הקוד לשעון החכם</span>
+              <span class="toggle-sub-desc" id="watchPeekDesc">כל קוד או דפוס שהצופה מקליד מופיע מיד על השעון שמחובר לטלפון, בלי לגעת בטלפון. בטלפון עצמו לא רואים ולא שומעים כלום.</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="toggleWatchPeek">
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="oneui-field-block" id="watchPeekExtra" style="display: none; padding-top: 0;">
+            <button type="button" class="media-upload-btn" id="watchPeekTestBtn" style="width: 100%;">שלח בדיקה לשעון</button>
+            <div class="toggle-sub-desc" id="watchPeekStatus" style="margin-top: 6px;">
+              בשעון Galaxy: באפליקציית Galaxy Wearable ← התראות ← יש להדליק "הצג התראות בשעון גם כשהטלפון בשימוש", ולוודא שההתראות של Lockscreen מופעלות.
+            </div>
+          </div>
+          <div class="oneui-card-divider"></div>
+          <!-- הצצה מטלפון שני -->
+          <div class="clean-toggle-row oneui-row-with-sub">
+            <div class="toggle-text-stack">
+              <span class="toggle-main-title">📲 שלח את הקוד לטלפון שני</span>
+              <span class="toggle-sub-desc">כל קוד שהצופה מקליד מופיע מיד בגדול בטלפון אחר: של עוזר בקהל, או טלפון שני בכיס שלך. הטלפון השני רק פותח קישור - לא צריך להתקין כלום.</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="toggleRemotePeek">
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="oneui-field-block" id="remotePeekExtra" style="display: none; padding-top: 0;">
+            <div class="remote-peek-link" id="remotePeekLink" dir="ltr"></div>
+            <div class="remote-peek-actions">
+              <button type="button" class="media-upload-btn" id="remotePeekWaBtn">שלח קישור בוואטסאפ</button>
+              <button type="button" class="media-upload-btn" id="remotePeekCopyBtn">העתק קישור</button>
+            </div>
+            <div class="remote-peek-actions">
+              <button type="button" class="media-upload-btn" id="remotePeekTestBtn">שלח בדיקה</button>
+              <button type="button" class="media-clear-btn" id="remotePeekNewBtn">קישור חדש</button>
+            </div>
+            <div class="toggle-sub-desc" id="remotePeekStatus" style="margin-top: 6px; min-height: 16px;">פתח את הקישור בטלפון השני והשאר את המסך דולק. הקישור סודי - מי שיש לו אותו רואה את הקודים.</div>
+            <div class="toggle-sub-desc" style="margin-top: 6px;">🎛️ <b>שלט רחוק:</b> בטלפון השני יש גם כפתורים: להדליק/לכבות "פתיחה בכל קוד", לבחור באיזה ניסיון הטלפון ייפתח, לאפס לצופה הבא, ולהפעיל את החשיפה או את השיחה הנכנסת ברגע שתבחר.</div>
+          </div>
+        </div>
+
+        <div class="oneui-section-header">🎯 תרגול</div>
+        <div class="config-group oneui-card">
+          <!-- מצב תרגול -->
+          <div class="clean-toggle-row oneui-row-with-sub">
+            <div class="toggle-text-stack">
+              <span class="toggle-main-title">🎯 מצב תרגול</span>
+              <span class="toggle-sub-desc">מתרגלים את ההצצות (רטט, שעון, לחיצה ארוכה, שעון חכם, טלפון שני) בלי שהקודים נשמרים בהיסטוריה ובלי שזה נספר בסטטיסטיקה. זכור לכבות לפני הופעה.</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="togglePracticeMode">
+              <span class="slider"></span>
+            </label>
+          </div>
+        </div>
         </section>
 
-        <!-- ===================== לשונית: אבטחה ===================== -->
-        <section class="settings-panel" data-tab="security">
+        <section class="settings-panel" data-tab="look">
+        <div class="oneui-section-header">📱 דגם הטלפון</div>
+        <div class="config-group oneui-card">
+          <!-- בחירת דגם מכשיר -->
+          <div class="oneui-field-block">
+            <div class="model-presets-grid" id="modelPresetsGrid"></div>
+          </div>
+        </div>
 
-        <!-- ================================================================
-             קטגוריה 4: קוד אישי וביומטריה (טביעת אצבע + זיהוי פנים)
-             ================================================================ -->
-        <div class="oneui-section-header">קוד אישי, טביעת אצבע וזיהוי פנים</div>
+        <div class="oneui-section-header">🖼️ טפט</div>
+        <div class="config-group oneui-card">
+          <div class="oneui-wallpaper-picker-row">
+            <div class="toggle-text-stack">
+              <span class="toggle-main-title">בחירת טפט</span>
+              <span class="toggle-sub-desc">טפט מובנה של הדגם או העלאת תמונה מהגלריה</span>
+            </div>
+            <div class="wallpaper-actions-inline">
+              <button type="button" class="wallpaper-preview-pill-btn" id="cycleWallpaperBtn" title="החלף טפט">
+                <span class="wp-circle-preview" id="currentWallpaperCirclePreview"></span>
+                <span>החלף טפט</span>
+              </button>
+              <label class="wallpaper-upload-icon-btn" title="העלה טפט אישי">
+                <span>גלריה</span>
+                <input type="file" id="wallpaperFileInput" accept="image/*" hidden>
+              </label>
+              <button type="button" class="media-clear-btn" id="clearWallpaperBtn" style="display: none;">איפוס</button>
+            </div>
+          </div>
+
+          <div class="wallpaper-gallery-row" id="wallpaperGalleryRow"></div>
+
+          <!-- הכי חשוב למראה אמיתי: הטפט שלך מהגלריה -->
+          <div class="oneui-field-block" style="padding-top: 4px;">
+            <label for="wallpaperFileInput" class="own-photo-btn">📷 בחר תמונה מהגלריה שלך (הטפט האמיתי שלך)</label>
+          </div>
+        </div>
+
+        <div class="oneui-section-header">🔒 מסך הנעילה</div>
+        <div class="config-group oneui-card">
+          <div class="oneui-field-block">
+            <label class="config-label" for="carrierTextInput">שם הספק בפינה למעלה (כמו אצלך במסך הנעילה)</label>
+            <input type="text" id="carrierTextInput" class="feedback-textarea gallery-text-input" maxlength="40" dir="ltr" placeholder="למשל: Pelephone">
+          </div>
+          <div class="oneui-field-block">
+            <label class="config-label" for="lockOwnerInfoInput">טקסט במסך הנעילה (פרטי קשר - אם יש לך כזה)</label>
+            <input type="text" id="lockOwnerInfoInput" class="feedback-textarea gallery-text-input" maxlength="60" dir="rtl" placeholder="למשל: אם נמצא, נא להתקשר...">
+          </div>
+          <div class="oneui-card-divider"></div>
+          <div class="clean-toggle-row">
+            <span class="toggle-main-title">הצג פס סטטוס עליון (שעה, סוללה וקליטה)</span>
+            <label class="switch">
+              <input type="checkbox" id="toggleStatusBar" checked>
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="clean-toggle-row" id="punchHoleSettingRow">
+            <span class="toggle-main-title">הצג חור מצלמה / Dynamic Island</span>
+            <label class="switch">
+              <input type="checkbox" id="togglePunchHole" checked>
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="clean-toggle-row" id="fingerprintSettingRow">
+            <span class="toggle-main-title">הצג חיישן טביעת אצבע בתחתית</span>
+            <label class="switch">
+              <input type="checkbox" id="toggleFingerprint" checked>
+              <span class="slider"></span>
+            </label>
+          </div>
+          <!-- מתגי תצוגה והצצה סודית -->
+          <div class="clean-toggle-row">
+            <span class="toggle-main-title">צליל מקשים מקורי של סמסונג</span>
+            <label class="switch">
+              <input type="checkbox" id="toggleKeySound" checked>
+              <span class="slider"></span>
+            </label>
+          </div>
+          <!-- סלקטור גיבוי לפס עליון (נשמר לתאימות) -->
+          <div class="segmented-row" id="statusBarSelector" style="display: none;">
+            <button type="button" class="seg-pill active" data-statusbar="show">הצג פס עליון</button>
+            <button type="button" class="seg-pill" data-statusbar="hide">ללא פס עליון</button>
+          </div>
+          <!-- בחירת מצב נעילה: הועברה לחלון שקופץ אחרי "שמור וסגור" (lockTypeChooser). נשאר מוסתר לתאימות. -->
+          <div class="oneui-field-block" style="display: none;">
+            <label class="config-label">בחירת מצב נעילה</label>
+            <div class="segmented-row" id="modeSelector">
+              <button type="button" class="seg-pill active" data-mode="pin">PIN</button>
+              <button type="button" class="seg-pill" data-mode="words">סיסמה</button>
+              <button type="button" class="seg-pill" data-mode="pattern">דפוס</button>
+              <button type="button" class="seg-pill" data-mode="swipe">החלקה</button>
+            </div>
+          </div>
+          <div id="pinLengthGroup">
+            <div class="oneui-field-block">
+              <label class="config-label">אורך קוד PIN (פתיחה אוטומטית ללא צורך ב-OK)</label>
+              <div class="segmented-row" id="pinLengthSelector">
+                <button type="button" class="seg-pill active" data-pinlen="4">4 ספרות</button>
+                <button type="button" class="seg-pill" data-pinlen="6">6 ספרות</button>
+              </div>
+            </div>
+          </div>
+          <!-- דפוס בלתי נראה (מוצג רק במצב Pattern) -->
+          <div id="stealthPatternGroup" style="display: none;">
+            <div class="oneui-card-divider"></div>
+            <div class="clean-toggle-row">
+              <span class="toggle-main-title">דפוס בלתי נראה (ללא קו מצויר)</span>
+              <label class="switch">
+                <input type="checkbox" id="toggleStealthPattern">
+                <span class="slider"></span>
+              </label>
+            </div>
+          </div>
+        </div>
+        </section>
+
+        <section class="settings-panel" data-tab="more">
+        <div class="oneui-section-header">❓ עזרה</div>
+        <div class="help-btn-grid">
+        <button type="button" class="guide-open-btn" id="openGuideBtn"><span class="hb-ico">📖</span><span>מדריך</span></button>
+        <button type="button" class="guide-open-btn" id="startTourBtn"><span class="hb-ico">🧭</span><span>סיור בהגדרות</span></button>
+        <button type="button" class="guide-open-btn" id="openWhatsNewBtn"><span class="hb-ico">🎉</span><span>מה חדש</span></button>
+        </div>
+
+        <div class="oneui-section-header">🌐 שפה / Language</div>
+        <div class="config-group oneui-card">
+          <div class="oneui-field-block">
+            <div class="segmented-row" id="uiLangSelector">
+              <button type="button" class="seg-pill" data-lang="he">עברית</button>
+              <button type="button" class="seg-pill" data-lang="en">English</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="oneui-section-header">🔐 קוד אישי, טביעת אצבע וזיהוי פנים</div>
         <div class="config-group oneui-card">
           <div class="clean-toggle-row oneui-row-with-sub">
             <div class="toggle-text-stack">
@@ -743,167 +1036,6 @@
               <p class="faceid-scan-caption" id="faceIdScanCaption">מקם את הפנים במסגרת לסריקה...</p>
             </div>
           </div>
-
-        </div>
-
-        </section>
-
-        <!-- ===================== לשונית: הצצה ===================== -->
-        <section class="settings-panel" data-tab="peek">
-
-        <div class="oneui-section-header">הצצה ותצוגה</div>
-        <div class="config-group oneui-card">
-          <!-- תצוגה נקייה של הקוד האחרון שנקלט -->
-          <div class="last-captured-pill">
-            <span>קוד אחרון שנקלט:</span>
-            <strong id="settingsLastInput">---</strong>
-          </div>
-
-          <!-- מצב תרגול -->
-          <div class="clean-toggle-row oneui-row-with-sub">
-            <div class="toggle-text-stack">
-              <span class="toggle-main-title">🎯 מצב תרגול</span>
-              <span class="toggle-sub-desc">מתרגלים את ההצצות (רטט, שעון, לחיצה ארוכה, שעון חכם, טלפון שני) בלי שהקודים נשמרים בהיסטוריה ובלי שזה נספר בסטטיסטיקה. זכור לכבות לפני הופעה.</span>
-            </div>
-            <label class="switch">
-              <input type="checkbox" id="togglePracticeMode">
-              <span class="slider"></span>
-            </label>
-          </div>
-
-          <div class="oneui-card-divider"></div>
-
-          <!-- היסטוריית קודים: כל מה שהוקלד, מהחדש לישן -->
-          <div class="history-head">
-            <span class="toggle-main-title">היסטוריית קודים</span>
-            <button type="button" class="routine-del-btn history-clear-btn" id="historyClearBtn">נקה</button>
-          </div>
-          <div class="code-history-list" id="codeHistoryList"></div>
-
-          <div class="oneui-card-divider"></div>
-
-          <!-- הצצה לשעון החכם -->
-          <div class="clean-toggle-row oneui-row-with-sub">
-            <div class="toggle-text-stack">
-              <span class="toggle-main-title">⌚ שלח את הקוד לשעון החכם</span>
-              <span class="toggle-sub-desc" id="watchPeekDesc">כל קוד או דפוס שהצופה מקליד מופיע מיד על השעון שמחובר לטלפון, בלי לגעת בטלפון. בטלפון עצמו לא רואים ולא שומעים כלום.</span>
-            </div>
-            <label class="switch">
-              <input type="checkbox" id="toggleWatchPeek">
-              <span class="slider"></span>
-            </label>
-          </div>
-          <div class="oneui-field-block" id="watchPeekExtra" style="display: none; padding-top: 0;">
-            <button type="button" class="media-upload-btn" id="watchPeekTestBtn" style="width: 100%;">שלח בדיקה לשעון</button>
-            <div class="toggle-sub-desc" id="watchPeekStatus" style="margin-top: 6px;">
-              בשעון Galaxy: באפליקציית Galaxy Wearable ← התראות ← יש להדליק "הצג התראות בשעון גם כשהטלפון בשימוש", ולוודא שההתראות של Lockscreen מופעלות.
-            </div>
-          </div>
-
-          <div class="oneui-card-divider"></div>
-
-          <!-- הצצה מטלפון שני -->
-          <div class="clean-toggle-row oneui-row-with-sub">
-            <div class="toggle-text-stack">
-              <span class="toggle-main-title">📲 שלח את הקוד לטלפון שני</span>
-              <span class="toggle-sub-desc">כל קוד שהצופה מקליד מופיע מיד בגדול בטלפון אחר: של עוזר בקהל, או טלפון שני בכיס שלך. הטלפון השני רק פותח קישור - לא צריך להתקין כלום.</span>
-            </div>
-            <label class="switch">
-              <input type="checkbox" id="toggleRemotePeek">
-              <span class="slider"></span>
-            </label>
-          </div>
-          <div class="oneui-field-block" id="remotePeekExtra" style="display: none; padding-top: 0;">
-            <div class="remote-peek-link" id="remotePeekLink" dir="ltr"></div>
-            <div class="remote-peek-actions">
-              <button type="button" class="media-upload-btn" id="remotePeekWaBtn">שלח קישור בוואטסאפ</button>
-              <button type="button" class="media-upload-btn" id="remotePeekCopyBtn">העתק קישור</button>
-            </div>
-            <div class="remote-peek-actions">
-              <button type="button" class="media-upload-btn" id="remotePeekTestBtn">שלח בדיקה</button>
-              <button type="button" class="media-clear-btn" id="remotePeekNewBtn">קישור חדש</button>
-            </div>
-            <div class="toggle-sub-desc" id="remotePeekStatus" style="margin-top: 6px; min-height: 16px;">פתח את הקישור בטלפון השני והשאר את המסך דולק. הקישור סודי - מי שיש לו אותו רואה את הקודים.</div>
-            <div class="toggle-sub-desc" style="margin-top: 6px;">🎛️ <b>שלט רחוק:</b> בטלפון השני יש גם כפתורים: להדליק/לכבות "פתיחה בכל קוד", לבחור באיזה ניסיון הטלפון ייפתח, לאפס לצופה הבא, ולהפעיל את החשיפה או את השיחה הנכנסת ברגע שתבחר.</div>
-          </div>
-
-          <div class="oneui-card-divider"></div>
-
-          <!-- מתגי תצוגה והצצה סודית -->
-          <div class="clean-toggle-row">
-            <span class="toggle-main-title">צליל מקשים מקורי של סמסונג</span>
-            <label class="switch">
-              <input type="checkbox" id="toggleKeySound" checked>
-              <span class="slider"></span>
-            </label>
-          </div>
-          <div class="clean-toggle-row">
-            <span class="toggle-main-title">רטט סודי של הקוד בכיס (Haptic Peek)</span>
-            <label class="switch">
-              <input type="checkbox" id="toggleHapticPeek" checked>
-              <span class="slider"></span>
-            </label>
-          </div>
-          <div class="clean-toggle-row">
-            <span class="toggle-main-title">הצגה בשעון העליון בלחיצה (Clock Peek)</span>
-            <label class="switch">
-              <input type="checkbox" id="toggleChameleonClock" checked>
-              <span class="slider"></span>
-            </label>
-          </div>
-          <div class="clean-toggle-row">
-            <span class="toggle-main-title">הצצה בלחיצה ממושכת בשטח ריק (Hold Peek)</span>
-            <label class="switch">
-              <input type="checkbox" id="toggleHoldPeek" checked>
-              <span class="slider"></span>
-            </label>
-          </div>
-          <div class="clean-toggle-row">
-            <span class="toggle-main-title">הצג פס סטטוס עליון (שעה, סוללה וקליטה)</span>
-            <label class="switch">
-              <input type="checkbox" id="toggleStatusBar" checked>
-              <span class="slider"></span>
-            </label>
-          </div>
-          <div class="clean-toggle-row" id="punchHoleSettingRow">
-            <span class="toggle-main-title">הצג חור מצלמה / Dynamic Island</span>
-            <label class="switch">
-              <input type="checkbox" id="togglePunchHole" checked>
-              <span class="slider"></span>
-            </label>
-          </div>
-          <div class="clean-toggle-row" id="fingerprintSettingRow">
-            <span class="toggle-main-title">הצג חיישן טביעת אצבע בתחתית</span>
-            <label class="switch">
-              <input type="checkbox" id="toggleFingerprint" checked>
-              <span class="slider"></span>
-            </label>
-          </div>
-
-          <!-- סלקטור גיבוי לפס עליון (נשמר לתאימות) -->
-          <div class="segmented-row" id="statusBarSelector" style="display: none;">
-            <button type="button" class="seg-pill active" data-statusbar="show">הצג פס עליון</button>
-            <button type="button" class="seg-pill" data-statusbar="hide">ללא פס עליון</button>
-          </div>
-        </div>
-
-        </section>
-
-        <!-- ===================== לשונית: עוד ===================== -->
-        <section class="settings-panel" data-tab="more">
-
-        <button type="button" class="guide-open-btn" id="openGuideBtn">📖 מדריך: איך משתמשים באפליקציה</button>
-        <button type="button" class="guide-open-btn" id="startTourBtn">🧭 סיור היכרות בהגדרות</button>
-        <button type="button" class="guide-open-btn" id="openWhatsNewBtn">🎉 מה חדש באפליקציה</button>
-
-        <div class="oneui-section-header">🌐 שפה / Language</div>
-        <div class="config-group oneui-card">
-          <div class="oneui-field-block">
-            <div class="segmented-row" id="uiLangSelector">
-              <button type="button" class="seg-pill" data-lang="he">עברית</button>
-              <button type="button" class="seg-pill" data-lang="en">English</button>
-            </div>
-          </div>
         </div>
 
         <div class="oneui-section-header">הפעלה מהירה</div>
@@ -974,7 +1106,6 @@
             <button type="button" class="bio-enroll-toggle-btn" id="checkUpdateNowBtn">בדוק עדכון</button>
           </div>
         </div>
-
         </section>
       </div>
 
@@ -1003,6 +1134,8 @@
     <div class="status-bar" id="statusBar">
       <div class="status-left">
         <span class="status-time" id="statusTime">14:22</span>
+        <!-- מסך נעילה של One UI: במקום השעה מופיע שם הספק (למשל Pelephone) -->
+        <span class="status-carrier" id="statusCarrier"></span>
       </div>
 
       <div class="camera-punch-hole" id="cameraPunchHole">
@@ -1028,6 +1161,8 @@
       <div class="status-right" id="statusRightIcons">
         <!-- אייקונים של Samsung -->
         <div class="status-icons-samsung">
+          <!-- One UI 7/8: סוללה בתוך "גלולה" עם המספר -->
+          <span class="samsung-battery-pill" id="samsungBatteryPill">88</span>
           <svg class="status-svg wifi-svg" viewBox="0 0 24 24">
             <path d="M12 4.5C7.3 4.5 3.1 6.4 0 9.5l12 12 12-12C20.9 6.4 16.7 4.5 12 4.5z"/>
           </svg>
@@ -1083,6 +1218,11 @@
         <div class="clock-lock-date" id="clockLockDate">יום שבת, 31 באוקטובר</div>
       </div>
       <div class="clock-lock-swipe-prompt">החלק או הקש להזנת סיסמה</div>
+      <!-- טקסט אישי במסך הנעילה (כמו "פרטי קשר" בסמסונג) + קיצור דרך לטלפון בפינה -->
+      <div class="clock-owner-info" id="clockOwnerInfo"></div>
+      <div class="clock-shortcut" id="clockShortcutPhone" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><path d="M6.6 10.8a15.2 15.2 0 0 0 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1A17 17 0 0 1 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1z"/></svg>
+      </div>
     </div>
 
     <!-- כותרת עליונה, כיתוב משני והודעת שגיאה באדום -->
@@ -1235,6 +1375,8 @@
           onerror="this.onerror=null; this.src='./p1.jpg';"
           alt="טביעת אצבע"
         />
+        <!-- טביעת אצבע של אנדרואיד (סמל Material, פיקסל / שיאומי) במקום התמונה של סמסונג -->
+        <svg class="fp-drawn" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.81 4.47c-.08 0-.16-.02-.23-.06C15.66 3.42 14 3 12.01 3c-1.98 0-3.86.47-5.57 1.41-.24.13-.54.04-.68-.2-.13-.24-.04-.55.2-.68C7.82 2.52 9.86 2 12.01 2c2.13 0 3.99.47 6.03 1.52.25.13.34.43.21.67-.09.18-.26.28-.44.28zM3.5 9.72c-.1 0-.2-.03-.29-.09-.23-.16-.28-.47-.12-.7.99-1.4 2.25-2.5 3.75-3.27C9.98 4.04 14 4.03 17.15 5.65c1.5.77 2.76 1.86 3.75 3.25.16.22.11.54-.12.7-.23.16-.54.11-.7-.12-.9-1.26-2.04-2.25-3.39-2.94-2.87-1.47-6.54-1.47-9.4.01-1.36.7-2.5 1.7-3.4 2.96-.08.14-.23.21-.39.21zm6.25 12.07c-.13 0-.26-.05-.35-.15-.87-.87-1.34-1.43-2.01-2.64-.69-1.23-1.05-2.73-1.05-4.34 0-2.97 2.54-5.39 5.66-5.39s5.66 2.42 5.66 5.39c0 .28-.22.5-.5.5s-.5-.22-.5-.5c0-2.42-2.09-4.39-4.66-4.39-2.57 0-4.66 1.97-4.66 4.39 0 1.44.32 2.77.93 3.85.64 1.15 1.08 1.64 1.85 2.42.19.2.19.51 0 .71-.11.1-.24.15-.37.15zm7.17-1.85c-1.19 0-2.24-.3-3.1-.89-1.49-1.01-2.38-2.65-2.38-4.39 0-.28.22-.5.5-.5s.5.22.5.5c0 1.41.72 2.74 1.94 3.56.71.48 1.54.71 2.54.71.24 0 .64-.03 1.04-.1.27-.05.53.13.58.41.05.27-.13.53-.41.58-.57.11-1.07.12-1.21.12zM14.91 22c-.04 0-.09-.01-.13-.02-1.59-.44-2.63-1.03-3.72-2.1-1.4-1.39-2.17-3.24-2.17-5.22 0-1.62 1.38-2.94 3.08-2.94 1.7 0 3.08 1.32 3.08 2.94 0 1.07.93 1.94 2.08 1.94s2.08-.87 2.08-1.94c0-3.77-3.25-6.83-7.25-6.83-2.84 0-5.44 1.58-6.61 4.03-.39.81-.59 1.76-.59 2.8 0 .78.07 2.01.67 3.61.1.26-.03.55-.29.64-.26.1-.55-.04-.64-.29-.49-1.31-.73-2.61-.73-3.96 0-1.2.23-2.29.68-3.24 1.33-2.79 4.28-4.6 7.51-4.6 4.55 0 8.25 3.51 8.25 7.83 0 1.62-1.38 2.94-3.08 2.94s-3.08-1.32-3.08-2.94c0-1.07-.93-1.94-2.08-1.94s-2.08.87-2.08 1.94c0 1.71.66 3.31 1.87 4.51.95.94 1.86 1.46 3.27 1.85.27.07.42.35.35.61-.05.23-.26.38-.47.38z"/></svg>
       </div>
 
       <!-- חץ חזרה ממוקם בצד ההפוך (בפינה הימנית התחתונה) ופונה לכיוון הנכון -->
@@ -1354,12 +1496,14 @@
     <div class="secret-peek" id="secretPeek">
       <svg class="peek-pattern-mini" id="peekPatternMini" viewBox="0 0 60 60"></svg>
       <span class="peek-text" id="peekText">----</span>
+      <span class="peek-birthday" id="peekBirthday" style="display: none;"></span>
     </div>
 
   </div>
 
   <script src="i18n.js"></script>
   <script src="firebase-config.js"></script>
+  <script src="fake-settings.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

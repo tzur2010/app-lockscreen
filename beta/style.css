@@ -4280,3 +4280,4 @@ html.real-ios .oneui-section-header:has(+ .config-group #pinQuickWidgetBtn) { di
 .lock-type-btn.active span { color: rgba(255, 255, 255, .85); }
 /* צילום מסך הבית נחוץ רק באייפון (באנדרואיד יוצאים למסך הבית האמיתי) */
 html:not(.real-ios) .media-actions-row:has(#homescreenFileInput) { display: none; }
+html.real-ios .clean-toggle-row:has(#toggleChameleonClock) { display: none !important; }

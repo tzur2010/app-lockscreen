@@ -2413,6 +2413,10 @@ function clearCurrentInputs() {
     passwordInput.value = '';
   }
   renderIosPinDots('');
+  // אייפון: כשהשדה ריק הכפתור למטה הוא "ביטול" (כמו באייפון אמיתי), לא "מחק"
+  if (typeof iosRightActionBtn !== 'undefined' && iosRightActionBtn) {
+    iosRightActionBtn.textContent = 'ביטול';
+  }
 
   activePatternNodes = [];
   isDrawingPattern = false;
@@ -4197,7 +4201,7 @@ function initDeviceLicenseGate() {
 // החלון מוצג רק כשמסך ההגדרות פתוח (בפתיחת האפליקציה / בתפריט הסודי),
 // ולעולם לא מעל מסך הנעילה הפעיל מול קהל.
 // ============================================================================
-const APP_VERSION = '7.8';
+const APP_VERSION = '7.9';
 const DEFAULT_APK_URL = 'https://github.com/tzur2010/app-lockscreen/raw/main/Lockscreen.apk';
 const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 const UPDATE_DISMISS_KEY = 'magic_update_dismissed_version';
@@ -6370,7 +6374,7 @@ async function collectPreShowChecks() {
   if (document.documentElement.classList.contains('real-ios')) {
     const standalone = window.navigator.standalone === true || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
     if (!standalone) add('bad', 'נפתח בתוך Safari', 'יופיע הסרגל של Safari. פתח את Lockscreen מהאייקון במסך הבית.');
-    if (config.chameleonClock) add('warn', 'הצצה בשעון לא זמינה באייפון', 'באייפון השעה למעלה היא של המערכת. השתמש בלחיצה ארוכה על המסך להצצה.');
+    // הצצה בשעון מוסתרת באייפון (השעה שם של המערכת) - אין צורך באזהרה
     // באייפון אי אפשר לצאת למסך הבית האמיתי - מוצג צילום מסך הבית של הקוסם. בלי צילום = מסך ריק (פדיחה)
     if (!localStorage.getItem(HOMESCREEN_STORAGE_KEY)) {
       add('bad', 'אין צילום של מסך הבית שלך', 'באייפון, אחרי הפתיחה הצופה רואה צילום של מסך הבית שלך. בלי צילום הוא יראה מסך ריק. במסך הבית: צד + עוצמה למעלה, ואז לשונית פתיחה ← "בחר צילום של מסך הבית שלך".');
@@ -6544,8 +6548,8 @@ const TRICK_TIPS = {
     en: ['⌚ Smartwatch', 'Every code appears on your watch as a silent notification. Nothing shows on the phone.', '"(checking the time) We have one more minute..."']
   },
   toggleRemotePeek: {
-    he: ['📲 טלפון שני + שלט', 'הקוד מופיע בגדול בטלפון שני (שלך בכיס או של עוזר). בטלפון השני יש גם שלט: להדליק/לכבות, לבחור ניסיון ולהפעיל חשיפה.', '"אני אפילו לא נוגע בטלפון. הכל אצלך."'],
-    en: ['📲 Second phone + remote', 'The code shows big on a second phone (yours or a helper\'s). It also has a remote: on/off, attempt, and trigger a reveal.', '"I\'m not even touching the phone. It\'s all with you."']
+    he: ['📲 טלפון שני + שלט', 'הקוד מופיע בגדול בטלפון שני (שלך בכיס או של עוזר). בטלפון השני יש גם שלט: להדליק/לכבות, לבחור ניסיון ולאפס לצופה הבא.', '"אני אפילו לא נוגע בטלפון. הכל אצלך."'],
+    en: ['📲 Second phone + remote', 'The code shows big on a second phone (yours or a helper\'s). It also has a remote: on/off, attempt, and reset for the next spectator.', '"I\'m not even touching the phone. It\'s all with you."']
   },
   toggleReveal: {
     he: ['💬 חשיפה בהודעה', 'כמה שניות אחרי הפתיחה מגיעה הודעה עם הקוד, מהשולח ועם התמונה שבחרת.', '"אה, קיבלתי הודעה... אתה יכול לקרוא אותה בקול?"'],
@@ -6629,7 +6633,7 @@ const TOUR_STEPS = [
   { target: '.show-actions-bar', tab: 'trick', he: '🔄 שני הכפתורים האלה תמיד למעלה:\n"מוכן לצופה הבא" מאפס הכל בין צופים, ו"בדיקה לפני הופעה" מוודא שהכל מוכן.', en: '🔄 These two buttons are always at the top:\n"Ready for next spectator" resets everything between spectators, and "Pre-show check" makes sure everything is ready.' },
   { target: '#toggleForceUnlockMode', tab: 'trick', he: '🎯 פתיחה בכל קוד\nכשזה דולק, כל קוד שהצופה מקליד פותח את הטלפון.', en: '🎯 Unlock with any code\nWhen on, any code the spectator types unlocks the phone.' },
   { target: '#unlockAttemptModeSelector', tab: 'trick', he: '🔁 כאן בוחרים באיזה ניסיון הטלפון ייפתח.\nלמשל 2 = בפעם הראשונה "קוד שגוי", ובשנייה נפתח.', en: '🔁 Choose which attempt unlocks the phone.\nE.g. 2 = first try "wrong code", second try opens.' },
-  { target: '#settingsTabs .settings-tab[data-tab="peek"]', tab: 'peek', he: '👁️ בלשונית הצצה: כל הדרכים לראות מה הצופה הקליד - לחיצה ארוכה, שעון, רטט, שעון חכם וטלפון שני.', en: '👁️ The Peek tab: every way to see what the spectator typed - long-press, clock, vibration, smartwatch and a second phone.' },
+  { target: '#settingsTabs .settings-tab[data-tab="peek"]', tab: 'peek', he: '👁️ בלשונית הצצה: כל הדרכים לראות מה הצופה הקליד - לחיצה ארוכה על המסך, טלפון שני ועוד.', en: '👁️ The Peek tab: every way to see what the spectator typed - long-press the screen, a second phone and more.' },
   { target: '.trick-tip-btn', tab: 'trick', he: '❓ ליד כל קסם יש כפתור כזה - הסבר קצר איך מבצעים אותו ומה אומרים לקהל.', en: '❓ Every trick has a button like this - a short how-to and what to say to the audience.' },
   { target: '#launchLockscreenBtn', tab: 'trick', he: '✅ כשהכל מוכן: "שמור וסגור", בוחרים סוג נעילה ונותנים את הטלפון לצופה.', en: '✅ When ready: "Save & Close", pick a lock type and hand the phone to the spectator.' },
   { target: null, tab: 'trick', he: '🔐 הכי חשוב לזכור:\nכדי לחזור להגדרות בסתר - לחיצה ארוכה של 3 שניות על השעון במסך הנעילה.\n\nבכל שאלה - כפתור ? למעלה. בהצלחה! ✨', en: '🔐 Most important:\nTo get back to settings secretly - long-press the clock for 3 seconds on the lock screen.\n\nAny question - the ? button at the top. Good luck! ✨' }
@@ -6727,6 +6731,7 @@ function initTour() {
 const WHATS_NEW_SEEN_KEY = 'magic_whats_new_seen_v1';
 const WHATS_NEW_MAX_ITEMS = 6;
 const WHATS_NEW = [
+  { ver: '7.9', icon: '🛡️', target: null, he: ['ליטוש לפני הופעות', 'עברנו על כל מסך בכל סוג טלפון. באייפון מוצג רק מה שעובד שם, והכל אמין יותר מתמיד.'], en: ['Polished for shows', 'We went over every screen on every phone type. On iPhone you see only what works there, and everything is more reliable than ever.'] },
   { ver: '7.8', icon: '✨', target: null, he: ['מראה חדש מהרגע הראשון', 'גם ההרשמה, בחירת הטלפון וכל החלונות בעיצוב החדש. האפליקציה ממוקדת: רק מה שעובד בצורה מושלמת.'], en: ['A new look from the first second', 'Sign-up, phone selection and every window now share the new design. The app is focused: only what works perfectly.'] },
   { ver: '7.6', icon: '🏠', target: '#homeTargetNote', he: ['רק מה שעובד - ומסך הבית האמיתי', 'אחרי הפתיחה הטלפון יוצא למסך הבית האמיתי. באייפון (שם אפל לא מאפשרת לצאת) מופיע צילום מסך הבית שלך עם השעה והסוללה האמיתיות. ו"תאריך לידה" מקבל הסבר מלא + "❌ לא תאריך".'], en: ['Only what works - and the real home screen', 'After unlocking the phone exits to the real home screen. On iPhone (where Apple doesn\'t allow exiting) a screenshot of your home screen appears with the real time and battery. And "Birthday" gets a full how-to + "❌ Not a date".'] },
   { ver: '7.5', icon: '🌌', target: null, he: ['עיצוב חדש: Aurora', 'הגדרות בעיצוב חדש לגמרי: זוהר צפוני ברקע, כרטיסי זכוכית זוהרים וכפתורים בגרדיאנט. יש גם גרסה בהירה (כפתור השמש למעלה).'], en: ['New design: Aurora', 'A brand-new settings design: northern lights in the background, glowing glass cards and gradient controls. There\'s a light version too (the sun button at the top).'] },
@@ -6740,7 +6745,7 @@ const WHATS_NEW = [
   { ver: '5.8', icon: '✨', target: null, he: ['אנימציית פתיחה אמיתית', 'כשהטלפון נפתח, מסך הנעילה מתקרב ונעלם (סמסונג) או מחליק למעלה (אייפון) - בדיוק כמו בטלפון אמיתי.'], en: ['Real unlock animation', 'When the phone unlocks, the lock screen zooms away (Samsung) or slides up (iPhone) - just like a real phone.'] },
   { ver: '5.6', icon: '❓', target: '#toggleForceUnlockMode', he: ['הסבר ליד כל קסם', 'כפתור ? ליד כל קסם: איך עושים אותו, ומה אומרים לקהל.'], en: ['Help next to every trick', 'A ? button next to every trick: how to do it and what to say.'] },
   { ver: '5.5', icon: '✅', target: '#preShowCheckBtn', he: ['בדיקה לפני הופעה', 'לחיצה אחת בודקת אינטרנט, התראות, סוללה, טלפון שני ועוד - עם כפתור תיקון.'], en: ['Pre-show check', 'One tap checks internet, notifications, battery, second phone and more - with a fix button.'] },
-  { ver: '5.4', icon: '🎛️', target: '#toggleRemotePeek', he: ['שלט רחוק מהטלפון השני', 'מהטלפון השני אפשר להדליק/לכבות "פתיחה בכל קוד", לבחור ניסיון ולהפעיל חשיפה - בלי לגעת בטלפון של הצופה.'], en: ['Remote control from a second phone', 'From the second phone: turn "any code" on/off, pick the attempt and trigger a reveal - without touching the spectator\'s phone.'] },
+  { ver: '5.4', icon: '🎛️', target: '#toggleRemotePeek', he: ['שלט רחוק מהטלפון השני', 'מהטלפון השני אפשר להדליק/לכבות "פתיחה בכל קוד", לבחור ניסיון ולאפס לצופה הבא - בלי לגעת בטלפון של הצופה.'], en: ['Remote control from a second phone', 'From the second phone: turn "any code" on/off, pick the attempt and reset for the next spectator - without touching the spectator\'s phone.'] },
   { ver: '5.4', icon: '🎯', target: '#togglePracticeMode', he: ['מצב תרגול', 'מתרגלים את כל ההצצות בלי שזה נשמר בהיסטוריה.'], en: ['Practice mode', 'Practice all the peeks without saving to history.'] },
   { ver: '5.2', icon: '📲', target: '#toggleRemotePeek', he: ['הצצה מטלפון שני', 'הקוד שהצופה מקליד מופיע מיד בגדול בטלפון אחר.'], en: ['Second-phone peek', 'The code the spectator types appears instantly, big, on another phone.'] },
   { ver: '5.2', icon: '🌐', target: '#uiLangSelector', he: ['אנגלית', 'אפשר להעביר את כל האפליקציה לאנגלית (לשונית עוד).'], en: ['English', 'Switch the whole app to English (More tab).'] }

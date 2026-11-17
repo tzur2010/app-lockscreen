@@ -417,7 +417,7 @@ window.MagicCloud = (function () {
     return fetch(`https://ntfy.sh/${topic}`, {
       method: 'POST',
       body: text,
-      headers: { Title: 'Magic Lock', Click: ADMIN_PAGE_URL, Tags: tag }
+      headers: { Title: 'Lockscreen', Click: ADMIN_PAGE_URL, Tags: tag }
     })
       .then((r) => r.ok)
       .catch(() => false);

@@ -2404,8 +2404,10 @@ window.onHeardWords = function (text, isFinal) {
 };
 
 // נגיעה במסך ה"כבוי": מסך הנעילה נדלק, והמילה כבר כתובה מתחת לשעון
+var wordPredictRevealAt = 0;
 function wordPredictReveal() {
   if (!wordPredictActive) return;
+  wordPredictRevealAt = Date.now();
   const word = wordPredictWord;
   wordPredictExit(false);
   const tpl = String(config.wordPredictTpl || '{מילה}');
@@ -2420,8 +2422,10 @@ function fillWordTemplate(tpl, word) {
 
 (function () {
   const off = document.getElementById('fakeOffScreen');
-  if (off) off.addEventListener('pointerdown', (e) => {
+  // "click" (ולא pointerdown): כל הנגיעה נבלעת במסך השחור ולא עוברת למסך השעון שמתחתיו
+  if (off) off.addEventListener('click', (e) => {
     e.preventDefault();
+    e.stopPropagation();
     wordPredictReveal();
   });
 })();
@@ -2989,6 +2993,8 @@ if (clockLockScreen) {
       faceTrickScan();
       return;
     }
+    // מיד אחרי ש"הטלפון ידע מראש" הדליק את המסך - לא קופצים למקלדת (השעון עם המילה נשאר)
+    if (Date.now() - wordPredictRevealAt < 1500) return;
     phoneContainer.classList.remove('clock-mode-active');
   });
 }
@@ -4510,7 +4516,7 @@ function initDeviceLicenseGate() {
 // החלון מוצג רק כשמסך ההגדרות פתוח (בפתיחת האפליקציה / בתפריט הסודי),
 // ולעולם לא מעל מסך הנעילה הפעיל מול קהל.
 // ============================================================================
-const APP_VERSION = '8.4';
+const APP_VERSION = '8.5';
 const DEFAULT_APK_URL = 'https://github.com/tzur2010/app-lockscreen/raw/main/Lockscreen.apk';
 const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 const UPDATE_DISMISS_KEY = 'magic_update_dismissed_version';

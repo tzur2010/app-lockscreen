@@ -170,7 +170,7 @@ fit();addEventListener('resize',fit);addEventListener('orientationchange',functi
         </details>
         <details>
           <summary>🔮 הטלפון ידע מראש</summary>
-          <p>1. "שמור וסגור" - המסך נהיה שחור, כאילו הטלפון כבוי.<br>2. הצופה אומר בקול מילה כלשהי (מפורסם, עיר, חיה). אתה שותק.<br>3. נוגעים במסך - מסך הנעילה נדלק והמילה כתובה מתחת לשעון.<br>💡 אנדרואיד בלבד. עם אוזנייה שומעים בסתר "נקלט: ..." לפני שנוגעים.</p>
+          <p>1. "שמור וסגור" - המסך נהיה שחור, כאילו הטלפון כבוי.<br>2. הצופה אומר בקול מילה כלשהי (מפורסם, עיר, חיה). אתה שותק.<br>3. לוחצים פעמיים על כפתור הצד - מסך הנעילה האמיתי נדלק, ובו התראה עם המילה.<br>💡 אנדרואיד בלבד. עם אוזנייה שומעים בסתר "נקלט: ..." לפני שנוגעים.</p>
         </details>
         <details>
           <summary>🎧 קריאה בזמן אמת</summary>
@@ -580,7 +580,7 @@ fit();addEventListener('resize',fit);addEventListener('orientationchange',functi
           <div class="clean-toggle-row oneui-row-with-sub">
             <div class="toggle-text-stack">
               <span class="toggle-main-title">🔮 הטלפון ידע מראש</span>
-              <span class="toggle-sub-desc">המסך נראה כבוי. הצופה אומר בקול מילה כלשהי - מפורסם, עיר, חיה. נוגעים במסך - והמילה כתובה מתחת לשעון, כאילו הגדרת אותה מזמן.</span>
+              <span class="toggle-sub-desc">המסך נראה כבוי. הצופה אומר בקול מילה כלשהי - מפורסם, עיר, חיה. מדליקים את הטלפון - ובמסך הנעילה האמיתי מחכה התראה "מלפני 3 שעות" עם המילה.</span>
             </div>
             <label class="switch">
               <input type="checkbox" id="toggleWordPredict">
@@ -588,8 +588,16 @@ fit();addEventListener('resize',fit);addEventListener('orientationchange',functi
             </label>
           </div>
           <div class="oneui-field-block" id="wordPredictExtra" style="display: none; padding-top: 0;">
-            <label class="config-label" for="wordPredictTplInput">מה כתוב מתחת לשעון ({מילה} = מה שהצופה אמר)</label>
+            <label class="config-label" for="wordPredictTitleInput">כותרת ההתראה</label>
+            <input type="text" id="wordPredictTitleInput" class="feedback-textarea gallery-text-input" maxlength="40" dir="rtl" placeholder="תזכורת">
+            <label class="config-label" for="wordPredictTplInput">תוכן ההתראה ({מילה} = מה שהצופה אמר)</label>
             <input type="text" id="wordPredictTplInput" class="feedback-textarea gallery-text-input" maxlength="60" dir="rtl">
+            <label class="config-label">ההתראה "נשלחה"</label>
+            <div class="segmented-row" id="wordPredictAgoSelector">
+              <button type="button" class="seg-pill" data-ago="30">לפני חצי שעה</button>
+              <button type="button" class="seg-pill" data-ago="180">לפני 3 שעות</button>
+              <button type="button" class="seg-pill" data-ago="1440">אתמול</button>
+            </div>
             <label class="config-label">שפת הזיהוי</label>
             <div class="segmented-row" id="wordPredictLangSelector">
               <button type="button" class="seg-pill" data-wplang="he">עברית</button>
@@ -597,7 +605,7 @@ fit();addEventListener('resize',fit);addEventListener('orientationchange',functi
             </div>
             <div class="toggle-sub-desc live-read-status" id="wordPredictStatus"></div>
             <div class="toggle-sub-desc" style="margin-top: 4px; line-height: 1.6;">
-              אחרי "שמור וסגור" המסך נהיה שחור ומקשיב. עם אוזנייה מחוברת שומעים בסתר "נקלט: ..." לפני שנוגעים. הסבר מלא: כפתור ה-?
+              אחרי "שמור וסגור" המסך נהיה שחור ומקשיב. אחרי שהצופה אומר את המילה: לוחצים פעמיים על כפתור הצד - ומסך הנעילה האמיתי נדלק עם ההתראה. הסבר מלא: כפתור ה-?
             </div>
           </div>
           <div class="oneui-card-divider"></div>

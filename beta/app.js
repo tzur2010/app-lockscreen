@@ -559,7 +559,9 @@ const DEFAULT_CONFIG = {
   liveReadRecap: true,          // בסוף ההקלדה - חזרה על כל הקוד
   liveReadVoice: false,         // אנדרואיד: "תחזור על הקוד" בקול - הקוד נלחש שוב
   wordPredict: false,           // "הטלפון ידע מראש": הצופה אומר מילה, והיא מופיעה מתחת לשעון
-  wordPredictTpl: '{מילה}',     // מה כתוב מתחת לשעון ({מילה} = מה שהצופה אמר)
+  wordPredictTpl: '{מילה}',     // מה כתוב בהתראה ({מילה} = מה שהצופה אמר)
+  wordPredictTitle: 'תזכורת',    // כותרת ההתראה האמיתית במסך הנעילה
+  wordPredictAgo: 180,          // ההתראה "נשלחה" לפני X דקות
   liveReadLang: isEnglishUi() ? 'en' : 'he',
   callName: isEnglishUi() ? '{code}' : '{קוד}',    // שם המתקשר שמופיע על המסך
   callDelaySec: 4,
@@ -2393,6 +2395,8 @@ window.onHeardWords = function (text, isFinal) {
   if (!w) return;
   wordPredictWord = w;
   if (!isFinal) return;
+  // התראה אמיתית במסך הנעילה האמיתי (המילה האחרונה מחליפה את הקודמת)
+  wordPredictPostReal(w);
   // אישור סודי באוזנייה (רק אם מחוברת): "נקלט: ריהאנה"
   clearTimeout(wordPredictWhisperTimer);
   wordPredictWhisperTimer = setTimeout(() => {
@@ -2415,6 +2419,30 @@ function wordPredictReveal() {
   phoneContainer.classList.add('clock-mode-active');
   applyConfigToUI();
 }
+
+function wordPredictPostReal(word) {
+  if (!window.AndroidNative || typeof window.AndroidNative.postWordNotification !== 'function') return false;
+  try {
+    const title = String(config.wordPredictTitle || 'תזכורת').slice(0, 40);
+    const text = fillWordTemplate(String(config.wordPredictTpl || '{מילה}'), word);
+    return Boolean(window.AndroidNative.postWordNotification(title, text, Number(config.wordPredictAgo) || 180));
+  } catch (e) {
+    return false;
+  }
+}
+
+function wordPredictNotifsAllowed() {
+  try {
+    return Boolean(window.AndroidNative.areNotificationsAllowed());
+  } catch (e) {
+    return false;
+  }
+}
+
+// כשהקוסם לוחץ על כפתור הצד (המסך נכבה באמת) - מסיימים את ההקשבה. ההתראה נשארת במסך הנעילה האמיתי.
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && wordPredictActive) wordPredictExit(false);
+});
 
 function fillWordTemplate(tpl, word) {
   return /\{(מילה|word)\}/i.test(tpl) ? tpl.replace(/\{(מילה|word)\}/gi, word) : `${tpl} ${word}`.trim();
@@ -2441,6 +2469,11 @@ function wordPredictExit(clearShown) {
     try {
       if (wasActive) window.AndroidNative.stopVoiceRepeat();
       window.AndroidNative.setFakeOff(false);
+    } catch (e) {}
+  }
+  if (clearShown && hasNativeWordListen()) {
+    try {
+      window.AndroidNative.cancelWordNotification();
     } catch (e) {}
   }
   if (clearShown && wordPredictShown) {
@@ -4516,7 +4549,7 @@ function initDeviceLicenseGate() {
 // החלון מוצג רק כשמסך ההגדרות פתוח (בפתיחת האפליקציה / בתפריט הסודי),
 // ולעולם לא מעל מסך הנעילה הפעיל מול קהל.
 // ============================================================================
-const APP_VERSION = '8.5';
+const APP_VERSION = '8.6';
 const DEFAULT_APK_URL = 'https://github.com/tzur2010/app-lockscreen/raw/main/Lockscreen.apk';
 const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 const UPDATE_DISMISS_KEY = 'magic_update_dismissed_version';
@@ -6312,6 +6345,11 @@ function syncNewRevealsUI() {
   if (wpExtra) wpExtra.style.display = config.wordPredict ? 'block' : 'none';
   const wpTpl = document.getElementById('wordPredictTplInput');
   if (wpTpl && document.activeElement !== wpTpl) wpTpl.value = config.wordPredictTpl || '{מילה}';
+  const wpTitle = document.getElementById('wordPredictTitleInput');
+  if (wpTitle && document.activeElement !== wpTitle) wpTitle.value = config.wordPredictTitle || 'תזכורת';
+  document.querySelectorAll('#wordPredictAgoSelector .seg-pill').forEach((btn) => {
+    btn.classList.toggle('active', Number(btn.dataset.ago) === (Number(config.wordPredictAgo) || 180));
+  });
   document.querySelectorAll('#wordPredictLangSelector .seg-pill').forEach((btn) => {
     btn.classList.toggle('active', btn.dataset.wplang === wordPredictLang());
   });
@@ -6418,6 +6456,9 @@ function initNewReveals() {
       syncNewRevealsUI();
       const st = document.getElementById('wordPredictStatus');
       if (wpToggle.checked && hasNativeWordListen()) {
+        if (!wordPredictNotifsAllowed()) {
+          try { window.AndroidNative.requestNotificationPermission(); } catch (e) {}
+        }
         if (liveReadMicReady()) {
           if (st) { st.textContent = isEnglishUi() ? '✓ Microphone allowed. After "Save & Close" the screen goes black and listens.' : '✓ המיקרופון מאושר. אחרי "שמור וסגור" המסך נהיה שחור ומקשיב.'; st.className = 'toggle-sub-desc live-read-status good'; }
         } else {
@@ -6426,6 +6467,16 @@ function initNewReveals() {
       } else if (st) st.textContent = '';
     });
   }
+  const wpTitleInput = document.getElementById('wordPredictTitleInput');
+  if (wpTitleInput) wpTitleInput.addEventListener('input', () => {
+    config.wordPredictTitle = wpTitleInput.value.slice(0, 40) || 'תזכורת';
+    saveConfig();
+  });
+  document.querySelectorAll('#wordPredictAgoSelector .seg-pill').forEach((btn) => btn.addEventListener('click', () => {
+    config.wordPredictAgo = Number(btn.dataset.ago) || 180;
+    saveConfig();
+    syncNewRevealsUI();
+  }));
   const wpTplInput = document.getElementById('wordPredictTplInput');
   if (wpTplInput) wpTplInput.addEventListener('input', () => {
     config.wordPredictTpl = wpTplInput.value.slice(0, 60) || '{מילה}';
@@ -6812,7 +6863,8 @@ async function collectPreShowChecks() {
 
   // 🔮 הטלפון ידע מראש: צריך מיקרופון
   if (config.wordPredict && hasNativeWordListen()) {
-    if (liveReadMicReady()) add('ok', 'הטלפון ידע מראש - מוכן', 'אחרי "שמור וסגור" המסך נהיה שחור ומקשיב. נגיעה = מסך הנעילה עם המילה.');
+    if (!wordPredictNotifsAllowed()) add('bad', 'ההתראות כבויות', 'בלי התראות המילה לא תופיע במסך הנעילה האמיתי.', 'אשר', () => { try { window.AndroidNative.requestNotificationPermission(); } catch (e) {} });
+    if (liveReadMicReady()) add('ok', 'הטלפון ידע מראש - מוכן', 'ודא שבהגדרות הטלפון מופעל "הצג תוכן התראות במסך הנעילה".');
     else add('bad', 'אין הרשאת מיקרופון', 'בלי מיקרופון "הטלפון ידע מראש" לא יעבוד.', 'אשר', () => { try { window.AndroidNative.requestMicPermission(); } catch (e) {} });
   }
 
@@ -7016,14 +7068,8 @@ const TRICK_TIPS = {
     en: ['🤳 The phone knows the spectator', '1. Tap the screen / swipe up = "face scan". The first times (as many as you chose) it fails - "Face not recognized".\n2. Hand it to the spectator and tap again while they look: it unlocks instantly.\n3. At that moment the front camera takes their photo - and it becomes the home screen wallpaper.\nTip: hold the phone at their eye level, like taking a selfie.', '"My phone doesn\'t recognize me today... wait, you try? ...how does it know you?! And look at my wallpaper..."']
   },
   toggleWordPredict: {
-    he: ['🔮 הטלפון ידע מראש', 'הכנה: מדליקים, ובהגדרות "מראה" ממלאים טקסט פרטי קשר רגיל (כמו בטלפון שלך). אם יש אוזנייה - מומלץ.\n\n1. "שמור וסגור" - המסך נהיה שחור, כאילו הטלפון כבוי. מניחים אותו על השולחן.\n2. "תגיד בקול שם של מפורסם - מי שבא לך." (או עיר, חיה, שם של חבר)\n3. הצופה אומר מילה. אתה שותק! (המילה האחרונה שנאמרת היא זו שמופיעה)\n4. עם אוזנייה: שומעים בסתר "נקלט: ..." - ככה יודעים שהטלפון קלט נכון.\n5. "מצחיק... תסתכל על הטלפון שלי." נוגעים במסך - מסך הנעילה נדלק, והמילה כתובה מתחת לשעון.\n\n💡 טיפים:\n• אחרי שהצופה אמר את המילה - לא לדבר עד שנוגעים במסך.\n• מקום שקט עובד הכי טוב. צריך אינטרנט.\n• "מוכן לצופה הבא" מוחק את המילה ממסך הנעילה.', '"תגיד שם של מפורסם... ריהאנה? מצחיק. תסתכל מה כתוב אצלי על המסך כבר חודש..."'],
-    en: ['🔮 My phone knew', 'Setup: turn it on, and in the "Look" tab fill in a normal contact-info text (like on your phone). An earphone is recommended.\n\n1. "Save & Close" - the screen goes black, as if the phone is off. Put it on the table.\n2. "Say out loud the name of a celebrity - anyone you like." (or a city, an animal, a friend\'s name)\n3. The spectator says a word. You stay silent! (the last word spoken is the one that appears)\n4. With an earphone: you secretly hear "got: ..." - so you know the phone caught it right.\n5. "Funny... look at my phone." Tap the screen - the lock screen lights up, and the word is written under the clock.\n\n💡 Tips:\n• After the spectator says the word - don\'t talk until you tap the screen.\n• A quiet place works best. Needs internet.\n• "Ready for next spectator" removes the word from the lock screen.', '"Name a celebrity... Rihanna? Funny. Look what has been on my screen for a month..."']
-  },  toggleLiveRead: {
-    he: ['🎧 קריאה בזמן אמת', 'הכנה: אוזניית בלוטות\' אחת באוזן, מחוברת לטלפון הזה. "בדיקת אוזנייה" - שומעים "אחת, שתיים, שלוש" רק באוזנייה. נעילה: קוד PIN.\n\n1. נותנים לצופה את הטלפון ומסתובבים עם הגב (או עוצמים עיניים).\n2. "תקליד קוד סודי, ספרה אחרי ספרה. בכל ספרה - תעצור ותחשוב עליה חזק."\n3. בכל לחיצה הטלפון לוחש לך את הספרה באוזנייה. אומרים אותה בקול - לאט, כאילו "קולטים": "...שבע".\n4. אחרי הספרה האחרונה הטלפון נפתח, ואתה כבר אמרת את כל הקוד.\n\n💡 טיפים:\n• אל תענה מהר מדי - תן לשנייה של "ריכוז" לפני כל ספרה.\n• מקליד מהר? כל הספרות נאמרות לפי הסדר, ובסוף שומעים שוב את כל הקוד.\n• 🗣️ באנדרואיד: אחרי הקוד אפשר להגיד "תחזור על הקוד" (או "תחזרי") - והקוד נלחש שוב. הטלפון צריך להישאר על מסך הנעילה.\n• אם הצופה מוחק ספרה - תשמע "מחק".\n• באנדרואיד: אם האוזנייה מתנתקת, הטלפון פשוט שותק - לא יוצא שום צליל.\n• באייפון: אין בדיקה אוטומטית - בודקים אוזנייה לפני כל הופעה.', '"אל תגיד כלום... רק תחשוב על הספרה... שבע? ...ועכשיו... ארבע?"'],
-    en: ['🎧 Live reading', 'Setup: one Bluetooth earphone in your ear, connected to this phone. "Earphone test" - you hear "one, two, three" ONLY in the earphone. Lock type: PIN.\n\n1. Hand the spectator the phone and turn your back (or close your eyes).\n2. "Type a secret code, one digit at a time. On each digit - pause and think of it hard."\n3. On every press the phone whispers the digit into your earphone. Say it out loud - slowly, as if you are "picking it up": "...seven".\n4. After the last digit the phone unlocks - and you have already named the whole code.\n\n💡 Tips:\n• Don\'t answer too fast - give each digit a second of "concentration".\n• Typing fast? Every digit is said in order, and at the end you hear the whole code again.\n• 🗣️ On Android: after the code you can say "repeat the code" - and it is whispered again. The phone must stay on the lock screen.\n• If the spectator deletes a digit - you hear "delete".\n• On Android: if the earphone disconnects, the phone simply stays silent - no sound at all.\n• On iPhone: there is no automatic check - test the earphone before every show.', '"Don\'t say anything... just think of the digit... seven? ...and now... four?"']
-  },  toggleBirthdayTrick: {
-    he: ['🎂 תאריך לידה', 'הכנה: מדליקים, בוחרים "6 ספרות" ו"יום ואז חודש". נעילה: קוד PIN.\n\n1. מה אומרים לצופה (מילה במילה):\n"תחשוב על מישהו שאתה אוהב. תקליד כקוד את תאריך הלידה שלו - יום, חודש ושנה, 6 ספרות. למשל 15 במרץ 1992 זה 150392. אל תגיד לי של מי."\n\n2. לחיצה ארוכה במסך (או השעון החכם): מתחת לקוד מופיעים מזל, גיל ויום בשבוע. בלשונית "הצצה" יש גם כמה ימים חי ועוד כמה ימים יום ההולדת.\n\n3. אם כתוב "❌ לא תאריך" - הצופה לא הקליד תאריך. לא חושפים מזל! עוברים לחשיפה רגילה של הקוד.\n\n4. סדר החשיפה:\n• קודם מי זה, לפי הגיל: קרוב לגיל הצופה = הוא עצמו, צעיר בהרבה = ילד, מבוגר בהרבה = הורה.\n• אחר כך המזל.\n• בסוף היום בשבוע שבו נולד - זה הרגע ש"אי אפשר לדעת".\n\n💡 לעולם לא אומרים את התאריך עצמו - ככה זה קריאת מחשבות ולא "ראית את הקוד".', '"אני מרגיש שזה מישהו צעיר... הילד שלך? הוא מזל דגים... ונולד ביום ראשון, נכון?"'],
-    en: ['🎂 Birthday', 'Setup: turn it on, pick "6 digits" and "Day then month". Lock type: PIN.\n\n1. What to tell the spectator (word for word):\n"Think of someone you love. Type their birthday as the code - day, month and year, 6 digits. For example March 15, 1992 is 150392. Don\'t tell me who it is."\n\n2. Long-press the screen (or check your watch): under the code you see star sign, age and weekday. The Peek tab also shows days lived and days until the next birthday.\n\n3. If it says "❌ Not a date" - they didn\'t type a date. Don\'t reveal a sign! Reveal the code normally.\n\n4. Reveal order:\n• First who it is, by age: close to the spectator\'s age = themselves, much younger = a child, much older = a parent.\n• Then the star sign.\n• Last, the weekday they were born - the "impossible" moment.\n\n💡 Never say the date itself - that way it\'s mind reading, not "you saw the code".', '"I feel it\'s someone young... your child? A Pisces... born on a Sunday, right?"']
+    he: ['🔮 הטלפון ידע מראש', 'הכנה (פעם אחת): לאשר מיקרופון והתראות. בהגדרות הטלפון: "מסך נעילה" ← "התראות" ← להציג תוכן. אוזנייה - מומלץ.\n\n1. "שמור וסגור" - המסך נהיה שחור, כאילו הטלפון כבוי. מניחים אותו על השולחן.\n2. "תגיד בקול שם של מפורסם - מי שבא לך." (או עיר, חיה, שם של חבר)\n3. הצופה אומר מילה. אתה שותק! (המילה האחרונה שנאמרת היא זו שמופיעה)\n4. עם אוזנייה: שומעים בסתר "נקלט: ..." - ככה יודעים שהטלפון קלט נכון.\n5. "מצחיק... תסתכל על הטלפון שלי." לוחצים פעמיים על כפתור הצד: הלחיצה הראשונה מכבה באמת (לא רואים הבדל), השנייה מדליקה את מסך הנעילה האמיתי - ובו התראה "מלפני 3 שעות" עם המילה.\n\n💡 טיפים:\n• אחרי שהצופה אמר את המילה - לא לדבר עד שמכבים.\n• מקום שקט עובד הכי טוב. צריך אינטרנט.\n• "מוכן לצופה הבא" מוחק את ההתראה.', '"תגיד שם של מפורסם... ריהאנה? מצחיק. תסתכל על התזכורת שיש לי בטלפון מהבוקר..."'],
+    en: ['🔮 My phone knew', 'Setup (once): allow microphone and notifications. In the phone settings: "Lock screen" → "Notifications" → show content. An earphone is recommended.\n\n1. "Save & Close" - the screen goes black, as if the phone is off. Put it on the table.\n2. "Say out loud the name of a celebrity - anyone you like." (or a city, an animal, a friend\'s name)\n3. The spectator says a word. You stay silent! (the last word spoken is the one that appears)\n4. With an earphone: you secretly hear "got: ..." - so you know the phone caught it right.\n5. "Funny... look at my phone." Press the side button twice: the first press really turns the screen off (no visible change), the second turns on the REAL lock screen - with a notification "from 3 hours ago" showing the word.\n\n💡 Tips:\n• After the spectator says the word - don\'t talk until you press the button.\n• A quiet place works best. Needs internet.\n• "Ready for next spectator" removes the notification.', '"Name a celebrity... Rihanna? Funny. Look at the reminder I have on my phone from this morning..."']
   },
   toggleCallReveal: {
     he: ['📞 חשיפה בשיחה נכנסת', 'אחרי הפתיחה הטלפון מצלצל, ושם המתקשר הוא הקוד. אפשר גם להפעיל מהשלט בטלפון השני.', '"מישהו מתקשר אליי... תגיד לי מי זה?"'],
@@ -7185,7 +7231,7 @@ function initTour() {
 const WHATS_NEW_SEEN_KEY = 'magic_whats_new_seen_v1';
 const WHATS_NEW_MAX_ITEMS = 6;
 const WHATS_NEW = [
-  { ver: '8.4', icon: '🔮', target: '#toggleWordPredict', he: ['הטלפון ידע מראש', 'המסך נראה כבוי, הצופה אומר בקול מילה כלשהי - ונגיעה במסך מדליקה את מסך הנעילה עם המילה כתובה מתחת לשעון. (אנדרואיד)'], en: ['My phone knew', 'The screen looks off, the spectator says any word out loud - and a tap lights up the lock screen with that word under the clock. (Android)'] },
+  { ver: '8.4', icon: '🔮', target: '#toggleWordPredict', he: ['הטלפון ידע מראש', 'המסך נראה כבוי, הצופה אומר בקול מילה כלשהי - ובמסך הנעילה האמיתי של הטלפון מחכה התראה מלפני 3 שעות עם המילה. (אנדרואיד)'], en: ['My phone knew', 'The screen looks off, the spectator says any word out loud - and the phone\'s REAL lock screen shows a notification from 3 hours ago with that word. (Android)'] },
   { ver: '8.0', icon: '🎧', target: '#toggleLiveRead', he: ['קריאה בזמן אמת', 'אתה עם הגב, הצופה מקליד קוד - ואתה אומר כל ספרה ברגע שהוא לוחץ עליה. הספרות נלחשות לך באוזניית בלוטות\'.'], en: ['Live reading', 'Your back is turned, the spectator types a code - and you name every digit the moment it is pressed. The digits are whispered into your Bluetooth earphone.'] },
   { ver: '7.9', icon: '🛡️', target: null, he: ['ליטוש לפני הופעות', 'עברנו על כל מסך בכל סוג טלפון. באייפון מוצג רק מה שעובד שם, והכל אמין יותר מתמיד.'], en: ['Polished for shows', 'We went over every screen on every phone type. On iPhone you see only what works there, and everything is more reliable than ever.'] },
   { ver: '7.8', icon: '✨', target: null, he: ['מראה חדש מהרגע הראשון', 'גם ההרשמה, בחירת הטלפון וכל החלונות בעיצוב החדש. האפליקציה ממוקדת: רק מה שעובד בצורה מושלמת.'], en: ['A new look from the first second', 'Sign-up, phone selection and every window now share the new design. The app is focused: only what works perfectly.'] },

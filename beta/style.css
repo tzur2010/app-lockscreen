@@ -4290,3 +4290,8 @@ html.real-ios .clean-toggle-row:has(#toggleChameleonClock) { display: none !impo
 .device-config-sheet.light-mode .live-read-status.good { color: #047857; }
 .device-config-sheet.light-mode .live-read-status.bad { color: #b91c1c; }
 .device-config-sheet.light-mode .live-read-status.warn { color: #92400e; }
+
+/* 🔮 "הטלפון ידע מראש": מסך שנראה כבוי לגמרי */
+.fake-off-screen { position: fixed; inset: 0; z-index: 99990; background: #000; cursor: none; }
+/* המילה מתחת לשעון - גם בפיקסל ובשיאומי (בסמסונג זו שורת פרטי הקשר הקיימת) */
+.phone-container.word-shown:not(.samsung-oneui-lock).clock-mode-active .clock-owner-info { display: block; position: absolute; bottom: 16%; left: 6%; right: 6%; text-align: center; font-size: min(4.3vw, 17px); color: #fff; text-shadow: 0 1px 6px rgba(0,0,0,.5); z-index: 6; }

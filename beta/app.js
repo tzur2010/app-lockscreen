@@ -558,6 +558,8 @@ const DEFAULT_CONFIG = {
   liveRead: false,              // "קריאה בזמן אמת": כל ספרה נלחשת לאוזניית הקוסם ברגע שנלחצת
   liveReadRecap: true,          // בסוף ההקלדה - חזרה על כל הקוד
   liveReadVoice: false,         // אנדרואיד: "תחזור על הקוד" בקול - הקוד נלחש שוב
+  wordPredict: false,           // "הטלפון ידע מראש": הצופה אומר מילה, והיא מופיעה מתחת לשעון
+  wordPredictTpl: '{מילה}',     // מה כתוב מתחת לשעון ({מילה} = מה שהצופה אמר)
   liveReadLang: isEnglishUi() ? 'en' : 'he',
   callName: isEnglishUi() ? '{code}' : '{קוד}',    // שם המתקשר שמופיע על המסך
   callDelaySec: 4,
@@ -879,6 +881,8 @@ function launchLockscreenNow() {
   closeSettingsSheet();
   if (config.settingsTrick) openSettingsTrick();
   liveReadPrepare();
+  // "הטלפון ידע מראש": מיד אחרי "שמור וסגור" המסך נראה כבוי ומתחיל להקשיב
+  if (config.wordPredict && hasNativeWordListen() && config.osTheme !== 'ios') setTimeout(wordPredictEnter, 350);
 }
 
 // ----------------------------------------------------------------------------
@@ -1734,7 +1738,9 @@ function applyConfigToUI() {
   if (carrierEl) carrierEl.textContent = (config.carrierText || '').trim();
   phoneContainer.classList.toggle('has-carrier', Boolean((config.carrierText || '').trim()));
   const ownerEl = document.getElementById('clockOwnerInfo');
-  if (ownerEl) ownerEl.textContent = (config.lockOwnerInfo || '').trim();
+  // "הטלפון ידע מראש": המילה שהצופה אמר מוצגת במקום טקסט פרטי הקשר
+  if (ownerEl) ownerEl.textContent = wordPredictShown || (config.lockOwnerInfo || '').trim();
+  phoneContainer.classList.toggle('word-shown', Boolean(wordPredictShown));
 
   // דגמי Notch (iPhone 12 / 13) מול Dynamic Island (iPhone 14 - 18)
   const isNotch = config.osTheme === 'ios' && currentModel.cutout === 'notch';
@@ -2340,6 +2346,106 @@ function liveReadSay(key) {
   liveReadWebSpeak(he, en);
 }
 
+// ----------------------------------------------------------------------------
+// 🔮 "הטלפון ידע מראש" (אנדרואיד): אחרי "שמור וסגור" המסך נראה כבוי (שחור, בהירות מינימלית)
+// והטלפון מקשיב. הצופה אומר מילה כלשהי בקול - וכשנוגעים במסך, מסך הנעילה נדלק
+// והמילה כתובה מתחת לשעון (בשורת פרטי הבעלים), כאילו הוגדרה מזמן.
+// ----------------------------------------------------------------------------
+var wordPredictActive = false;   // המסך "כבוי" ומקשיבים
+var wordPredictWord = '';        // המילה האחרונה שנקלטה
+var wordPredictShown = '';       // מה מוצג עכשיו מתחת לשעון (ריק = טקסט פרטי הקשר הרגיל)
+var wordPredictWhisperTimer = null;
+const WORD_FILLERS = /^(אה+|אמ+|אממ+|אום|כאילו|נגיד|יאללה|טוב|eh+|um+|uh+|like)\s+/i;
+
+function hasNativeWordListen() {
+  return Boolean(window.AndroidNative && typeof window.AndroidNative.startWordListen === 'function');
+}
+
+function wordPredictLang() {
+  return config.wordPredictLang === 'en' ? 'en' : 'he';
+}
+
+function cleanSpokenWord(text) {
+  let t = String(text || '').replace(/[.,!?״"׳'"]/g, ' ').replace(/\s+/g, ' ').trim();
+  for (let i = 0; i < 3 && WORD_FILLERS.test(t); i++) t = t.replace(WORD_FILLERS, '');
+  return t.slice(0, 40);
+}
+
+function wordPredictEnter() {
+  if (!hasNativeWordListen()) return;
+  const off = document.getElementById('fakeOffScreen');
+  if (!off) return;
+  wordPredictActive = true;
+  wordPredictWord = '';
+  wordPredictShown = '';
+  applyConfigToUI();
+  off.style.display = 'block';
+  try {
+    window.AndroidNative.setFakeOff(true);
+    window.AndroidNative.startWordListen(wordPredictLang());
+  } catch (e) {}
+}
+
+// כל מילה ששומעים: האחרונה "מנצחת" (הקוסם שותק אחרי שהצופה אומר את המילה)
+window.onHeardWords = function (text, isFinal) {
+  if (!wordPredictActive) return;
+  const w = cleanSpokenWord(text);
+  if (!w) return;
+  wordPredictWord = w;
+  if (!isFinal) return;
+  // אישור סודי באוזנייה (רק אם מחוברת): "נקלט: ריהאנה"
+  clearTimeout(wordPredictWhisperTimer);
+  wordPredictWhisperTimer = setTimeout(() => {
+    if (!wordPredictActive || !hasNativeSecretVoice()) return;
+    try {
+      window.AndroidNative.speakSecret('נקלט: ' + wordPredictWord, wordPredictLang(), 'got: ' + wordPredictWord);
+    } catch (e) {}
+  }, 250);
+};
+
+// נגיעה במסך ה"כבוי": מסך הנעילה נדלק, והמילה כבר כתובה מתחת לשעון
+function wordPredictReveal() {
+  if (!wordPredictActive) return;
+  const word = wordPredictWord;
+  wordPredictExit(false);
+  const tpl = String(config.wordPredictTpl || '{מילה}');
+  wordPredictShown = word ? fillWordTemplate(tpl, word) : '';
+  phoneContainer.classList.add('clock-mode-active');
+  applyConfigToUI();
+}
+
+function fillWordTemplate(tpl, word) {
+  return /\{(מילה|word)\}/i.test(tpl) ? tpl.replace(/\{(מילה|word)\}/gi, word) : `${tpl} ${word}`.trim();
+}
+
+(function () {
+  const off = document.getElementById('fakeOffScreen');
+  if (off) off.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    wordPredictReveal();
+  });
+})();
+
+// clearShown=true ("מוכן לצופה הבא"): גם מוחקים את המילה ממסך הנעילה
+function wordPredictExit(clearShown) {
+  const wasActive = wordPredictActive;
+  wordPredictActive = false;
+  clearTimeout(wordPredictWhisperTimer);
+  const off = document.getElementById('fakeOffScreen');
+  if (off) off.style.display = 'none';
+  if (hasNativeWordListen()) {
+    try {
+      if (wasActive) window.AndroidNative.stopVoiceRepeat();
+      window.AndroidNative.setFakeOff(false);
+    } catch (e) {}
+  }
+  if (clearShown && wordPredictShown) {
+    wordPredictShown = '';
+    wordPredictWord = '';
+    applyConfigToUI();
+  }
+}
+
 // 🗣️ "חזרה בפקודה קולית" (אנדרואיד): אחרי שהצופה הקליד, הטלפון מקשיב למשפט "תחזור/תחזרי על הקוד"
 // ולוחש את הקוד שוב. מקשיבים רק עד "מוכן לצופה הבא" או כניסה להגדרות.
 function hasNativeVoiceRepeat() {
@@ -2374,6 +2480,11 @@ function liveReadMicReady() {
 
 // תשובת אנדרואיד לבקשת הרשאת המיקרופון
 window.onMicPermission = function (ok) {
+  const wpSt = document.getElementById('wordPredictStatus');
+  if (wpSt && config.wordPredict) {
+    wpSt.textContent = ok ? (isEnglishUi() ? '✓ Microphone allowed.' : '✓ המיקרופון מאושר.') : (isEnglishUi() ? '⚠️ Microphone not allowed - the trick will not work.' : '⚠️ המיקרופון לא אושר - הקסם לא יעבוד.');
+    wpSt.className = 'toggle-sub-desc live-read-status ' + (ok ? 'good' : 'bad');
+  }
   const st = document.getElementById('liveReadVoiceStatus');
   if (!st) return;
   const isEn = isEnglishUi();
@@ -4399,7 +4510,7 @@ function initDeviceLicenseGate() {
 // החלון מוצג רק כשמסך ההגדרות פתוח (בפתיחת האפליקציה / בתפריט הסודי),
 // ולעולם לא מעל מסך הנעילה הפעיל מול קהל.
 // ============================================================================
-const APP_VERSION = '8.3';
+const APP_VERSION = '8.4';
 const DEFAULT_APK_URL = 'https://github.com/tzur2010/app-lockscreen/raw/main/Lockscreen.apk';
 const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 const UPDATE_DISMISS_KEY = 'magic_update_dismissed_version';
@@ -5411,6 +5522,7 @@ function relockFakePhone() {
 // "מוכן לצופה הבא": מנקה את הקוד האחרון, מאפס ניסיונות וחוזר למסך הנעילה
 function resetForNextShow() {
   liveReadStopVoice();
+  wordPredictExit(true);
   trackEvent('reset_show');
   try {
     localStorage.removeItem(LAST_PIN_KEY);
@@ -5661,6 +5773,7 @@ function getStatsForReport() {
   if (config.settingsTrick) on.push('settingstrick');
   if (config.birthdayTrick) on.push('birthday');
   if (config.liveRead) on.push('liveread');
+  if (config.wordPredict) on.push('wordpredict');
   if (config.unlockTargetScreen === 'gallery') on.push('gallery');
   if (config.unlockTargetScreen === 'search') on.push('search');
   try {
@@ -6185,9 +6298,20 @@ function syncNewRevealsUI() {
     btn.classList.toggle('active', Number(btn.dataset.fails) === faceTrickFails());
   });
 
+  const wpBlock = document.getElementById('wordPredictBlock');
+  if (wpBlock) wpBlock.style.display = hasNativeWordListen() ? '' : 'none';
+  const wpToggle = document.getElementById('toggleWordPredict');
+  if (wpToggle) wpToggle.checked = Boolean(config.wordPredict);
+  const wpExtra = document.getElementById('wordPredictExtra');
+  if (wpExtra) wpExtra.style.display = config.wordPredict ? 'block' : 'none';
+  const wpTpl = document.getElementById('wordPredictTplInput');
+  if (wpTpl && document.activeElement !== wpTpl) wpTpl.value = config.wordPredictTpl || '{מילה}';
+  document.querySelectorAll('#wordPredictLangSelector .seg-pill').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.wplang === wordPredictLang());
+  });
+
   const lrToggle = document.getElementById('toggleLiveRead');
-  if (lrToggle) lrToggle.checked = Boolean(config.liveRead);
-  const lrExtra = document.getElementById('liveReadExtra');
+  if (lrToggle) lrToggle.checked = Boolean(config.liveRead);  const lrExtra = document.getElementById('liveReadExtra');
   if (lrExtra) lrExtra.style.display = config.liveRead ? 'block' : 'none';
   document.querySelectorAll('#liveReadLangSelector .seg-pill').forEach((btn) => {
     btn.classList.toggle('active', btn.dataset.lrlang === liveReadLang());
@@ -6280,9 +6404,35 @@ function initNewReveals() {
     });
   }
 
+  const wpToggle = document.getElementById('toggleWordPredict');
+  if (wpToggle) {
+    wpToggle.addEventListener('change', () => {
+      config.wordPredict = wpToggle.checked;
+      saveConfig();
+      syncNewRevealsUI();
+      const st = document.getElementById('wordPredictStatus');
+      if (wpToggle.checked && hasNativeWordListen()) {
+        if (liveReadMicReady()) {
+          if (st) { st.textContent = isEnglishUi() ? '✓ Microphone allowed. After "Save & Close" the screen goes black and listens.' : '✓ המיקרופון מאושר. אחרי "שמור וסגור" המסך נהיה שחור ומקשיב.'; st.className = 'toggle-sub-desc live-read-status good'; }
+        } else {
+          try { window.AndroidNative.requestMicPermission(); } catch (e) {}
+        }
+      } else if (st) st.textContent = '';
+    });
+  }
+  const wpTplInput = document.getElementById('wordPredictTplInput');
+  if (wpTplInput) wpTplInput.addEventListener('input', () => {
+    config.wordPredictTpl = wpTplInput.value.slice(0, 60) || '{מילה}';
+    saveConfig();
+  });
+  document.querySelectorAll('#wordPredictLangSelector .seg-pill').forEach((btn) => btn.addEventListener('click', () => {
+    config.wordPredictLang = btn.dataset.wplang === 'en' ? 'en' : 'he';
+    saveConfig();
+    syncNewRevealsUI();
+  }));
+
   const lrToggle = document.getElementById('toggleLiveRead');
-  if (lrToggle) {
-    lrToggle.addEventListener('change', () => {
+  if (lrToggle) {    lrToggle.addEventListener('change', () => {
       config.liveRead = lrToggle.checked;
       // הקריאה עובדת על קוד PIN (ספרות)
       if (lrToggle.checked && config.unlockMode !== 'pin') config.unlockMode = 'pin';
@@ -6654,6 +6804,12 @@ async function collectPreShowChecks() {
     }
   }
 
+  // 🔮 הטלפון ידע מראש: צריך מיקרופון
+  if (config.wordPredict && hasNativeWordListen()) {
+    if (liveReadMicReady()) add('ok', 'הטלפון ידע מראש - מוכן', 'אחרי "שמור וסגור" המסך נהיה שחור ומקשיב. נגיעה = מסך הנעילה עם המילה.');
+    else add('bad', 'אין הרשאת מיקרופון', 'בלי מיקרופון "הטלפון ידע מראש" לא יעבוד.', 'אשר', () => { try { window.AndroidNative.requestMicPermission(); } catch (e) {} });
+  }
+
   // 🎧 קריאה בזמן אמת: האוזנייה חייבת להיות מחוברת (אחרת הקוסם לא שומע כלום)
   if (config.liveRead) {
     if (config.unlockMode !== 'pin') {
@@ -6853,7 +7009,10 @@ const TRICK_TIPS = {
     he: ['🤳 הטלפון מזהה את הצופה', '1. נגיעה במסך / החלקה למעלה = "זיהוי פנים". בפעמים הראשונות (כמה שבחרת) הוא נכשל - "הפנים לא זוהו".\n2. מגישים לצופה ונוגעים שוב במסך כשהוא מסתכל: הטלפון נפתח מיד.\n3. באותו רגע המצלמה הקדמית מצלמת אותו - והתמונה שלו היא הטפט של מסך הבית.\nטיפ: תחזיק את הטלפון מול הפנים של הצופה בגובה העיניים, כמו שמצלמים סלפי.', '"הטלפון שלי לא מזהה אותי היום... רגע, תסתכל אתה? ...איך הוא מכיר אותך?! ותסתכל על הטפט שלי..."'],
     en: ['🤳 The phone knows the spectator', '1. Tap the screen / swipe up = "face scan". The first times (as many as you chose) it fails - "Face not recognized".\n2. Hand it to the spectator and tap again while they look: it unlocks instantly.\n3. At that moment the front camera takes their photo - and it becomes the home screen wallpaper.\nTip: hold the phone at their eye level, like taking a selfie.', '"My phone doesn\'t recognize me today... wait, you try? ...how does it know you?! And look at my wallpaper..."']
   },
-  toggleLiveRead: {
+  toggleWordPredict: {
+    he: ['🔮 הטלפון ידע מראש', 'הכנה: מדליקים, ובהגדרות "מראה" ממלאים טקסט פרטי קשר רגיל (כמו בטלפון שלך). אם יש אוזנייה - מומלץ.\n\n1. "שמור וסגור" - המסך נהיה שחור, כאילו הטלפון כבוי. מניחים אותו על השולחן.\n2. "תגיד בקול שם של מפורסם - מי שבא לך." (או עיר, חיה, שם של חבר)\n3. הצופה אומר מילה. אתה שותק! (המילה האחרונה שנאמרת היא זו שמופיעה)\n4. עם אוזנייה: שומעים בסתר "נקלט: ..." - ככה יודעים שהטלפון קלט נכון.\n5. "מצחיק... תסתכל על הטלפון שלי." נוגעים במסך - מסך הנעילה נדלק, והמילה כתובה מתחת לשעון.\n\n💡 טיפים:\n• אחרי שהצופה אמר את המילה - לא לדבר עד שנוגעים במסך.\n• מקום שקט עובד הכי טוב. צריך אינטרנט.\n• "מוכן לצופה הבא" מוחק את המילה ממסך הנעילה.', '"תגיד שם של מפורסם... ריהאנה? מצחיק. תסתכל מה כתוב אצלי על המסך כבר חודש..."'],
+    en: ['🔮 My phone knew', 'Setup: turn it on, and in the "Look" tab fill in a normal contact-info text (like on your phone). An earphone is recommended.\n\n1. "Save & Close" - the screen goes black, as if the phone is off. Put it on the table.\n2. "Say out loud the name of a celebrity - anyone you like." (or a city, an animal, a friend\'s name)\n3. The spectator says a word. You stay silent! (the last word spoken is the one that appears)\n4. With an earphone: you secretly hear "got: ..." - so you know the phone caught it right.\n5. "Funny... look at my phone." Tap the screen - the lock screen lights up, and the word is written under the clock.\n\n💡 Tips:\n• After the spectator says the word - don\'t talk until you tap the screen.\n• A quiet place works best. Needs internet.\n• "Ready for next spectator" removes the word from the lock screen.', '"Name a celebrity... Rihanna? Funny. Look what has been on my screen for a month..."']
+  },  toggleLiveRead: {
     he: ['🎧 קריאה בזמן אמת', 'הכנה: אוזניית בלוטות\' אחת באוזן, מחוברת לטלפון הזה. "בדיקת אוזנייה" - שומעים "אחת, שתיים, שלוש" רק באוזנייה. נעילה: קוד PIN.\n\n1. נותנים לצופה את הטלפון ומסתובבים עם הגב (או עוצמים עיניים).\n2. "תקליד קוד סודי, ספרה אחרי ספרה. בכל ספרה - תעצור ותחשוב עליה חזק."\n3. בכל לחיצה הטלפון לוחש לך את הספרה באוזנייה. אומרים אותה בקול - לאט, כאילו "קולטים": "...שבע".\n4. אחרי הספרה האחרונה הטלפון נפתח, ואתה כבר אמרת את כל הקוד.\n\n💡 טיפים:\n• אל תענה מהר מדי - תן לשנייה של "ריכוז" לפני כל ספרה.\n• מקליד מהר? כל הספרות נאמרות לפי הסדר, ובסוף שומעים שוב את כל הקוד.\n• 🗣️ באנדרואיד: אחרי הקוד אפשר להגיד "תחזור על הקוד" (או "תחזרי") - והקוד נלחש שוב. הטלפון צריך להישאר על מסך הנעילה.\n• אם הצופה מוחק ספרה - תשמע "מחק".\n• באנדרואיד: אם האוזנייה מתנתקת, הטלפון פשוט שותק - לא יוצא שום צליל.\n• באייפון: אין בדיקה אוטומטית - בודקים אוזנייה לפני כל הופעה.', '"אל תגיד כלום... רק תחשוב על הספרה... שבע? ...ועכשיו... ארבע?"'],
     en: ['🎧 Live reading', 'Setup: one Bluetooth earphone in your ear, connected to this phone. "Earphone test" - you hear "one, two, three" ONLY in the earphone. Lock type: PIN.\n\n1. Hand the spectator the phone and turn your back (or close your eyes).\n2. "Type a secret code, one digit at a time. On each digit - pause and think of it hard."\n3. On every press the phone whispers the digit into your earphone. Say it out loud - slowly, as if you are "picking it up": "...seven".\n4. After the last digit the phone unlocks - and you have already named the whole code.\n\n💡 Tips:\n• Don\'t answer too fast - give each digit a second of "concentration".\n• Typing fast? Every digit is said in order, and at the end you hear the whole code again.\n• 🗣️ On Android: after the code you can say "repeat the code" - and it is whispered again. The phone must stay on the lock screen.\n• If the spectator deletes a digit - you hear "delete".\n• On Android: if the earphone disconnects, the phone simply stays silent - no sound at all.\n• On iPhone: there is no automatic check - test the earphone before every show.', '"Don\'t say anything... just think of the digit... seven? ...and now... four?"']
   },  toggleBirthdayTrick: {
@@ -7020,6 +7179,7 @@ function initTour() {
 const WHATS_NEW_SEEN_KEY = 'magic_whats_new_seen_v1';
 const WHATS_NEW_MAX_ITEMS = 6;
 const WHATS_NEW = [
+  { ver: '8.4', icon: '🔮', target: '#toggleWordPredict', he: ['הטלפון ידע מראש', 'המסך נראה כבוי, הצופה אומר בקול מילה כלשהי - ונגיעה במסך מדליקה את מסך הנעילה עם המילה כתובה מתחת לשעון. (אנדרואיד)'], en: ['My phone knew', 'The screen looks off, the spectator says any word out loud - and a tap lights up the lock screen with that word under the clock. (Android)'] },
   { ver: '8.0', icon: '🎧', target: '#toggleLiveRead', he: ['קריאה בזמן אמת', 'אתה עם הגב, הצופה מקליד קוד - ואתה אומר כל ספרה ברגע שהוא לוחץ עליה. הספרות נלחשות לך באוזניית בלוטות\'.'], en: ['Live reading', 'Your back is turned, the spectator types a code - and you name every digit the moment it is pressed. The digits are whispered into your Bluetooth earphone.'] },
   { ver: '7.9', icon: '🛡️', target: null, he: ['ליטוש לפני הופעות', 'עברנו על כל מסך בכל סוג טלפון. באייפון מוצג רק מה שעובד שם, והכל אמין יותר מתמיד.'], en: ['Polished for shows', 'We went over every screen on every phone type. On iPhone you see only what works there, and everything is more reliable than ever.'] },
   { ver: '7.8', icon: '✨', target: null, he: ['מראה חדש מהרגע הראשון', 'גם ההרשמה, בחירת הטלפון וכל החלונות בעיצוב החדש. האפליקציה ממוקדת: רק מה שעובד בצורה מושלמת.'], en: ['A new look from the first second', 'Sign-up, phone selection and every window now share the new design. The app is focused: only what works perfectly.'] },

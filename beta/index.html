@@ -169,6 +169,10 @@ fit();addEventListener('resize',fit);addEventListener('orientationchange',functi
           <p>באנדרואיד: הטלפון יוצא באמת למסך הבית האמיתי שלך.<br>באייפון: אפל לא מאפשרת לאף אפליקציה לצאת לבד למסך הבית, לכן מוצג צילום של מסך הבית שלך - עם השעה והסוללה האמיתיות למעלה.<br>פעם אחת: במסך הבית לוחצים צד + עוצמה למעלה, ואז לשונית פתיחה ← "בחר צילום של מסך הבית שלך".</p>
         </details>
         <details>
+          <summary>🔮 הטלפון ידע מראש</summary>
+          <p>1. "שמור וסגור" - המסך נהיה שחור, כאילו הטלפון כבוי.<br>2. הצופה אומר בקול מילה כלשהי (מפורסם, עיר, חיה). אתה שותק.<br>3. נוגעים במסך - מסך הנעילה נדלק והמילה כתובה מתחת לשעון.<br>💡 אנדרואיד בלבד. עם אוזנייה שומעים בסתר "נקלט: ..." לפני שנוגעים.</p>
+        </details>
+        <details>
           <summary>🎧 קריאה בזמן אמת</summary>
           <p>1. אוזניית בלוטות' אחת באוזן, מחוברת לטלפון. בהגדרות: "🔊 בדיקת אוזנייה".<br>2. נותנים לצופה את הטלפון ומסתובבים עם הגב: "תקליד קוד, ספרה אחרי ספרה".<br>3. כל ספרה נלחשת לך באוזנייה ברגע שהיא נלחצת - אומרים אותה בקול, לאט.<br>💡 באנדרואיד: בלי אוזנייה הטלפון שותק לגמרי. באייפון: בודקים אוזנייה לפני כל הופעה.</p>
         </details>
@@ -570,6 +574,34 @@ fit();addEventListener('resize',fit);addEventListener('orientationchange',functi
           </div>
 
           <div class="oneui-card-divider"></div>
+
+          <!-- הטלפון ידע מראש: הצופה אומר מילה בקול - והיא מופיעה מתחת לשעון במסך הנעילה (אנדרואיד) -->
+          <div id="wordPredictBlock" style="display: none;">
+          <div class="clean-toggle-row oneui-row-with-sub">
+            <div class="toggle-text-stack">
+              <span class="toggle-main-title">🔮 הטלפון ידע מראש</span>
+              <span class="toggle-sub-desc">המסך נראה כבוי. הצופה אומר בקול מילה כלשהי - מפורסם, עיר, חיה. נוגעים במסך - והמילה כתובה מתחת לשעון, כאילו הגדרת אותה מזמן.</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="toggleWordPredict">
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="oneui-field-block" id="wordPredictExtra" style="display: none; padding-top: 0;">
+            <label class="config-label" for="wordPredictTplInput">מה כתוב מתחת לשעון ({מילה} = מה שהצופה אמר)</label>
+            <input type="text" id="wordPredictTplInput" class="feedback-textarea gallery-text-input" maxlength="60" dir="rtl">
+            <label class="config-label">שפת הזיהוי</label>
+            <div class="segmented-row" id="wordPredictLangSelector">
+              <button type="button" class="seg-pill" data-wplang="he">עברית</button>
+              <button type="button" class="seg-pill" data-wplang="en">English</button>
+            </div>
+            <div class="toggle-sub-desc live-read-status" id="wordPredictStatus"></div>
+            <div class="toggle-sub-desc" style="margin-top: 4px; line-height: 1.6;">
+              אחרי "שמור וסגור" המסך נהיה שחור ומקשיב. עם אוזנייה מחוברת שומעים בסתר "נקלט: ..." לפני שנוגעים. הסבר מלא: כפתור ה-?
+            </div>
+          </div>
+          <div class="oneui-card-divider"></div>
+          </div>
 
           <!-- תאריך לידה: הצופה מקליד כקוד תאריך לידה של מישהו קרוב - הקוסם יודע מזל, גיל ועוד -->
           <div class="clean-toggle-row oneui-row-with-sub">
@@ -1546,6 +1578,9 @@ fit();addEventListener('resize',fit);addEventListener('orientationchange',functi
     </div>
 
     <!-- חלון הצצה סודי (Secret Hold Peek) -->
+    <!-- 🔮 "הטלפון ידע מראש": מסך "כבוי" (שחור). נגיעה = מסך הנעילה נדלק עם המילה -->
+    <div class="fake-off-screen" id="fakeOffScreen" style="display: none;"></div>
+
     <div class="secret-peek" id="secretPeek">
       <svg class="peek-pattern-mini" id="peekPatternMini" viewBox="0 0 60 60"></svg>
       <span class="peek-text" id="peekText">----</span>

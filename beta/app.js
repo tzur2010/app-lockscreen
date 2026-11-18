@@ -4383,9 +4383,18 @@ function useBetaChannel() {
 }
 
 async function fetchBetaConfig() {
-  const res = await fetch(`${BETA_BASE_URL}version.json?t=${Date.now()}`, { cache: 'no-store' });
-  if (!res.ok) return null;
-  const data = await res.json();
+  const url = `${BETA_BASE_URL}version.json?t=${Date.now()}`;
+  let data = null;
+  // באנדרואיד (APK) fetch ישיר לאינטרנט חסום - קוראים דרך הגשר הנייטיבי (כמו כל שאר החיבורים)
+  if (window.MagicCloud && typeof window.MagicCloud.httpGet === 'function' && isNativeApk()) {
+    const res = await window.MagicCloud.httpGet(url);
+    if (!res || !res.ok) return null;
+    data = JSON.parse(res.text || 'null');
+  } else {
+    const res = await fetch(url, { cache: 'no-store' });
+    if (!res.ok) return null;
+    data = await res.json();
+  }
   if (!data || !data.latest_version) return null;
   return { latest_version: String(data.latest_version), apk_url: BETA_APK_URL, message: '🧪 גרסת בטא - רק לבודקים', beta: true };
 }

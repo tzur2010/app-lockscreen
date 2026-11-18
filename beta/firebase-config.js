@@ -792,6 +792,8 @@ window.MagicCloud = (function () {
   return {
     isConfigured,
     getAppConfig,
+    // קריאת קובץ מהאינטרנט דרך הגשר הנייטיבי באנדרואיד (fetch רגיל חסום מתוך ה-APK)
+    httpGet: (url) => http(url),
     notifyAdmin,
     adminNotifyTopic: () => String(cfg.adminNotifyTopic || ''),
     device: {

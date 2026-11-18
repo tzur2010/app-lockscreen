@@ -594,6 +594,13 @@ fit();addEventListener('resize',fit);addEventListener('orientationchange',functi
               <button type="button" class="seg-pill" data-wpmode="notification">📩 כהתראה</button>
             </div>
             <div class="toggle-sub-desc" id="wordPredictModeNote" style="line-height: 1.6;"></div>
+            <div id="wordPredictWpFields">
+              <label class="media-upload-btn" style="display: block; text-align: center; width: 100%; margin-top: 4px; box-sizing: border-box;">
+                🖼️ בחר את התמונה המקורית (בלי שעון)
+                <input type="file" id="wordWallpaperFileInput" accept="image/*" hidden>
+              </label>
+              <div class="toggle-sub-desc live-read-status" id="wordWallpaperStatus"></div>
+            </div>
             <div id="wordPredictNotifFields">
             <label class="config-label" for="wordPredictTitleInput">כותרת ההתראה</label>
             <input type="text" id="wordPredictTitleInput" class="feedback-textarea gallery-text-input" maxlength="40" dir="rtl" placeholder="תזכורת">

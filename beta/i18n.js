@@ -79,6 +79,8 @@
     '🎧 קריאה בזמן אמת': '🎧 Live reading',
     'אתה עומד עם הגב, והצופה מקליד קוד. כל ספרה נלחשת לך באוזנייה ברגע שהוא לוחץ - ואתה אומר אותה בקול, אחת אחרי השנייה.': 'Your back is turned while the spectator types a code. Every digit is whispered into your earphone the moment it is pressed - and you say it out loud, one after another.',
     'שפת הלחישה': 'Whisper language',
+    '🔁 חזרה על כל הקוד בסוף': '🔁 Repeat the whole code at the end',
+    'כשהצופה מסיים להקליד, שומעים שוב את כל הקוד ברצף - גם אם פספסת ספרה.': 'When the spectator finishes typing, you hear the whole code again in one go - even if you missed a digit.',
     '🔊 בדיקת אוזנייה': '🔊 Earphone test',
     'צריך אוזניית בלוטות\' אחת באוזן. באנדרואיד הטלפון שותק לגמרי אם אין אוזנייה מחוברת. עובד עם קוד PIN. הסבר מלא ומה אומרים לצופה: כפתור ה-?': 'You need one Bluetooth earphone in your ear. On Android the phone stays completely silent if no earphone is connected. Works with a PIN. Full how-to and what to say: the ? button.',
     'קריאה בזמן אמת עובדת רק עם קוד PIN': 'Live reading works only with a PIN',

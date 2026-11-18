@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#000000">
+  <meta name="robots" content="noindex">
+  <title>Lockscreen</title>
+  <!--
+    ניסיון: "אני שומע את המחשבות שלך" - קריאת הקוד בזמן אמת.
+    בכל לחיצה על ספרה הטלפון לוחש את הספרה לאוזניית הבלוטות' של הקוסם.
+    עמוד נפרד לגמרי מהאפליקציה - לא נוגע בשום הגדרה של הקוסמים.
+  -->
+  <style>
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { margin: 0; height: 100%; background: #000; color: #fff; font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif; overflow: hidden; user-select: none; -webkit-user-select: none; touch-action: manipulation; }
+    section { position: fixed; inset: 0; display: none; }
+    section.on { display: flex; }
+
+    /* ---------- מסך הכנה (רק לקוסם) ---------- */
+    #setup { flex-direction: column; align-items: center; overflow-y: auto; padding: 28px 20px 40px;
+      background: radial-gradient(120% 60% at 90% 0%, rgba(139,92,246,.4) 0%, transparent 60%), radial-gradient(120% 60% at 0% 100%, rgba(6,182,212,.25) 0%, transparent 60%), #07060f; }
+    .wrap { width: 100%; max-width: 440px; }
+    .logo { width: 72px; height: 72px; margin: 0 auto 12px; border-radius: 22px; display: grid; place-items: center; font-size: 36px; background: linear-gradient(135deg, #8b5cf6, #6366f1 48%, #06b6d4); box-shadow: 0 14px 40px rgba(99,102,241,.5); }
+    h1 { text-align: center; font-size: 22px; margin: 0 0 4px; }
+    .sub { text-align: center; color: #a5a3c4; font-size: 14px; margin: 0 0 18px; line-height: 1.5; }
+    .card { background: linear-gradient(rgba(22,20,44,.8), rgba(22,20,44,.8)) padding-box, linear-gradient(145deg, rgba(167,139,250,.45), rgba(255,255,255,.05) 40%, rgba(34,211,238,.35)) border-box; border: 1px solid transparent; border-radius: 20px; padding: 16px; margin-bottom: 12px; }
+    .card h2 { font-size: 15px; margin: 0 0 8px; }
+    .card p, .card li { font-size: 14px; line-height: 1.6; color: #cbd5e1; margin: 0; }
+    .card ol { margin: 0; padding-inline-start: 20px; }
+    .card li { margin-bottom: 6px; }
+    .card b { color: #fff; }
+    .btn { display: block; width: 100%; min-height: 52px; border: 0; border-radius: 16px; font: inherit; font-size: 16px; font-weight: 800; color: #fff; cursor: pointer; margin-top: 10px; }
+    .btn-main { background: linear-gradient(135deg, #8b5cf6, #6366f1 48%, #06b6d4); box-shadow: 0 10px 28px rgba(99,102,241,.45); }
+    .btn-soft { background: rgba(255,255,255,.08); border: 1px solid rgba(167,139,250,.3); }
+    .row { display: flex; gap: 8px; }
+    .row .btn { margin-top: 0; }
+    .seg { display: flex; gap: 6px; background: rgba(0,0,0,.35); padding: 5px; border-radius: 14px; }
+    .seg button { flex: 1; min-height: 40px; border: 0; border-radius: 10px; background: transparent; color: #a5a3c4; font: inherit; font-weight: 700; cursor: pointer; }
+    .seg button.on { background: linear-gradient(135deg, #8b5cf6, #06b6d4); color: #fff; }
+    .note { font-size: 13px; color: #fde68a; margin-top: 8px; line-height: 1.5; }
+    .ok { color: #6ee7b7; }
+    .warn { color: #fca5a5; }
+
+    /* ---------- מסך הנעילה (מה שהצופה רואה) ---------- */
+    #lock { flex-direction: column; align-items: center;
+      background: radial-gradient(120% 80% at 80% 0%, #3b2a7a 0%, transparent 60%), radial-gradient(120% 80% at 0% 100%, #0b4b63 0%, transparent 60%), #0d0b1d; }
+    .status { width: 100%; display: flex; justify-content: space-between; padding: calc(env(safe-area-inset-top, 0px) + 10px) 22px 0; font-size: 14px; font-weight: 600; direction: ltr; opacity: .95; }
+    .lock-ico { margin-top: 8vh; font-size: 22px; opacity: .9; }
+    .title { margin-top: 2.5vh; font-size: 20px; font-weight: 600; }
+    .hint { margin-top: 6px; font-size: 13px; color: rgba(255,255,255,.7); }
+    .dots { display: flex; gap: 16px; margin: 4.5vh 0 5vh; height: 14px; direction: ltr; }
+    .dot { width: 13px; height: 13px; border-radius: 50%; border: 1.6px solid rgba(255,255,255,.85); transition: background .12s; }
+    .dot.f { background: #fff; }
+    .dots.shake { animation: shake .35s; }
+    @keyframes shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-10px); } 75% { transform: translateX(10px); } }
+    .pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2.4vh 9vw; direction: ltr; }
+    .key { width: min(19vw, 78px); height: min(19vw, 78px); border-radius: 50%; border: 0; background: rgba(255,255,255,.14); color: #fff; font: inherit; font-size: min(8.5vw, 34px); font-weight: 400; display: grid; place-items: center; cursor: pointer; transition: background .08s; }
+    .key:active, .key.p { background: rgba(255,255,255,.38); }
+    .key.blank { background: transparent; pointer-events: none; }
+    .key.txt { background: transparent; font-size: 16px; font-weight: 600; }
+    .emergency { position: absolute; bottom: calc(env(safe-area-inset-bottom, 0px) + 26px); font-size: 15px; font-weight: 600; opacity: .9; }
+
+    /* ---------- "נפתח" ---------- */
+    #home { flex-direction: column; align-items: center; justify-content: center; background: radial-gradient(120% 80% at 80% 0%, #3b2a7a 0%, transparent 60%), radial-gradient(120% 80% at 0% 100%, #0b4b63 0%, transparent 60%), #0d0b1d; }
+    #home .big { font-size: 64px; font-weight: 300; }
+    #home .date { font-size: 15px; opacity: .85; margin-top: 4px; }
+    .unlock-anim { animation: unl .32s ease-out forwards; }
+    @keyframes unl { to { transform: scale(1.12); opacity: 0; } }
+
+    /* פינה סודית: 3 הקשות מהירות */
+    .corner { position: absolute; top: 0; right: 0; width: 70px; height: 70px; z-index: 5; }
+  </style>
+</head>
+<body>
+
+<!-- ===================== הכנה ===================== -->
+<section id="setup" class="on">
+  <div class="wrap">
+    <div class="logo">🎧</div>
+    <h1>ניסיון: קריאת הקוד בזמן אמת</h1>
+    <p class="sub">הצופה מקליד קוד, ואתה - עם הגב - אומר כל ספרה ברגע שהוא לוחץ עליה.</p>
+
+    <div class="card">
+      <h2>1. חבר אוזניית בלוטות' לטלפון הזה</h2>
+      <p>אוזנייה אחת באוזן מספיקה. עוצמת המדיה - נמוכה עד בינונית.</p>
+    </div>
+
+    <div class="card">
+      <h2>2. שפת הלחישה</h2>
+      <div class="seg" id="langSeg">
+        <button type="button" data-l="he" class="on">עברית</button>
+        <button type="button" data-l="en">English</button>
+      </div>
+      <p class="note" id="voiceNote"></p>
+    </div>
+
+    <div class="card">
+      <h2>3. בדיקת אוזנייה (חובה)</h2>
+      <p>לוחצים ומקשיבים: את המילים צריך לשמוע <b>רק באוזנייה</b>. אם זה יוצא מהרמקול של הטלפון - <b>לא ממשיכים</b> (הצופה ישמע את הספרות).</p>
+      <button type="button" class="btn btn-soft" id="testBtn">🔊 בדיקה: "אחת, שתיים, שלוש"</button>
+      <p class="note" id="testNote"></p>
+    </div>
+
+    <div class="card">
+      <h2>4. ההופעה</h2>
+      <ol>
+        <li>לוחצים <b>"התחל"</b> - המסך הופך למסך נעילה.</li>
+        <li>נותנים לצופה ו<b>מסתובבים עם הגב</b>: "תקליד קוד סודי, ספרה אחרי ספרה, ותחשוב חזק על כל אחת".</li>
+        <li>בכל לחיצה שומעים את הספרה באוזנייה - ואומרים אותה בקול, לאט, כאילו "קולטים".</li>
+        <li>אחרי 4 ספרות הטלפון "נפתח".</li>
+      </ol>
+      <p class="note">🔁 לצופה הבא: <b>3 הקשות מהירות בפינה הימנית העליונה</b>. מתוך מסך הנעילה, 3 הקשות שם מחזירות לכאן.</p>
+    </div>
+
+    <button type="button" class="btn btn-main" id="startBtn">התחל ▶</button>
+  </div>
+</section>
+
+<!-- ===================== מסך נעילה ===================== -->
+<section id="lock">
+  <div class="corner" data-corner="lock"></div>
+  <div class="status"><span id="sTime">12:00</span><span>📶 🔋</span></div>
+  <div class="lock-ico">🔒</div>
+  <div class="title" id="lockTitle">הזן קוד PIN</div>
+  <div class="hint" id="lockHint">&nbsp;</div>
+  <div class="dots" id="dots"></div>
+  <div class="pad" id="pad"></div>
+  <div class="emergency" id="emerg">שיחת חירום</div>
+</section>
+
+<!-- ===================== נפתח ===================== -->
+<section id="home">
+  <div class="corner" data-corner="home"></div>
+  <div class="big" id="hTime">12:00</div>
+  <div class="date" id="hDate"></div>
+</section>
+
+<script>
+(function () {
+  const LEN = 4;
+  const WORDS = {
+    he: ['אפס', 'אחת', 'שתיים', 'שלוש', 'ארבע', 'חמש', 'שש', 'שבע', 'שמונה', 'תשע'],
+    en: ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine']
+  };
+  const DEL = { he: 'מחק', en: 'delete' };
+  let lang = localStorage.getItem('lr_lang') || 'he';
+  let voices = [];
+  let code = '';
+  let busy = false;
+  let wakeLock = null;
+
+  const $ = (id) => document.getElementById(id);
+  const show = (id) => document.querySelectorAll('section').forEach((s) => s.classList.toggle('on', s.id === id));
+
+  // ---------- קול ----------
+  function pickVoice(l) {
+    const want = l === 'he' ? /^(he|iw)/i : /^en/i;
+    return voices.find((v) => want.test(v.lang)) || null;
+  }
+  function refreshVoices() {
+    voices = window.speechSynthesis ? speechSynthesis.getVoices() : [];
+    const note = $('voiceNote');
+    if (!window.speechSynthesis) { note.textContent = '⚠️ הדפדפן הזה לא תומך בהקראה. נסה Chrome באנדרואיד או Safari באייפון.'; return; }
+    if (lang === 'he' && voices.length && !pickVoice('he')) {
+      note.innerHTML = '<span class="warn">אין קול עברי בטלפון הזה - הספרות ייאמרו באנגלית.</span>';
+    } else {
+      note.textContent = '';
+    }
+  }
+  function say(text) {
+    if (!window.speechSynthesis) return;
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    let v = pickVoice(lang);
+    let l = lang;
+    if (!v && lang === 'he' && voices.length) { v = pickVoice('en'); l = 'en'; }
+    if (v) u.voice = v;
+    u.lang = l === 'he' ? 'he-IL' : 'en-US';
+    u.rate = 1.15;
+    u.volume = 1;
+    speechSynthesis.speak(u);
+  }
+  function word(d) {
+    const useHe = lang === 'he' && (!voices.length || pickVoice('he'));
+    return (useHe ? WORDS.he : WORDS.en)[d];
+  }
+  if (window.speechSynthesis) {
+    refreshVoices();
+    speechSynthesis.onvoiceschanged = refreshVoices;
+  }
+
+  // ---------- הכנה ----------
+  document.querySelectorAll('#langSeg button').forEach((b) => {
+    b.classList.toggle('on', b.dataset.l === lang);
+    b.addEventListener('click', () => {
+      lang = b.dataset.l;
+      localStorage.setItem('lr_lang', lang);
+      document.querySelectorAll('#langSeg button').forEach((x) => x.classList.toggle('on', x === b));
+      refreshVoices();
+    });
+  });
+  $('testBtn').addEventListener('click', () => {
+    say([1, 2, 3].map(word).join(', '));
+    $('testNote').innerHTML = 'שמעת <b>רק באוזנייה</b>? מעולה. יצא מהרמקול? חבר את האוזנייה ונסה שוב.';
+  });
+
+  async function keepAwake() {
+    try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } catch (e) {}
+  }
+  $('startBtn').addEventListener('click', async () => {
+    try { if (document.documentElement.requestFullscreen) await document.documentElement.requestFullscreen(); } catch (e) {}
+    // "מחמם" את מנוע הקול בתוך לחיצה (חובה באייפון) - בשקט
+    if (window.speechSynthesis) { const w = new SpeechSynthesisUtterance(' '); w.volume = 0; speechSynthesis.speak(w); }
+    keepAwake();
+    toLock();
+  });
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && !$('setup').classList.contains('on')) keepAwake(); });
+
+  // ---------- מסך נעילה ----------
+  function renderDots(shake) {
+    const d = $('dots');
+    d.innerHTML = '';
+    for (let i = 0; i < LEN; i++) {
+      const s = document.createElement('div');
+      s.className = 'dot' + (i < code.length ? ' f' : '');
+      d.appendChild(s);
+    }
+    if (shake) { d.classList.remove('shake'); void d.offsetWidth; d.classList.add('shake'); }
+  }
+  function buildPad() {
+    const pad = $('pad');
+    pad.innerHTML = '';
+    ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'del'].forEach((k) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      if (k === '') { b.className = 'key blank'; }
+      else if (k === 'del') { b.className = 'key txt'; b.textContent = 'מחק'; b.dataset.k = 'del'; }
+      else { b.className = 'key'; b.textContent = k; b.dataset.k = k; }
+      pad.appendChild(b);
+    });
+  }
+  // pointerdown = הכי מהיר: הלחישה יוצאת באותו רגע שהאצבע נוגעת
+  $('pad').addEventListener('pointerdown', (e) => {
+    const b = e.target.closest('.key[data-k]');
+    if (!b || busy) return;
+    e.preventDefault();
+    b.classList.add('p');
+    setTimeout(() => b.classList.remove('p'), 120);
+    const k = b.dataset.k;
+    if (k === 'del') {
+      if (!code.length) return;
+      code = code.slice(0, -1);
+      say(DEL[lang === 'he' && pickVoice('he') ? 'he' : 'en']);
+      renderDots();
+      return;
+    }
+    if (code.length >= LEN) return;
+    code += k;
+    say(word(Number(k)));
+    renderDots();
+    if (code.length === LEN) {
+      busy = true;
+      setTimeout(unlock, 450);
+    }
+  });
+
+  function unlock() {
+    const lock = $('lock');
+    lock.classList.add('unlock-anim');
+    setTimeout(() => {
+      lock.classList.remove('unlock-anim');
+      show('home');
+      busy = false;
+    }, 320);
+  }
+  function toLock() {
+    code = '';
+    busy = false;
+    renderDots();
+    show('lock');
+  }
+
+  // שעה ותאריך אמיתיים
+  function tick() {
+    const n = new Date();
+    const t = String(n.getHours()).padStart(2, '0') + ':' + String(n.getMinutes()).padStart(2, '0');
+    $('sTime').textContent = t;
+    $('hTime').textContent = t;
+    $('hDate').textContent = n.toLocaleDateString('he-IL', { weekday: 'long', day: 'numeric', month: 'long' });
+  }
+  tick();
+  setInterval(tick, 10000);
+
+  // פינה סודית: 3 הקשות מהירות
+  let taps = 0, tapTimer = null;
+  document.querySelectorAll('.corner').forEach((c) => c.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    taps++;
+    clearTimeout(tapTimer);
+    tapTimer = setTimeout(() => (taps = 0), 700);
+    if (taps < 3) return;
+    taps = 0;
+    if (c.dataset.corner === 'home') { toLock(); }
+    else {
+      try { if (document.fullscreenElement) document.exitFullscreen(); } catch (err) {}
+      show('setup');
+    }
+  }));
+
+  buildPad();
+  renderDots();
+})();
+</script>
+</body>
+</html>

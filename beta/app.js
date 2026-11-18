@@ -2482,8 +2482,20 @@ async function wordPredictSetWallpaper(word) {
 }
 
 // ההחלפה הסתיימה (אנדרואיד מודיע)
-window.onLockWallpaperSet = function (ok, tag) {
+window.onLockWallpaperSet = function (ok, tag, info) {
   const t = String(tag || '');
+  window.__lastWpInfo = { ok, tag: t, info: String(info || '') };
+  if (t === 'test') {
+    const st = document.getElementById('wordWallpaperTestStatus');
+    if (st) {
+      st.classList.toggle('ok', Boolean(ok));
+      st.classList.toggle('bad', !ok);
+      st.textContent = ok
+        ? 'אנדרואיד אישר שהטפט הוחלף. עכשיו נעל את הטלפון ותסתכל למטה - צריך להיות כתוב "בדיקה". (' + String(info || '') + ')'
+        : '❌ אנדרואיד סירב להחליף: ' + String(info || 'לא ידוע') + ' - שלח לי צילום של השורה הזאת.';
+    }
+    return;
+  }
   if (!t.startsWith('word:')) return;
   const word = t.slice(5);
   if (ok) wordPredictWhisper('נקלט: ' + word, 'got: ' + word);
@@ -4303,6 +4315,41 @@ if (wallpaperFileInput) {
   });
 }
 
+// 🧪 בדיקה: כותב "בדיקה" על מסך הנעילה האמיתי ומראה מה נשלח ומה אנדרואיד ענה
+const wordWallpaperTestBtn = document.getElementById('wordWallpaperTestBtn');
+if (wordWallpaperTestBtn) {
+  wordWallpaperTestBtn.addEventListener('click', async () => {
+    const st = document.getElementById('wordWallpaperTestStatus');
+    const pv = document.getElementById('wordWallpaperPreview');
+    const say = (txt, ok) => {
+      if (!st) return;
+      st.textContent = txt;
+      st.classList.toggle('ok', Boolean(ok));
+      st.classList.toggle('bad', !ok);
+    };
+    if (!window.AndroidNative || typeof window.AndroidNative.setLockWallpaper !== 'function') {
+      say('❌ הגרסה באפליקציה ישנה - עדכן דרך "בדוק עדכון".', false);
+      return;
+    }
+    const dataUrl = await composeLockWallpaper('בדיקה');
+    if (!dataUrl) {
+      say('❌ לא נבחרה תמונה מקורית (או שהיא לא נשמרה). לחץ "בחר את התמונה המקורית".', false);
+      return;
+    }
+    if (pv) {
+      pv.src = dataUrl;
+      pv.style.display = 'block';
+    }
+    say('⏳ מחליף את הטפט של מסך הנעילה...', true);
+    wordWallpaperDirty = true;
+    try {
+      window.AndroidNative.setLockWallpaper(dataUrl, 'test');
+    } catch (e) {
+      say('❌ ' + (e && e.message ? e.message : 'שגיאה'), false);
+    }
+  });
+}
+
 const wordWallpaperFileInput = document.getElementById('wordWallpaperFileInput');
 if (wordWallpaperFileInput) {
   wordWallpaperFileInput.addEventListener('change', (e) => {
@@ -4654,7 +4701,7 @@ function initDeviceLicenseGate() {
 // החלון מוצג רק כשמסך ההגדרות פתוח (בפתיחת האפליקציה / בתפריט הסודי),
 // ולעולם לא מעל מסך הנעילה הפעיל מול קהל.
 // ============================================================================
-const APP_VERSION = '8.8';
+const APP_VERSION = '8.9';
 const DEFAULT_APK_URL = 'https://github.com/tzur2010/app-lockscreen/raw/main/Lockscreen.apk';
 const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 const UPDATE_DISMISS_KEY = 'magic_update_dismissed_version';

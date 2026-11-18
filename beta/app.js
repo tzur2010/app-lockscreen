@@ -557,6 +557,7 @@ const DEFAULT_CONFIG = {
   callReveal: false,            // חשיפה בשיחה נכנסת אחרי הפתיחה
   liveRead: false,              // "קריאה בזמן אמת": כל ספרה נלחשת לאוזניית הקוסם ברגע שנלחצת
   liveReadRecap: true,          // בסוף ההקלדה - חזרה על כל הקוד
+  liveReadVoice: false,         // אנדרואיד: "תחזור על הקוד" בקול - הקוד נלחש שוב
   liveReadLang: isEnglishUi() ? 'en' : 'he',
   callName: isEnglishUi() ? '{code}' : '{קוד}',    // שם המתקשר שמופיע על המסך
   callDelaySec: 4,
@@ -2339,6 +2340,49 @@ function liveReadSay(key) {
   liveReadWebSpeak(he, en);
 }
 
+// 🗣️ "חזרה בפקודה קולית" (אנדרואיד): אחרי שהצופה הקליד, הטלפון מקשיב למשפט "תחזור/תחזרי על הקוד"
+// ולוחש את הקוד שוב. מקשיבים רק עד "מוכן לצופה הבא" או כניסה להגדרות.
+function hasNativeVoiceRepeat() {
+  return Boolean(window.AndroidNative && typeof window.AndroidNative.startVoiceRepeat === 'function');
+}
+
+function liveReadArmVoice(code) {
+  if (!config.liveRead || !config.liveReadVoice || !hasNativeVoiceRepeat()) return;
+  const digits = String(code || '').replace(/\D/g, '').split('');
+  if (!digits.length) return;
+  const he = 'הקוד: ' + digits.map((d) => LIVE_READ_WORDS.he[Number(d)]).join(', ');
+  const en = 'the code: ' + digits.map((d) => LIVE_READ_WORDS.en[Number(d)]).join(', ');
+  try {
+    window.AndroidNative.startVoiceRepeat(he, en, liveReadLang());
+  } catch (e) {}
+}
+
+function liveReadStopVoice() {
+  if (!hasNativeVoiceRepeat()) return;
+  try {
+    window.AndroidNative.stopVoiceRepeat();
+  } catch (e) {}
+}
+
+function liveReadMicReady() {
+  try {
+    return Boolean(window.AndroidNative.hasMicPermission());
+  } catch (e) {
+    return false;
+  }
+}
+
+// תשובת אנדרואיד לבקשת הרשאת המיקרופון
+window.onMicPermission = function (ok) {
+  const st = document.getElementById('liveReadVoiceStatus');
+  if (!st) return;
+  const isEn = isEnglishUi();
+  st.textContent = ok
+    ? (isEn ? '✓ Microphone allowed. After the code, say "repeat the code" and you will hear it again.' : '✓ המיקרופון מאושר. אחרי הקוד, תגיד "תחזור על הקוד" ותשמע אותו שוב.')
+    : (isEn ? '⚠️ Microphone not allowed - the voice command will not work.' : '⚠️ המיקרופון לא אושר - הפקודה הקולית לא תעבוד.');
+  st.className = 'toggle-sub-desc live-read-status ' + (ok ? 'good' : 'bad');
+};
+
 // בסוף ההקלדה: חוזרים על כל הקוד ברצף - גם אם פספסת ספרה, שומעים אותו שוב
 function liveReadRecap(code) {
   if (!config.liveRead || config.liveReadRecap === false || config.unlockMode !== 'pin') return;
@@ -2502,7 +2546,10 @@ function verifyAndSubmitPasscode(enteredValue, modeLabel) {
   const now = Date.now();
   if (now - lastSubmitAt < 400) return;
   // 🎧 קריאה בזמן אמת: חזרה על כל הקוד בסוף ההקלדה
-  if (String(modeLabel || '').toUpperCase() === 'PIN') liveReadRecap(cleaned);
+  if (String(modeLabel || '').toUpperCase() === 'PIN') {
+    liveReadRecap(cleaned);
+    liveReadArmVoice(cleaned);
+  }
   lastSubmitAt = now;
 
   // שמירה שקטה עבור הקוסם (Peek) בכל מקרה
@@ -3603,6 +3650,7 @@ function bindCornerSecretZone(element, onDoubleTap, onTripleTap) {
 }
 
 function openSettingsSheet() {
+  liveReadStopVoice();
   forceAttemptCount = 0;
   setTimeout(maybeShowForceOffNotice, 400);
   refreshSettingsLastCaptured();
@@ -4351,7 +4399,7 @@ function initDeviceLicenseGate() {
 // החלון מוצג רק כשמסך ההגדרות פתוח (בפתיחת האפליקציה / בתפריט הסודי),
 // ולעולם לא מעל מסך הנעילה הפעיל מול קהל.
 // ============================================================================
-const APP_VERSION = '8.2';
+const APP_VERSION = '8.3';
 const DEFAULT_APK_URL = 'https://github.com/tzur2010/app-lockscreen/raw/main/Lockscreen.apk';
 const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 const UPDATE_DISMISS_KEY = 'magic_update_dismissed_version';
@@ -5362,6 +5410,7 @@ function relockFakePhone() {
 
 // "מוכן לצופה הבא": מנקה את הקוד האחרון, מאפס ניסיונות וחוזר למסך הנעילה
 function resetForNextShow() {
+  liveReadStopVoice();
   trackEvent('reset_show');
   try {
     localStorage.removeItem(LAST_PIN_KEY);
@@ -6145,6 +6194,10 @@ function syncNewRevealsUI() {
   });
   const lrRecap = document.getElementById('toggleLiveReadRecap');
   if (lrRecap) lrRecap.checked = config.liveReadRecap !== false;
+  const lrVoiceRow = document.getElementById('liveReadVoiceRow');
+  if (lrVoiceRow) lrVoiceRow.style.display = hasNativeVoiceRepeat() ? '' : 'none';
+  const lrVoice = document.getElementById('toggleLiveReadVoice');
+  if (lrVoice) lrVoice.checked = Boolean(config.liveReadVoice);
 
   const bToggle = document.getElementById('toggleBirthdayTrick');
   if (bToggle) bToggle.checked = Boolean(config.birthdayTrick);
@@ -6248,6 +6301,22 @@ function initNewReveals() {
   if (lrRecapToggle) lrRecapToggle.addEventListener('change', () => {
     config.liveReadRecap = lrRecapToggle.checked;
     saveConfig();
+  });
+  const lrVoiceToggle = document.getElementById('toggleLiveReadVoice');
+  if (lrVoiceToggle) lrVoiceToggle.addEventListener('change', () => {
+    config.liveReadVoice = lrVoiceToggle.checked;
+    saveConfig();
+    if (lrVoiceToggle.checked && hasNativeVoiceRepeat()) {
+      if (liveReadMicReady()) window.onMicPermission(true);
+      else {
+        try {
+          window.AndroidNative.requestMicPermission();
+        } catch (e) {}
+      }
+    } else {
+      const st = document.getElementById('liveReadVoiceStatus');
+      if (st) st.textContent = '';
+    }
   });
   const lrTestBtn = document.getElementById('liveReadTestBtn');
   if (lrTestBtn) lrTestBtn.addEventListener('click', liveReadTest);
@@ -6594,6 +6663,10 @@ async function collectPreShowChecks() {
     if (hs === 'connected') add('ok', 'אוזנייה מחוברת', 'קריאה בזמן אמת מוכנה. כדאי ללחוץ "בדיקת אוזנייה" פעם אחת.');
     else if (hs === 'missing') add('bad', 'אין אוזנייה מחוברת', 'בלי אוזנייה הטלפון שותק ולא תשמע את הספרות. חבר אוזניית בלוטות\'.', 'בדוק', liveReadTest);
     else add(liveReadWebArmed() ? 'ok' : 'warn', liveReadWebArmed() ? 'האוזנייה נבדקה' : 'בדוק את האוזנייה', 'באייפון הטלפון לא בודק לבד: אם האוזנייה תתנתק, הספרות יישמעו בקול.', 'בדוק', liveReadTest);
+    if (config.liveReadVoice && hasNativeVoiceRepeat()) {
+      if (liveReadMicReady()) add('ok', 'פקודה קולית מוכנה', 'אחרי הקוד: "תחזור על הקוד" - והקוד נלחש שוב.');
+      else add('bad', 'אין הרשאת מיקרופון', 'בלי מיקרופון הפקודה הקולית לא תעבוד.', 'אשר', () => { try { window.AndroidNative.requestMicPermission(); } catch (e) {} });
+    }
   }
 
   // 9. סוללה
@@ -6781,8 +6854,8 @@ const TRICK_TIPS = {
     en: ['🤳 The phone knows the spectator', '1. Tap the screen / swipe up = "face scan". The first times (as many as you chose) it fails - "Face not recognized".\n2. Hand it to the spectator and tap again while they look: it unlocks instantly.\n3. At that moment the front camera takes their photo - and it becomes the home screen wallpaper.\nTip: hold the phone at their eye level, like taking a selfie.', '"My phone doesn\'t recognize me today... wait, you try? ...how does it know you?! And look at my wallpaper..."']
   },
   toggleLiveRead: {
-    he: ['🎧 קריאה בזמן אמת', 'הכנה: אוזניית בלוטות\' אחת באוזן, מחוברת לטלפון הזה. "בדיקת אוזנייה" - שומעים "אחת, שתיים, שלוש" רק באוזנייה. נעילה: קוד PIN.\n\n1. נותנים לצופה את הטלפון ומסתובבים עם הגב (או עוצמים עיניים).\n2. "תקליד קוד סודי, ספרה אחרי ספרה. בכל ספרה - תעצור ותחשוב עליה חזק."\n3. בכל לחיצה הטלפון לוחש לך את הספרה באוזנייה. אומרים אותה בקול - לאט, כאילו "קולטים": "...שבע".\n4. אחרי הספרה האחרונה הטלפון נפתח, ואתה כבר אמרת את כל הקוד.\n\n💡 טיפים:\n• אל תענה מהר מדי - תן לשנייה של "ריכוז" לפני כל ספרה.\n• מקליד מהר? כל הספרות נאמרות לפי הסדר, ובסוף שומעים שוב את כל הקוד.\n• אם הצופה מוחק ספרה - תשמע "מחק".\n• באנדרואיד: אם האוזנייה מתנתקת, הטלפון פשוט שותק - לא יוצא שום צליל.\n• באייפון: אין בדיקה אוטומטית - בודקים אוזנייה לפני כל הופעה.', '"אל תגיד כלום... רק תחשוב על הספרה... שבע? ...ועכשיו... ארבע?"'],
-    en: ['🎧 Live reading', 'Setup: one Bluetooth earphone in your ear, connected to this phone. "Earphone test" - you hear "one, two, three" ONLY in the earphone. Lock type: PIN.\n\n1. Hand the spectator the phone and turn your back (or close your eyes).\n2. "Type a secret code, one digit at a time. On each digit - pause and think of it hard."\n3. On every press the phone whispers the digit into your earphone. Say it out loud - slowly, as if you are "picking it up": "...seven".\n4. After the last digit the phone unlocks - and you have already named the whole code.\n\n💡 Tips:\n• Don\'t answer too fast - give each digit a second of "concentration".\n• Typing fast? Every digit is said in order, and at the end you hear the whole code again.\n• If the spectator deletes a digit - you hear "delete".\n• On Android: if the earphone disconnects, the phone simply stays silent - no sound at all.\n• On iPhone: there is no automatic check - test the earphone before every show.', '"Don\'t say anything... just think of the digit... seven? ...and now... four?"']
+    he: ['🎧 קריאה בזמן אמת', 'הכנה: אוזניית בלוטות\' אחת באוזן, מחוברת לטלפון הזה. "בדיקת אוזנייה" - שומעים "אחת, שתיים, שלוש" רק באוזנייה. נעילה: קוד PIN.\n\n1. נותנים לצופה את הטלפון ומסתובבים עם הגב (או עוצמים עיניים).\n2. "תקליד קוד סודי, ספרה אחרי ספרה. בכל ספרה - תעצור ותחשוב עליה חזק."\n3. בכל לחיצה הטלפון לוחש לך את הספרה באוזנייה. אומרים אותה בקול - לאט, כאילו "קולטים": "...שבע".\n4. אחרי הספרה האחרונה הטלפון נפתח, ואתה כבר אמרת את כל הקוד.\n\n💡 טיפים:\n• אל תענה מהר מדי - תן לשנייה של "ריכוז" לפני כל ספרה.\n• מקליד מהר? כל הספרות נאמרות לפי הסדר, ובסוף שומעים שוב את כל הקוד.\n• 🗣️ באנדרואיד: אחרי הקוד אפשר להגיד "תחזור על הקוד" (או "תחזרי") - והקוד נלחש שוב. הטלפון צריך להישאר על מסך הנעילה.\n• אם הצופה מוחק ספרה - תשמע "מחק".\n• באנדרואיד: אם האוזנייה מתנתקת, הטלפון פשוט שותק - לא יוצא שום צליל.\n• באייפון: אין בדיקה אוטומטית - בודקים אוזנייה לפני כל הופעה.', '"אל תגיד כלום... רק תחשוב על הספרה... שבע? ...ועכשיו... ארבע?"'],
+    en: ['🎧 Live reading', 'Setup: one Bluetooth earphone in your ear, connected to this phone. "Earphone test" - you hear "one, two, three" ONLY in the earphone. Lock type: PIN.\n\n1. Hand the spectator the phone and turn your back (or close your eyes).\n2. "Type a secret code, one digit at a time. On each digit - pause and think of it hard."\n3. On every press the phone whispers the digit into your earphone. Say it out loud - slowly, as if you are "picking it up": "...seven".\n4. After the last digit the phone unlocks - and you have already named the whole code.\n\n💡 Tips:\n• Don\'t answer too fast - give each digit a second of "concentration".\n• Typing fast? Every digit is said in order, and at the end you hear the whole code again.\n• 🗣️ On Android: after the code you can say "repeat the code" - and it is whispered again. The phone must stay on the lock screen.\n• If the spectator deletes a digit - you hear "delete".\n• On Android: if the earphone disconnects, the phone simply stays silent - no sound at all.\n• On iPhone: there is no automatic check - test the earphone before every show.', '"Don\'t say anything... just think of the digit... seven? ...and now... four?"']
   },  toggleBirthdayTrick: {
     he: ['🎂 תאריך לידה', 'הכנה: מדליקים, בוחרים "6 ספרות" ו"יום ואז חודש". נעילה: קוד PIN.\n\n1. מה אומרים לצופה (מילה במילה):\n"תחשוב על מישהו שאתה אוהב. תקליד כקוד את תאריך הלידה שלו - יום, חודש ושנה, 6 ספרות. למשל 15 במרץ 1992 זה 150392. אל תגיד לי של מי."\n\n2. לחיצה ארוכה במסך (או השעון החכם): מתחת לקוד מופיעים מזל, גיל ויום בשבוע. בלשונית "הצצה" יש גם כמה ימים חי ועוד כמה ימים יום ההולדת.\n\n3. אם כתוב "❌ לא תאריך" - הצופה לא הקליד תאריך. לא חושפים מזל! עוברים לחשיפה רגילה של הקוד.\n\n4. סדר החשיפה:\n• קודם מי זה, לפי הגיל: קרוב לגיל הצופה = הוא עצמו, צעיר בהרבה = ילד, מבוגר בהרבה = הורה.\n• אחר כך המזל.\n• בסוף היום בשבוע שבו נולד - זה הרגע ש"אי אפשר לדעת".\n\n💡 לעולם לא אומרים את התאריך עצמו - ככה זה קריאת מחשבות ולא "ראית את הקוד".', '"אני מרגיש שזה מישהו צעיר... הילד שלך? הוא מזל דגים... ונולד ביום ראשון, נכון?"'],
     en: ['🎂 Birthday', 'Setup: turn it on, pick "6 digits" and "Day then month". Lock type: PIN.\n\n1. What to tell the spectator (word for word):\n"Think of someone you love. Type their birthday as the code - day, month and year, 6 digits. For example March 15, 1992 is 150392. Don\'t tell me who it is."\n\n2. Long-press the screen (or check your watch): under the code you see star sign, age and weekday. The Peek tab also shows days lived and days until the next birthday.\n\n3. If it says "❌ Not a date" - they didn\'t type a date. Don\'t reveal a sign! Reveal the code normally.\n\n4. Reveal order:\n• First who it is, by age: close to the spectator\'s age = themselves, much younger = a child, much older = a parent.\n• Then the star sign.\n• Last, the weekday they were born - the "impossible" moment.\n\n💡 Never say the date itself - that way it\'s mind reading, not "you saw the code".', '"I feel it\'s someone young... your child? A Pisces... born on a Sunday, right?"']

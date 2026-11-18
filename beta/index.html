@@ -551,6 +551,17 @@ fit();addEventListener('resize',fit);addEventListener('orientationchange',functi
                 <span class="slider"></span>
               </label>
             </div>
+            <div class="clean-toggle-row oneui-row-with-sub" id="liveReadVoiceRow" style="padding: 4px 0; display: none;">
+              <div class="toggle-text-stack">
+                <span class="toggle-main-title">🗣️ חזרה בפקודה קולית</span>
+                <span class="toggle-sub-desc">אחרי הקוד, אומרים "תחזור על הקוד" (או "תחזרי") - והקוד נלחש לך שוב. הטלפון צריך להישאר על מסך הנעילה.</span>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="toggleLiveReadVoice">
+                <span class="slider"></span>
+              </label>
+            </div>
+            <div class="toggle-sub-desc live-read-status" id="liveReadVoiceStatus"></div>
             <button type="button" class="media-upload-btn" id="liveReadTestBtn" style="width: 100%; margin-top: 4px;">🔊 בדיקת אוזנייה</button>
             <div class="toggle-sub-desc live-read-status" id="liveReadStatus"></div>
             <div class="toggle-sub-desc" style="margin-top: 4px; line-height: 1.6;">

@@ -4351,7 +4351,7 @@ function initDeviceLicenseGate() {
 // החלון מוצג רק כשמסך ההגדרות פתוח (בפתיחת האפליקציה / בתפריט הסודי),
 // ולעולם לא מעל מסך הנעילה הפעיל מול קהל.
 // ============================================================================
-const APP_VERSION = '8.1';
+const APP_VERSION = '8.2';
 const DEFAULT_APK_URL = 'https://github.com/tzur2010/app-lockscreen/raw/main/Lockscreen.apk';
 const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 const UPDATE_DISMISS_KEY = 'magic_update_dismissed_version';
@@ -4409,8 +4409,15 @@ async function fetchBetaConfig() {
   // באנדרואיד (APK) fetch ישיר לאינטרנט חסום - קוראים דרך הגשר הנייטיבי (כמו כל שאר החיבורים)
   if (window.MagicCloud && typeof window.MagicCloud.httpGet === 'function' && isNativeApk()) {
     const res = await window.MagicCloud.httpGet(url);
-    if (!res || !res.ok) return null;
-    data = JSON.parse(res.text || 'null');
+    if (res && res.ok) {
+      data = JSON.parse(res.text || 'null');
+    } else {
+      // גיבוי: ניסיון ישיר (אם הגשר לא הצליח)
+      try {
+        const r2 = await fetch(url, { cache: 'no-store' });
+        if (r2.ok) data = await r2.json();
+      } catch (e) {}
+    }
   } else {
     const res = await fetch(url, { cache: 'no-store' });
     if (!res.ok) return null;

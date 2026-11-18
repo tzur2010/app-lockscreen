@@ -4308,3 +4308,10 @@ html.real-ios .clean-toggle-row:has(#toggleChameleonClock) { display: none !impo
 .remote-notif .rn-title { font-weight: 700; font-size: 15px; margin-bottom: 2px; }
 .remote-notif .rn-text { font-size: 14.5px; line-height: 1.35; }
 @keyframes remoteNotifIn { from { opacity: 0; transform: translateY(-14px) scale(.97); } to { opacity: 1; transform: none; } }
+
+/* סמסונג אמיתי: במסך השעון אין שכבה כהה על הטפט, והשעון/התאריך במקום ובמשקל של One UI 8 (לפי צילום אמיתי) */
+.phone-container.samsung-oneui-lock.clock-mode-active .lockscreen-dim-backdrop { background: transparent; }
+.phone-container.samsung-oneui-lock .clock-lock-center { top: 6.6%; }
+.phone-container.samsung-oneui-lock .clock-lock-big-time { font-size: min(25.5vw, 124px); font-weight: 700; color: rgba(255,255,255,.9); text-shadow: 0 1px 10px rgba(0,0,0,.18); }
+.phone-container.samsung-oneui-lock .clock-lock-date { font-size: min(4.6vw, 19px); font-weight: 600; margin-top: 0.9vh; color: rgba(255,255,255,.92); text-shadow: 0 1px 6px rgba(0,0,0,.3); }
+.phone-container.samsung-oneui-lock .clock-shortcut { background: rgba(40,30,30,.45); }

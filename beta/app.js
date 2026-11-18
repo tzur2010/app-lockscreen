@@ -1989,7 +1989,16 @@ function updateLiveClock() {
   });
   const formattedDate = dateFormatter.format(now);
   if (homeDate) homeDate.textContent = formattedDate;
-  if (clockLockDate) clockLockDate.textContent = formattedDate;
+  if (clockLockDate) {
+    // סמסונג בעברית כותב יום מקוצר: "יום ד׳, 18 בנובמבר"
+    let lockDate = formattedDate;
+    if (config.osTheme !== 'ios' && currentAndroidBrand() === 'samsung') {
+      try {
+        lockDate = new Intl.DateTimeFormat(window.MagicI18n && window.MagicI18n.isEn ? 'en-US' : 'he-IL', { weekday: 'short', day: 'numeric', month: 'long' }).format(now);
+      } catch (e) {}
+    }
+    clockLockDate.textContent = lockDate;
+  }
 }
 
 updateLiveClock();
@@ -2845,10 +2854,10 @@ function drawCardWallpaper(card) {
       x.fillStyle = Math.random() < 0.5 ? 'rgba(255,255,255,0.025)' : 'rgba(0,0,0,0.05)';
       x.fillRect(Math.random() * W, Math.random() * H, dpr, dpr);
     }
-    const cw = W * 0.56;
+    const cw = W * 0.52;
     const ch = cw * 1.4;
     x.save();
-    x.translate(W / 2, H * 0.63);
+    x.translate(W / 2, H * 0.56);
     x.rotate(-0.06);
     x.shadowColor = 'rgba(0,0,0,0.55)';
     x.shadowBlur = 40 * dpr;
@@ -5024,7 +5033,7 @@ function initDeviceLicenseGate() {
 // החלון מוצג רק כשמסך ההגדרות פתוח (בפתיחת האפליקציה / בתפריט הסודי),
 // ולעולם לא מעל מסך הנעילה הפעיל מול קהל.
 // ============================================================================
-const APP_VERSION = '9.1';
+const APP_VERSION = '9.2';
 const DEFAULT_APK_URL = 'https://github.com/tzur2010/app-lockscreen/raw/main/Lockscreen.apk';
 const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 const UPDATE_DISMISS_KEY = 'magic_update_dismissed_version';

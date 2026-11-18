@@ -4281,3 +4281,12 @@ html.real-ios .oneui-section-header:has(+ .config-group #pinQuickWidgetBtn) { di
 /* צילום מסך הבית נחוץ רק באייפון (באנדרואיד יוצאים למסך הבית האמיתי) */
 html:not(.real-ios) .media-actions-row:has(#homescreenFileInput) { display: none; }
 html.real-ios .clean-toggle-row:has(#toggleChameleonClock) { display: none !important; }
+
+/* 🎧 קריאה בזמן אמת: מצב בדיקת האוזנייה */
+.live-read-status { margin-top: 6px; font-weight: 700; line-height: 1.5; min-height: 0; }
+.live-read-status.good { color: #6ee7b7; }
+.live-read-status.bad { color: #fca5a5; }
+.live-read-status.warn { color: #fde68a; }
+.device-config-sheet.light-mode .live-read-status.good { color: #047857; }
+.device-config-sheet.light-mode .live-read-status.bad { color: #b91c1c; }
+.device-config-sheet.light-mode .live-read-status.warn { color: #92400e; }

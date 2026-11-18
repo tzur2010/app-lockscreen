@@ -169,8 +169,11 @@ fit();addEventListener('resize',fit);addEventListener('orientationchange',functi
           <p>באנדרואיד: הטלפון יוצא באמת למסך הבית האמיתי שלך.<br>באייפון: אפל לא מאפשרת לאף אפליקציה לצאת לבד למסך הבית, לכן מוצג צילום של מסך הבית שלך - עם השעה והסוללה האמיתיות למעלה.<br>פעם אחת: במסך הבית לוחצים צד + עוצמה למעלה, ואז לשונית פתיחה ← "בחר צילום של מסך הבית שלך".</p>
         </details>
         <details>
-          <summary>🎂 תאריך לידה</summary>
-          <p>1. אומרים לצופה: "תחשוב על מישהו שאתה אוהב, ותקליד כקוד את תאריך הלידה שלו: יום, חודש ושנה - 6 ספרות. אל תגיד לי של מי." (15 במרץ 1992 = 150392)<br>2. לחיצה ארוכה במסך: מתחת לקוד מופיעים מזל, גיל ויום בשבוע.<br>3. אם כתוב "❌ לא תאריך" - הצופה לא הקליד תאריך: עוברים לחשיפה רגילה של הקוד.<br>4. סדר החשיפה: קודם מי זה לפי הגיל ("מישהו צעיר... הילד שלך?"), אחר כך המזל, ובסוף היום שבו נולד.<br>💡 לעולם לא חושפים את התאריך עצמו - ככה זה קריאת מחשבות ולא "ראית את הקוד".</p>
+          <summary>🎧 קריאה בזמן אמת</summary>
+          <p>1. אוזניית בלוטות' אחת באוזן, מחוברת לטלפון. בהגדרות: "🔊 בדיקת אוזנייה".<br>2. נותנים לצופה את הטלפון ומסתובבים עם הגב: "תקליד קוד, ספרה אחרי ספרה".<br>3. כל ספרה נלחשת לך באוזנייה ברגע שהיא נלחצת - אומרים אותה בקול, לאט.<br>💡 באנדרואיד: בלי אוזנייה הטלפון שותק לגמרי. באייפון: בודקים אוזנייה לפני כל הופעה.</p>
+        </details>
+        <details>
+          <summary>🎂 תאריך לידה</summary>          <p>1. אומרים לצופה: "תחשוב על מישהו שאתה אוהב, ותקליד כקוד את תאריך הלידה שלו: יום, חודש ושנה - 6 ספרות. אל תגיד לי של מי." (15 במרץ 1992 = 150392)<br>2. לחיצה ארוכה במסך: מתחת לקוד מופיעים מזל, גיל ויום בשבוע.<br>3. אם כתוב "❌ לא תאריך" - הצופה לא הקליד תאריך: עוברים לחשיפה רגילה של הקוד.<br>4. סדר החשיפה: קודם מי זה לפי הגיל ("מישהו צעיר... הילד שלך?"), אחר כך המזל, ובסוף היום שבו נולד.<br>💡 לעולם לא חושפים את התאריך עצמו - ככה זה קריאת מחשבות ולא "ראית את הקוד".</p>
         </details>
         <details style="display: none;">
           <summary>📝 חשיפה בפתקים</summary>
@@ -520,6 +523,32 @@ fit();addEventListener('resize',fit);addEventListener('orientationchange',functi
           </div>
 
           </div>
+
+          <!-- קריאה בזמן אמת: כל ספרה נלחשת לאוזניית הקוסם ברגע שנלחצת (הקוסם עם הגב) -->
+          <div class="clean-toggle-row oneui-row-with-sub">
+            <div class="toggle-text-stack">
+              <span class="toggle-main-title">🎧 קריאה בזמן אמת</span>
+              <span class="toggle-sub-desc">אתה עומד עם הגב, והצופה מקליד קוד. כל ספרה נלחשת לך באוזנייה ברגע שהוא לוחץ - ואתה אומר אותה בקול, אחת אחרי השנייה.</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="toggleLiveRead">
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="oneui-field-block" id="liveReadExtra" style="display: none; padding-top: 0;">
+            <label class="config-label">שפת הלחישה</label>
+            <div class="segmented-row" id="liveReadLangSelector">
+              <button type="button" class="seg-pill" data-lrlang="he">עברית</button>
+              <button type="button" class="seg-pill" data-lrlang="en">English</button>
+            </div>
+            <button type="button" class="media-upload-btn" id="liveReadTestBtn" style="width: 100%; margin-top: 4px;">🔊 בדיקת אוזנייה</button>
+            <div class="toggle-sub-desc live-read-status" id="liveReadStatus"></div>
+            <div class="toggle-sub-desc" style="margin-top: 4px; line-height: 1.6;">
+              צריך אוזניית בלוטות' אחת באוזן. באנדרואיד הטלפון שותק לגמרי אם אין אוזנייה מחוברת. עובד עם קוד PIN. הסבר מלא ומה אומרים לצופה: כפתור ה-?
+            </div>
+          </div>
+
+          <div class="oneui-card-divider"></div>
 
           <!-- תאריך לידה: הצופה מקליד כקוד תאריך לידה של מישהו קרוב - הקוסם יודע מזל, גיל ועוד -->
           <div class="clean-toggle-row oneui-row-with-sub">

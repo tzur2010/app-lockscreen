@@ -555,6 +555,8 @@ const DEFAULT_CONFIG = {
   faceTrick: false,             // "הטלפון מזהה את הצופה": נכשל לקוסם, נפתח לצופה + סלפי שלו כטפט
   faceTrickFails: 1,            // כמה פעמים הזיהוי נכשל לקוסם לפני שמגישים לצופה
   callReveal: false,            // חשיפה בשיחה נכנסת אחרי הפתיחה
+  liveRead: false,              // "קריאה בזמן אמת": כל ספרה נלחשת לאוזניית הקוסם ברגע שנלחצת
+  liveReadLang: isEnglishUi() ? 'en' : 'he',
   callName: isEnglishUi() ? '{code}' : '{קוד}',    // שם המתקשר שמופיע על המסך
   callDelaySec: 4,
   practiceMode: false,          // מצב תרגול: בלי היסטוריה ובלי סטטיסטיקה
@@ -874,6 +876,7 @@ function launchLockscreenNow() {
   phoneContainer.classList.remove('clock-mode-active');
   closeSettingsSheet();
   if (config.settingsTrick) openSettingsTrick();
+  liveReadPrepare();
 }
 
 // ----------------------------------------------------------------------------
@@ -2270,6 +2273,129 @@ function refreshBirthdayPeek(value) {
   }
 }
 
+// ----------------------------------------------------------------------------
+// 🎧 "קריאה בזמן אמת": בכל לחיצה על ספרה הטלפון לוחש אותה לאוזניית הקוסם.
+// הקוסם עומד עם הגב ואומר כל ספרה ברגע שהצופה לוחץ עליה.
+// בטיחות: באנדרואיד הטלפון בודק בעצמו שמחוברת אוזנייה - אחרת שקט מוחלט.
+// באייפון/אתר אין בדיקה אוטומטית: הלחישה נפתחת רק אחרי "בדיקת אוזנייה" בהפעלה הנוכחית.
+// ----------------------------------------------------------------------------
+const LIVE_READ_WORDS = {
+  he: ['אפס', 'אחת', 'שתיים', 'שלוש', 'ארבע', 'חמש', 'שש', 'שבע', 'שמונה', 'תשע'],
+  en: ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine']
+};
+const LIVE_READ_ARMED_KEY = 'magic_live_read_armed';
+
+function liveReadLang() {
+  return config.liveReadLang === 'en' ? 'en' : 'he';
+}
+
+function hasNativeSecretVoice() {
+  return Boolean(window.AndroidNative && typeof window.AndroidNative.speakSecret === 'function');
+}
+
+function liveReadWebArmed() {
+  try {
+    return sessionStorage.getItem(LIVE_READ_ARMED_KEY) === '1';
+  } catch (e) {
+    return false;
+  }
+}
+
+function liveReadWebSpeak(textHe, textEn) {
+  if (!window.speechSynthesis) return;
+  const voices = speechSynthesis.getVoices();
+  let lang = liveReadLang();
+  let voice = voices.find((v) => (lang === 'he' ? /^(he|iw)/i : /^en/i).test(v.lang));
+  // אין קול עברי בטלפון - אומרים באנגלית
+  if (!voice && lang === 'he' && voices.length) {
+    lang = 'en';
+    voice = voices.find((v) => /^en/i.test(v.lang));
+  }
+  try {
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(lang === 'he' ? textHe : textEn);
+    if (voice) u.voice = voice;
+    u.lang = lang === 'he' ? 'he-IL' : 'en-US';
+    u.rate = 1.15;
+    speechSynthesis.speak(u);
+  } catch (e) {}
+}
+
+// key: ספרה ('0'-'9') או 'del'
+function liveReadSay(key) {
+  if (!config.liveRead || config.unlockMode !== 'pin') return;
+  const he = key === 'del' ? 'מחק' : LIVE_READ_WORDS.he[Number(key)];
+  const en = key === 'del' ? 'delete' : LIVE_READ_WORDS.en[Number(key)];
+  if (he === undefined) return;
+  if (hasNativeSecretVoice()) {
+    try {
+      window.AndroidNative.speakSecret(he, liveReadLang(), en);
+    } catch (e) {}
+    return;
+  }
+  if (!liveReadWebArmed()) return;
+  liveReadWebSpeak(he, en);
+}
+
+// מחמם את מנוע הדיבור כשמסך הנעילה עולה - כדי שהספרה הראשונה תצא מיד
+function liveReadPrepare() {
+  if (!config.liveRead) return;
+  if (hasNativeSecretVoice() && typeof window.AndroidNative.prepareSecretVoice === 'function') {
+    try {
+      window.AndroidNative.prepareSecretVoice();
+    } catch (e) {}
+  }
+}
+
+function liveReadHeadsetState() {
+  if (hasNativeSecretVoice() && typeof window.AndroidNative.isHeadsetConnected === 'function') {
+    try {
+      return window.AndroidNative.isHeadsetConnected() ? 'connected' : 'missing';
+    } catch (e) {
+      return 'missing';
+    }
+  }
+  return 'unknown';
+}
+
+// כפתור "בדיקת אוזנייה" בהגדרות
+function liveReadTest() {
+  const status = document.getElementById('liveReadStatus');
+  const isEn = isEnglishUi();
+  const set = (t, cls) => {
+    if (!status) return;
+    status.textContent = t;
+    status.className = 'toggle-sub-desc live-read-status ' + (cls || '');
+  };
+  if (hasNativeSecretVoice()) {
+    if (liveReadHeadsetState() !== 'connected') {
+      set(isEn ? '⚠️ No earphone connected - the phone stays silent. Connect a Bluetooth earphone and test again.' : '⚠️ לא מחוברת אוזנייה - הטלפון ישתוק. חבר אוזניית בלוטות\' ובדוק שוב.', 'bad');
+      return;
+    }
+    liveReadPrepare();
+    const attempt = (n) => {
+      const res = window.AndroidNative.speakSecret('אחת, שתיים, שלוש', liveReadLang(), 'one, two, three');
+      if (res === 'not-ready' && n < 6) return setTimeout(() => attempt(n + 1), 400);
+      if (res === 'no-headset') return set(isEn ? '⚠️ The earphone disconnected - the phone stays silent.' : '⚠️ האוזנייה התנתקה - הטלפון ישתוק.', 'bad');
+      const note = res === 'en' && liveReadLang() === 'he' ? (isEn ? ' (no Hebrew voice on this phone - digits are said in English)' : ' (אין קול עברי בטלפון הזה - הספרות ייאמרו באנגלית)') : '';
+      set((isEn ? '✓ Earphone connected. You should hear "one, two, three" ONLY in the earphone.' : '✓ אוזנייה מחוברת. אתה אמור לשמוע "אחת, שתיים, שלוש" רק באוזנייה.') + note, 'good');
+    };
+    attempt(0);
+    return;
+  }
+  if (!window.speechSynthesis) {
+    set(isEn ? '⚠️ This phone/browser cannot speak.' : '⚠️ הטלפון או הדפדפן הזה לא יכול להקריא.', 'bad');
+    return;
+  }
+  try {
+    sessionStorage.setItem(LIVE_READ_ARMED_KEY, '1');
+  } catch (e) {}
+  liveReadWebSpeak('אחת, שתיים, שלוש', 'one, two, three');
+  set(isEn
+    ? 'Heard it ONLY in the earphone? You are ready. ⚠️ On iPhone the phone cannot check the earphone by itself - if it disconnects, the digits will be heard out loud. Test before every show.'
+    : 'שמעת רק באוזנייה? אתה מוכן. ⚠️ באייפון הטלפון לא יכול לבדוק לבד את האוזנייה - אם היא תתנתק, הספרות יישמעו בקול. בודקים לפני כל הופעה.', 'warn');
+}
+
 // הצגת הודעת שגיאה באדום + רטט מותאם (רטט קל בניסיון ראשון של Tension Mode או רטט כפול בשגיאה רגילה)
 function triggerErrorFeedback(customErrorMessage = 'קוד PIN שגוי. נסה שוב', isLightVibration = false) {
   if (isLockedOut) return;
@@ -2597,6 +2723,7 @@ function initCleanNumericKeypad() {
       // הוספת הספרה ישירות לשדה הסיסמה והפעלת אירוע input (יוצרת נקודה דינמית חדשה באנימציית pop)
       passwordInput.value += digit;
       passwordInput.dispatchEvent(new Event('input', { bubbles: true }));
+      liveReadSay(digit);
 
       // צליל הקשה מקורי ורטט קצר (30ms) בכל הקשה על ספרה
       playKeyClickSound();
@@ -2618,6 +2745,7 @@ function initCleanNumericKeypad() {
         passwordInput.value = passwordInput.value.slice(0, -1);
         passwordInput.dispatchEvent(new Event('input', { bubbles: true }));
         triggerHaptic(15);
+        liveReadSay('del');
       }
     });
   }
@@ -2654,6 +2782,7 @@ if (iosRightActionBtn) {
       passwordInput.value = passwordInput.value.slice(0, -1);
       passwordInput.dispatchEvent(new Event('input', { bubbles: true }));
       iosRightActionBtn.textContent = passwordInput.value.length > 0 ? 'מחק' : 'ביטול';
+      liveReadSay('del');
     }
   });
 }
@@ -4201,7 +4330,7 @@ function initDeviceLicenseGate() {
 // החלון מוצג רק כשמסך ההגדרות פתוח (בפתיחת האפליקציה / בתפריט הסודי),
 // ולעולם לא מעל מסך הנעילה הפעיל מול קהל.
 // ============================================================================
-const APP_VERSION = '7.9';
+const APP_VERSION = '8.0';
 const DEFAULT_APK_URL = 'https://github.com/tzur2010/app-lockscreen/raw/main/Lockscreen.apk';
 const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 const UPDATE_DISMISS_KEY = 'magic_update_dismissed_version';
@@ -5445,6 +5574,7 @@ function getStatsForReport() {
   if (config.faceTrick) on.push('facetrick');
   if (config.settingsTrick) on.push('settingstrick');
   if (config.birthdayTrick) on.push('birthday');
+  if (config.liveRead) on.push('liveread');
   if (config.unlockTargetScreen === 'gallery') on.push('gallery');
   if (config.unlockTargetScreen === 'search') on.push('search');
   try {
@@ -5969,6 +6099,14 @@ function syncNewRevealsUI() {
     btn.classList.toggle('active', Number(btn.dataset.fails) === faceTrickFails());
   });
 
+  const lrToggle = document.getElementById('toggleLiveRead');
+  if (lrToggle) lrToggle.checked = Boolean(config.liveRead);
+  const lrExtra = document.getElementById('liveReadExtra');
+  if (lrExtra) lrExtra.style.display = config.liveRead ? 'block' : 'none';
+  document.querySelectorAll('#liveReadLangSelector .seg-pill').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.lrlang === liveReadLang());
+  });
+
   const bToggle = document.getElementById('toggleBirthdayTrick');
   if (bToggle) bToggle.checked = Boolean(config.birthdayTrick);
   const bExtra = document.getElementById('birthdayTrickExtra');
@@ -6049,6 +6187,26 @@ function initNewReveals() {
       saveConfig();
     });
   }
+
+  const lrToggle = document.getElementById('toggleLiveRead');
+  if (lrToggle) {
+    lrToggle.addEventListener('change', () => {
+      config.liveRead = lrToggle.checked;
+      // הקריאה עובדת על קוד PIN (ספרות)
+      if (lrToggle.checked && config.unlockMode !== 'pin') config.unlockMode = 'pin';
+      saveConfig();
+      applyConfigToUI();
+      syncNewRevealsUI();
+      liveReadPrepare();
+    });
+  }
+  document.querySelectorAll('#liveReadLangSelector .seg-pill').forEach((btn) => btn.addEventListener('click', () => {
+    config.liveReadLang = btn.dataset.lrlang === 'en' ? 'en' : 'he';
+    saveConfig();
+    syncNewRevealsUI();
+  }));
+  const lrTestBtn = document.getElementById('liveReadTestBtn');
+  if (lrTestBtn) lrTestBtn.addEventListener('click', liveReadTest);
 
   const bToggle = document.getElementById('toggleBirthdayTrick');
   if (bToggle) {
@@ -6383,6 +6541,17 @@ async function collectPreShowChecks() {
     }
   }
 
+  // 🎧 קריאה בזמן אמת: האוזנייה חייבת להיות מחוברת (אחרת הקוסם לא שומע כלום)
+  if (config.liveRead) {
+    if (config.unlockMode !== 'pin') {
+      add('warn', 'קריאה בזמן אמת עובדת רק עם קוד PIN', 'בחר "קוד PIN" בחלון סוג הנעילה.');
+    }
+    const hs = liveReadHeadsetState();
+    if (hs === 'connected') add('ok', 'אוזנייה מחוברת', 'קריאה בזמן אמת מוכנה. כדאי ללחוץ "בדיקת אוזנייה" פעם אחת.');
+    else if (hs === 'missing') add('bad', 'אין אוזנייה מחוברת', 'בלי אוזנייה הטלפון שותק ולא תשמע את הספרות. חבר אוזניית בלוטות\'.', 'בדוק', liveReadTest);
+    else add(liveReadWebArmed() ? 'ok' : 'warn', liveReadWebArmed() ? 'האוזנייה נבדקה' : 'בדוק את האוזנייה', 'באייפון הטלפון לא בודק לבד: אם האוזנייה תתנתק, הספרות יישמעו בקול.', 'בדוק', liveReadTest);
+  }
+
   // 9. סוללה
   try {
     if (navigator.getBattery) {
@@ -6567,7 +6736,10 @@ const TRICK_TIPS = {
     he: ['🤳 הטלפון מזהה את הצופה', '1. נגיעה במסך / החלקה למעלה = "זיהוי פנים". בפעמים הראשונות (כמה שבחרת) הוא נכשל - "הפנים לא זוהו".\n2. מגישים לצופה ונוגעים שוב במסך כשהוא מסתכל: הטלפון נפתח מיד.\n3. באותו רגע המצלמה הקדמית מצלמת אותו - והתמונה שלו היא הטפט של מסך הבית.\nטיפ: תחזיק את הטלפון מול הפנים של הצופה בגובה העיניים, כמו שמצלמים סלפי.', '"הטלפון שלי לא מזהה אותי היום... רגע, תסתכל אתה? ...איך הוא מכיר אותך?! ותסתכל על הטפט שלי..."'],
     en: ['🤳 The phone knows the spectator', '1. Tap the screen / swipe up = "face scan". The first times (as many as you chose) it fails - "Face not recognized".\n2. Hand it to the spectator and tap again while they look: it unlocks instantly.\n3. At that moment the front camera takes their photo - and it becomes the home screen wallpaper.\nTip: hold the phone at their eye level, like taking a selfie.', '"My phone doesn\'t recognize me today... wait, you try? ...how does it know you?! And look at my wallpaper..."']
   },
-  toggleBirthdayTrick: {
+  toggleLiveRead: {
+    he: ['🎧 קריאה בזמן אמת', 'הכנה: אוזניית בלוטות\' אחת באוזן, מחוברת לטלפון הזה. "בדיקת אוזנייה" - שומעים "אחת, שתיים, שלוש" רק באוזנייה. נעילה: קוד PIN.\n\n1. נותנים לצופה את הטלפון ומסתובבים עם הגב (או עוצמים עיניים).\n2. "תקליד קוד סודי, ספרה אחרי ספרה. בכל ספרה - תעצור ותחשוב עליה חזק."\n3. בכל לחיצה הטלפון לוחש לך את הספרה באוזנייה. אומרים אותה בקול - לאט, כאילו "קולטים": "...שבע".\n4. אחרי הספרה האחרונה הטלפון נפתח, ואתה כבר אמרת את כל הקוד.\n\n💡 טיפים:\n• אל תענה מהר מדי - תן לשנייה של "ריכוז" לפני כל ספרה.\n• אם הצופה מוחק ספרה - תשמע "מחק".\n• באנדרואיד: אם האוזנייה מתנתקת, הטלפון פשוט שותק - לא יוצא שום צליל.\n• באייפון: אין בדיקה אוטומטית - בודקים אוזנייה לפני כל הופעה.', '"אל תגיד כלום... רק תחשוב על הספרה... שבע? ...ועכשיו... ארבע?"'],
+    en: ['🎧 Live reading', 'Setup: one Bluetooth earphone in your ear, connected to this phone. "Earphone test" - you hear "one, two, three" ONLY in the earphone. Lock type: PIN.\n\n1. Hand the spectator the phone and turn your back (or close your eyes).\n2. "Type a secret code, one digit at a time. On each digit - pause and think of it hard."\n3. On every press the phone whispers the digit into your earphone. Say it out loud - slowly, as if you are "picking it up": "...seven".\n4. After the last digit the phone unlocks - and you have already named the whole code.\n\n💡 Tips:\n• Don\'t answer too fast - give each digit a second of "concentration".\n• If the spectator deletes a digit - you hear "delete".\n• On Android: if the earphone disconnects, the phone simply stays silent - no sound at all.\n• On iPhone: there is no automatic check - test the earphone before every show.', '"Don\'t say anything... just think of the digit... seven? ...and now... four?"']
+  },  toggleBirthdayTrick: {
     he: ['🎂 תאריך לידה', 'הכנה: מדליקים, בוחרים "6 ספרות" ו"יום ואז חודש". נעילה: קוד PIN.\n\n1. מה אומרים לצופה (מילה במילה):\n"תחשוב על מישהו שאתה אוהב. תקליד כקוד את תאריך הלידה שלו - יום, חודש ושנה, 6 ספרות. למשל 15 במרץ 1992 זה 150392. אל תגיד לי של מי."\n\n2. לחיצה ארוכה במסך (או השעון החכם): מתחת לקוד מופיעים מזל, גיל ויום בשבוע. בלשונית "הצצה" יש גם כמה ימים חי ועוד כמה ימים יום ההולדת.\n\n3. אם כתוב "❌ לא תאריך" - הצופה לא הקליד תאריך. לא חושפים מזל! עוברים לחשיפה רגילה של הקוד.\n\n4. סדר החשיפה:\n• קודם מי זה, לפי הגיל: קרוב לגיל הצופה = הוא עצמו, צעיר בהרבה = ילד, מבוגר בהרבה = הורה.\n• אחר כך המזל.\n• בסוף היום בשבוע שבו נולד - זה הרגע ש"אי אפשר לדעת".\n\n💡 לעולם לא אומרים את התאריך עצמו - ככה זה קריאת מחשבות ולא "ראית את הקוד".', '"אני מרגיש שזה מישהו צעיר... הילד שלך? הוא מזל דגים... ונולד ביום ראשון, נכון?"'],
     en: ['🎂 Birthday', 'Setup: turn it on, pick "6 digits" and "Day then month". Lock type: PIN.\n\n1. What to tell the spectator (word for word):\n"Think of someone you love. Type their birthday as the code - day, month and year, 6 digits. For example March 15, 1992 is 150392. Don\'t tell me who it is."\n\n2. Long-press the screen (or check your watch): under the code you see star sign, age and weekday. The Peek tab also shows days lived and days until the next birthday.\n\n3. If it says "❌ Not a date" - they didn\'t type a date. Don\'t reveal a sign! Reveal the code normally.\n\n4. Reveal order:\n• First who it is, by age: close to the spectator\'s age = themselves, much younger = a child, much older = a parent.\n• Then the star sign.\n• Last, the weekday they were born - the "impossible" moment.\n\n💡 Never say the date itself - that way it\'s mind reading, not "you saw the code".', '"I feel it\'s someone young... your child? A Pisces... born on a Sunday, right?"']
   },
@@ -6731,6 +6903,7 @@ function initTour() {
 const WHATS_NEW_SEEN_KEY = 'magic_whats_new_seen_v1';
 const WHATS_NEW_MAX_ITEMS = 6;
 const WHATS_NEW = [
+  { ver: '8.0', icon: '🎧', target: '#toggleLiveRead', he: ['קריאה בזמן אמת', 'אתה עם הגב, הצופה מקליד קוד - ואתה אומר כל ספרה ברגע שהוא לוחץ עליה. הספרות נלחשות לך באוזניית בלוטות\'.'], en: ['Live reading', 'Your back is turned, the spectator types a code - and you name every digit the moment it is pressed. The digits are whispered into your Bluetooth earphone.'] },
   { ver: '7.9', icon: '🛡️', target: null, he: ['ליטוש לפני הופעות', 'עברנו על כל מסך בכל סוג טלפון. באייפון מוצג רק מה שעובד שם, והכל אמין יותר מתמיד.'], en: ['Polished for shows', 'We went over every screen on every phone type. On iPhone you see only what works there, and everything is more reliable than ever.'] },
   { ver: '7.8', icon: '✨', target: null, he: ['מראה חדש מהרגע הראשון', 'גם ההרשמה, בחירת הטלפון וכל החלונות בעיצוב החדש. האפליקציה ממוקדת: רק מה שעובד בצורה מושלמת.'], en: ['A new look from the first second', 'Sign-up, phone selection and every window now share the new design. The app is focused: only what works perfectly.'] },
   { ver: '7.6', icon: '🏠', target: '#homeTargetNote', he: ['רק מה שעובד - ומסך הבית האמיתי', 'אחרי הפתיחה הטלפון יוצא למסך הבית האמיתי. באייפון (שם אפל לא מאפשרת לצאת) מופיע צילום מסך הבית שלך עם השעה והסוללה האמיתיות. ו"תאריך לידה" מקבל הסבר מלא + "❌ לא תאריך".'], en: ['Only what works - and the real home screen', 'After unlocking the phone exits to the real home screen. On iPhone (where Apple doesn\'t allow exiting) a screenshot of your home screen appears with the real time and battery. And "Birthday" gets a full how-to + "❌ Not a date".'] },

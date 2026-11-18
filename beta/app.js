@@ -588,6 +588,8 @@ function enforceRetiredFeatures(cfg) {
   // 7.8: הוסרו גם החשיפה בהתראה והשיחה הנכנסת
   cfg.revealEnabled = false;
   cfg.callReveal = false;
+  // 9.0: "הטלפון ידע מראש" הוסר (אנדרואיד לא מאפשר לכתוב בשורה של מסך הנעילה)
+  cfg.wordPredict = false;
   return cfg;
 }
 
@@ -4701,7 +4703,7 @@ function initDeviceLicenseGate() {
 // החלון מוצג רק כשמסך ההגדרות פתוח (בפתיחת האפליקציה / בתפריט הסודי),
 // ולעולם לא מעל מסך הנעילה הפעיל מול קהל.
 // ============================================================================
-const APP_VERSION = '8.9';
+const APP_VERSION = '9.0';
 const DEFAULT_APK_URL = 'https://github.com/tzur2010/app-lockscreen/raw/main/Lockscreen.apk';
 const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 const UPDATE_DISMISS_KEY = 'magic_update_dismissed_version';
@@ -6490,7 +6492,7 @@ function syncNewRevealsUI() {
   });
 
   const wpBlock = document.getElementById('wordPredictBlock');
-  if (wpBlock) wpBlock.style.display = hasNativeWordListen() ? '' : 'none';
+  if (wpBlock) wpBlock.style.display = 'none';
   const wpToggle = document.getElementById('toggleWordPredict');
   if (wpToggle) wpToggle.checked = Boolean(config.wordPredict);
   const wpExtra = document.getElementById('wordPredictExtra');
@@ -7419,7 +7421,6 @@ function initTour() {
 const WHATS_NEW_SEEN_KEY = 'magic_whats_new_seen_v1';
 const WHATS_NEW_MAX_ITEMS = 6;
 const WHATS_NEW = [
-  { ver: '8.4', icon: '🔮', target: '#toggleWordPredict', he: ['הטלפון ידע מראש', 'המסך נראה כבוי, הצופה אומר בקול מילה כלשהי - ובמסך הנעילה האמיתי של הטלפון, בשורה שלמטה, כתובה המילה. (אנדרואיד)'], en: ['My phone knew', 'The screen looks off, the spectator says any word out loud - and the phone\'s REAL lock screen shows a notification from 3 hours ago with that word. (Android)'] },
   { ver: '8.0', icon: '🎧', target: '#toggleLiveRead', he: ['קריאה בזמן אמת', 'אתה עם הגב, הצופה מקליד קוד - ואתה אומר כל ספרה ברגע שהוא לוחץ עליה. הספרות נלחשות לך באוזניית בלוטות\'.'], en: ['Live reading', 'Your back is turned, the spectator types a code - and you name every digit the moment it is pressed. The digits are whispered into your Bluetooth earphone.'] },
   { ver: '7.9', icon: '🛡️', target: null, he: ['ליטוש לפני הופעות', 'עברנו על כל מסך בכל סוג טלפון. באייפון מוצג רק מה שעובד שם, והכל אמין יותר מתמיד.'], en: ['Polished for shows', 'We went over every screen on every phone type. On iPhone you see only what works there, and everything is more reliable than ever.'] },
   { ver: '7.8', icon: '✨', target: null, he: ['מראה חדש מהרגע הראשון', 'גם ההרשמה, בחירת הטלפון וכל החלונות בעיצוב החדש. האפליקציה ממוקדת: רק מה שעובד בצורה מושלמת.'], en: ['A new look from the first second', 'Sign-up, phone selection and every window now share the new design. The app is focused: only what works perfectly.'] },

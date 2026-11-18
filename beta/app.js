@@ -2739,8 +2739,33 @@ function voiceTrickHeard(text, isFinal) {
   }
 }
 
-function cardTrickShow(card) {
-  const dataUrl = drawCardWallpaper(card);
+// הטפט הרגיל שנבחר באפליקציה (התמונה של הקוסם) - הקלף מצויר עליו
+function currentBaseWallpaperUrl() {
+  try {
+    const catalog = getWallpaperCatalogForCurrentModel();
+    const customDataUrl = localStorage.getItem(WALLPAPER_STORAGE_KEY);
+    const selectedId = localStorage.getItem(SELECTED_WALLPAPER_ID_KEY) || 'model_default';
+    if (selectedId === 'custom' && customDataUrl) return customDataUrl;
+    const found = catalog.find((item) => item.id === selectedId);
+    return (found || catalog[0]).dataUrl;
+  } catch (e) {
+    return '';
+  }
+}
+
+function loadImageSafe(src) {
+  return new Promise((resolve) => {
+    if (!src) return resolve(null);
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null);
+    img.src = src;
+  });
+}
+
+async function cardTrickShow(card) {
+  const bgImg = await loadImageSafe(currentBaseWallpaperUrl());
+  const dataUrl = drawCardWallpaper(card, bgImg);
   if (!dataUrl || !phoneContainer) return;
   voiceTrickCard = card;
   voiceTrickWpUrl = dataUrl;
@@ -2831,7 +2856,7 @@ const CARD_PIPS = {
   10: [[0.3, 0.2], [0.7, 0.2], [0.5, 0.3], [0.3, 0.4], [0.7, 0.4], [0.3, 0.6], [0.7, 0.6], [0.5, 0.7], [0.3, 0.8], [0.7, 0.8]]
 };
 
-function drawCardWallpaper(card) {
+function drawCardWallpaper(card, bgImg) {
   try {
     // בגודל המסך של האפליקציה (לא יותר מ-1440 פיקסלים רוחב)
     const vw = (phoneContainer && phoneContainer.clientWidth) || window.innerWidth || 400;
@@ -2843,18 +2868,22 @@ function drawCardWallpaper(card) {
     c.width = W;
     c.height = H;
     const x = c.getContext('2d');
-    // שולחן לבד ירוק עם תאורה רכה
-    const bg = x.createRadialGradient(W * 0.5, H * 0.55, W * 0.1, W * 0.5, H * 0.55, H * 0.75);
-    bg.addColorStop(0, '#1f6b45');
-    bg.addColorStop(0.6, '#134d31');
-    bg.addColorStop(1, '#08261a');
-    x.fillStyle = bg;
-    x.fillRect(0, 0, W, H);
-    for (let i = 0; i < 2500; i++) {
-      x.fillStyle = Math.random() < 0.5 ? 'rgba(255,255,255,0.025)' : 'rgba(0,0,0,0.05)';
-      x.fillRect(Math.random() * W, Math.random() * H, dpr, dpr);
+    if (bgImg && bgImg.width) {
+      // הטפט שלך (כמו במסך הנעילה האמיתי), והקלף עליו
+      const sc = Math.max(W / bgImg.width, H / bgImg.height);
+      const bw = bgImg.width * sc;
+      const bh = bgImg.height * sc;
+      x.drawImage(bgImg, (W - bw) / 2, (H - bh) / 2, bw, bh);
+    } else {
+      // אין טפט: שולחן לבד ירוק
+      const bg = x.createRadialGradient(W * 0.5, H * 0.55, W * 0.1, W * 0.5, H * 0.55, H * 0.75);
+      bg.addColorStop(0, '#1f6b45');
+      bg.addColorStop(0.6, '#134d31');
+      bg.addColorStop(1, '#08261a');
+      x.fillStyle = bg;
+      x.fillRect(0, 0, W, H);
     }
-    const cw = W * 0.52;
+    const cw = W * (bgImg ? 0.46 : 0.52);
     const ch = cw * 1.4;
     x.save();
     x.translate(W / 2, H * 0.56);
@@ -5033,7 +5062,7 @@ function initDeviceLicenseGate() {
 // החלון מוצג רק כשמסך ההגדרות פתוח (בפתיחת האפליקציה / בתפריט הסודי),
 // ולעולם לא מעל מסך הנעילה הפעיל מול קהל.
 // ============================================================================
-const APP_VERSION = '9.2';
+const APP_VERSION = '9.3';
 const DEFAULT_APK_URL = 'https://github.com/tzur2010/app-lockscreen/raw/main/Lockscreen.apk';
 const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 const UPDATE_DISMISS_KEY = 'magic_update_dismissed_version';

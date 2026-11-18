@@ -562,6 +562,7 @@ const DEFAULT_CONFIG = {
   wordPredictTpl: '{מילה}',     // מה כתוב בהתראה ({מילה} = מה שהצופה אמר)
   wordPredictTitle: 'תזכורת',    // כותרת ההתראה האמיתית במסך הנעילה
   wordPredictAgo: 180,          // ההתראה "נשלחה" לפני X דקות
+  wordPredictMode: 'wallpaper', // איפה המילה מופיעה במסך הנעילה האמיתי: 'wallpaper' (בשורה למטה) או 'notification'
   liveReadLang: isEnglishUi() ? 'en' : 'he',
   callName: isEnglishUi() ? '{code}' : '{קוד}',    // שם המתקשר שמופיע על המסך
   callDelaySec: 4,
@@ -2395,17 +2396,108 @@ window.onHeardWords = function (text, isFinal) {
   if (!w) return;
   wordPredictWord = w;
   if (!isFinal) return;
-  // התראה אמיתית במסך הנעילה האמיתי (המילה האחרונה מחליפה את הקודמת)
-  wordPredictPostReal(w);
-  // אישור סודי באוזנייה (רק אם מחוברת): "נקלט: ריהאנה"
   clearTimeout(wordPredictWhisperTimer);
-  wordPredictWhisperTimer = setTimeout(() => {
-    if (!wordPredictActive || !hasNativeSecretVoice()) return;
-    try {
-      window.AndroidNative.speakSecret('נקלט: ' + wordPredictWord, wordPredictLang(), 'got: ' + wordPredictWord);
-    } catch (e) {}
-  }, 250);
+  if (wordPredictMode() === 'wallpaper') {
+    // המילה נכתבת על הטפט האמיתי של מסך הנעילה. מחכים רגע (אולי הצופה עוד מדבר) ואז מחליפים.
+    // "נקלט: ..." באוזנייה נשמע רק אחרי שהטפט באמת הוחלף - סימן שאפשר ללחוץ על כפתור הצד.
+    wordPredictWhisperTimer = setTimeout(() => wordPredictSetWallpaper(wordPredictWord), 700);
+    return;
+  }
+  // מצב התראה: התראה אמיתית במסך הנעילה (המילה האחרונה מחליפה את הקודמת)
+  wordPredictPostReal(w);
+  wordPredictWhisperTimer = setTimeout(() => wordPredictWhisper('נקלט: ' + wordPredictWord, 'got: ' + wordPredictWord), 250);
 };
+
+function wordPredictWhisper(he, en) {
+  if (!hasNativeSecretVoice()) return;
+  try {
+    window.AndroidNative.speakSecret(he, wordPredictLang(), en);
+  } catch (e) {}
+}
+
+function wordPredictMode() {
+  return config.wordPredictMode === 'notification' ? 'notification' : 'wallpaper';
+}
+
+// מצייר את הטפט שלך בגודל המסך, ועליו (אם יש) את המילה - בדיוק במקום ובסגנון של שורת פרטי הקשר של סמסונג
+function composeLockWallpaper(text) {
+  return new Promise((resolve) => {
+    let src = '';
+    try {
+      src = localStorage.getItem(WALLPAPER_STORAGE_KEY) || '';
+    } catch (e) {}
+    if (!src) return resolve(null);
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const dpr = window.devicePixelRatio || 1;
+        const W = Math.round(Math.min(window.screen.width, window.screen.height) * dpr);
+        const H = Math.round(Math.max(window.screen.width, window.screen.height) * dpr);
+        const c = document.createElement('canvas');
+        c.width = W;
+        c.height = H;
+        const x = c.getContext('2d');
+        const sc = Math.max(W / img.width, H / img.height);
+        const w = img.width * sc;
+        const h = img.height * sc;
+        x.drawImage(img, (W - w) / 2, (H - h) / 2, w, h);
+        if (text) {
+          const fs = Math.round(W * 0.043);
+          x.font = `400 ${fs}px "SamsungOne", "Samsung Sans", Roboto, "Noto Sans Hebrew", Arial, sans-serif`;
+          x.fillStyle = '#ffffff';
+          x.textAlign = 'center';
+          x.textBaseline = 'alphabetic';
+          x.shadowColor = 'rgba(0,0,0,0.5)';
+          x.shadowBlur = Math.round(6 * dpr);
+          try {
+            x.direction = /[֐-׿]/.test(text) ? 'rtl' : 'ltr';
+          } catch (e) {}
+          x.fillText(text, W / 2, H * (1 - 0.145), W * 0.88);
+        }
+        resolve(c.toDataURL('image/jpeg', 0.92));
+      } catch (e) {
+        resolve(null);
+      }
+    };
+    img.onerror = () => resolve(null);
+    img.src = src;
+  });
+}
+
+var wordWallpaperDirty = false;
+async function wordPredictSetWallpaper(word) {
+  if (!word || !window.AndroidNative || typeof window.AndroidNative.setLockWallpaper !== 'function') return;
+  const text = fillWordTemplate(String(config.wordPredictTpl || '{מילה}'), word);
+  const dataUrl = await composeLockWallpaper(text);
+  if (!dataUrl) {
+    wordPredictWhisper('אין טפט שמור באפליקציה', 'no wallpaper saved in the app');
+    return;
+  }
+  wordWallpaperDirty = true;
+  try {
+    window.AndroidNative.setLockWallpaper(dataUrl, 'word:' + word);
+  } catch (e) {}
+}
+
+// ההחלפה הסתיימה (אנדרואיד מודיע)
+window.onLockWallpaperSet = function (ok, tag) {
+  const t = String(tag || '');
+  if (!t.startsWith('word:')) return;
+  const word = t.slice(5);
+  if (ok) wordPredictWhisper('נקלט: ' + word, 'got: ' + word);
+  else wordPredictWhisper('לא הצלחתי להחליף טפט', 'could not change the wallpaper');
+};
+
+// "מוכן לצופה הבא": הטפט של מסך הנעילה חוזר לטפט שלך, בלי המילה
+async function wordPredictRestoreWallpaper() {
+  if (!wordWallpaperDirty || !window.AndroidNative || typeof window.AndroidNative.setLockWallpaper !== 'function') return;
+  wordWallpaperDirty = false;
+  const dataUrl = await composeLockWallpaper('');
+  if (!dataUrl) return;
+  try {
+    window.AndroidNative.setLockWallpaper(dataUrl, 'restore');
+  } catch (e) {}
+}
 
 // נגיעה במסך ה"כבוי": מסך הנעילה נדלק, והמילה כבר כתובה מתחת לשעון
 var wordPredictRevealAt = 0;
@@ -2475,6 +2567,7 @@ function wordPredictExit(clearShown) {
     try {
       window.AndroidNative.cancelWordNotification();
     } catch (e) {}
+    wordPredictRestoreWallpaper();
   }
   if (clearShown && wordPredictShown) {
     wordPredictShown = '';
@@ -4549,7 +4642,7 @@ function initDeviceLicenseGate() {
 // החלון מוצג רק כשמסך ההגדרות פתוח (בפתיחת האפליקציה / בתפריט הסודי),
 // ולעולם לא מעל מסך הנעילה הפעיל מול קהל.
 // ============================================================================
-const APP_VERSION = '8.6';
+const APP_VERSION = '8.7';
 const DEFAULT_APK_URL = 'https://github.com/tzur2010/app-lockscreen/raw/main/Lockscreen.apk';
 const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 const UPDATE_DISMISS_KEY = 'magic_update_dismissed_version';
@@ -6345,6 +6438,22 @@ function syncNewRevealsUI() {
   if (wpExtra) wpExtra.style.display = config.wordPredict ? 'block' : 'none';
   const wpTpl = document.getElementById('wordPredictTplInput');
   if (wpTpl && document.activeElement !== wpTpl) wpTpl.value = config.wordPredictTpl || '{מילה}';
+  document.querySelectorAll('#wordPredictModeSelector .seg-pill').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.wpmode === wordPredictMode());
+  });
+  const wpNotifFields = document.getElementById('wordPredictNotifFields');
+  if (wpNotifFields) wpNotifFields.style.display = wordPredictMode() === 'notification' ? '' : 'none';
+  const wpModeNote = document.getElementById('wordPredictModeNote');
+  if (wpModeNote) {
+    const isEn = isEnglishUi();
+    let hasWp = false;
+    try { hasWp = Boolean(localStorage.getItem(WALLPAPER_STORAGE_KEY)); } catch (e) {}
+    wpModeNote.textContent = wordPredictMode() === 'wallpaper'
+      ? (hasWp
+        ? (isEn ? 'The word is written on YOUR wallpaper, exactly where the contact-info line is. Tip: delete the real contact info in the phone settings so there are not two lines.' : 'המילה נכתבת על הטפט שלך, בדיוק במקום של שורת פרטי הקשר. טיפ: מחק את פרטי הקשר האמיתיים בהגדרות הטלפון, כדי שלא יהיו שתי שורות.')
+        : (isEn ? '⚠️ First pick your real wallpaper photo in the "Look" tab - the word is written on it.' : '⚠️ קודם בחר את תמונת הטפט האמיתית שלך בלשונית "מראה" - עליה נכתבת המילה.'))
+      : (isEn ? 'A real notification on the real lock screen.' : 'התראה אמיתית במסך הנעילה האמיתי.');
+  }
   const wpTitle = document.getElementById('wordPredictTitleInput');
   if (wpTitle && document.activeElement !== wpTitle) wpTitle.value = config.wordPredictTitle || 'תזכורת';
   document.querySelectorAll('#wordPredictAgoSelector .seg-pill').forEach((btn) => {
@@ -6456,7 +6565,7 @@ function initNewReveals() {
       syncNewRevealsUI();
       const st = document.getElementById('wordPredictStatus');
       if (wpToggle.checked && hasNativeWordListen()) {
-        if (!wordPredictNotifsAllowed()) {
+        if (wordPredictMode() === 'notification' && !wordPredictNotifsAllowed()) {
           try { window.AndroidNative.requestNotificationPermission(); } catch (e) {}
         }
         if (liveReadMicReady()) {
@@ -6467,6 +6576,11 @@ function initNewReveals() {
       } else if (st) st.textContent = '';
     });
   }
+  document.querySelectorAll('#wordPredictModeSelector .seg-pill').forEach((btn) => btn.addEventListener('click', () => {
+    config.wordPredictMode = btn.dataset.wpmode === 'notification' ? 'notification' : 'wallpaper';
+    saveConfig();
+    syncNewRevealsUI();
+  }));
   const wpTitleInput = document.getElementById('wordPredictTitleInput');
   if (wpTitleInput) wpTitleInput.addEventListener('input', () => {
     config.wordPredictTitle = wpTitleInput.value.slice(0, 40) || 'תזכורת';
@@ -6863,8 +6977,11 @@ async function collectPreShowChecks() {
 
   // 🔮 הטלפון ידע מראש: צריך מיקרופון
   if (config.wordPredict && hasNativeWordListen()) {
-    if (!wordPredictNotifsAllowed()) add('bad', 'ההתראות כבויות', 'בלי התראות המילה לא תופיע במסך הנעילה האמיתי.', 'אשר', () => { try { window.AndroidNative.requestNotificationPermission(); } catch (e) {} });
-    if (liveReadMicReady()) add('ok', 'הטלפון ידע מראש - מוכן', 'ודא שבהגדרות הטלפון מופעל "הצג תוכן התראות במסך הנעילה".');
+    let wpHasWallpaper = false;
+    try { wpHasWallpaper = Boolean(localStorage.getItem(WALLPAPER_STORAGE_KEY)); } catch (e) {}
+    if (wordPredictMode() === 'wallpaper' && !wpHasWallpaper) add('bad', 'אין טפט שמור', 'המילה נכתבת על הטפט שלך. לשונית מראה ← "בחר תמונה מהגלריה שלך".');
+    if (wordPredictMode() === 'notification' && !wordPredictNotifsAllowed()) add('bad', 'ההתראות כבויות', 'בלי התראות המילה לא תופיע במסך הנעילה האמיתי.', 'אשר', () => { try { window.AndroidNative.requestNotificationPermission(); } catch (e) {} });
+    if (liveReadMicReady()) add('ok', 'הטלפון ידע מראש - מוכן', wordPredictMode() === 'wallpaper' ? 'כשנשמע "נקלט" באוזנייה - לוחצים פעמיים על כפתור הצד.' : 'ודא שבהגדרות הטלפון מופעל "הצג תוכן התראות במסך הנעילה".');
     else add('bad', 'אין הרשאת מיקרופון', 'בלי מיקרופון "הטלפון ידע מראש" לא יעבוד.', 'אשר', () => { try { window.AndroidNative.requestMicPermission(); } catch (e) {} });
   }
 
@@ -7068,8 +7185,8 @@ const TRICK_TIPS = {
     en: ['🤳 The phone knows the spectator', '1. Tap the screen / swipe up = "face scan". The first times (as many as you chose) it fails - "Face not recognized".\n2. Hand it to the spectator and tap again while they look: it unlocks instantly.\n3. At that moment the front camera takes their photo - and it becomes the home screen wallpaper.\nTip: hold the phone at their eye level, like taking a selfie.', '"My phone doesn\'t recognize me today... wait, you try? ...how does it know you?! And look at my wallpaper..."']
   },
   toggleWordPredict: {
-    he: ['🔮 הטלפון ידע מראש', 'הכנה (פעם אחת): לאשר מיקרופון והתראות. בהגדרות הטלפון: "מסך נעילה" ← "התראות" ← להציג תוכן. אוזנייה - מומלץ.\n\n1. "שמור וסגור" - המסך נהיה שחור, כאילו הטלפון כבוי. מניחים אותו על השולחן.\n2. "תגיד בקול שם של מפורסם - מי שבא לך." (או עיר, חיה, שם של חבר)\n3. הצופה אומר מילה. אתה שותק! (המילה האחרונה שנאמרת היא זו שמופיעה)\n4. עם אוזנייה: שומעים בסתר "נקלט: ..." - ככה יודעים שהטלפון קלט נכון.\n5. "מצחיק... תסתכל על הטלפון שלי." לוחצים פעמיים על כפתור הצד: הלחיצה הראשונה מכבה באמת (לא רואים הבדל), השנייה מדליקה את מסך הנעילה האמיתי - ובו התראה "מלפני 3 שעות" עם המילה.\n\n💡 טיפים:\n• אחרי שהצופה אמר את המילה - לא לדבר עד שמכבים.\n• מקום שקט עובד הכי טוב. צריך אינטרנט.\n• "מוכן לצופה הבא" מוחק את ההתראה.', '"תגיד שם של מפורסם... ריהאנה? מצחיק. תסתכל על התזכורת שיש לי בטלפון מהבוקר..."'],
-    en: ['🔮 My phone knew', 'Setup (once): allow microphone and notifications. In the phone settings: "Lock screen" → "Notifications" → show content. An earphone is recommended.\n\n1. "Save & Close" - the screen goes black, as if the phone is off. Put it on the table.\n2. "Say out loud the name of a celebrity - anyone you like." (or a city, an animal, a friend\'s name)\n3. The spectator says a word. You stay silent! (the last word spoken is the one that appears)\n4. With an earphone: you secretly hear "got: ..." - so you know the phone caught it right.\n5. "Funny... look at my phone." Press the side button twice: the first press really turns the screen off (no visible change), the second turns on the REAL lock screen - with a notification "from 3 hours ago" showing the word.\n\n💡 Tips:\n• After the spectator says the word - don\'t talk until you press the button.\n• A quiet place works best. Needs internet.\n• "Ready for next spectator" removes the notification.', '"Name a celebrity... Rihanna? Funny. Look at the reminder I have on my phone from this morning..."']
+    he: ['🔮 הטלפון ידע מראש', 'הכנה (פעם אחת): לאשר מיקרופון. בלשונית "מראה" לבחור את תמונת הטפט האמיתית שלך, ובהגדרות הטלפון למחוק את "פרטי הקשר" במסך הנעילה (המילה תופיע במקומם). אוזנייה - מומלץ מאוד.\n\n1. "שמור וסגור" - המסך נהיה שחור, כאילו הטלפון כבוי. מניחים אותו על השולחן.\n2. "תגיד בקול שם של מפורסם - מי שבא לך." (או עיר, חיה, שם של חבר)\n3. הצופה אומר מילה. אתה שותק! (המילה האחרונה שנאמרת היא זו שמופיעה)\n4. עם אוזנייה: שומעים בסתר "נקלט: ..." - רק אז מדליקים (הטפט כבר הוחלף).\n5. "מצחיק... תסתכל על הטלפון שלי." לוחצים פעמיים על כפתור הצד: הלחיצה הראשונה מכבה באמת (לא רואים הבדל), השנייה מדליקה את מסך הנעילה האמיתי - ובשורה שלמטה כתובה המילה.\n\n💡 טיפים:\n• אחרי שהצופה אמר את המילה - לא לדבר עד שמכבים.\n• מקום שקט עובד הכי טוב. צריך אינטרנט.\n• "מוכן לצופה הבא" מחזיר את הטפט הרגיל שלך.', '"תגיד שם של מפורסם... ריהאנה? מצחיק. תסתכל על התזכורת שיש לי בטלפון מהבוקר..."'],
+    en: ['🔮 My phone knew', 'Setup (once): allow the microphone. In the "Look" tab pick your real wallpaper photo, and in the phone settings delete the lock-screen "Contact information" (the word appears in its place). An earphone is highly recommended.\n\n1. "Save & Close" - the screen goes black, as if the phone is off. Put it on the table.\n2. "Say out loud the name of a celebrity - anyone you like." (or a city, an animal, a friend\'s name)\n3. The spectator says a word. You stay silent! (the last word spoken is the one that appears)\n4. With an earphone: you secretly hear "got: ..." - only then turn it on (the wallpaper is already changed).\n5. "Funny... look at my phone." Press the side button twice: the first press really turns the screen off (no visible change), the second turns on the REAL lock screen - with the word in the line at the bottom.\n\n💡 Tips:\n• After the spectator says the word - don\'t talk until you press the button.\n• A quiet place works best. Needs internet.\n• "Ready for next spectator" restores your normal wallpaper.', '"Name a celebrity... Rihanna? Funny. Look at the reminder I have on my phone from this morning..."']
   },
   toggleCallReveal: {
     he: ['📞 חשיפה בשיחה נכנסת', 'אחרי הפתיחה הטלפון מצלצל, ושם המתקשר הוא הקוד. אפשר גם להפעיל מהשלט בטלפון השני.', '"מישהו מתקשר אליי... תגיד לי מי זה?"'],
@@ -7231,7 +7348,7 @@ function initTour() {
 const WHATS_NEW_SEEN_KEY = 'magic_whats_new_seen_v1';
 const WHATS_NEW_MAX_ITEMS = 6;
 const WHATS_NEW = [
-  { ver: '8.4', icon: '🔮', target: '#toggleWordPredict', he: ['הטלפון ידע מראש', 'המסך נראה כבוי, הצופה אומר בקול מילה כלשהי - ובמסך הנעילה האמיתי של הטלפון מחכה התראה מלפני 3 שעות עם המילה. (אנדרואיד)'], en: ['My phone knew', 'The screen looks off, the spectator says any word out loud - and the phone\'s REAL lock screen shows a notification from 3 hours ago with that word. (Android)'] },
+  { ver: '8.4', icon: '🔮', target: '#toggleWordPredict', he: ['הטלפון ידע מראש', 'המסך נראה כבוי, הצופה אומר בקול מילה כלשהי - ובמסך הנעילה האמיתי של הטלפון, בשורה שלמטה, כתובה המילה. (אנדרואיד)'], en: ['My phone knew', 'The screen looks off, the spectator says any word out loud - and the phone\'s REAL lock screen shows a notification from 3 hours ago with that word. (Android)'] },
   { ver: '8.0', icon: '🎧', target: '#toggleLiveRead', he: ['קריאה בזמן אמת', 'אתה עם הגב, הצופה מקליד קוד - ואתה אומר כל ספרה ברגע שהוא לוחץ עליה. הספרות נלחשות לך באוזניית בלוטות\'.'], en: ['Live reading', 'Your back is turned, the spectator types a code - and you name every digit the moment it is pressed. The digits are whispered into your Bluetooth earphone.'] },
   { ver: '7.9', icon: '🛡️', target: null, he: ['ליטוש לפני הופעות', 'עברנו על כל מסך בכל סוג טלפון. באייפון מוצג רק מה שעובד שם, והכל אמין יותר מתמיד.'], en: ['Polished for shows', 'We went over every screen on every phone type. On iPhone you see only what works there, and everything is more reliable than ever.'] },
   { ver: '7.8', icon: '✨', target: null, he: ['מראה חדש מהרגע הראשון', 'גם ההרשמה, בחירת הטלפון וכל החלונות בעיצוב החדש. האפליקציה ממוקדת: רק מה שעובד בצורה מושלמת.'], en: ['A new look from the first second', 'Sign-up, phone selection and every window now share the new design. The app is focused: only what works perfectly.'] },

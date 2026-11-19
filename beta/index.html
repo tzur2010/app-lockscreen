@@ -426,32 +426,79 @@ fit();addEventListener('resize',fit);addEventListener('orientationchange',functi
           <span id="trialBannerText"></span>
           <button type="button" class="trial-banner-btn" id="trialBuyBtn">לרכישה</button>
         </div>
-        <div class="show-actions-bar">
-          <button type="button" class="reset-show-btn" id="resetShowBtn">🔄 מוכן לצופה הבא</button>
-          <button type="button" class="preshow-btn" id="preShowCheckBtn">✅ בדיקה לפני הופעה</button>
+        <!-- 10.1: במקום לשוניות - מסך בית עם אריחים, וכל אריח פותח עמוד משלו עם "חזרה" -->
+        <div class="subpage-bar" id="subpageBar">
+          <button type="button" class="subpage-back" id="subpageBack" aria-label="חזרה">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+            <span id="subpageBackText">ראשי</span>
+          </button>
+          <div class="subpage-title" id="subpageTitle"></div>
         </div>
 
-        <!-- לשוניות: טריק (מה קורה) · פתיחה (מסך הבית אחרי הפתיחה) · הצצה (איך אתה יודע) · מראה · עוד -->
+        <section class="settings-panel" data-tab="home">
+          <div class="home-hero">
+            <div class="home-greet" id="homeGreet">ערב טוב</div>
+            <div class="home-title" id="homeTitle">מוכן להופעה?</div>
+          </div>
+
+          <div class="show-actions-bar">
+            <button type="button" class="reset-show-btn" id="resetShowBtn">🔄 מוכן לצופה הבא</button>
+            <button type="button" class="preshow-btn" id="preShowCheckBtn">✅ בדיקה לפני הופעה</button>
+          </div>
+
+          <!-- הטריק המרכזי -->
+          <div class="star-trick-card" id="starTrickCard">
+            <div class="stc-top">
+              <span class="stc-ico"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><path d="M3 14v-2a9 9 0 0 1 18 0v2"/><rect x="2.5" y="14" width="5" height="7" rx="2"/><rect x="16.5" y="14" width="5" height="7" rx="2"/></svg></span>
+              <div>
+                <div class="stc-kicker" id="starTrickKicker">הטריק הכי חזק באפליקציה</div>
+                <div class="stc-title" id="starTrickTitle">קריאה בזמן אמת</div>
+                <div class="stc-sub" id="starTrickSub">אתה עם הגב, הצופה מקליד קוד - וכל ספרה נלחשת לך באוזנייה ברגע שהיא נלחצת.</div>
+              </div>
+            </div>
+            <button type="button" class="stc-btn" id="starTrickBtn">🎧 הפעל ונסה עכשיו</button>
+          </div>
+
+          <div class="home-grid" id="homeGrid">
+            <button type="button" class="home-tile big" data-go="trick">
+              <span class="ht-ico">🎯</span>
+              <span class="ht-title" data-ht="trick">טריקים</span>
+              <span class="ht-sub" id="htSubTrick"></span>
+              <span class="ht-arrow">‹</span>
+            </button>
+            <button type="button" class="home-tile" data-go="peek">
+              <span class="ht-ico">👁️</span>
+              <span class="ht-title" data-ht="peek">הצצה</span>
+              <span class="ht-sub" id="htSubPeek"></span>
+            </button>
+            <button type="button" class="home-tile" data-go="look">
+              <span class="ht-ico">📱</span>
+              <span class="ht-title" data-ht="look">מראה</span>
+              <span class="ht-sub" id="htSubLook"></span>
+            </button>
+            <button type="button" class="home-tile" data-go="reveal">
+              <span class="ht-ico">🏠</span>
+              <span class="ht-title" data-ht="reveal">אחרי הפתיחה</span>
+              <span class="ht-sub" id="htSubReveal"></span>
+            </button>
+            <button type="button" class="home-tile" data-go="more">
+              <span class="ht-ico">⚙️</span>
+              <span class="ht-title" data-ht="more">עוד</span>
+              <span class="ht-sub" id="htSubMore"></span>
+            </button>
+          </div>
+        </section>
+
+        <!-- לשוניות ישנות (מוסתרות): נשארות בשביל הקוד הקיים -->
         <nav class="settings-tabs" id="settingsTabs" role="tablist">
-          <button type="button" class="settings-tab active" data-tab="trick" role="tab"><span class="tab-ico">🎯</span><span>טריק</span></button>
+          <button type="button" class="settings-tab" data-tab="home" role="tab"><span class="tab-ico">⌂</span><span>ראשי</span></button>
+          <button type="button" class="settings-tab" data-tab="trick" role="tab"><span class="tab-ico">🎯</span><span>טריק</span></button>
           <button type="button" class="settings-tab" data-tab="reveal" role="tab"><span class="tab-ico">🏠</span><span>פתיחה</span></button>
           <button type="button" class="settings-tab" data-tab="peek" role="tab"><span class="tab-ico">👁️</span><span>הצצה</span></button>
           <button type="button" class="settings-tab" data-tab="look" role="tab"><span class="tab-ico">📱</span><span>מראה</span></button>
           <button type="button" class="settings-tab" data-tab="more" role="tab"><span class="tab-ico">⚙️</span><span>עוד</span></button>
         </nav>
-        <section class="settings-panel active" data-tab="trick">
-        <!-- הטריק המרכזי: מוצג ראשון, עם כפתור אחד להפעלה -->
-        <div class="star-trick-card" id="starTrickCard">
-          <div class="stc-top">
-            <span class="stc-ico"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><path d="M3 14v-2a9 9 0 0 1 18 0v2"/><rect x="2.5" y="14" width="5" height="7" rx="2"/><rect x="16.5" y="14" width="5" height="7" rx="2"/></svg></span>
-            <div>
-              <div class="stc-kicker" id="starTrickKicker">הטריק הכי חזק באפליקציה</div>
-              <div class="stc-title" id="starTrickTitle">קריאה בזמן אמת</div>
-              <div class="stc-sub" id="starTrickSub">אתה עם הגב, הצופה מקליד קוד - וכל ספרה נלחשת לך באוזנייה ברגע שהיא נלחצת.</div>
-            </div>
-          </div>
-          <button type="button" class="stc-btn" id="starTrickBtn">🎧 הפעל ונסה עכשיו</button>
-        </div>
+        <section class="settings-panel" data-tab="trick">
         <div class="oneui-section-header">🔓 הבסיס</div>
         <div class="config-group oneui-card">
           <div class="clean-toggle-row oneui-row-with-sub">

@@ -4273,6 +4273,7 @@ function bindCornerSecretZone(element, onDoubleTap, onTripleTap) {
 function openSettingsSheet() {
   liveReadStopVoice();
   voiceTricksReset();
+  if (typeof showSettingsTab === 'function') showSettingsTab('home');
   forceAttemptCount = 0;
   setTimeout(maybeShowForceOffNotice, 400);
   refreshSettingsLastCaptured();
@@ -5066,7 +5067,7 @@ function initDeviceLicenseGate() {
 // החלון מוצג רק כשמסך ההגדרות פתוח (בפתיחת האפליקציה / בתפריט הסודי),
 // ולעולם לא מעל מסך הנעילה הפעיל מול קהל.
 // ============================================================================
-const APP_VERSION = '10.0';
+const APP_VERSION = '10.1';
 const DEFAULT_APK_URL = 'https://github.com/tzur2010/app-lockscreen/raw/main/Lockscreen.apk';
 const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 const UPDATE_DISMISS_KEY = 'magic_update_dismissed_version';
@@ -5987,14 +5988,79 @@ function showSettingsTab(tab) {
   const panels = document.querySelectorAll('.settings-panel');
   if (!tabs.length) return;
   const exists = Array.from(panels).some((p) => p.dataset.tab === tab);
-  const target = exists ? tab : 'trick';
+  const target = exists ? tab : 'home';
   tabs.forEach((t) => t.classList.toggle('active', t.dataset.tab === target));
   panels.forEach((p) => p.classList.toggle('active', p.dataset.tab === target));
+  // מסך בית / עמוד פנימי עם "חזרה"
+  if (deviceConfigSheet) deviceConfigSheet.classList.toggle('in-subpage', target !== 'home');
+  const titleEl = document.getElementById('subpageTitle');
+  if (titleEl) titleEl.textContent = settingsPageTitle(target);
+  const backTxt = document.getElementById('subpageBackText');
+  if (backTxt) backTxt.textContent = isEnglishUi() ? 'Home' : 'ראשי';
+  if (target === 'home') updateHomeTiles();
   const body = document.querySelector('.config-body');
   if (body) body.scrollTop = 0;
   try {
     localStorage.setItem(SETTINGS_TAB_KEY, target);
   } catch (e) {}
+}
+
+function settingsPageTitle(tab) {
+  const en = isEnglishUi();
+  const T = {
+    trick: en ? 'Tricks' : 'טריקים',
+    peek: en ? 'Peek' : 'הצצה',
+    look: en ? 'Look' : 'מראה',
+    reveal: en ? 'After unlocking' : 'אחרי הפתיחה',
+    more: en ? 'More' : 'עוד'
+  };
+  return T[tab] || '';
+}
+
+// מה מוגדר עכשיו - שורה קצרה בכל אריח במסך הבית
+function updateHomeTiles() {
+  const en = isEnglishUi();
+  const set = (id, txt) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = txt;
+  };
+  const h = new Date().getHours();
+  set('homeGreet', en
+    ? (h < 5 ? 'Good night' : h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening')
+    : (h < 5 ? 'לילה טוב' : h < 12 ? 'בוקר טוב' : h < 18 ? 'צהריים טובים' : 'ערב טוב'));
+  set('homeTitle', en ? 'Ready for the show?' : 'מוכן להופעה?');
+  document.querySelectorAll('[data-ht]').forEach((el) => {
+    const k = el.dataset.ht;
+    if (k === 'reveal') el.textContent = en ? 'After unlocking' : 'אחרי הפתיחה';
+    else el.textContent = settingsPageTitle(k);
+  });
+
+  const mode = config.unlockMode === 'pattern' ? (en ? 'Pattern' : 'דפוס') : config.unlockMode === 'words' || config.unlockMode === 'password' ? (en ? 'Password' : 'סיסמה') : 'PIN';
+  const tricks = [];
+  if (config.liveRead) tricks.push(en ? '🎧 Live reading' : '🎧 קריאה בזמן אמת');
+  if (config.birthdayTrick) tricks.push(en ? '🎂 Birthday' : '🎂 תאריך לידה');
+  set('htSubTrick', tricks.length ? tricks.join(' · ') + ' · ' + mode : (en ? 'Any code unlocks · ' : 'כל קוד פותח · ') + mode);
+
+  const peeks = [];
+  if (config.holdPeek) peeks.push(en ? 'Long-press' : 'לחיצה ארוכה');
+  if (config.hapticPeek) peeks.push(en ? 'Buzz' : 'רטט');
+  if (config.watchPeek) peeks.push(en ? 'Watch' : 'שעון');
+  if (config.remotePeek) peeks.push(en ? '2nd phone' : 'טלפון שני');
+  set('htSubPeek', peeks.length ? peeks.join(' · ') : (en ? 'Not set' : 'לא מוגדר'));
+
+  let model = '';
+  try {
+    model = getCurrentModelObject().name;
+  } catch (e) {}
+  let ownWp = false;
+  try {
+    ownWp = localStorage.getItem(SELECTED_WALLPAPER_ID_KEY) === 'custom' && Boolean(localStorage.getItem(WALLPAPER_STORAGE_KEY));
+  } catch (e) {}
+  set('htSubLook', model + ' · ' + (ownWp ? (en ? 'your wallpaper' : 'הטפט שלך') : (en ? 'default wallpaper' : 'טפט רגיל')));
+
+  const target = config.unlockTargetScreen || 'homescreen';
+  set('htSubReveal', target === 'gallery' ? (en ? 'Gallery' : 'גלריה') : target === 'search' ? (en ? 'Search' : 'חיפוש') : (en ? 'Home screen' : 'מסך הבית'));
+  set('htSubMore', en ? 'Guide · language · backup' : 'מדריך · שפה · גיבוי');
 }
 
 function initSettingsTabs() {
@@ -6004,11 +6070,20 @@ function initSettingsTabs() {
       showSettingsTab(btn.dataset.tab);
     });
   });
-  let saved = 'trick';
-  try {
-    saved = localStorage.getItem(SETTINGS_TAB_KEY) || 'trick';
-  } catch (e) {}
-  showSettingsTab(saved);
+  // אריחים במסך הבית + כפתור "חזרה"
+  document.querySelectorAll('.home-tile[data-go]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      triggerHaptic(10);
+      showSettingsTab(btn.dataset.go);
+    });
+  });
+  const back = document.getElementById('subpageBack');
+  if (back) back.addEventListener('click', () => {
+    triggerHaptic(10);
+    showSettingsTab('home');
+  });
+  // תמיד נפתח במסך הבית
+  showSettingsTab('home');
 }
 
 // ============================================================================
@@ -7166,6 +7241,8 @@ function initNewReveals() {
       const test = document.getElementById('liveReadTestBtn');
       if (test) test.click();
     }
+    // ההגדרות של הטריק נמצאות בעמוד "טריקים"
+    showSettingsTab('trick');
     const row = target.closest('.clean-toggle-row');
     if (row) {
       row.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -7829,14 +7906,14 @@ function initTrickTips() {
 // ============================================================================
 const TOUR_DONE_KEY = 'magic_tour_done_v1';
 const TOUR_STEPS = [
-  { target: '#settingsTabs', tab: 'trick', he: '👋 ברוך הבא ל-Lockscreen!\nההגדרות מחולקות ל-5 לשוניות:\n🎯 טריק - מה קורה בטלפון\n🏠 פתיחה - מסך הבית אחרי הפתיחה\n👁️ הצצה - איך אתה יודע את הקוד\n📱 מראה - שהטלפון ייראה כמו שלך\n⚙️ עוד - עזרה, קוד אישי, גיבוי ושפה', en: '👋 Welcome to Lockscreen!\nSettings are split into 5 tabs:\n🎯 Trick - what happens on the phone\n🏠 Unlock - the home screen after unlocking\n👁️ Peek - how you learn the code\n📱 Look - make it look like your phone\n⚙️ More - help, personal code, backup and language' },
-  { target: '.show-actions-bar', tab: 'trick', he: '🔄 שני הכפתורים האלה תמיד למעלה:\n"מוכן לצופה הבא" מאפס הכל בין צופים, ו"בדיקה לפני הופעה" מוודא שהכל מוכן.', en: '🔄 These two buttons are always at the top:\n"Ready for next spectator" resets everything between spectators, and "Pre-show check" makes sure everything is ready.' },
+  { target: '#homeGrid', tab: 'home', he: '👋 ברוך הבא ל-Lockscreen!\nזה המסך הראשי. כל אריח פותח עמוד משלו:\n🎯 טריקים - מה קורה בטלפון\n👁️ הצצה - איך אתה יודע את הקוד\n📱 מראה - שהטלפון ייראה כמו שלך\n🏠 אחרי הפתיחה - מה הצופה רואה\n⚙️ עוד - עזרה, קוד אישי, גיבוי ושפה\nבכל עמוד "ראשי" למעלה מחזיר לכאן.', en: '👋 Welcome to Lockscreen!\nThis is the home screen. Each tile opens its own page:\n🎯 Tricks - what happens on the phone\n👁️ Peek - how you learn the code\n📱 Look - make it look like your phone\n🏠 After unlocking - what the spectator sees\n⚙️ More - help, personal code, backup and language\n"Home" at the top of every page brings you back here.' },
+  { target: '.show-actions-bar', tab: 'home', he: '🔄 שני הכפתורים האלה במסך הראשי:\n"מוכן לצופה הבא" מאפס הכל בין צופים, ו"בדיקה לפני הופעה" מוודא שהכל מוכן.', en: '🔄 These two buttons are on the home screen:\n"Ready for next spectator" resets everything between spectators, and "Pre-show check" makes sure everything is ready.' },
   { target: '#toggleForceUnlockMode', tab: 'trick', he: '🎯 פתיחה בכל קוד\nכשזה דולק, כל קוד שהצופה מקליד פותח את הטלפון.', en: '🎯 Unlock with any code\nWhen on, any code the spectator types unlocks the phone.' },
   { target: '#unlockAttemptModeSelector', tab: 'trick', he: '🔁 כאן בוחרים באיזה ניסיון הטלפון ייפתח.\nלמשל 2 = בפעם הראשונה "קוד שגוי", ובשנייה נפתח.', en: '🔁 Choose which attempt unlocks the phone.\nE.g. 2 = first try "wrong code", second try opens.' },
-  { target: '#settingsTabs .settings-tab[data-tab="peek"]', tab: 'peek', he: '👁️ בלשונית הצצה: כל הדרכים לראות מה הצופה הקליד - לחיצה ארוכה על המסך, טלפון שני ועוד.', en: '👁️ The Peek tab: every way to see what the spectator typed - long-press the screen, a second phone and more.' },
+  { target: '.home-tile[data-go="peek"]', tab: 'home', he: '👁️ באריח הצצה: כל הדרכים לראות מה הצופה הקליד - לחיצה ארוכה על המסך, טלפון שני ועוד.', en: '👁️ The Peek tile: every way to see what the spectator typed - long-press the screen, a second phone and more.' },
   { target: '.trick-tip-btn', tab: 'trick', he: '❓ ליד כל קסם יש כפתור כזה - הסבר קצר איך מבצעים אותו ומה אומרים לקהל.', en: '❓ Every trick has a button like this - a short how-to and what to say to the audience.' },
-  { target: '#launchLockscreenBtn', tab: 'trick', he: '✅ כשהכל מוכן: "שמור וסגור", בוחרים סוג נעילה ונותנים את הטלפון לצופה.', en: '✅ When ready: "Save & Close", pick a lock type and hand the phone to the spectator.' },
-  { target: null, tab: 'trick', he: '🔐 הכי חשוב לזכור:\nכדי לחזור להגדרות בסתר - לחיצה ארוכה של 3 שניות על השעון במסך הנעילה.\n\nבכל שאלה - כפתור ? למעלה. בהצלחה! ✨', en: '🔐 Most important:\nTo get back to settings secretly - long-press the clock for 3 seconds on the lock screen.\n\nAny question - the ? button at the top. Good luck! ✨' }
+  { target: '#launchLockscreenBtn', tab: 'home', he: '✅ כשהכל מוכן: "שמור וסגור", בוחרים סוג נעילה ונותנים את הטלפון לצופה.', en: '✅ When ready: "Save & Close", pick a lock type and hand the phone to the spectator.' },
+  { target: null, tab: 'home', he: '🔐 הכי חשוב לזכור:\nכדי לחזור להגדרות בסתר - לחיצה ארוכה של 3 שניות על השעון במסך הנעילה.\n\nבכל שאלה - כפתור ? למעלה. בהצלחה! ✨', en: '🔐 Most important:\nTo get back to settings secretly - long-press the clock for 3 seconds on the lock screen.\n\nAny question - the ? button at the top. Good luck! ✨' }
 ];
 let tourIndex = 0;
 
@@ -7867,7 +7944,7 @@ function endTour() {
     // קוסם שעבר את הסיור כבר מכיר את כל מה שיש - לא מראים לו "מה חדש" על אותה גרסה
     if (!localStorage.getItem(WHATS_NEW_SEEN_KEY)) localStorage.setItem(WHATS_NEW_SEEN_KEY, getInstalledAppVersion());
   } catch (e) {}
-  if (typeof showSettingsTab === 'function') showSettingsTab('trick');
+  if (typeof showSettingsTab === 'function') showSettingsTab('home');
 }
 
 function showTourStep() {

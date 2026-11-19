@@ -4,6 +4,8 @@
 
 const CONFIG_STORAGE_KEY = 'magic_lockscreen_config_v6';
 const WALLPAPER_STORAGE_KEY = 'magic_custom_wallpaper';
+// 🔮 הטלפון ידע מראש: התמונה המקורית (בלי שעון/טקסט) שעליה נכתבת המילה
+const WORD_WALLPAPER_KEY = 'magic_word_clean_wallpaper';
 const SELECTED_WALLPAPER_ID_KEY = 'magic_selected_wallpaper_id_v1';
 const HOMESCREEN_STORAGE_KEY = 'magic_custom_homescreen';
 const LAST_PIN_KEY = 'last_entered_pin';
@@ -555,6 +557,22 @@ const DEFAULT_CONFIG = {
   faceTrick: false,             // "הטלפון מזהה את הצופה": נכשל לקוסם, נפתח לצופה + סלפי שלו כטפט
   faceTrickFails: 1,            // כמה פעמים הזיהוי נכשל לקוסם לפני שמגישים לצופה
   callReveal: false,            // חשיפה בשיחה נכנסת אחרי הפתיחה
+  liveRead: false,              // "קריאה בזמן אמת": כל ספרה נלחשת לאוזניית הקוסם ברגע שנלחצת
+  liveReadRecap: true,          // בסוף ההקלדה - חזרה על כל הקוד
+  liveReadVoice: false,         // אנדרואיד: "תחזור על הקוד" בקול - הקוד נלחש שוב
+  wordPredict: false,           // "הטלפון ידע מראש": הצופה אומר מילה, והיא מופיעה מתחת לשעון
+  wordPredictTpl: '{מילה}',     // מה כתוב בהתראה ({מילה} = מה שהצופה אמר)
+  wordPredictTitle: 'תזכורת',    // כותרת ההתראה האמיתית במסך הנעילה
+  wordPredictAgo: 180,          // ההתראה "נשלחה" לפני X דקות
+  wordPredictMode: 'wallpaper', // איפה המילה מופיעה במסך הנעילה האמיתי: 'wallpaper' (בשורה למטה) או 'notification'
+  liveReadLang: isEnglishUi() ? 'en' : 'he',
+  cardTrick: false,             // 🃏 "הקלף בטלפון": הצופה אומר קלף - הטפט הופך לקלף שלו
+  remoteTrick: false,           // 🗣️ "שלט רחוק סודי": מילת קוד של הקוסם - קופצת הודעה / מתחלפת התמונה
+  remoteWord: 'וואלה',          // מילת הקוד
+  remoteAction: 'notif',        // 'notif' (הודעה במסך הנעילה) או 'photo' (הטפט מתחלף לתמונה)
+  remoteNotifTitle: 'אמא',
+  remoteNotifText: 'תגיד לחבר שלך שלום 👋',
+  voiceLang: isEnglishUi() ? 'en' : 'he',
   callName: isEnglishUi() ? '{code}' : '{קוד}',    // שם המתקשר שמופיע על המסך
   callDelaySec: 4,
   practiceMode: false,          // מצב תרגול: בלי היסטוריה ובלי סטטיסטיקה
@@ -577,6 +595,11 @@ function enforceRetiredFeatures(cfg) {
   // 7.8: הוסרו גם החשיפה בהתראה והשיחה הנכנסת
   cfg.revealEnabled = false;
   cfg.callReveal = false;
+  // 9.0: "הטלפון ידע מראש" הוסר (אנדרואיד לא מאפשר לכתוב בשורה של מסך הנעילה)
+  cfg.wordPredict = false;
+  // 9.4: הוסרו גם "הקלף בטלפון" ו"שלט רחוק סודי"
+  cfg.cardTrick = false;
+  cfg.remoteTrick = false;
   return cfg;
 }
 
@@ -874,6 +897,11 @@ function launchLockscreenNow() {
   phoneContainer.classList.remove('clock-mode-active');
   closeSettingsSheet();
   if (config.settingsTrick) openSettingsTrick();
+  liveReadPrepare();
+  // "הטלפון ידע מראש": מיד אחרי "שמור וסגור" המסך נראה כבוי ומתחיל להקשיב
+  if (config.wordPredict && hasNativeWordListen() && config.osTheme !== 'ios') setTimeout(wordPredictEnter, 350);
+  // 🃏 / 🗣️: מתחילים להקשיב (ומחזירים טפט רגיל מהצופה הקודם)
+  setTimeout(voiceTricksStart, 350);
 }
 
 // ----------------------------------------------------------------------------
@@ -1102,7 +1130,8 @@ function applyWallpaperToContainer() {
     }
   }
 
-  phoneContainer.style.backgroundImage = `url("${chosenUrl}")`;
+  // 🃏/🗣️: בזמן הקסם הטפט הוא הקלף / התמונה הסודית
+  phoneContainer.style.backgroundImage = `url("${voiceTrickWpUrl || chosenUrl}")`;
   phoneContainer.style.backgroundSize = 'cover';
   phoneContainer.style.backgroundPosition = 'center';
 
@@ -1729,7 +1758,9 @@ function applyConfigToUI() {
   if (carrierEl) carrierEl.textContent = (config.carrierText || '').trim();
   phoneContainer.classList.toggle('has-carrier', Boolean((config.carrierText || '').trim()));
   const ownerEl = document.getElementById('clockOwnerInfo');
-  if (ownerEl) ownerEl.textContent = (config.lockOwnerInfo || '').trim();
+  // "הטלפון ידע מראש": המילה שהצופה אמר מוצגת במקום טקסט פרטי הקשר
+  if (ownerEl) ownerEl.textContent = wordPredictShown || (config.lockOwnerInfo || '').trim();
+  phoneContainer.classList.toggle('word-shown', Boolean(wordPredictShown));
 
   // דגמי Notch (iPhone 12 / 13) מול Dynamic Island (iPhone 14 - 18)
   const isNotch = config.osTheme === 'ios' && currentModel.cutout === 'notch';
@@ -1961,7 +1992,16 @@ function updateLiveClock() {
   });
   const formattedDate = dateFormatter.format(now);
   if (homeDate) homeDate.textContent = formattedDate;
-  if (clockLockDate) clockLockDate.textContent = formattedDate;
+  if (clockLockDate) {
+    // סמסונג בעברית כותב יום מקוצר: "יום ד׳, 18 בנובמבר"
+    let lockDate = formattedDate;
+    if (config.osTheme !== 'ios' && currentAndroidBrand() === 'samsung') {
+      try {
+        lockDate = new Intl.DateTimeFormat(window.MagicI18n && window.MagicI18n.isEn ? 'en-US' : 'he-IL', { weekday: 'short', day: 'numeric', month: 'long' }).format(now);
+      } catch (e) {}
+    }
+    clockLockDate.textContent = lockDate;
+  }
 }
 
 updateLiveClock();
@@ -2270,6 +2310,773 @@ function refreshBirthdayPeek(value) {
   }
 }
 
+// ----------------------------------------------------------------------------
+// 🎧 "קריאה בזמן אמת": בכל לחיצה על ספרה הטלפון לוחש אותה לאוזניית הקוסם.
+// הקוסם עומד עם הגב ואומר כל ספרה ברגע שהצופה לוחץ עליה.
+// בטיחות: באנדרואיד הטלפון בודק בעצמו שמחוברת אוזנייה - אחרת שקט מוחלט.
+// באייפון/אתר אין בדיקה אוטומטית: הלחישה נפתחת רק אחרי "בדיקת אוזנייה" בהפעלה הנוכחית.
+// ----------------------------------------------------------------------------
+const LIVE_READ_WORDS = {
+  he: ['אפס', 'אחת', 'שתיים', 'שלוש', 'ארבע', 'חמש', 'שש', 'שבע', 'שמונה', 'תשע'],
+  en: ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine']
+};
+const LIVE_READ_ARMED_KEY = 'magic_live_read_armed';
+
+function liveReadLang() {
+  return config.liveReadLang === 'en' ? 'en' : 'he';
+}
+
+function hasNativeSecretVoice() {
+  return Boolean(window.AndroidNative && typeof window.AndroidNative.speakSecret === 'function');
+}
+
+function liveReadWebArmed() {
+  try {
+    return sessionStorage.getItem(LIVE_READ_ARMED_KEY) === '1';
+  } catch (e) {
+    return false;
+  }
+}
+
+// flush=false: כל ספרה נכנסת לתור ונאמרת לפי הסדר (גם כשמקלידים מהר). flush=true רק לבדיקה.
+function liveReadWebSpeak(textHe, textEn, flush) {
+  if (!window.speechSynthesis) return;
+  const voices = speechSynthesis.getVoices();
+  let lang = liveReadLang();
+  let voice = voices.find((v) => (lang === 'he' ? /^(he|iw)/i : /^en/i).test(v.lang));
+  // אין קול עברי בטלפון - אומרים באנגלית
+  if (!voice && lang === 'he' && voices.length) {
+    lang = 'en';
+    voice = voices.find((v) => /^en/i.test(v.lang));
+  }
+  try {
+    if (flush) speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(lang === 'he' ? textHe : textEn);
+    if (voice) u.voice = voice;
+    u.lang = lang === 'he' ? 'he-IL' : 'en-US';
+    u.rate = 1.35;
+    speechSynthesis.speak(u);
+  } catch (e) {}
+}
+
+// key: ספרה ('0'-'9') או 'del'
+function liveReadSay(key) {
+  if (!config.liveRead || config.unlockMode !== 'pin') return;
+  const he = key === 'del' ? 'מחק' : LIVE_READ_WORDS.he[Number(key)];
+  const en = key === 'del' ? 'delete' : LIVE_READ_WORDS.en[Number(key)];
+  if (he === undefined) return;
+  if (hasNativeSecretVoice()) {
+    try {
+      window.AndroidNative.speakSecret(he, liveReadLang(), en);
+    } catch (e) {}
+    return;
+  }
+  if (!liveReadWebArmed()) return;
+  liveReadWebSpeak(he, en);
+}
+
+// ----------------------------------------------------------------------------
+// 🔮 "הטלפון ידע מראש" (אנדרואיד): אחרי "שמור וסגור" המסך נראה כבוי (שחור, בהירות מינימלית)
+// והטלפון מקשיב. הצופה אומר מילה כלשהי בקול - וכשנוגעים במסך, מסך הנעילה נדלק
+// והמילה כתובה מתחת לשעון (בשורת פרטי הבעלים), כאילו הוגדרה מזמן.
+// ----------------------------------------------------------------------------
+var wordPredictActive = false;   // המסך "כבוי" ומקשיבים
+var wordPredictWord = '';        // המילה האחרונה שנקלטה
+var wordPredictShown = '';       // מה מוצג עכשיו מתחת לשעון (ריק = טקסט פרטי הקשר הרגיל)
+var wordPredictWhisperTimer = null;
+const WORD_FILLERS = /^(אה+|אמ+|אממ+|אום|כאילו|נגיד|יאללה|טוב|eh+|um+|uh+|like)\s+/i;
+
+function hasNativeWordListen() {
+  return Boolean(window.AndroidNative && typeof window.AndroidNative.startWordListen === 'function');
+}
+
+function wordPredictLang() {
+  return config.wordPredictLang === 'en' ? 'en' : 'he';
+}
+
+function cleanSpokenWord(text) {
+  let t = String(text || '').replace(/[.,!?״"׳'"]/g, ' ').replace(/\s+/g, ' ').trim();
+  for (let i = 0; i < 3 && WORD_FILLERS.test(t); i++) t = t.replace(WORD_FILLERS, '');
+  return t.slice(0, 40);
+}
+
+function wordPredictEnter() {
+  if (!hasNativeWordListen()) return;
+  const off = document.getElementById('fakeOffScreen');
+  if (!off) return;
+  wordPredictActive = true;
+  wordPredictWord = '';
+  wordPredictShown = '';
+  applyConfigToUI();
+  off.style.display = 'block';
+  try {
+    window.AndroidNative.setFakeOff(true);
+    window.AndroidNative.startWordListen(wordPredictLang());
+  } catch (e) {}
+}
+
+// כל מילה ששומעים: האחרונה "מנצחת" (הקוסם שותק אחרי שהצופה אומר את המילה)
+window.onHeardWords = function (text, isFinal) {
+  if (voiceTrickListening) {
+    voiceTrickHeard(text, isFinal);
+    return;
+  }
+  if (!wordPredictActive) return;
+  const w = cleanSpokenWord(text);
+  if (!w) return;
+  wordPredictWord = w;
+  if (!isFinal) return;
+  clearTimeout(wordPredictWhisperTimer);
+  if (wordPredictMode() === 'wallpaper') {
+    // המילה נכתבת על הטפט האמיתי של מסך הנעילה. מחכים רגע (אולי הצופה עוד מדבר) ואז מחליפים.
+    // "נקלט: ..." באוזנייה נשמע רק אחרי שהטפט באמת הוחלף - סימן שאפשר ללחוץ על כפתור הצד.
+    wordPredictWhisperTimer = setTimeout(() => wordPredictSetWallpaper(wordPredictWord), 700);
+    return;
+  }
+  // מצב התראה: התראה אמיתית במסך הנעילה (המילה האחרונה מחליפה את הקודמת)
+  wordPredictPostReal(w);
+  wordPredictWhisperTimer = setTimeout(() => wordPredictWhisper('נקלט: ' + wordPredictWord, 'got: ' + wordPredictWord), 250);
+};
+
+function wordPredictWhisper(he, en) {
+  if (!hasNativeSecretVoice()) return;
+  try {
+    window.AndroidNative.speakSecret(he, wordPredictLang(), en);
+  } catch (e) {}
+}
+
+function wordPredictMode() {
+  return config.wordPredictMode === 'notification' ? 'notification' : 'wallpaper';
+}
+
+// מצייר את הטפט שלך בגודל המסך, ועליו (אם יש) את המילה - בדיוק במקום ובסגנון של שורת פרטי הקשר של סמסונג
+function composeLockWallpaper(text) {
+  return new Promise((resolve) => {
+    let src = '';
+    try {
+      src = localStorage.getItem(WORD_WALLPAPER_KEY) || '';
+    } catch (e) {}
+    if (!src) return resolve(null);
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const dpr = window.devicePixelRatio || 1;
+        const W = Math.round(Math.min(window.screen.width, window.screen.height) * dpr);
+        const H = Math.round(Math.max(window.screen.width, window.screen.height) * dpr);
+        const c = document.createElement('canvas');
+        c.width = W;
+        c.height = H;
+        const x = c.getContext('2d');
+        const sc = Math.max(W / img.width, H / img.height);
+        const w = img.width * sc;
+        const h = img.height * sc;
+        x.drawImage(img, (W - w) / 2, (H - h) / 2, w, h);
+        if (text) {
+          const fs = Math.round(W * 0.043);
+          x.font = `400 ${fs}px "SamsungOne", "Samsung Sans", Roboto, "Noto Sans Hebrew", Arial, sans-serif`;
+          x.fillStyle = '#ffffff';
+          x.textAlign = 'center';
+          x.textBaseline = 'alphabetic';
+          x.shadowColor = 'rgba(0,0,0,0.5)';
+          x.shadowBlur = Math.round(6 * dpr);
+          try {
+            x.direction = /[֐-׿]/.test(text) ? 'rtl' : 'ltr';
+          } catch (e) {}
+          x.fillText(text, W / 2, H * (1 - 0.145), W * 0.88);
+        }
+        resolve(c.toDataURL('image/jpeg', 0.92));
+      } catch (e) {
+        resolve(null);
+      }
+    };
+    img.onerror = () => resolve(null);
+    img.src = src;
+  });
+}
+
+var wordWallpaperDirty = false;
+async function wordPredictSetWallpaper(word) {
+  if (!word || !window.AndroidNative || typeof window.AndroidNative.setLockWallpaper !== 'function') return;
+  const text = fillWordTemplate(String(config.wordPredictTpl || '{מילה}'), word);
+  const dataUrl = await composeLockWallpaper(text);
+  if (!dataUrl) {
+    wordPredictWhisper('לא נבחרה תמונה מקורית', 'no original photo picked');
+    return;
+  }
+  wordWallpaperDirty = true;
+  try {
+    window.AndroidNative.setLockWallpaper(dataUrl, 'word:' + word);
+  } catch (e) {}
+}
+
+// ההחלפה הסתיימה (אנדרואיד מודיע)
+window.onLockWallpaperSet = function (ok, tag, info) {
+  const t = String(tag || '');
+  window.__lastWpInfo = { ok, tag: t, info: String(info || '') };
+  if (t === 'test') {
+    const st = document.getElementById('wordWallpaperTestStatus');
+    if (st) {
+      st.classList.toggle('ok', Boolean(ok));
+      st.classList.toggle('bad', !ok);
+      st.textContent = ok
+        ? 'אנדרואיד אישר שהטפט הוחלף. עכשיו נעל את הטלפון ותסתכל למטה - צריך להיות כתוב "בדיקה". (' + String(info || '') + ')'
+        : '❌ אנדרואיד סירב להחליף: ' + String(info || 'לא ידוע') + ' - שלח לי צילום של השורה הזאת.';
+    }
+    return;
+  }
+  if (!t.startsWith('word:')) return;
+  const word = t.slice(5);
+  if (ok) wordPredictWhisper('נקלט: ' + word, 'got: ' + word);
+  else wordPredictWhisper('לא הצלחתי להחליף טפט', 'could not change the wallpaper');
+};
+
+// "מוכן לצופה הבא": הטפט של מסך הנעילה חוזר לטפט שלך, בלי המילה
+async function wordPredictRestoreWallpaper() {
+  if (!wordWallpaperDirty || !window.AndroidNative || typeof window.AndroidNative.setLockWallpaper !== 'function') return;
+  wordWallpaperDirty = false;
+  const dataUrl = await composeLockWallpaper('');
+  if (!dataUrl) return;
+  try {
+    window.AndroidNative.setLockWallpaper(dataUrl, 'restore');
+  } catch (e) {}
+}
+
+// נגיעה במסך ה"כבוי": מסך הנעילה נדלק, והמילה כבר כתובה מתחת לשעון
+var wordPredictRevealAt = 0;
+function wordPredictReveal() {
+  if (!wordPredictActive) return;
+  wordPredictRevealAt = Date.now();
+  const word = wordPredictWord;
+  wordPredictExit(false);
+  const tpl = String(config.wordPredictTpl || '{מילה}');
+  wordPredictShown = word ? fillWordTemplate(tpl, word) : '';
+  phoneContainer.classList.add('clock-mode-active');
+  applyConfigToUI();
+}
+
+function wordPredictPostReal(word) {
+  if (!window.AndroidNative || typeof window.AndroidNative.postWordNotification !== 'function') return false;
+  try {
+    const title = String(config.wordPredictTitle || 'תזכורת').slice(0, 40);
+    const text = fillWordTemplate(String(config.wordPredictTpl || '{מילה}'), word);
+    return Boolean(window.AndroidNative.postWordNotification(title, text, Number(config.wordPredictAgo) || 180));
+  } catch (e) {
+    return false;
+  }
+}
+
+function wordPredictNotifsAllowed() {
+  try {
+    return Boolean(window.AndroidNative.areNotificationsAllowed());
+  } catch (e) {
+    return false;
+  }
+}
+
+// כשהקוסם לוחץ על כפתור הצד (המסך נכבה באמת) - מסיימים את ההקשבה. ההתראה נשארת במסך הנעילה האמיתי.
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && wordPredictActive) wordPredictExit(false);
+});
+
+function fillWordTemplate(tpl, word) {
+  return /\{(מילה|word)\}/i.test(tpl) ? tpl.replace(/\{(מילה|word)\}/gi, word) : `${tpl} ${word}`.trim();
+}
+
+(function () {
+  const off = document.getElementById('fakeOffScreen');
+  // "click" (ולא pointerdown): כל הנגיעה נבלעת במסך השחור ולא עוברת למסך השעון שמתחתיו
+  if (off) off.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    wordPredictReveal();
+  });
+})();
+
+// clearShown=true ("מוכן לצופה הבא"): גם מוחקים את המילה ממסך הנעילה
+function wordPredictExit(clearShown) {
+  const wasActive = wordPredictActive;
+  wordPredictActive = false;
+  clearTimeout(wordPredictWhisperTimer);
+  const off = document.getElementById('fakeOffScreen');
+  if (off) off.style.display = 'none';
+  if (hasNativeWordListen()) {
+    try {
+      if (wasActive) window.AndroidNative.stopVoiceRepeat();
+      window.AndroidNative.setFakeOff(false);
+    } catch (e) {}
+  }
+  if (clearShown && hasNativeWordListen()) {
+    try {
+      window.AndroidNative.cancelWordNotification();
+    } catch (e) {}
+    wordPredictRestoreWallpaper();
+  }
+  if (clearShown && wordPredictShown) {
+    wordPredictShown = '';
+    wordPredictWord = '';
+    applyConfigToUI();
+  }
+}
+
+// ----------------------------------------------------------------------------
+// 🃏 "הקלף בטלפון" + 🗣️ "שלט רחוק סודי" (אנדרואיד): אחרי "שמור וסגור" הטלפון מקשיב.
+// 🃏 הצופה אומר קלף ("שבע לב") - הטפט של מסך הנעילה הופך לתמונה של הקלף שלו.
+// 🗣️ הקוסם אומר בשיחה מילת קוד - ובטלפון שביד הצופה קופצת הודעה / מתחלפת התמונה.
+// ----------------------------------------------------------------------------
+var voiceTrickListening = false;
+var voiceTrickCard = null;        // הקלף שמוצג עכשיו ({r, s})
+var voiceTrickRemoteFired = false;
+var voiceTrickCardTimer = null;
+var voiceTrickWpUrl = '';         // טפט זמני של הקסם (ריק = הטפט הרגיל)
+const REMOTE_PHOTO_KEY = 'magic_remote_photo';
+
+const CARD_RANK_WORDS = [
+  ['A', ['אס', 'אייס', 'אסה', 'אחד', 'אחת', 'ace', 'one', '1']],
+  ['2', ['שתיים', 'שניים', 'שתים', 'שנים', 'שתי', 'שני', 'two', '2']],
+  ['3', ['שלוש', 'שלושה', 'שלש', 'three', '3']],
+  ['4', ['ארבע', 'ארבעה', 'four', '4']],
+  ['5', ['חמש', 'חמישה', 'five', '5']],
+  ['6', ['שש', 'שישה', 'six', '6']],
+  ['7', ['שבע', 'שבעה', 'seven', '7']],
+  ['8', ['שמונה', 'eight', '8']],
+  ['9', ['תשע', 'תשעה', 'nine', '9']],
+  ['10', ['עשר', 'עשרה', 'ten', '10']],
+  ['J', ['נסיך', 'גק', 'ג\'ק', 'גאק', 'jack', 'j']],
+  ['Q', ['מלכה', 'קווין', 'queen', 'q']],
+  ['K', ['מלך', 'קינג', 'king', 'k']]
+];
+const CARD_SUIT_WORDS = [
+  ['H', ['לב', 'לבבות', 'לבבה', 'הארט', 'הארטס', 'heart', 'hearts']],
+  ['D', ['יהלום', 'יהלומים', 'מעוין', 'מעוינים', 'דיאמונד', 'diamond', 'diamonds']],
+  ['C', ['תלתן', 'תלתנים', 'קלאב', 'צלב', 'club', 'clubs']],
+  ['S', ['עלה', 'עלים', 'פיק', 'ספייד', 'ספיידס', 'spade', 'spades']]
+];
+const CARD_NAMES = {
+  he: { A: 'אס', 2: 'שתיים', 3: 'שלוש', 4: 'ארבע', 5: 'חמש', 6: 'שש', 7: 'שבע', 8: 'שמונה', 9: 'תשע', 10: 'עשר', J: 'נסיך', Q: 'מלכה', K: 'מלך', H: 'לב', D: 'יהלום', C: 'תלתן', S: 'עלה' },
+  en: { A: 'ace', 2: 'two', 3: 'three', 4: 'four', 5: 'five', 6: 'six', 7: 'seven', 8: 'eight', 9: 'nine', 10: 'ten', J: 'jack', Q: 'queen', K: 'king', H: 'hearts', D: 'diamonds', C: 'clubs', S: 'spades' }
+};
+
+function voiceLang() {
+  return config.voiceLang === 'en' ? 'en' : 'he';
+}
+
+function voiceTricksWanted() {
+  return Boolean((config.cardTrick || config.remoteTrick) && hasNativeWordListen() && config.osTheme !== 'ios');
+}
+
+function normalizeHeard(text) {
+  return String(text || '').toLowerCase().replace(/[׳״'"`.,!?\-]/g, '').replace(/\s+/g, ' ').trim();
+}
+
+// מוצא בתוך משפט את הקלף (צריך גם ערך וגם צורה). האחרון במשפט מנצח.
+function parseSpokenCard(text) {
+  const tokens = normalizeHeard(text).split(' ').filter(Boolean);
+  const lookup = (tok, table) => {
+    const cands = [tok];
+    // "המלכה", "הלב", "של לב" - מורידים אות שימוש בהתחלה
+    if (/^[הובלשמכ]/.test(tok) && tok.length > 2) cands.push(tok.slice(1));
+    for (const c of cands) {
+      for (const [key, words] of table) {
+        if (words.some((w) => w.replace(/'/g, '') === c)) return key;
+      }
+    }
+    return null;
+  };
+  let rank = null;
+  let suit = null;
+  tokens.forEach((tok) => {
+    const r = lookup(tok, CARD_RANK_WORDS);
+    if (r) { rank = r; return; }
+    const s = lookup(tok, CARD_SUIT_WORDS);
+    if (s) suit = s;
+  });
+  return rank && suit ? { r: rank, s: suit } : null;
+}
+
+function voiceTricksStart() {
+  voiceTricksReset();
+  if (!voiceTricksWanted()) return;
+  voiceTrickListening = true;
+  try {
+    window.AndroidNative.startWordListen(voiceLang());
+  } catch (e) {}
+}
+
+// "מוכן לצופה הבא" / הפעלה חדשה: הטפט הרגיל חוזר וההודעה נעלמת
+function voiceTricksReset() {
+  voiceTrickListening = false;
+  voiceTrickRemoteFired = false;
+  clearTimeout(voiceTrickCardTimer);
+  const n = document.getElementById('remoteNotif');
+  if (n) n.classList.remove('show');
+  voiceTrickCard = null;
+  if (voiceTrickWpUrl) {
+    voiceTrickWpUrl = '';
+    applyWallpaperToContainer();
+  }
+}
+
+function voiceTrickWhisper(he, en) {
+  if (!hasNativeSecretVoice()) return;
+  try {
+    window.AndroidNative.speakSecret(he, voiceLang(), en);
+  } catch (e) {}
+}
+
+function voiceTrickHeard(text, isFinal) {
+  // 🗣️ מילת הקוד של הקוסם - גם באמצע משפט, בלי לחכות לסוף
+  if (config.remoteTrick && !voiceTrickRemoteFired) {
+    const code = normalizeHeard(config.remoteWord || 'וואלה');
+    if (code && (' ' + normalizeHeard(text) + ' ').includes(code)) {
+      voiceTrickRemoteFired = true;
+      remoteTrickFire();
+      return;
+    }
+  }
+  // 🃏 הקלף של הצופה
+  if (config.cardTrick && isFinal) {
+    const card = parseSpokenCard(text);
+    if (!card) return;
+    clearTimeout(voiceTrickCardTimer);
+    voiceTrickCardTimer = setTimeout(() => cardTrickShow(card), 300);
+  }
+}
+
+// הטפט הרגיל שנבחר באפליקציה (התמונה של הקוסם) - הקלף מצויר עליו
+function currentBaseWallpaperUrl() {
+  try {
+    const catalog = getWallpaperCatalogForCurrentModel();
+    const customDataUrl = localStorage.getItem(WALLPAPER_STORAGE_KEY);
+    const selectedId = localStorage.getItem(SELECTED_WALLPAPER_ID_KEY) || 'model_default';
+    if (selectedId === 'custom' && customDataUrl) return customDataUrl;
+    const found = catalog.find((item) => item.id === selectedId);
+    return (found || catalog[0]).dataUrl;
+  } catch (e) {
+    return '';
+  }
+}
+
+function loadImageSafe(src) {
+  return new Promise((resolve) => {
+    if (!src) return resolve(null);
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null);
+    img.src = src;
+  });
+}
+
+async function cardTrickShow(card) {
+  const bgImg = await loadImageSafe(currentBaseWallpaperUrl());
+  const dataUrl = drawCardWallpaper(card, bgImg);
+  if (!dataUrl || !phoneContainer) return;
+  voiceTrickCard = card;
+  voiceTrickWpUrl = dataUrl;
+  applyWallpaperToContainer();
+  // מסך השעון (בלי מקלדת וטשטוש) - כמו טלפון נעול שמדליקים
+  phoneContainer.classList.add('clock-mode-active');
+  trackEvent('cardtrick_hit');
+  const he = CARD_NAMES.he[card.r] + ' ' + CARD_NAMES.he[card.s];
+  const en = CARD_NAMES.en[card.r] + ' of ' + CARD_NAMES.en[card.s];
+  voiceTrickWhisper('נקלט: ' + he, 'got: ' + en);
+}
+
+function remoteTrickFire() {
+  trackEvent('remotetrick_hit');
+  if (config.remoteAction === 'photo') {
+    let src = '';
+    try { src = localStorage.getItem(REMOTE_PHOTO_KEY) || ''; } catch (e) {}
+    if (src) {
+      voiceTrickWpUrl = src;
+      applyWallpaperToContainer();
+    }
+    return;
+  }
+  const n = document.getElementById('remoteNotif');
+  if (!n) return;
+  const title = n.querySelector('.rn-title');
+  const body = n.querySelector('.rn-text');
+  if (title) title.textContent = String(config.remoteNotifTitle || 'אמא').slice(0, 40);
+  if (body) body.textContent = String(config.remoteNotifText || 'תגיד לחבר שלך שלום 👋').slice(0, 120);
+  if (phoneContainer) phoneContainer.classList.add('clock-mode-active');
+  n.classList.remove('show');
+  void n.offsetWidth;
+  n.classList.add('show');
+  triggerHaptic([0, 70, 90, 70]);
+}
+
+// --- ציור הקלף: קלף משחק אמיתי על שולחן לבד ירוק, בגודל המסך ---
+function drawSuitShape(x, suit, cx, cy, s, flip) {
+  x.save();
+  x.translate(cx, cy);
+  if (flip) x.rotate(Math.PI);
+  x.fillStyle = suit === 'H' || suit === 'D' ? '#c8102e' : '#141414';
+  x.beginPath();
+  if (suit === 'H') {
+    x.moveTo(0, s * 0.42);
+    x.bezierCurveTo(-s * 0.62, -s * 0.02, -s * 0.36, -s * 0.58, 0, -s * 0.2);
+    x.bezierCurveTo(s * 0.36, -s * 0.58, s * 0.62, -s * 0.02, 0, s * 0.42);
+  } else if (suit === 'D') {
+    x.moveTo(0, -s * 0.5);
+    x.quadraticCurveTo(s * 0.18, -s * 0.18, s * 0.38, 0);
+    x.quadraticCurveTo(s * 0.18, s * 0.18, 0, s * 0.5);
+    x.quadraticCurveTo(-s * 0.18, s * 0.18, -s * 0.38, 0);
+    x.quadraticCurveTo(-s * 0.18, -s * 0.18, 0, -s * 0.5);
+  } else if (suit === 'S') {
+    x.moveTo(0, -s * 0.48);
+    x.bezierCurveTo(-s * 0.62, -s * 0.02, -s * 0.36, s * 0.42, 0, s * 0.14);
+    x.bezierCurveTo(s * 0.36, s * 0.42, s * 0.62, -s * 0.02, 0, -s * 0.48);
+    x.moveTo(0, s * 0.1);
+    x.lineTo(-s * 0.16, s * 0.5);
+    x.lineTo(s * 0.16, s * 0.5);
+  } else {
+    const r = s * 0.2;
+    x.moveTo(r, -s * 0.24);
+    x.arc(0, -s * 0.24, r, 0, Math.PI * 2);
+    x.moveTo(-s * 0.2 + r, s * 0.06);
+    x.arc(-s * 0.2, s * 0.06, r, 0, Math.PI * 2);
+    x.moveTo(s * 0.2 + r, s * 0.06);
+    x.arc(s * 0.2, s * 0.06, r, 0, Math.PI * 2);
+    x.moveTo(0, -s * 0.02);
+    x.lineTo(-s * 0.16, s * 0.5);
+    x.lineTo(s * 0.16, s * 0.5);
+  }
+  x.closePath();
+  x.fill();
+  x.restore();
+}
+
+const CARD_PIPS = {
+  A: [[0.5, 0.5]],
+  2: [[0.5, 0.2], [0.5, 0.8]],
+  3: [[0.5, 0.2], [0.5, 0.5], [0.5, 0.8]],
+  4: [[0.3, 0.2], [0.7, 0.2], [0.3, 0.8], [0.7, 0.8]],
+  5: [[0.3, 0.2], [0.7, 0.2], [0.5, 0.5], [0.3, 0.8], [0.7, 0.8]],
+  6: [[0.3, 0.2], [0.7, 0.2], [0.3, 0.5], [0.7, 0.5], [0.3, 0.8], [0.7, 0.8]],
+  7: [[0.3, 0.2], [0.7, 0.2], [0.5, 0.35], [0.3, 0.5], [0.7, 0.5], [0.3, 0.8], [0.7, 0.8]],
+  8: [[0.3, 0.2], [0.7, 0.2], [0.5, 0.35], [0.3, 0.5], [0.7, 0.5], [0.5, 0.65], [0.3, 0.8], [0.7, 0.8]],
+  9: [[0.3, 0.2], [0.7, 0.2], [0.3, 0.4], [0.7, 0.4], [0.5, 0.5], [0.3, 0.6], [0.7, 0.6], [0.3, 0.8], [0.7, 0.8]],
+  10: [[0.3, 0.2], [0.7, 0.2], [0.5, 0.3], [0.3, 0.4], [0.7, 0.4], [0.3, 0.6], [0.7, 0.6], [0.5, 0.7], [0.3, 0.8], [0.7, 0.8]]
+};
+
+function drawCardWallpaper(card, bgImg) {
+  try {
+    // בגודל המסך של האפליקציה (לא יותר מ-1440 פיקסלים רוחב)
+    const vw = (phoneContainer && phoneContainer.clientWidth) || window.innerWidth || 400;
+    const vh = (phoneContainer && phoneContainer.clientHeight) || window.innerHeight || 860;
+    const dpr = Math.min(window.devicePixelRatio || 1, 3, 1440 / vw);
+    const W = Math.max(200, Math.round(vw * dpr));
+    const H = Math.max(400, Math.round(vh * dpr));
+    const c = document.createElement('canvas');
+    c.width = W;
+    c.height = H;
+    const x = c.getContext('2d');
+    if (bgImg && bgImg.width) {
+      // הטפט שלך (כמו במסך הנעילה האמיתי), והקלף עליו
+      const sc = Math.max(W / bgImg.width, H / bgImg.height);
+      const bw = bgImg.width * sc;
+      const bh = bgImg.height * sc;
+      x.drawImage(bgImg, (W - bw) / 2, (H - bh) / 2, bw, bh);
+    } else {
+      // אין טפט: שולחן לבד ירוק
+      const bg = x.createRadialGradient(W * 0.5, H * 0.55, W * 0.1, W * 0.5, H * 0.55, H * 0.75);
+      bg.addColorStop(0, '#1f6b45');
+      bg.addColorStop(0.6, '#134d31');
+      bg.addColorStop(1, '#08261a');
+      x.fillStyle = bg;
+      x.fillRect(0, 0, W, H);
+    }
+    const cw = W * (bgImg ? 0.46 : 0.52);
+    const ch = cw * 1.4;
+    x.save();
+    x.translate(W / 2, H * 0.56);
+    x.rotate(-0.06);
+    x.shadowColor = 'rgba(0,0,0,0.55)';
+    x.shadowBlur = 40 * dpr;
+    x.shadowOffsetY = 14 * dpr;
+    const rr = cw * 0.06;
+    x.beginPath();
+    x.moveTo(-cw / 2 + rr, -ch / 2);
+    x.arcTo(cw / 2, -ch / 2, cw / 2, ch / 2, rr);
+    x.arcTo(cw / 2, ch / 2, -cw / 2, ch / 2, rr);
+    x.arcTo(-cw / 2, ch / 2, -cw / 2, -ch / 2, rr);
+    x.arcTo(-cw / 2, -ch / 2, cw / 2, -ch / 2, rr);
+    x.closePath();
+    x.fillStyle = '#fbfaf6';
+    x.fill();
+    x.shadowColor = 'transparent';
+    x.translate(-cw / 2, -ch / 2);
+    const red = card.s === 'H' || card.s === 'D';
+    const ink = red ? '#c8102e' : '#141414';
+    // פינות: ערך + צורה
+    const corner = (flip) => {
+      x.save();
+      if (flip) {
+        x.translate(cw, ch);
+        x.rotate(Math.PI);
+      }
+      x.fillStyle = ink;
+      x.font = `700 ${Math.round(cw * 0.15)}px Georgia, "Times New Roman", serif`;
+      x.textAlign = 'center';
+      x.textBaseline = 'top';
+      x.fillText(card.r, cw * 0.1, ch * 0.035);
+      drawSuitShape(x, card.s, cw * 0.1, ch * 0.165, cw * 0.1, false);
+      x.restore();
+    };
+    corner(false);
+    corner(true);
+    if (/^(J|Q|K)$/.test(card.r)) {
+      // קלף תמונה: מסגרת, אות גדולה וצורות
+      x.strokeStyle = ink;
+      x.lineWidth = Math.max(2, cw * 0.006);
+      x.strokeRect(cw * 0.2, ch * 0.13, cw * 0.6, ch * 0.74);
+      x.fillStyle = red ? 'rgba(200,16,46,0.07)' : 'rgba(20,20,20,0.06)';
+      x.fillRect(cw * 0.2, ch * 0.13, cw * 0.6, ch * 0.74);
+      x.fillStyle = ink;
+      x.font = `700 ${Math.round(cw * 0.42)}px Georgia, "Times New Roman", serif`;
+      x.textAlign = 'center';
+      x.textBaseline = 'middle';
+      x.fillText(card.r, cw * 0.5, ch * 0.5);
+      drawSuitShape(x, card.s, cw * 0.5, ch * 0.24, cw * 0.14, false);
+      drawSuitShape(x, card.s, cw * 0.5, ch * 0.76, cw * 0.14, true);
+    } else {
+      const pips = CARD_PIPS[card.r] || [];
+      const ps = card.r === 'A' ? cw * 0.42 : cw * 0.17;
+      pips.forEach(([px, py]) => {
+        drawSuitShape(x, card.s, cw * (0.14 + px * 0.72), ch * (0.1 + py * 0.8), ps, py > 0.55);
+      });
+    }
+    x.restore();
+    return c.toDataURL('image/jpeg', 0.9);
+  } catch (e) {
+    return null;
+  }
+}
+
+// 🗣️ "חזרה בפקודה קולית" (אנדרואיד): אחרי שהצופה הקליד, הטלפון מקשיב למשפט "תחזור/תחזרי על הקוד"
+// ולוחש את הקוד שוב. מקשיבים רק עד "מוכן לצופה הבא" או כניסה להגדרות.
+function hasNativeVoiceRepeat() {
+  return Boolean(window.AndroidNative && typeof window.AndroidNative.startVoiceRepeat === 'function');
+}
+
+function liveReadArmVoice(code) {
+  if (!config.liveRead || !config.liveReadVoice || !hasNativeVoiceRepeat()) return;
+  const digits = String(code || '').replace(/\D/g, '').split('');
+  if (!digits.length) return;
+  const he = 'הקוד: ' + digits.map((d) => LIVE_READ_WORDS.he[Number(d)]).join(', ');
+  const en = 'the code: ' + digits.map((d) => LIVE_READ_WORDS.en[Number(d)]).join(', ');
+  try {
+    window.AndroidNative.startVoiceRepeat(he, en, liveReadLang());
+  } catch (e) {}
+}
+
+function liveReadStopVoice() {
+  if (!hasNativeVoiceRepeat()) return;
+  try {
+    window.AndroidNative.stopVoiceRepeat();
+  } catch (e) {}
+}
+
+function liveReadMicReady() {
+  try {
+    return Boolean(window.AndroidNative.hasMicPermission());
+  } catch (e) {
+    return false;
+  }
+}
+
+// תשובת אנדרואיד לבקשת הרשאת המיקרופון
+window.onMicPermission = function (ok) {
+  const wpSt = document.getElementById('wordPredictStatus');
+  if (wpSt && config.wordPredict) {
+    wpSt.textContent = ok ? (isEnglishUi() ? '✓ Microphone allowed.' : '✓ המיקרופון מאושר.') : (isEnglishUi() ? '⚠️ Microphone not allowed - the trick will not work.' : '⚠️ המיקרופון לא אושר - הקסם לא יעבוד.');
+    wpSt.className = 'toggle-sub-desc live-read-status ' + (ok ? 'good' : 'bad');
+  }
+  const st = document.getElementById('liveReadVoiceStatus');
+  if (!st) return;
+  const isEn = isEnglishUi();
+  st.textContent = ok
+    ? (isEn ? '✓ Microphone allowed. After the code, say "repeat the code" and you will hear it again.' : '✓ המיקרופון מאושר. אחרי הקוד, תגיד "תחזור על הקוד" ותשמע אותו שוב.')
+    : (isEn ? '⚠️ Microphone not allowed - the voice command will not work.' : '⚠️ המיקרופון לא אושר - הפקודה הקולית לא תעבוד.');
+  st.className = 'toggle-sub-desc live-read-status ' + (ok ? 'good' : 'bad');
+};
+
+// בסוף ההקלדה: חוזרים על כל הקוד ברצף - גם אם פספסת ספרה, שומעים אותו שוב
+function liveReadRecap(code) {
+  if (!config.liveRead || config.liveReadRecap === false || config.unlockMode !== 'pin') return;
+  const digits = String(code || '').replace(/\D/g, '').split('');
+  if (!digits.length) return;
+  const he = 'הקוד: ' + digits.map((d) => LIVE_READ_WORDS.he[Number(d)]).join(', ');
+  const en = 'the code: ' + digits.map((d) => LIVE_READ_WORDS.en[Number(d)]).join(', ');
+  if (hasNativeSecretVoice()) {
+    try {
+      window.AndroidNative.speakSecret(he, liveReadLang(), en);
+    } catch (e) {}
+    return;
+  }
+  if (!liveReadWebArmed()) return;
+  liveReadWebSpeak(he, en);
+}
+
+// מחמם את מנוע הדיבור כשמסך הנעילה עולה - כדי שהספרה הראשונה תצא מיד
+function liveReadPrepare() {
+  if (!config.liveRead) return;
+  if (hasNativeSecretVoice() && typeof window.AndroidNative.prepareSecretVoice === 'function') {
+    try {
+      window.AndroidNative.prepareSecretVoice();
+    } catch (e) {}
+  }
+}
+
+function liveReadHeadsetState() {
+  if (hasNativeSecretVoice() && typeof window.AndroidNative.isHeadsetConnected === 'function') {
+    try {
+      return window.AndroidNative.isHeadsetConnected() ? 'connected' : 'missing';
+    } catch (e) {
+      return 'missing';
+    }
+  }
+  return 'unknown';
+}
+
+// כפתור "בדיקת אוזנייה" בהגדרות
+function liveReadTest() {
+  const status = document.getElementById('liveReadStatus');
+  const isEn = isEnglishUi();
+  const set = (t, cls) => {
+    if (!status) return;
+    status.textContent = t;
+    status.className = 'toggle-sub-desc live-read-status ' + (cls || '');
+  };
+  if (hasNativeSecretVoice()) {
+    if (liveReadHeadsetState() !== 'connected') {
+      set(isEn ? '⚠️ No earphone connected - the phone stays silent. Connect a Bluetooth earphone and test again.' : '⚠️ לא מחוברת אוזנייה - הטלפון ישתוק. חבר אוזניית בלוטות\' ובדוק שוב.', 'bad');
+      return;
+    }
+    liveReadPrepare();
+    const attempt = (n) => {
+      const res = window.AndroidNative.speakSecret('אחת, שתיים, שלוש', liveReadLang(), 'one, two, three');
+      if (res === 'not-ready' && n < 6) return setTimeout(() => attempt(n + 1), 400);
+      if (res === 'no-headset') return set(isEn ? '⚠️ The earphone disconnected - the phone stays silent.' : '⚠️ האוזנייה התנתקה - הטלפון ישתוק.', 'bad');
+      const note = res === 'en' && liveReadLang() === 'he' ? (isEn ? ' (no Hebrew voice on this phone - digits are said in English)' : ' (אין קול עברי בטלפון הזה - הספרות ייאמרו באנגלית)') : '';
+      set((isEn ? '✓ Earphone connected. You should hear "one, two, three" ONLY in the earphone.' : '✓ אוזנייה מחוברת. אתה אמור לשמוע "אחת, שתיים, שלוש" רק באוזנייה.') + note, 'good');
+    };
+    attempt(0);
+    return;
+  }
+  if (!window.speechSynthesis) {
+    set(isEn ? '⚠️ This phone/browser cannot speak.' : '⚠️ הטלפון או הדפדפן הזה לא יכול להקריא.', 'bad');
+    return;
+  }
+  try {
+    sessionStorage.setItem(LIVE_READ_ARMED_KEY, '1');
+  } catch (e) {}
+  liveReadWebSpeak('אחת, שתיים, שלוש', 'one, two, three', true);
+  set(isEn
+    ? 'Heard it ONLY in the earphone? You are ready. ⚠️ On iPhone the phone cannot check the earphone by itself - if it disconnects, the digits will be heard out loud. Test before every show.'
+    : 'שמעת רק באוזנייה? אתה מוכן. ⚠️ באייפון הטלפון לא יכול לבדוק לבד את האוזנייה - אם היא תתנתק, הספרות יישמעו בקול. בודקים לפני כל הופעה.', 'warn');
+}
+
 // הצגת הודעת שגיאה באדום + רטט מותאם (רטט קל בניסיון ראשון של Tension Mode או רטט כפול בשגיאה רגילה)
 function triggerErrorFeedback(customErrorMessage = 'קוד PIN שגוי. נסה שוב', isLightVibration = false) {
   if (isLockedOut) return;
@@ -2356,6 +3163,11 @@ function verifyAndSubmitPasscode(enteredValue, modeLabel) {
   // הגנה מלחיצה כפולה (למשל Enter + כפתור אישור באותו רגע): ניסיון אחד בלבד
   const now = Date.now();
   if (now - lastSubmitAt < 400) return;
+  // 🎧 קריאה בזמן אמת: חזרה על כל הקוד בסוף ההקלדה
+  if (String(modeLabel || '').toUpperCase() === 'PIN') {
+    liveReadRecap(cleaned);
+    liveReadArmVoice(cleaned);
+  }
   lastSubmitAt = now;
 
   // שמירה שקטה עבור הקוסם (Peek) בכל מקרה
@@ -2597,6 +3409,7 @@ function initCleanNumericKeypad() {
       // הוספת הספרה ישירות לשדה הסיסמה והפעלת אירוע input (יוצרת נקודה דינמית חדשה באנימציית pop)
       passwordInput.value += digit;
       passwordInput.dispatchEvent(new Event('input', { bubbles: true }));
+      liveReadSay(digit);
 
       // צליל הקשה מקורי ורטט קצר (30ms) בכל הקשה על ספרה
       playKeyClickSound();
@@ -2618,6 +3431,7 @@ function initCleanNumericKeypad() {
         passwordInput.value = passwordInput.value.slice(0, -1);
         passwordInput.dispatchEvent(new Event('input', { bubbles: true }));
         triggerHaptic(15);
+        liveReadSay('del');
       }
     });
   }
@@ -2654,6 +3468,7 @@ if (iosRightActionBtn) {
       passwordInput.value = passwordInput.value.slice(0, -1);
       passwordInput.dispatchEvent(new Event('input', { bubbles: true }));
       iosRightActionBtn.textContent = passwordInput.value.length > 0 ? 'מחק' : 'ביטול';
+      liveReadSay('del');
     }
   });
 }
@@ -2681,6 +3496,8 @@ if (clockLockScreen) {
       faceTrickScan();
       return;
     }
+    // מיד אחרי ש"הטלפון ידע מראש" הדליק את המסך - לא קופצים למקלדת (השעון עם המילה נשאר)
+    if (Date.now() - wordPredictRevealAt < 1500) return;
     phoneContainer.classList.remove('clock-mode-active');
   });
 }
@@ -3453,6 +4270,8 @@ function bindCornerSecretZone(element, onDoubleTap, onTripleTap) {
 }
 
 function openSettingsSheet() {
+  liveReadStopVoice();
+  voiceTricksReset();
   forceAttemptCount = 0;
   setTimeout(maybeShowForceOffNotice, 400);
   refreshSettingsLastCaptured();
@@ -3860,6 +4679,51 @@ if (wallpaperFileInput) {
   });
 }
 
+// 🧪 בדיקה: כותב "בדיקה" על מסך הנעילה האמיתי ומראה מה נשלח ומה אנדרואיד ענה
+const wordWallpaperTestBtn = document.getElementById('wordWallpaperTestBtn');
+if (wordWallpaperTestBtn) {
+  wordWallpaperTestBtn.addEventListener('click', async () => {
+    const st = document.getElementById('wordWallpaperTestStatus');
+    const pv = document.getElementById('wordWallpaperPreview');
+    const say = (txt, ok) => {
+      if (!st) return;
+      st.textContent = txt;
+      st.classList.toggle('ok', Boolean(ok));
+      st.classList.toggle('bad', !ok);
+    };
+    if (!window.AndroidNative || typeof window.AndroidNative.setLockWallpaper !== 'function') {
+      say('❌ הגרסה באפליקציה ישנה - עדכן דרך "בדוק עדכון".', false);
+      return;
+    }
+    const dataUrl = await composeLockWallpaper('בדיקה');
+    if (!dataUrl) {
+      say('❌ לא נבחרה תמונה מקורית (או שהיא לא נשמרה). לחץ "בחר את התמונה המקורית".', false);
+      return;
+    }
+    if (pv) {
+      pv.src = dataUrl;
+      pv.style.display = 'block';
+    }
+    say('⏳ מחליף את הטפט של מסך הנעילה...', true);
+    wordWallpaperDirty = true;
+    try {
+      window.AndroidNative.setLockWallpaper(dataUrl, 'test');
+    } catch (e) {
+      say('❌ ' + (e && e.message ? e.message : 'שגיאה'), false);
+    }
+  });
+}
+
+const wordWallpaperFileInput = document.getElementById('wordWallpaperFileInput');
+if (wordWallpaperFileInput) {
+  wordWallpaperFileInput.addEventListener('change', (e) => {
+    compressAndStoreImage(e.target.files[0], WORD_WALLPAPER_KEY, () => {
+      wordWallpaperFileInput.value = '';
+      syncNewRevealsUI();
+    });
+  });
+}
+
 if (clearWallpaperBtn) {
   clearWallpaperBtn.addEventListener('click', () => {
     localStorage.removeItem(WALLPAPER_STORAGE_KEY);
@@ -4201,7 +5065,7 @@ function initDeviceLicenseGate() {
 // החלון מוצג רק כשמסך ההגדרות פתוח (בפתיחת האפליקציה / בתפריט הסודי),
 // ולעולם לא מעל מסך הנעילה הפעיל מול קהל.
 // ============================================================================
-const APP_VERSION = '7.9';
+const APP_VERSION = '9.4';
 const DEFAULT_APK_URL = 'https://github.com/tzur2010/app-lockscreen/raw/main/Lockscreen.apk';
 const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 const UPDATE_DISMISS_KEY = 'magic_update_dismissed_version';
@@ -4254,9 +5118,25 @@ function useBetaChannel() {
 }
 
 async function fetchBetaConfig() {
-  const res = await fetch(`${BETA_BASE_URL}version.json?t=${Date.now()}`, { cache: 'no-store' });
-  if (!res.ok) return null;
-  const data = await res.json();
+  const url = `${BETA_BASE_URL}version.json?t=${Date.now()}`;
+  let data = null;
+  // באנדרואיד (APK) fetch ישיר לאינטרנט חסום - קוראים דרך הגשר הנייטיבי (כמו כל שאר החיבורים)
+  if (window.MagicCloud && typeof window.MagicCloud.httpGet === 'function' && isNativeApk()) {
+    const res = await window.MagicCloud.httpGet(url);
+    if (res && res.ok) {
+      data = JSON.parse(res.text || 'null');
+    } else {
+      // גיבוי: ניסיון ישיר (אם הגשר לא הצליח)
+      try {
+        const r2 = await fetch(url, { cache: 'no-store' });
+        if (r2.ok) data = await r2.json();
+      } catch (e) {}
+    }
+  } else {
+    const res = await fetch(url, { cache: 'no-store' });
+    if (!res.ok) return null;
+    data = await res.json();
+  }
   if (!data || !data.latest_version) return null;
   return { latest_version: String(data.latest_version), apk_url: BETA_APK_URL, message: '🧪 גרסת בטא - רק לבודקים', beta: true };
 }
@@ -5196,6 +6076,8 @@ function relockFakePhone() {
 
 // "מוכן לצופה הבא": מנקה את הקוד האחרון, מאפס ניסיונות וחוזר למסך הנעילה
 function resetForNextShow() {
+  liveReadStopVoice();
+  wordPredictExit(true);
   trackEvent('reset_show');
   try {
     localStorage.removeItem(LAST_PIN_KEY);
@@ -5445,6 +6327,10 @@ function getStatsForReport() {
   if (config.faceTrick) on.push('facetrick');
   if (config.settingsTrick) on.push('settingstrick');
   if (config.birthdayTrick) on.push('birthday');
+  if (config.liveRead) on.push('liveread');
+  if (config.wordPredict) on.push('wordpredict');
+  if (config.cardTrick) on.push('cardtrick');
+  if (config.remoteTrick) on.push('remotetrick');
   if (config.unlockTargetScreen === 'gallery') on.push('gallery');
   if (config.unlockTargetScreen === 'search') on.push('search');
   try {
@@ -5969,6 +6855,103 @@ function syncNewRevealsUI() {
     btn.classList.toggle('active', Number(btn.dataset.fails) === faceTrickFails());
   });
 
+  // 🃏 / 🗣️ (אנדרואיד בלבד)
+  const voiceOk = hasNativeWordListen();
+  const ctBlock = document.getElementById('cardTrickBlock');
+  if (ctBlock) ctBlock.style.display = 'none';
+  const rtBlock = document.getElementById('remoteTrickBlock');
+  if (rtBlock) rtBlock.style.display = 'none';
+  const ctToggle = document.getElementById('toggleCardTrick');
+  if (ctToggle) ctToggle.checked = Boolean(config.cardTrick);
+  const ctExtra = document.getElementById('cardTrickExtra');
+  if (ctExtra) ctExtra.style.display = config.cardTrick ? 'block' : 'none';
+  const rtToggle = document.getElementById('toggleRemoteTrick');
+  if (rtToggle) rtToggle.checked = Boolean(config.remoteTrick);
+  const rtExtra = document.getElementById('remoteTrickExtra');
+  if (rtExtra) rtExtra.style.display = config.remoteTrick ? 'block' : 'none';
+  const rWord = document.getElementById('remoteWordInput');
+  if (rWord && document.activeElement !== rWord) rWord.value = config.remoteWord || 'וואלה';
+  const rTitle = document.getElementById('remoteNotifTitleInput');
+  if (rTitle && document.activeElement !== rTitle) rTitle.value = config.remoteNotifTitle || 'אמא';
+  const rText = document.getElementById('remoteNotifTextInput');
+  if (rText && document.activeElement !== rText) rText.value = config.remoteNotifText || '';
+  const rIsPhoto = config.remoteAction === 'photo';
+  document.querySelectorAll('#remoteActionSelector .seg-pill').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.raction === (rIsPhoto ? 'photo' : 'notif'));
+  });
+  const rNotifF = document.getElementById('remoteNotifFields');
+  if (rNotifF) rNotifF.style.display = rIsPhoto ? 'none' : '';
+  const rPhotoF = document.getElementById('remotePhotoFields');
+  if (rPhotoF) rPhotoF.style.display = rIsPhoto ? '' : 'none';
+  const rPhotoSt = document.getElementById('remotePhotoStatus');
+  if (rPhotoSt) {
+    let has = false;
+    try { has = Boolean(localStorage.getItem(REMOTE_PHOTO_KEY)); } catch (e) {}
+    rPhotoSt.textContent = has ? '✅ התמונה נשמרה' : '⚠️ עוד לא נבחרה תמונה';
+    rPhotoSt.className = 'toggle-sub-desc live-read-status ' + (has ? 'good' : 'bad');
+  }
+  document.querySelectorAll('.voice-lang-selector .seg-pill').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.vlang === voiceLang());
+  });
+
+  const wpBlock = document.getElementById('wordPredictBlock');
+  if (wpBlock) wpBlock.style.display = 'none';
+  const wpToggle = document.getElementById('toggleWordPredict');
+  if (wpToggle) wpToggle.checked = Boolean(config.wordPredict);
+  const wpExtra = document.getElementById('wordPredictExtra');
+  if (wpExtra) wpExtra.style.display = config.wordPredict ? 'block' : 'none';
+  const wpTpl = document.getElementById('wordPredictTplInput');
+  if (wpTpl && document.activeElement !== wpTpl) wpTpl.value = config.wordPredictTpl || '{מילה}';
+  document.querySelectorAll('#wordPredictModeSelector .seg-pill').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.wpmode === wordPredictMode());
+  });
+  const wpNotifFields = document.getElementById('wordPredictNotifFields');
+  if (wpNotifFields) wpNotifFields.style.display = wordPredictMode() === 'notification' ? '' : 'none';
+  const wpWpFields = document.getElementById('wordPredictWpFields');
+  if (wpWpFields) wpWpFields.style.display = wordPredictMode() === 'wallpaper' ? '' : 'none';
+  const wpWpStatus = document.getElementById('wordWallpaperStatus');
+  if (wpWpStatus) {
+    let hasClean = false;
+    try { hasClean = Boolean(localStorage.getItem(WORD_WALLPAPER_KEY)); } catch (e) {}
+    wpWpStatus.textContent = hasClean
+      ? (isEnglishUi() ? '✅ Original photo saved' : '✅ התמונה המקורית נשמרה')
+      : (isEnglishUi() ? '⚠️ Pick the original photo from the gallery - not a screenshot' : '⚠️ בחר את התמונה המקורית מהגלריה - לא צילום מסך');
+    wpWpStatus.classList.toggle('ok', hasClean);
+    wpWpStatus.classList.toggle('bad', !hasClean);
+  }
+  const wpModeNote = document.getElementById('wordPredictModeNote');
+  if (wpModeNote) {
+    const isEn = isEnglishUi();
+    let hasWp = false;
+    try { hasWp = Boolean(localStorage.getItem(WORD_WALLPAPER_KEY)); } catch (e) {}
+    wpModeNote.textContent = wordPredictMode() === 'wallpaper'
+      ? (hasWp
+        ? (isEn ? 'The word is written on your photo, exactly where the contact-info line is. Delete the real contact info in the phone settings so there are not two lines.' : 'המילה נכתבת על התמונה שלך, בדיוק במקום של שורת פרטי הקשר. מחק את פרטי הקשר בהגדרות הטלפון, כדי שלא יהיו שתי שורות.')
+        : (isEn ? 'Pick the ORIGINAL photo (from the gallery, not a screenshot of the lock screen) - the word is written on it.' : 'בחר את התמונה המקורית (מהגלריה, לא צילום מסך של מסך הנעילה) - עליה נכתבת המילה.'))
+      : (isEn ? 'A real notification on the real lock screen.' : 'התראה אמיתית במסך הנעילה האמיתי.');
+  }
+  const wpTitle = document.getElementById('wordPredictTitleInput');
+  if (wpTitle && document.activeElement !== wpTitle) wpTitle.value = config.wordPredictTitle || 'תזכורת';
+  document.querySelectorAll('#wordPredictAgoSelector .seg-pill').forEach((btn) => {
+    btn.classList.toggle('active', Number(btn.dataset.ago) === (Number(config.wordPredictAgo) || 180));
+  });
+  document.querySelectorAll('#wordPredictLangSelector .seg-pill').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.wplang === wordPredictLang());
+  });
+
+  const lrToggle = document.getElementById('toggleLiveRead');
+  if (lrToggle) lrToggle.checked = Boolean(config.liveRead);  const lrExtra = document.getElementById('liveReadExtra');
+  if (lrExtra) lrExtra.style.display = config.liveRead ? 'block' : 'none';
+  document.querySelectorAll('#liveReadLangSelector .seg-pill').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.lrlang === liveReadLang());
+  });
+  const lrRecap = document.getElementById('toggleLiveReadRecap');
+  if (lrRecap) lrRecap.checked = config.liveReadRecap !== false;
+  const lrVoiceRow = document.getElementById('liveReadVoiceRow');
+  if (lrVoiceRow) lrVoiceRow.style.display = hasNativeVoiceRepeat() ? '' : 'none';
+  const lrVoice = document.getElementById('toggleLiveReadVoice');
+  if (lrVoice) lrVoice.checked = Boolean(config.liveReadVoice);
+
   const bToggle = document.getElementById('toggleBirthdayTrick');
   if (bToggle) bToggle.checked = Boolean(config.birthdayTrick);
   const bExtra = document.getElementById('birthdayTrickExtra');
@@ -6049,6 +7032,143 @@ function initNewReveals() {
       saveConfig();
     });
   }
+
+  const wpToggle = document.getElementById('toggleWordPredict');
+  if (wpToggle) {
+    wpToggle.addEventListener('change', () => {
+      config.wordPredict = wpToggle.checked;
+      saveConfig();
+      syncNewRevealsUI();
+      const st = document.getElementById('wordPredictStatus');
+      if (wpToggle.checked && hasNativeWordListen()) {
+        if (wordPredictMode() === 'notification' && !wordPredictNotifsAllowed()) {
+          try { window.AndroidNative.requestNotificationPermission(); } catch (e) {}
+        }
+        if (liveReadMicReady()) {
+          if (st) { st.textContent = isEnglishUi() ? '✓ Microphone allowed. After "Save & Close" the screen goes black and listens.' : '✓ המיקרופון מאושר. אחרי "שמור וסגור" המסך נהיה שחור ומקשיב.'; st.className = 'toggle-sub-desc live-read-status good'; }
+        } else {
+          try { window.AndroidNative.requestMicPermission(); } catch (e) {}
+        }
+      } else if (st) st.textContent = '';
+    });
+  }
+  document.querySelectorAll('#wordPredictModeSelector .seg-pill').forEach((btn) => btn.addEventListener('click', () => {
+    config.wordPredictMode = btn.dataset.wpmode === 'notification' ? 'notification' : 'wallpaper';
+    saveConfig();
+    syncNewRevealsUI();
+  }));
+  const wpTitleInput = document.getElementById('wordPredictTitleInput');
+  if (wpTitleInput) wpTitleInput.addEventListener('input', () => {
+    config.wordPredictTitle = wpTitleInput.value.slice(0, 40) || 'תזכורת';
+    saveConfig();
+  });
+  document.querySelectorAll('#wordPredictAgoSelector .seg-pill').forEach((btn) => btn.addEventListener('click', () => {
+    config.wordPredictAgo = Number(btn.dataset.ago) || 180;
+    saveConfig();
+    syncNewRevealsUI();
+  }));
+  const wpTplInput = document.getElementById('wordPredictTplInput');
+  if (wpTplInput) wpTplInput.addEventListener('input', () => {
+    config.wordPredictTpl = wpTplInput.value.slice(0, 60) || '{מילה}';
+    saveConfig();
+  });
+  document.querySelectorAll('#wordPredictLangSelector .seg-pill').forEach((btn) => btn.addEventListener('click', () => {
+    config.wordPredictLang = btn.dataset.wplang === 'en' ? 'en' : 'he';
+    saveConfig();
+    syncNewRevealsUI();
+  }));
+
+  // 🃏 / 🗣️ הגדרות
+  const voiceTrickToggle = (id, key, statusId) => {
+    const t = document.getElementById(id);
+    if (!t) return;
+    t.addEventListener('change', () => {
+      config[key] = t.checked;
+      saveConfig();
+      syncNewRevealsUI();
+      const st = document.getElementById(statusId);
+      if (!st) return;
+      if (!t.checked || !hasNativeWordListen()) {
+        st.textContent = '';
+        return;
+      }
+      if (liveReadMicReady()) {
+        st.textContent = isEnglishUi() ? '✓ Microphone allowed. Needs internet.' : '✓ המיקרופון מאושר. צריך אינטרנט.';
+        st.className = 'toggle-sub-desc live-read-status good';
+      } else {
+        try { window.AndroidNative.requestMicPermission(); } catch (e) {}
+      }
+    });
+  };
+  voiceTrickToggle('toggleCardTrick', 'cardTrick', 'cardTrickStatus');
+  voiceTrickToggle('toggleRemoteTrick', 'remoteTrick', 'remoteTrickStatus');
+  document.querySelectorAll('.voice-lang-selector .seg-pill').forEach((btn) => btn.addEventListener('click', () => {
+    config.voiceLang = btn.dataset.vlang === 'en' ? 'en' : 'he';
+    saveConfig();
+    syncNewRevealsUI();
+  }));
+  document.querySelectorAll('#remoteActionSelector .seg-pill').forEach((btn) => btn.addEventListener('click', () => {
+    config.remoteAction = btn.dataset.raction === 'photo' ? 'photo' : 'notif';
+    saveConfig();
+    syncNewRevealsUI();
+  }));
+  const bindText = (id, key, max, fallback) => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('input', () => {
+      config[key] = el.value.slice(0, max) || fallback;
+      saveConfig();
+    });
+  };
+  bindText('remoteWordInput', 'remoteWord', 30, 'וואלה');
+  bindText('remoteNotifTitleInput', 'remoteNotifTitle', 40, 'אמא');
+  bindText('remoteNotifTextInput', 'remoteNotifText', 120, 'תגיד לחבר שלך שלום 👋');
+  const remotePhotoInput = document.getElementById('remotePhotoFileInput');
+  if (remotePhotoInput) remotePhotoInput.addEventListener('change', (e) => {
+    compressAndStoreImage(e.target.files[0], REMOTE_PHOTO_KEY, () => {
+      remotePhotoInput.value = '';
+      syncNewRevealsUI();
+    });
+  });
+
+  const lrToggle = document.getElementById('toggleLiveRead');
+  if (lrToggle) {    lrToggle.addEventListener('change', () => {
+      config.liveRead = lrToggle.checked;
+      // הקריאה עובדת על קוד PIN (ספרות)
+      if (lrToggle.checked && config.unlockMode !== 'pin') config.unlockMode = 'pin';
+      saveConfig();
+      applyConfigToUI();
+      syncNewRevealsUI();
+      liveReadPrepare();
+    });
+  }
+  document.querySelectorAll('#liveReadLangSelector .seg-pill').forEach((btn) => btn.addEventListener('click', () => {
+    config.liveReadLang = btn.dataset.lrlang === 'en' ? 'en' : 'he';
+    saveConfig();
+    syncNewRevealsUI();
+  }));
+  const lrRecapToggle = document.getElementById('toggleLiveReadRecap');
+  if (lrRecapToggle) lrRecapToggle.addEventListener('change', () => {
+    config.liveReadRecap = lrRecapToggle.checked;
+    saveConfig();
+  });
+  const lrVoiceToggle = document.getElementById('toggleLiveReadVoice');
+  if (lrVoiceToggle) lrVoiceToggle.addEventListener('change', () => {
+    config.liveReadVoice = lrVoiceToggle.checked;
+    saveConfig();
+    if (lrVoiceToggle.checked && hasNativeVoiceRepeat()) {
+      if (liveReadMicReady()) window.onMicPermission(true);
+      else {
+        try {
+          window.AndroidNative.requestMicPermission();
+        } catch (e) {}
+      }
+    } else {
+      const st = document.getElementById('liveReadVoiceStatus');
+      if (st) st.textContent = '';
+    }
+  });
+  const lrTestBtn = document.getElementById('liveReadTestBtn');
+  if (lrTestBtn) lrTestBtn.addEventListener('click', liveReadTest);
 
   const bToggle = document.getElementById('toggleBirthdayTrick');
   if (bToggle) {
@@ -6383,6 +7503,45 @@ async function collectPreShowChecks() {
     }
   }
 
+  // 🃏 / 🗣️: צריך מיקרופון (ותמונה, אם בחרו "התמונה מתחלפת")
+  if ((config.cardTrick || config.remoteTrick) && hasNativeWordListen()) {
+    if (!liveReadMicReady()) add('bad', 'אין הרשאת מיקרופון', 'בלי מיקרופון 🃏 / 🗣️ לא יעבדו.', 'אשר', () => { try { window.AndroidNative.requestMicPermission(); } catch (e) {} });
+    else {
+      if (config.cardTrick) add('ok', '🃏 הקלף בטלפון - מוכן', 'הצופה אומר את הקלף בקול, ואז הופכים את הטלפון.');
+      if (config.remoteTrick) add('ok', '🗣️ שלט רחוק - מוכן', 'מילת הקוד: "' + (config.remoteWord || 'וואלה') + '"');
+    }
+    if (config.remoteTrick && config.remoteAction === 'photo') {
+      let hasRp = false;
+      try { hasRp = Boolean(localStorage.getItem(REMOTE_PHOTO_KEY)); } catch (e) {}
+      if (!hasRp) add('bad', 'לא נבחרה תמונה', 'קסמים ← 🗣️ ← "בחר את התמונה שתופיע".');
+    }
+  }
+
+  // 🔮 הטלפון ידע מראש: צריך מיקרופון
+  if (config.wordPredict && hasNativeWordListen()) {
+    let wpHasWallpaper = false;
+    try { wpHasWallpaper = Boolean(localStorage.getItem(WORD_WALLPAPER_KEY)); } catch (e) {}
+    if (wordPredictMode() === 'wallpaper' && !wpHasWallpaper) add('bad', 'אין תמונה מקורית', 'קסמים ← 🔮 ← "בחר את התמונה המקורית (בלי שעון)".');
+    if (wordPredictMode() === 'notification' && !wordPredictNotifsAllowed()) add('bad', 'ההתראות כבויות', 'בלי התראות המילה לא תופיע במסך הנעילה האמיתי.', 'אשר', () => { try { window.AndroidNative.requestNotificationPermission(); } catch (e) {} });
+    if (liveReadMicReady()) add('ok', 'הטלפון ידע מראש - מוכן', wordPredictMode() === 'wallpaper' ? 'כשנשמע "נקלט" באוזנייה - לוחצים פעמיים על כפתור הצד.' : 'ודא שבהגדרות הטלפון מופעל "הצג תוכן התראות במסך הנעילה".');
+    else add('bad', 'אין הרשאת מיקרופון', 'בלי מיקרופון "הטלפון ידע מראש" לא יעבוד.', 'אשר', () => { try { window.AndroidNative.requestMicPermission(); } catch (e) {} });
+  }
+
+  // 🎧 קריאה בזמן אמת: האוזנייה חייבת להיות מחוברת (אחרת הקוסם לא שומע כלום)
+  if (config.liveRead) {
+    if (config.unlockMode !== 'pin') {
+      add('warn', 'קריאה בזמן אמת עובדת רק עם קוד PIN', 'בחר "קוד PIN" בחלון סוג הנעילה.');
+    }
+    const hs = liveReadHeadsetState();
+    if (hs === 'connected') add('ok', 'אוזנייה מחוברת', 'קריאה בזמן אמת מוכנה. כדאי ללחוץ "בדיקת אוזנייה" פעם אחת.');
+    else if (hs === 'missing') add('bad', 'אין אוזנייה מחוברת', 'בלי אוזנייה הטלפון שותק ולא תשמע את הספרות. חבר אוזניית בלוטות\'.', 'בדוק', liveReadTest);
+    else add(liveReadWebArmed() ? 'ok' : 'warn', liveReadWebArmed() ? 'האוזנייה נבדקה' : 'בדוק את האוזנייה', 'באייפון הטלפון לא בודק לבד: אם האוזנייה תתנתק, הספרות יישמעו בקול.', 'בדוק', liveReadTest);
+    if (config.liveReadVoice && hasNativeVoiceRepeat()) {
+      if (liveReadMicReady()) add('ok', 'פקודה קולית מוכנה', 'אחרי הקוד: "תחזור על הקוד" - והקוד נלחש שוב.');
+      else add('bad', 'אין הרשאת מיקרופון', 'בלי מיקרופון הפקודה הקולית לא תעבוד.', 'אשר', () => { try { window.AndroidNative.requestMicPermission(); } catch (e) {} });
+    }
+  }
+
   // 9. סוללה
   try {
     if (navigator.getBattery) {
@@ -6567,9 +7726,17 @@ const TRICK_TIPS = {
     he: ['🤳 הטלפון מזהה את הצופה', '1. נגיעה במסך / החלקה למעלה = "זיהוי פנים". בפעמים הראשונות (כמה שבחרת) הוא נכשל - "הפנים לא זוהו".\n2. מגישים לצופה ונוגעים שוב במסך כשהוא מסתכל: הטלפון נפתח מיד.\n3. באותו רגע המצלמה הקדמית מצלמת אותו - והתמונה שלו היא הטפט של מסך הבית.\nטיפ: תחזיק את הטלפון מול הפנים של הצופה בגובה העיניים, כמו שמצלמים סלפי.', '"הטלפון שלי לא מזהה אותי היום... רגע, תסתכל אתה? ...איך הוא מכיר אותך?! ותסתכל על הטפט שלי..."'],
     en: ['🤳 The phone knows the spectator', '1. Tap the screen / swipe up = "face scan". The first times (as many as you chose) it fails - "Face not recognized".\n2. Hand it to the spectator and tap again while they look: it unlocks instantly.\n3. At that moment the front camera takes their photo - and it becomes the home screen wallpaper.\nTip: hold the phone at their eye level, like taking a selfie.', '"My phone doesn\'t recognize me today... wait, you try? ...how does it know you?! And look at my wallpaper..."']
   },
-  toggleBirthdayTrick: {
-    he: ['🎂 תאריך לידה', 'הכנה: מדליקים, בוחרים "6 ספרות" ו"יום ואז חודש". נעילה: קוד PIN.\n\n1. מה אומרים לצופה (מילה במילה):\n"תחשוב על מישהו שאתה אוהב. תקליד כקוד את תאריך הלידה שלו - יום, חודש ושנה, 6 ספרות. למשל 15 במרץ 1992 זה 150392. אל תגיד לי של מי."\n\n2. לחיצה ארוכה במסך (או השעון החכם): מתחת לקוד מופיעים מזל, גיל ויום בשבוע. בלשונית "הצצה" יש גם כמה ימים חי ועוד כמה ימים יום ההולדת.\n\n3. אם כתוב "❌ לא תאריך" - הצופה לא הקליד תאריך. לא חושפים מזל! עוברים לחשיפה רגילה של הקוד.\n\n4. סדר החשיפה:\n• קודם מי זה, לפי הגיל: קרוב לגיל הצופה = הוא עצמו, צעיר בהרבה = ילד, מבוגר בהרבה = הורה.\n• אחר כך המזל.\n• בסוף היום בשבוע שבו נולד - זה הרגע ש"אי אפשר לדעת".\n\n💡 לעולם לא אומרים את התאריך עצמו - ככה זה קריאת מחשבות ולא "ראית את הקוד".', '"אני מרגיש שזה מישהו צעיר... הילד שלך? הוא מזל דגים... ונולד ביום ראשון, נכון?"'],
-    en: ['🎂 Birthday', 'Setup: turn it on, pick "6 digits" and "Day then month". Lock type: PIN.\n\n1. What to tell the spectator (word for word):\n"Think of someone you love. Type their birthday as the code - day, month and year, 6 digits. For example March 15, 1992 is 150392. Don\'t tell me who it is."\n\n2. Long-press the screen (or check your watch): under the code you see star sign, age and weekday. The Peek tab also shows days lived and days until the next birthday.\n\n3. If it says "❌ Not a date" - they didn\'t type a date. Don\'t reveal a sign! Reveal the code normally.\n\n4. Reveal order:\n• First who it is, by age: close to the spectator\'s age = themselves, much younger = a child, much older = a parent.\n• Then the star sign.\n• Last, the weekday they were born - the "impossible" moment.\n\n💡 Never say the date itself - that way it\'s mind reading, not "you saw the code".', '"I feel it\'s someone young... your child? A Pisces... born on a Sunday, right?"']
+  toggleWordPredict: {
+    he: ['🔮 הטלפון ידע מראש', 'הכנה (פעם אחת): לאשר מיקרופון. ללחוץ "בחר את התמונה המקורית" ולבחור מהגלריה את התמונה של הטפט (התמונה עצמה, לא צילום מסך), ובהגדרות הטלפון למחוק את "פרטי הקשר" במסך הנעילה (המילה תופיע במקומם). אוזנייה - מומלץ מאוד.\n\n1. "שמור וסגור" - המסך נהיה שחור, כאילו הטלפון כבוי. מניחים אותו על השולחן.\n2. "תגיד בקול שם של מפורסם - מי שבא לך." (או עיר, חיה, שם של חבר)\n3. הצופה אומר מילה. אתה שותק! (המילה האחרונה שנאמרת היא זו שמופיעה)\n4. עם אוזנייה: שומעים בסתר "נקלט: ..." - רק אז מדליקים (הטפט כבר הוחלף).\n5. "מצחיק... תסתכל על הטלפון שלי." לוחצים פעמיים על כפתור הצד: הלחיצה הראשונה מכבה באמת (לא רואים הבדל), השנייה מדליקה את מסך הנעילה האמיתי - ובשורה שלמטה כתובה המילה.\n\n💡 טיפים:\n• אחרי שהצופה אמר את המילה - לא לדבר עד שמכבים.\n• מקום שקט עובד הכי טוב. צריך אינטרנט.\n• "מוכן לצופה הבא" מחזיר את הטפט הרגיל שלך.', '"תגיד שם של מפורסם... ריהאנה? מצחיק. תסתכל על התזכורת שיש לי בטלפון מהבוקר..."'],
+    en: ['🔮 My phone knew', 'Setup (once): allow the microphone. In the "Look" tab pick your real wallpaper photo, and in the phone settings delete the lock-screen "Contact information" (the word appears in its place). An earphone is highly recommended.\n\n1. "Save & Close" - the screen goes black, as if the phone is off. Put it on the table.\n2. "Say out loud the name of a celebrity - anyone you like." (or a city, an animal, a friend\'s name)\n3. The spectator says a word. You stay silent! (the last word spoken is the one that appears)\n4. With an earphone: you secretly hear "got: ..." - only then turn it on (the wallpaper is already changed).\n5. "Funny... look at my phone." Press the side button twice: the first press really turns the screen off (no visible change), the second turns on the REAL lock screen - with the word in the line at the bottom.\n\n💡 Tips:\n• After the spectator says the word - don\'t talk until you press the button.\n• A quiet place works best. Needs internet.\n• "Ready for next spectator" restores your normal wallpaper.', '"Name a celebrity... Rihanna? Funny. Look at the reminder I have on my phone from this morning..."']
+  },
+  toggleCardTrick: {
+    he: ['🃏 הקלף בטלפון', 'הכנה: לאשר מיקרופון. צריך אינטרנט. אוזנייה - מומלץ.\n\n1. "שמור וסגור" - מסך הנעילה מופיע. מניחים את הטלפון הפוך על השולחן.\n2. הצופה בוחר קלף מהחפיסה.\n3. "תגיד בקול איזה קלף בחרת." ("שבע לב", "מלכה עלה", "אס יהלום")\n4. עם אוזנייה: שומעים בסתר "נקלט: ..." - הקלף כבר מוכן.\n5. "תהפוך את הטלפון שלי." הטפט של מסך הנעילה הוא הקלף שלו.\n\n💡 טיפים:\n• אחרי שהצופה אמר את הקלף - לא להגיד קלף אחר בקול.\n• "מוכן לצופה הבא" מחזיר את הטפט הרגיל.', '"איזה קלף בחרת? שבע לב? ...מוזר. תהפוך את הטלפון שלי."'],
+    en: ['🃏 Card on the phone', 'Setup: allow the microphone. Needs internet. An earphone is recommended.\n\n1. "Save & Close" - the lock screen shows. Put the phone face down on the table.\n2. The spectator picks a card.\n3. "Say out loud which card you picked." ("seven of hearts")\n4. With an earphone: you secretly hear "got: ..." - the card is ready.\n5. "Flip my phone." The lock screen wallpaper is their card.\n\n💡 Tips:\n• After the spectator names the card - don\'t say another card out loud.\n• "Ready for next spectator" restores the normal wallpaper.', '"Which card? Seven of hearts? ...strange. Flip my phone."']
+  },
+  toggleRemoteTrick: {
+    he: ['🗣️ שלט רחוק סודי', 'הכנה: לאשר מיקרופון ולבחור מילת קוד. צריך אינטרנט.\n\n1. "שמור וסגור" - מסך הנעילה מופיע.\n2. מגישים את הטלפון לצופה: "תחזיק רגע."\n3. ממשיכים לדבר רגיל, ובאמצע אומרים את מילת הקוד (למשל "וואלה").\n4. באותה שנייה אצלו בטלפון קופצת הודעה (עם רטט), או שהתמונה מתחלפת.\n\n💡 טיפים:\n• בחר מילה שאתה יכול להגיד בטבעיות, אבל שהצופה לא יגיד לבד.\n• עובד פעם אחת בכל הופעה. "מוכן לצופה הבא" מאפס.', '"תחזיק לי רגע את הטלפון... וואלה, איזה יום היה היום. רגע, מי שלח לך הודעה?"'],
+    en: ['🗣️ Secret remote', 'Setup: allow the microphone and choose a code word. Needs internet.\n\n1. "Save & Close" - the lock screen shows.\n2. Hand the phone to the spectator: "Hold this for a sec."\n3. Keep talking normally, and say the code word in the middle.\n4. That second a message pops up on the phone in their hand (with a buzz), or the photo changes.\n\n💡 Tips:\n• Pick a word you can say naturally but the spectator won\'t say by chance.\n• Works once per show. "Ready for next spectator" resets it.', '"Hold my phone for a sec... wow, what a day. Wait, who just messaged you?"']
   },
   toggleCallReveal: {
     he: ['📞 חשיפה בשיחה נכנסת', 'אחרי הפתיחה הטלפון מצלצל, ושם המתקשר הוא הקוד. אפשר גם להפעיל מהשלט בטלפון השני.', '"מישהו מתקשר אליי... תגיד לי מי זה?"'],
@@ -6731,6 +7898,7 @@ function initTour() {
 const WHATS_NEW_SEEN_KEY = 'magic_whats_new_seen_v1';
 const WHATS_NEW_MAX_ITEMS = 6;
 const WHATS_NEW = [
+  { ver: '8.0', icon: '🎧', target: '#toggleLiveRead', he: ['קריאה בזמן אמת', 'אתה עם הגב, הצופה מקליד קוד - ואתה אומר כל ספרה ברגע שהוא לוחץ עליה. הספרות נלחשות לך באוזניית בלוטות\'.'], en: ['Live reading', 'Your back is turned, the spectator types a code - and you name every digit the moment it is pressed. The digits are whispered into your Bluetooth earphone.'] },
   { ver: '7.9', icon: '🛡️', target: null, he: ['ליטוש לפני הופעות', 'עברנו על כל מסך בכל סוג טלפון. באייפון מוצג רק מה שעובד שם, והכל אמין יותר מתמיד.'], en: ['Polished for shows', 'We went over every screen on every phone type. On iPhone you see only what works there, and everything is more reliable than ever.'] },
   { ver: '7.8', icon: '✨', target: null, he: ['מראה חדש מהרגע הראשון', 'גם ההרשמה, בחירת הטלפון וכל החלונות בעיצוב החדש. האפליקציה ממוקדת: רק מה שעובד בצורה מושלמת.'], en: ['A new look from the first second', 'Sign-up, phone selection and every window now share the new design. The app is focused: only what works perfectly.'] },
   { ver: '7.6', icon: '🏠', target: '#homeTargetNote', he: ['רק מה שעובד - ומסך הבית האמיתי', 'אחרי הפתיחה הטלפון יוצא למסך הבית האמיתי. באייפון (שם אפל לא מאפשרת לצאת) מופיע צילום מסך הבית שלך עם השעה והסוללה האמיתיות. ו"תאריך לידה" מקבל הסבר מלא + "❌ לא תאריך".'], en: ['Only what works - and the real home screen', 'After unlocking the phone exits to the real home screen. On iPhone (where Apple doesn\'t allow exiting) a screenshot of your home screen appears with the real time and battery. And "Birthday" gets a full how-to + "❌ Not a date".'] },

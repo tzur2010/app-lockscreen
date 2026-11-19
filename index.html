@@ -169,8 +169,11 @@ fit();addEventListener('resize',fit);addEventListener('orientationchange',functi
           <p>באנדרואיד: הטלפון יוצא באמת למסך הבית האמיתי שלך.<br>באייפון: אפל לא מאפשרת לאף אפליקציה לצאת לבד למסך הבית, לכן מוצג צילום של מסך הבית שלך - עם השעה והסוללה האמיתיות למעלה.<br>פעם אחת: במסך הבית לוחצים צד + עוצמה למעלה, ואז לשונית פתיחה ← "בחר צילום של מסך הבית שלך".</p>
         </details>
         <details>
-          <summary>🎂 תאריך לידה</summary>
-          <p>1. אומרים לצופה: "תחשוב על מישהו שאתה אוהב, ותקליד כקוד את תאריך הלידה שלו: יום, חודש ושנה - 6 ספרות. אל תגיד לי של מי." (15 במרץ 1992 = 150392)<br>2. לחיצה ארוכה במסך: מתחת לקוד מופיעים מזל, גיל ויום בשבוע.<br>3. אם כתוב "❌ לא תאריך" - הצופה לא הקליד תאריך: עוברים לחשיפה רגילה של הקוד.<br>4. סדר החשיפה: קודם מי זה לפי הגיל ("מישהו צעיר... הילד שלך?"), אחר כך המזל, ובסוף היום שבו נולד.<br>💡 לעולם לא חושפים את התאריך עצמו - ככה זה קריאת מחשבות ולא "ראית את הקוד".</p>
+          <summary>🎧 קריאה בזמן אמת</summary>
+          <p>1. אוזניית בלוטות' אחת באוזן, מחוברת לטלפון. בהגדרות: "🔊 בדיקת אוזנייה".<br>2. נותנים לצופה את הטלפון ומסתובבים עם הגב: "תקליד קוד, ספרה אחרי ספרה".<br>3. כל ספרה נלחשת לך באוזנייה ברגע שהיא נלחצת - אומרים אותה בקול, לאט.<br>💡 באנדרואיד: בלי אוזנייה הטלפון שותק לגמרי. באייפון: בודקים אוזנייה לפני כל הופעה.</p>
+        </details>
+        <details>
+          <summary>🎂 תאריך לידה</summary>          <p>1. אומרים לצופה: "תחשוב על מישהו שאתה אוהב, ותקליד כקוד את תאריך הלידה שלו: יום, חודש ושנה - 6 ספרות. אל תגיד לי של מי." (15 במרץ 1992 = 150392)<br>2. לחיצה ארוכה במסך: מתחת לקוד מופיעים מזל, גיל ויום בשבוע.<br>3. אם כתוב "❌ לא תאריך" - הצופה לא הקליד תאריך: עוברים לחשיפה רגילה של הקוד.<br>4. סדר החשיפה: קודם מי זה לפי הגיל ("מישהו צעיר... הילד שלך?"), אחר כך המזל, ובסוף היום שבו נולד.<br>💡 לעולם לא חושפים את התאריך עצמו - ככה זה קריאת מחשבות ולא "ראית את הקוד".</p>
         </details>
         <details style="display: none;">
           <summary>📝 חשיפה בפתקים</summary>
@@ -519,6 +522,179 @@ fit();addEventListener('resize',fit);addEventListener('orientationchange',functi
             <div class="toggle-sub-desc" id="faceTrickCamNote" style="margin-top: 6px; font-weight: 600;"></div>
           </div>
 
+          </div>
+
+          <!-- קריאה בזמן אמת: כל ספרה נלחשת לאוזניית הקוסם ברגע שנלחצת (הקוסם עם הגב) -->
+          <div class="clean-toggle-row oneui-row-with-sub">
+            <div class="toggle-text-stack">
+              <span class="toggle-main-title">🎧 קריאה בזמן אמת</span>
+              <span class="toggle-sub-desc">אתה עומד עם הגב, והצופה מקליד קוד. כל ספרה נלחשת לך באוזנייה ברגע שהוא לוחץ - ואתה אומר אותה בקול, אחת אחרי השנייה.</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="toggleLiveRead">
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="oneui-field-block" id="liveReadExtra" style="display: none; padding-top: 0;">
+            <label class="config-label">שפת הלחישה</label>
+            <div class="segmented-row" id="liveReadLangSelector">
+              <button type="button" class="seg-pill" data-lrlang="he">עברית</button>
+              <button type="button" class="seg-pill" data-lrlang="en">English</button>
+            </div>
+            <div class="clean-toggle-row oneui-row-with-sub" style="padding: 4px 0;">
+              <div class="toggle-text-stack">
+                <span class="toggle-main-title">🔁 חזרה על כל הקוד בסוף</span>
+                <span class="toggle-sub-desc">כשהצופה מסיים להקליד, שומעים שוב את כל הקוד ברצף - גם אם פספסת ספרה.</span>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="toggleLiveReadRecap" checked>
+                <span class="slider"></span>
+              </label>
+            </div>
+            <div class="clean-toggle-row oneui-row-with-sub" id="liveReadVoiceRow" style="padding: 4px 0; display: none;">
+              <div class="toggle-text-stack">
+                <span class="toggle-main-title">🗣️ חזרה בפקודה קולית</span>
+                <span class="toggle-sub-desc">אחרי הקוד, אומרים "תחזור על הקוד" (או "תחזרי") - והקוד נלחש לך שוב. הטלפון צריך להישאר על מסך הנעילה.</span>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="toggleLiveReadVoice">
+                <span class="slider"></span>
+              </label>
+            </div>
+            <div class="toggle-sub-desc live-read-status" id="liveReadVoiceStatus"></div>
+            <button type="button" class="media-upload-btn" id="liveReadTestBtn" style="width: 100%; margin-top: 4px;">🔊 בדיקת אוזנייה</button>
+            <div class="toggle-sub-desc live-read-status" id="liveReadStatus"></div>
+            <div class="toggle-sub-desc" style="margin-top: 4px; line-height: 1.6;">
+              צריך אוזניית בלוטות' אחת באוזן. באנדרואיד הטלפון שותק לגמרי אם אין אוזנייה מחוברת. עובד עם קוד PIN. הסבר מלא ומה אומרים לצופה: כפתור ה-?
+            </div>
+          </div>
+
+          <div class="oneui-card-divider"></div>
+
+          <!-- הטלפון ידע מראש: הצופה אומר מילה בקול - והיא מופיעה מתחת לשעון במסך הנעילה (אנדרואיד) -->
+          <div id="wordPredictBlock" style="display: none;">
+          <div class="clean-toggle-row oneui-row-with-sub">
+            <div class="toggle-text-stack">
+              <span class="toggle-main-title">🔮 הטלפון ידע מראש</span>
+              <span class="toggle-sub-desc">המסך נראה כבוי. הצופה אומר בקול מילה כלשהי - מפורסם, עיר, חיה. מדליקים את הטלפון - ובמסך הנעילה האמיתי, בשורה שלמטה, כתובה המילה.</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="toggleWordPredict">
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="oneui-field-block" id="wordPredictExtra" style="display: none; padding-top: 0;">
+            <label class="config-label">איפה המילה מופיעה במסך הנעילה האמיתי</label>
+            <div class="segmented-row" id="wordPredictModeSelector">
+              <button type="button" class="seg-pill" data-wpmode="wallpaper">🖼️ בשורה למטה</button>
+              <button type="button" class="seg-pill" data-wpmode="notification">📩 כהתראה</button>
+            </div>
+            <div class="toggle-sub-desc" id="wordPredictModeNote" style="line-height: 1.6;"></div>
+            <div id="wordPredictWpFields">
+              <label class="media-upload-btn" style="display: block; text-align: center; width: 100%; margin-top: 4px; box-sizing: border-box;">
+                🖼️ בחר את התמונה המקורית (בלי שעון)
+                <input type="file" id="wordWallpaperFileInput" accept="image/*" hidden>
+              </label>
+              <div class="toggle-sub-desc live-read-status" id="wordWallpaperStatus"></div>
+              <button type="button" class="media-upload-btn" id="wordWallpaperTestBtn" style="width: 100%; margin-top: 4px;">🧪 בדיקה: כתוב "בדיקה" על מסך הנעילה</button>
+              <div class="toggle-sub-desc live-read-status" id="wordWallpaperTestStatus" style="line-height: 1.6;"></div>
+              <img id="wordWallpaperPreview" alt="" style="display: none; width: 34%; margin: 6px auto 0; border-radius: 10px; border: 1px solid rgba(255,255,255,0.2);">
+            </div>
+            <div id="wordPredictNotifFields">
+            <label class="config-label" for="wordPredictTitleInput">כותרת ההתראה</label>
+            <input type="text" id="wordPredictTitleInput" class="feedback-textarea gallery-text-input" maxlength="40" dir="rtl" placeholder="תזכורת">
+            <label class="config-label">ההתראה "נשלחה"</label>
+            <div class="segmented-row" id="wordPredictAgoSelector">
+              <button type="button" class="seg-pill" data-ago="30">לפני חצי שעה</button>
+              <button type="button" class="seg-pill" data-ago="180">לפני 3 שעות</button>
+              <button type="button" class="seg-pill" data-ago="1440">אתמול</button>
+            </div>
+            </div>
+            <label class="config-label" for="wordPredictTplInput">מה כתוב ({מילה} = מה שהצופה אמר)</label>
+            <input type="text" id="wordPredictTplInput" class="feedback-textarea gallery-text-input" maxlength="60" dir="rtl">
+            <label class="config-label">שפת הזיהוי</label>
+            <div class="segmented-row" id="wordPredictLangSelector">
+              <button type="button" class="seg-pill" data-wplang="he">עברית</button>
+              <button type="button" class="seg-pill" data-wplang="en">English</button>
+            </div>
+            <div class="toggle-sub-desc live-read-status" id="wordPredictStatus"></div>
+            <div class="toggle-sub-desc" style="margin-top: 4px; line-height: 1.6;">
+              אחרי "שמור וסגור" המסך נהיה שחור ומקשיב. כשבאוזנייה נשמע "נקלט: ..." - לוחצים פעמיים על כפתור הצד, ומסך הנעילה האמיתי נדלק עם המילה. הסבר מלא: כפתור ה-?
+            </div>
+          </div>
+          <div class="oneui-card-divider"></div>
+          </div>
+
+          <!-- 🃏 הקלף בטלפון: הצופה אומר קלף בקול - הטפט של מסך הנעילה הופך לקלף שלו (אנדרואיד) -->
+          <div id="cardTrickBlock">
+          <div class="clean-toggle-row oneui-row-with-sub">
+            <div class="toggle-text-stack">
+              <span class="toggle-main-title">🃏 הקלף בטלפון</span>
+              <span class="toggle-sub-desc">הצופה אומר בקול איזה קלף בחר ("שבע לב"). הופכים את הטלפון הנעול - והטפט הוא הקלף שלו.</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="toggleCardTrick">
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="oneui-field-block" id="cardTrickExtra" style="display: none; padding-top: 0;">
+            <label class="config-label">שפת הזיהוי</label>
+            <div class="segmented-row voice-lang-selector">
+              <button type="button" class="seg-pill" data-vlang="he">עברית</button>
+              <button type="button" class="seg-pill" data-vlang="en">English</button>
+            </div>
+            <div class="toggle-sub-desc live-read-status" id="cardTrickStatus"></div>
+            <div class="toggle-sub-desc" style="margin-top: 4px; line-height: 1.6;">
+              אחרי "שמור וסגור" הטלפון מקשיב. שמות: אס, 2-10, נסיך, מלכה, מלך + לב, יהלום, תלתן, עלה. עם אוזנייה שומעים "נקלט: ..." ברגע שהקלף מוכן.
+            </div>
+          </div>
+          <div class="oneui-card-divider"></div>
+          </div>
+
+          <!-- 🗣️ שלט רחוק סודי: הקוסם אומר מילת קוד - בטלפון שביד הצופה קופצת הודעה / מתחלפת התמונה (אנדרואיד) -->
+          <div id="remoteTrickBlock">
+          <div class="clean-toggle-row oneui-row-with-sub">
+            <div class="toggle-text-stack">
+              <span class="toggle-main-title">🗣️ שלט רחוק סודי</span>
+              <span class="toggle-sub-desc">הטלפון הנעול ביד של הצופה. אתה אומר בשיחה מילת קוד - ובאותה שנייה קופצת לו הודעה, או שהתמונה מתחלפת.</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="toggleRemoteTrick">
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="oneui-field-block" id="remoteTrickExtra" style="display: none; padding-top: 0;">
+            <label class="config-label" for="remoteWordInput">מילת הקוד (מה שאתה אומר)</label>
+            <input type="text" id="remoteWordInput" class="feedback-textarea gallery-text-input" maxlength="30" dir="rtl" placeholder="וואלה">
+            <label class="config-label">מה קורה</label>
+            <div class="segmented-row" id="remoteActionSelector">
+              <button type="button" class="seg-pill" data-raction="notif">💬 קופצת הודעה</button>
+              <button type="button" class="seg-pill" data-raction="photo">🖼️ התמונה מתחלפת</button>
+            </div>
+            <div id="remoteNotifFields">
+              <label class="config-label" for="remoteNotifTitleInput">ממי ההודעה</label>
+              <input type="text" id="remoteNotifTitleInput" class="feedback-textarea gallery-text-input" maxlength="40" dir="rtl" placeholder="אמא">
+              <label class="config-label" for="remoteNotifTextInput">מה כתוב בהודעה</label>
+              <input type="text" id="remoteNotifTextInput" class="feedback-textarea gallery-text-input" maxlength="120" dir="rtl">
+            </div>
+            <div id="remotePhotoFields">
+              <label class="media-upload-btn" style="display: block; text-align: center; width: 100%; margin-top: 4px; box-sizing: border-box;">
+                🖼️ בחר את התמונה שתופיע
+                <input type="file" id="remotePhotoFileInput" accept="image/*" hidden>
+              </label>
+              <div class="toggle-sub-desc live-read-status" id="remotePhotoStatus"></div>
+            </div>
+            <label class="config-label">שפת הזיהוי</label>
+            <div class="segmented-row voice-lang-selector">
+              <button type="button" class="seg-pill" data-vlang="he">עברית</button>
+              <button type="button" class="seg-pill" data-vlang="en">English</button>
+            </div>
+            <div class="toggle-sub-desc live-read-status" id="remoteTrickStatus"></div>
+            <div class="toggle-sub-desc" style="margin-top: 4px; line-height: 1.6;">
+              בחר מילה שאתה יכול להגיד בטבעיות, אבל שהצופה לא יגיד לבד. עובד פעם אחת בכל הופעה.
+            </div>
+          </div>
+          <div class="oneui-card-divider"></div>
           </div>
 
           <!-- תאריך לידה: הצופה מקליד כקוד תאריך לידה של מישהו קרוב - הקוסם יודע מזל, גיל ועוד -->
@@ -1223,6 +1399,16 @@ fit();addEventListener('resize',fit);addEventListener('orientationchange',functi
       <div class="clock-lock-swipe-prompt">החלק או הקש להזנת סיסמה</div>
       <!-- טקסט אישי במסך הנעילה (כמו "פרטי קשר" בסמסונג) + קיצור דרך לטלפון בפינה -->
       <div class="clock-owner-info" id="clockOwnerInfo"></div>
+      <!-- 🗣️ שלט רחוק סודי: הודעה שקופצת במסך הנעילה -->
+      <div class="remote-notif" id="remoteNotif" aria-hidden="true">
+        <div class="rn-head">
+          <span class="rn-icon"><svg viewBox="0 0 24 24"><path fill="#fff" d="M12 3a9 9 0 0 0-7.8 13.5L3 21l4.6-1.2A9 9 0 1 0 12 3zm4.6 12.6c-.2.6-1.1 1.1-1.6 1.2-.4.1-1 .1-1.6-.1-.4-.1-.8-.3-1.4-.5-2.5-1.1-4.1-3.6-4.2-3.8-.1-.2-1-1.3-1-2.5s.6-1.8.9-2.1c.2-.2.5-.3.7-.3h.5c.2 0 .4 0 .6.4l.8 1.9c.1.2.1.3 0 .5l-.4.6c-.1.2-.3.3-.1.6.1.2.6 1 1.3 1.6.9.8 1.6 1 1.8 1.1.2.1.4.1.5-.1l.7-.8c.2-.2.3-.2.6-.1l1.8.9c.3.1.4.2.5.3 0 .1 0 .6-.1 1.2z"/></svg></span>
+          <span class="rn-app">WhatsApp</span>
+          <span class="rn-time">עכשיו</span>
+        </div>
+        <div class="rn-title"></div>
+        <div class="rn-text"></div>
+      </div>
       <div class="clock-shortcut" id="clockShortcutPhone" aria-hidden="true">
         <svg viewBox="0 0 24 24"><path d="M6.6 10.8a15.2 15.2 0 0 0 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1A17 17 0 0 1 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1z"/></svg>
       </div>
@@ -1496,6 +1682,9 @@ fit();addEventListener('resize',fit);addEventListener('orientationchange',functi
     </div>
 
     <!-- חלון הצצה סודי (Secret Hold Peek) -->
+    <!-- 🔮 "הטלפון ידע מראש": מסך "כבוי" (שחור). נגיעה = מסך הנעילה נדלק עם המילה -->
+    <div class="fake-off-screen" id="fakeOffScreen" style="display: none;"></div>
+
     <div class="secret-peek" id="secretPeek">
       <svg class="peek-pattern-mini" id="peekPatternMini" viewBox="0 0 60 60"></svg>
       <span class="peek-text" id="peekText">----</span>

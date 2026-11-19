@@ -11,14 +11,14 @@
   <meta property="og:description" content="אפליקציית קסמים לטלפון: כל ספרה שהצופה לוחץ נלחשת לך באוזנייה. אנדרואיד ואייפון.">
   <style>
     :root {
-      --bg: #060609; --panel: #0e0e15; --panel2: #13131c; --line: rgba(255,255,255,.08); --line2: rgba(255,255,255,.14);
-      --text: #f4f4f7; --muted: #9a9aab; --soft: #c9c9d4; --accent: #7c6cff; --accent2: #22d3ee;
-      --grad: linear-gradient(135deg, #7c6cff 0%, #5b8cff 50%, #22d3ee 100%);
+      --bg: #0b0a09; --panel: #171615; --panel2: #1e1c1a; --line: rgba(255,238,210,.08); --line2: rgba(255,238,210,.14);
+      --text: #f6f1e8; --muted: #a69d90; --soft: #d6cec2; --accent: #e7b85c; --accent2: #f6d68f;
+      --grad: linear-gradient(135deg, #f6d68f 0%, #e7b85c 55%, #c99436 100%); --ink: #1a1408;
     }
     * { box-sizing: border-box; }
     html { scroll-behavior: smooth; }
     body { margin: 0; min-height: 100vh; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "Noto Sans Hebrew", Arial, sans-serif; line-height: 1.6; -webkit-font-smoothing: antialiased; }
-    body::before { content: ''; position: fixed; inset: -20% -10% auto; height: 70vh; background: radial-gradient(50% 50% at 50% 50%, rgba(124,108,255,.22), transparent 70%); pointer-events: none; z-index: 0; }
+    body::before { content: ''; position: fixed; inset: -20% -10% auto; height: 70vh; background: radial-gradient(50% 50% at 50% 50%, rgba(231,184,92,.16), transparent 70%); pointer-events: none; z-index: 0; }
     main { position: relative; z-index: 1; max-width: 520px; margin: 0 auto; padding: 0 20px 40px; }
     .hide { display: none !important; }
     a { color: inherit; }
@@ -26,21 +26,21 @@
     /* סרגל עליון */
     .nav { display: flex; align-items: center; justify-content: space-between; padding: 18px 0 8px; }
     .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 17px; letter-spacing: .2px; direction: ltr; }
-    .mark { width: 32px; height: 32px; border-radius: 9px; background: var(--grad); display: grid; place-items: center; box-shadow: 0 6px 18px rgba(124,108,255,.45); }
+    .mark { width: 32px; height: 32px; border-radius: 9px; background: var(--grad); color: var(--ink); display: grid; place-items: center; box-shadow: 0 6px 18px rgba(231,184,92,.35); }
     .mark svg { width: 17px; height: 17px; }
     .lang { background: transparent; border: 1px solid var(--line2); color: var(--soft); border-radius: 999px; padding: 6px 14px; font: inherit; font-size: 13px; cursor: pointer; }
 
     /* פתיח */
     .hero { text-align: center; padding: 34px 0 10px; }
     .eyebrow { display: inline-flex; align-items: center; gap: 8px; padding: 5px 12px 5px 14px; border-radius: 999px; border: 1px solid var(--line2); background: rgba(255,255,255,.03); color: var(--soft); font-size: 12.5px; font-weight: 600; }
-    .eyebrow i { width: 7px; height: 7px; border-radius: 50%; background: var(--accent2); box-shadow: 0 0 10px var(--accent2); }
+    .eyebrow i { width: 7px; height: 7px; border-radius: 50%; background: var(--accent2); box-shadow: 0 0 10px var(--accent); }
     h1 { margin: 18px 0 14px; font-size: 37px; line-height: 1.15; font-weight: 700; letter-spacing: -.5px; }
     h1 .g { background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
     .lead { margin: 0 auto; max-width: 400px; color: var(--muted); font-size: 16.5px; }
     .cta-row { display: flex; gap: 10px; margin: 24px 0 6px; }
     .btn { flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 52px; border-radius: 14px; border: none; font: inherit; font-size: 16px; font-weight: 700; text-decoration: none; cursor: pointer; }
     .btn-main { background: var(--text); color: #0a0a10; }
-    .btn-grad { background: var(--grad); color: #fff; box-shadow: 0 10px 30px rgba(91,140,255,.35); }
+    .btn-grad { background: var(--grad); color: var(--ink); box-shadow: 0 10px 30px rgba(231,184,92,.28); }
     .btn-ghost { background: rgba(255,255,255,.05); color: var(--text); border: 1px solid var(--line2); }
     .meta { text-align: center; color: var(--muted); font-size: 12.5px; margin-top: 8px; }
 
@@ -49,7 +49,7 @@
     .demo-grid { display: flex; align-items: center; gap: 14px; }
     .phone-col { width: 50%; flex: none; }
     .phone { position: relative; aspect-ratio: 9 / 19.5; border-radius: 30px; padding: 6px; background: linear-gradient(145deg, #2a2a33, #111116); box-shadow: inset 0 0 0 1px rgba(255,255,255,.08), 0 20px 40px rgba(0,0,0,.6); }
-    .screen { position: relative; height: 100%; border-radius: 25px; overflow: hidden; background: radial-gradient(120% 60% at 30% 0%, #3b3b8f 0%, transparent 60%), linear-gradient(170deg, #1d2346 0%, #24164a 55%, #120c26 100%); display: flex; flex-direction: column; align-items: center; padding-top: 20%; }
+    .screen { position: relative; height: 100%; border-radius: 25px; overflow: hidden; background: radial-gradient(120% 60% at 30% 0%, #3a2f22 0%, transparent 60%), linear-gradient(170deg, #1f1a14 0%, #15110d 55%, #0d0b09 100%); display: flex; flex-direction: column; align-items: center; padding-top: 20%; }
     .cam { position: absolute; top: 2.4%; left: 50%; width: 7px; height: 7px; margin-left: -3.5px; border-radius: 50%; background: #000; box-shadow: 0 0 0 1.5px #1a1a1a; }
     .pin-title { color: rgba(255,255,255,.92); font-size: 11.5px; font-weight: 600; }
     .dots { direction: ltr; display: flex; gap: 9px; margin: 10px 0 13%; }
@@ -64,15 +64,15 @@
     .finger.tap { transform: scale(.72); }
 
     .ear-col { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
-    .ear { padding: 14px 12px; border-radius: 18px; background: rgba(34,211,238,.06); border: 1px solid rgba(34,211,238,.22); }
-    .ear-h { display: flex; align-items: center; gap: 7px; font-size: 11.5px; font-weight: 600; color: #8fe9f7; }
+    .ear { padding: 14px 12px; border-radius: 18px; background: rgba(231,184,92,.07); border: 1px solid rgba(231,184,92,.3); }
+    .ear-h { display: flex; align-items: center; gap: 7px; font-size: 11.5px; font-weight: 600; color: #f6d68f; }
     .ear-h svg { width: 15px; height: 15px; flex: none; }
     .ear-word { font-size: 25px; font-weight: 700; margin: 6px 0 8px; min-height: 36px; letter-spacing: .3px; transition: opacity .15s; }
     .wave { direction: ltr; display: flex; align-items: center; gap: 3px; height: 22px; }
-    .wave span { flex: 1; height: 3px; border-radius: 2px; background: rgba(143,233,247,.45); transition: height .12s; }
+    .wave span { flex: 1; height: 3px; border-radius: 2px; background: rgba(246,214,143,.4); transition: height .12s; }
     .wave.on span { animation: wv .5s ease-in-out infinite alternate; }
     .wave.on span:nth-child(2n) { animation-delay: .1s; } .wave.on span:nth-child(3n) { animation-delay: .2s; } .wave.on span:nth-child(5n) { animation-delay: .3s; }
-    @keyframes wv { from { height: 3px; } to { height: 20px; background: #8fe9f7; } }
+    @keyframes wv { from { height: 3px; } to { height: 20px; background: #f6d68f; } }
     .said { padding: 12px; border-radius: 18px; background: rgba(255,255,255,.04); border: 1px solid var(--line); }
     .said-h { font-size: 11.5px; font-weight: 600; color: var(--muted); }
     .said-v { direction: ltr; text-align: start; font-size: 22px; font-weight: 700; letter-spacing: 4px; min-height: 32px; margin-top: 2px; }
@@ -91,7 +91,7 @@
     .diff b { display: block; color: var(--text); font-size: 14px; margin-bottom: 2px; }
     .steps { display: grid; gap: 10px; }
     .step { display: flex; gap: 14px; align-items: flex-start; padding: 16px; border-radius: 18px; background: var(--panel); border: 1px solid var(--line); }
-    .num { flex: none; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: 14px; background: rgba(124,108,255,.15); color: #b4abff; border: 1px solid rgba(124,108,255,.35); }
+    .num { flex: none; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: 14px; background: rgba(231,184,92,.12); color: var(--accent2); border: 1px solid rgba(231,184,92,.4); }
     .step b { display: block; font-size: 15.5px; }
     .step span { color: var(--muted); font-size: 14px; }
     .feat { list-style: none; margin: 0; padding: 6px 18px; border-radius: 20px; background: var(--panel); border: 1px solid var(--line); }
@@ -116,7 +116,7 @@
     .tabs { display: flex; gap: 8px; margin-bottom: 12px; }
     .tab { flex: 1; padding: 10px; border-radius: 12px; border: 1px solid var(--line2); background: transparent; color: var(--soft); font: inherit; font-weight: 700; cursor: pointer; }
     .tab.on { background: var(--text); color: #0a0a10; border-color: transparent; }
-    .final { margin-top: 44px; padding: 26px 20px; border-radius: 24px; text-align: center; background: radial-gradient(100% 120% at 50% 0%, rgba(124,108,255,.25), transparent 70%), var(--panel); border: 1px solid var(--line2); }
+    .final { margin-top: 44px; padding: 26px 20px; border-radius: 24px; text-align: center; background: radial-gradient(100% 120% at 50% 0%, rgba(231,184,92,.18), transparent 70%), var(--panel); border: 1px solid var(--line2); }
     .final h2 { margin: 0 0 6px; }
     .final p { margin: 0 0 18px; color: var(--muted); }
     .foot { text-align: center; font-size: 12px; color: #5d5d6c; margin-top: 26px; }
@@ -127,7 +127,7 @@
 <main>
   <nav class="nav">
     <div class="brand">
-      <span class="mark"><svg viewBox="0 0 24 24" fill="none"><rect x="5" y="10.5" width="14" height="10" rx="2.5" fill="#fff"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/></svg></span>
+      <span class="mark"><svg viewBox="0 0 24 24" fill="none"><rect x="5" y="10.5" width="14" height="10" rx="2.5" fill="#1a1408"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5" stroke="#1a1408" stroke-width="2.2" stroke-linecap="round"/></svg></span>
       Lockscreen
     </div>
     <button type="button" class="lang" id="langBtn">English</button>
@@ -178,9 +178,9 @@
     <div class="kicker" data-t="diffK"></div>
     <h2 data-t="diffH"></h2>
     <div class="diff">
-      <div><svg viewBox="0 0 24 24" fill="none" stroke="#b4abff" stroke-width="1.8" stroke-linecap="round"><path d="M3 3l18 18"/><path d="M10.6 5.1A10.4 10.4 0 0 1 12 5c6 0 9.5 7 9.5 7a17 17 0 0 1-3.1 4.1M6.2 6.2A17 17 0 0 0 2.5 12S6 19 12 19a9.6 9.6 0 0 0 5-1.4"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg><b data-t="d1b"></b><span data-t="d1"></span></div>
-      <div><svg viewBox="0 0 24 24" fill="none" stroke="#b4abff" stroke-width="1.8" stroke-linecap="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4l6 6M22 4l-6 6"/></svg><b data-t="d2b"></b><span data-t="d2"></span></div>
-      <div><svg viewBox="0 0 24 24" fill="none" stroke="#b4abff" stroke-width="1.8" stroke-linecap="round"><rect x="6" y="2.5" width="12" height="19" rx="3"/><path d="M10.5 18.5h3"/></svg><b data-t="d3b"></b><span data-t="d3"></span></div>
+      <div><svg viewBox="0 0 24 24" fill="none" stroke="#e7b85c" stroke-width="1.8" stroke-linecap="round"><path d="M3 3l18 18"/><path d="M10.6 5.1A10.4 10.4 0 0 1 12 5c6 0 9.5 7 9.5 7a17 17 0 0 1-3.1 4.1M6.2 6.2A17 17 0 0 0 2.5 12S6 19 12 19a9.6 9.6 0 0 0 5-1.4"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg><b data-t="d1b"></b><span data-t="d1"></span></div>
+      <div><svg viewBox="0 0 24 24" fill="none" stroke="#e7b85c" stroke-width="1.8" stroke-linecap="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4l6 6M22 4l-6 6"/></svg><b data-t="d2b"></b><span data-t="d2"></span></div>
+      <div><svg viewBox="0 0 24 24" fill="none" stroke="#e7b85c" stroke-width="1.8" stroke-linecap="round"><rect x="6" y="2.5" width="12" height="19" rx="3"/><path d="M10.5 18.5h3"/></svg><b data-t="d3b"></b><span data-t="d3"></span></div>
     </div>
   </section>
 
@@ -200,11 +200,11 @@
     <div class="kicker" data-t="featK"></div>
     <h2 data-t="featH"></h2>
     <ul class="feat">
-      <li><svg viewBox="0 0 24 24" fill="none" stroke="#22d3ee" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg><span data-t="f1"></span></li>
-      <li><svg viewBox="0 0 24 24" fill="none" stroke="#22d3ee" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg><span data-t="f2"></span></li>
-      <li><svg viewBox="0 0 24 24" fill="none" stroke="#22d3ee" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg><span data-t="f3"></span></li>
-      <li><svg viewBox="0 0 24 24" fill="none" stroke="#22d3ee" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg><span data-t="f4"></span></li>
-      <li><svg viewBox="0 0 24 24" fill="none" stroke="#22d3ee" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg><span data-t="f5"></span></li>
+      <li><svg viewBox="0 0 24 24" fill="none" stroke="#e7b85c" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg><span data-t="f1"></span></li>
+      <li><svg viewBox="0 0 24 24" fill="none" stroke="#e7b85c" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg><span data-t="f2"></span></li>
+      <li><svg viewBox="0 0 24 24" fill="none" stroke="#e7b85c" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg><span data-t="f3"></span></li>
+      <li><svg viewBox="0 0 24 24" fill="none" stroke="#e7b85c" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg><span data-t="f4"></span></li>
+      <li><svg viewBox="0 0 24 24" fill="none" stroke="#e7b85c" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg><span data-t="f5"></span></li>
     </ul>
   </section>
 

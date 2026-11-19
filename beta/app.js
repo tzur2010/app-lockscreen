@@ -1022,7 +1022,8 @@ function applySettingsColorScheme() {
   if (!deviceConfigSheet) return;
   const savedScheme = localStorage.getItem('magic_lockscreen_settings_theme') || config.settingsColorScheme || 'dark';
   config.settingsColorScheme = savedScheme === 'light' ? 'light' : 'dark';
-  deviceConfigSheet.classList.toggle('light-mode', config.settingsColorScheme === 'light');
+  // 10.0 (עיצוב "במה"): עיצוב אחד כהה עם זהב - בלי מצב בהיר
+  deviceConfigSheet.classList.remove('light-mode');
 }
 
 if (settingsThemeToggleBtn) {
@@ -5065,7 +5066,7 @@ function initDeviceLicenseGate() {
 // החלון מוצג רק כשמסך ההגדרות פתוח (בפתיחת האפליקציה / בתפריט הסודי),
 // ולעולם לא מעל מסך הנעילה הפעיל מול קהל.
 // ============================================================================
-const APP_VERSION = '9.6';
+const APP_VERSION = '10.0';
 const DEFAULT_APK_URL = 'https://github.com/tzur2010/app-lockscreen/raw/main/Lockscreen.apk';
 const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 const UPDATE_DISMISS_KEY = 'magic_update_dismissed_version';

@@ -5067,7 +5067,7 @@ function initDeviceLicenseGate() {
 // החלון מוצג רק כשמסך ההגדרות פתוח (בפתיחת האפליקציה / בתפריט הסודי),
 // ולעולם לא מעל מסך הנעילה הפעיל מול קהל.
 // ============================================================================
-const APP_VERSION = '10.1';
+const APP_VERSION = '10.2';
 const DEFAULT_APK_URL = 'https://github.com/tzur2010/app-lockscreen/raw/main/Lockscreen.apk';
 const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 const UPDATE_DISMISS_KEY = 'magic_update_dismissed_version';
@@ -6061,6 +6061,41 @@ function updateHomeTiles() {
   const target = config.unlockTargetScreen || 'homescreen';
   set('htSubReveal', target === 'gallery' ? (en ? 'Gallery' : 'גלריה') : target === 'search' ? (en ? 'Search' : 'חיפוש') : (en ? 'Home screen' : 'מסך הבית'));
   set('htSubMore', en ? 'Guide · language · backup' : 'מדריך · שפה · גיבוי');
+
+  // תצוגה מקדימה: הטפט, השעה והתאריך - בדיוק מה שהצופה יראה
+  const pv = document.getElementById('hmPreview');
+  if (pv) {
+    let wp = '';
+    try { wp = currentBaseWallpaperUrl(); } catch (e) {}
+    if (wp) pv.style.backgroundImage = `url("${wp}")`;
+    const t = document.getElementById('clockLockBigTime');
+    const d = document.getElementById('clockLockDate');
+    set('hmPvTime', t ? t.textContent : '');
+    set('hmPvDate', d ? d.textContent : '');
+  }
+  set('hmLabel', en ? 'What the spectator sees' : 'מה שהצופה יראה');
+  set('hmDevice', model);
+  set('hmMeta', mode + ' · ' + (ownWp ? (en ? 'your wallpaper' : 'הטפט שלך') : (en ? 'default wallpaper' : 'טפט רגיל')));
+  set('hmStartText', en ? 'Start the show' : 'התחל הופעה');
+  set('hmTricksHead', en ? 'Your tricks' : 'הטריקים שלך');
+  set('hmAllTricks', en ? 'All ›' : 'הכל ‹');
+  set('hmSetHead', en ? 'Settings' : 'הגדרות');
+  if (en) {
+    const cardTxt = { live: ['Live reading', 'Every digit whispered to you'], any: ['Any code unlocks', 'Whatever they type opens it'], bday: ['Birthday', 'Sign, age and weekday'] };
+    Object.keys(cardTxt).forEach((k) => {
+      const tt = document.querySelector(`[data-hc="${k}"]`);
+      const ss = document.querySelector(`[data-hcs="${k}"]`);
+      if (tt) tt.textContent = cardTxt[k][0];
+      if (ss) ss.textContent = cardTxt[k][1];
+    });
+  }
+  document.querySelectorAll('.hm-card[data-toggle]').forEach((card) => {
+    const box = document.getElementById(card.dataset.toggle);
+    const on = Boolean(box && box.checked);
+    card.classList.toggle('on', on);
+    const b = card.querySelector('.hm-card-state b');
+    if (b) b.textContent = on ? (en ? 'On' : 'פועל') : (en ? 'Off' : 'כבוי');
+  });
 }
 
 function initSettingsTabs() {
@@ -6070,8 +6105,25 @@ function initSettingsTabs() {
       showSettingsTab(btn.dataset.tab);
     });
   });
-  // אריחים במסך הבית + כפתור "חזרה"
-  document.querySelectorAll('.home-tile[data-go]').forEach((btn) => {
+  // "התחל הופעה" = "שמור וסגור"
+  const hmStart = document.getElementById('hmStartBtn');
+  if (hmStart) hmStart.addEventListener('click', () => {
+    const launch = document.getElementById('launchLockscreenBtn');
+    if (launch) launch.click();
+  });
+  // כרטיסי הטריקים: נגיעה מדליקה/מכבה
+  document.querySelectorAll('.hm-card[data-toggle]').forEach((card) => {
+    card.addEventListener('click', () => {
+      const box = document.getElementById(card.dataset.toggle);
+      if (!box) return;
+      triggerHaptic(12);
+      box.checked = !box.checked;
+      box.dispatchEvent(new Event('change'));
+      updateHomeTiles();
+    });
+  });
+  // אריחים/שורות במסך הבית + כפתור "חזרה"
+  document.querySelectorAll('.home-tile[data-go], .hm-link[data-go]').forEach((btn) => {
     btn.addEventListener('click', () => {
       triggerHaptic(10);
       showSettingsTab(btn.dataset.go);

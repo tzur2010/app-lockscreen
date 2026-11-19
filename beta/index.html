@@ -440,6 +440,18 @@ fit();addEventListener('resize',fit);addEventListener('orientationchange',functi
           <button type="button" class="settings-tab" data-tab="more" role="tab"><span class="tab-ico">⚙️</span><span>עוד</span></button>
         </nav>
         <section class="settings-panel active" data-tab="trick">
+        <!-- הטריק המרכזי: מוצג ראשון, עם כפתור אחד להפעלה -->
+        <div class="star-trick-card" id="starTrickCard">
+          <div class="stc-top">
+            <span class="stc-ico">🎧</span>
+            <div>
+              <div class="stc-kicker" id="starTrickKicker">הטריק הכי חזק באפליקציה</div>
+              <div class="stc-title" id="starTrickTitle">קריאה בזמן אמת</div>
+              <div class="stc-sub" id="starTrickSub">אתה עם הגב, הצופה מקליד קוד - וכל ספרה נלחשת לך באוזנייה ברגע שהיא נלחצת.</div>
+            </div>
+          </div>
+          <button type="button" class="stc-btn" id="starTrickBtn">🎧 הפעל ונסה עכשיו</button>
+        </div>
         <div class="oneui-section-header">🔓 הבסיס</div>
         <div class="config-group oneui-card">
           <div class="clean-toggle-row oneui-row-with-sub">

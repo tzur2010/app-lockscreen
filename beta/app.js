@@ -5065,7 +5065,7 @@ function initDeviceLicenseGate() {
 // החלון מוצג רק כשמסך ההגדרות פתוח (בפתיחת האפליקציה / בתפריט הסודי),
 // ולעולם לא מעל מסך הנעילה הפעיל מול קהל.
 // ============================================================================
-const APP_VERSION = '9.4';
+const APP_VERSION = '9.5';
 const DEFAULT_APK_URL = 'https://github.com/tzur2010/app-lockscreen/raw/main/Lockscreen.apk';
 const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 const UPDATE_DISMISS_KEY = 'magic_update_dismissed_version';
@@ -6942,6 +6942,17 @@ function syncNewRevealsUI() {
   const lrToggle = document.getElementById('toggleLiveRead');
   if (lrToggle) lrToggle.checked = Boolean(config.liveRead);  const lrExtra = document.getElementById('liveReadExtra');
   if (lrExtra) lrExtra.style.display = config.liveRead ? 'block' : 'none';
+  // 🎧 כרטיס "הטריק הכי חזק" בראש הלשונית
+  const starCard = document.getElementById('starTrickCard');
+  if (starCard) {
+    const en = isEnglishUi();
+    starCard.classList.toggle('on', Boolean(config.liveRead));
+    const setTxt = (id, he, enTxt) => { const el = document.getElementById(id); if (el) el.textContent = en ? enTxt : he; };
+    setTxt('starTrickKicker', config.liveRead ? '✓ פעיל' : 'הטריק הכי חזק באפליקציה', config.liveRead ? '✓ On' : 'The strongest trick in the app');
+    setTxt('starTrickTitle', 'קריאה בזמן אמת', 'Live reading');
+    setTxt('starTrickSub', 'אתה עם הגב, הצופה מקליד קוד - וכל ספרה נלחשת לך באוזנייה ברגע שהיא נלחצת.', 'Your back is turned, the spectator types a code - and every digit is whispered into your earphone the moment it is pressed.');
+    setTxt('starTrickBtn', config.liveRead ? '🔊 בדיקת אוזנייה' : '🎧 הפעל ונסה עכשיו', config.liveRead ? '🔊 Earphone test' : '🎧 Turn on & try now');
+  }
   document.querySelectorAll('#liveReadLangSelector .seg-pill').forEach((btn) => {
     btn.classList.toggle('active', btn.dataset.lrlang === liveReadLang());
   });
@@ -7141,6 +7152,27 @@ function initNewReveals() {
       liveReadPrepare();
     });
   }
+  // 🎧 כפתור הכרטיס: כבוי = מדליק ומראה את ההגדרות; פעיל = בדיקת אוזנייה
+  const starBtn = document.getElementById('starTrickBtn');
+  if (starBtn) starBtn.addEventListener('click', () => {
+    const target = document.getElementById('toggleLiveRead');
+    if (!target) return;
+    if (!config.liveRead) {
+      target.checked = true;
+      target.dispatchEvent(new Event('change'));
+      trackEvent('star_trick_on');
+    } else {
+      const test = document.getElementById('liveReadTestBtn');
+      if (test) test.click();
+    }
+    const row = target.closest('.clean-toggle-row');
+    if (row) {
+      row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      row.classList.remove('flash-highlight');
+      void row.offsetWidth;
+      row.classList.add('flash-highlight');
+    }
+  });
   document.querySelectorAll('#liveReadLangSelector .seg-pill').forEach((btn) => btn.addEventListener('click', () => {
     config.liveReadLang = btn.dataset.lrlang === 'en' ? 'en' : 'he';
     saveConfig();

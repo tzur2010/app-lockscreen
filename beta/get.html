@@ -5,283 +5,106 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="robots" content="noindex">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:">
-  <meta name="theme-color" content="#f5f5f7">
-  <title>Lockscreen</title>
-  <meta property="og:title" content="Lockscreen - הצופה מקליד קוד. אתה עם הגב. ואתה יודע כל ספרה.">
-  <meta property="og:description" content="אפליקציית קסמים לטלפון: כל ספרה שהצופה לוחץ נלחשת לך באוזנייה. אנדרואיד ואייפון.">
+  <meta name="theme-color" content="#07060f">
+  <title>Lockscreen - התקנה</title>
   <style>
-    :root {
-      --bg: #f5f5f7; --panel: #ffffff; --panel2: #f3f3f6; --line: rgba(17,17,26,.07); --line2: rgba(17,17,26,.12);
-      --text: #15151b; --muted: #6e6e7a; --soft: #3d3d47; --accent: #ff6a45; --accent2: #ff8f70;
-      --grad: linear-gradient(135deg, #ff8a5c 0%, #ff5a3c 100%); --ink: #ffffff;
-    }
     * { box-sizing: border-box; }
-    html { scroll-behavior: smooth; }
-    body { margin: 0; min-height: 100vh; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "Noto Sans Hebrew", Arial, sans-serif; line-height: 1.6; -webkit-font-smoothing: antialiased; }
-    body::before { content: ''; position: fixed; inset: -20% -10% auto; height: 70vh; background: radial-gradient(50% 50% at 50% 50%, rgba(255,106,69,.16), transparent 70%); pointer-events: none; z-index: 0; }
-    main { position: relative; z-index: 1; max-width: 520px; margin: 0 auto; padding: 0 20px 40px; }
-    .hide { display: none !important; }
-    a { color: inherit; }
-
-    /* סרגל עליון */
-    .nav { display: flex; align-items: center; justify-content: space-between; padding: 18px 0 8px; }
-    .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 17px; letter-spacing: .2px; direction: ltr; }
-    .mark { width: 32px; height: 32px; border-radius: 9px; background: var(--grad); color: var(--ink); display: grid; place-items: center; box-shadow: 0 6px 18px rgba(255,106,69,.35); }
-    .mark svg { width: 17px; height: 17px; }
-    .lang { background: transparent; border: 1px solid var(--line2); color: var(--soft); border-radius: 999px; padding: 6px 14px; font: inherit; font-size: 13px; cursor: pointer; }
-
-    /* פתיח */
-    .hero { text-align: center; padding: 34px 0 10px; }
-    .eyebrow { display: inline-flex; align-items: center; gap: 8px; padding: 5px 12px 5px 14px; border-radius: 999px; border: 1px solid var(--line2); background: rgba(255,255,255,.03); color: var(--soft); font-size: 12.5px; font-weight: 600; }
-    .eyebrow i { width: 7px; height: 7px; border-radius: 50%; background: var(--accent2); box-shadow: 0 0 10px var(--accent); }
-    h1 { margin: 18px 0 14px; font-size: 37px; line-height: 1.15; font-weight: 700; letter-spacing: -.5px; }
-    h1 .g { background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
-    .lead { margin: 0 auto; max-width: 400px; color: var(--muted); font-size: 16.5px; }
-    .cta-row { display: flex; gap: 10px; margin: 24px 0 6px; }
-    .btn { flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 52px; border-radius: 14px; border: none; font: inherit; font-size: 16px; font-weight: 700; text-decoration: none; cursor: pointer; }
-    .btn-main { background: var(--text); color: #fff; }
-    .btn-grad { background: var(--grad); color: var(--ink); box-shadow: 0 10px 30px rgba(255,106,69,.28); }
-    .btn-ghost { background: rgba(255,255,255,.05); color: var(--text); border: 1px solid var(--line2); }
-    .meta { text-align: center; color: var(--muted); font-size: 12.5px; margin-top: 8px; }
-
-    /* הדגמה */
-    .demo { margin: 30px 0 0; padding: 18px 16px 16px; border-radius: 26px; background: linear-gradient(180deg, var(--panel2), var(--panel)); border: 1px solid var(--line); box-shadow: 0 30px 60px rgba(0,0,0,.45); }
-    .demo-grid { display: flex; align-items: center; gap: 14px; }
-    .phone-col { width: 50%; flex: none; }
-    .phone { position: relative; aspect-ratio: 9 / 19.5; border-radius: 30px; padding: 6px; background: linear-gradient(145deg, #2a2a33, #111116); box-shadow: inset 0 0 0 1px rgba(255,255,255,.08), 0 20px 40px rgba(0,0,0,.6); }
-    .screen { position: relative; height: 100%; border-radius: 25px; overflow: hidden; background: radial-gradient(120% 60% at 30% 0%, #2a2a33 0%, transparent 60%), linear-gradient(170deg, #1b1b22 0%, #131318 55%, #0c0c0f 100%); display: flex; flex-direction: column; align-items: center; padding-top: 20%; }
-    .cam { position: absolute; top: 2.4%; left: 50%; width: 7px; height: 7px; margin-left: -3.5px; border-radius: 50%; background: #000; box-shadow: 0 0 0 1.5px #1a1a1a; }
-    .pin-title { color: rgba(255,255,255,.92); font-size: 11.5px; font-weight: 600; }
-    .dots { direction: ltr; display: flex; gap: 9px; margin: 10px 0 13%; }
-    .dot { width: 8px; height: 8px; border-radius: 50%; border: 1.4px solid rgba(255,255,255,.7); transition: background .15s; }
-    .dot.on { background: #fff; }
-    .keys { direction: ltr; display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px 11px; width: 80%; }
-    .key { aspect-ratio: 1; border-radius: 50%; display: grid; place-items: center; color: #fff; font-size: 14px; font-weight: 500; background: rgba(255,255,255,.1); transition: background .12s, transform .12s; }
-    .key.blank { background: transparent; }
-    .key.hit { background: rgba(255,255,255,.5); transform: scale(.9); }
-    .finger { position: absolute; width: 24px; height: 24px; margin: -12px 0 0 -12px; border-radius: 50%; background: rgba(255,255,255,.35); border: 1.5px solid rgba(255,255,255,.9); box-shadow: 0 4px 14px rgba(0,0,0,.4); transition: left .45s cubic-bezier(.3,.8,.3,1), top .45s cubic-bezier(.3,.8,.3,1), transform .12s, opacity .3s; z-index: 3; left: 50%; top: 108%; opacity: 0; }
-    .finger.in { opacity: 1; }
-    .finger.tap { transform: scale(.72); }
-
-    .ear-col { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
-    .ear { padding: 14px 12px; border-radius: 18px; background: rgba(255,106,69,.07); border: 1px solid rgba(255,106,69,.3); }
-    .ear-h { display: flex; align-items: center; gap: 7px; font-size: 11.5px; font-weight: 600; color: #ff8f70; }
-    .ear-h svg { width: 15px; height: 15px; flex: none; }
-    .ear-word { font-size: 25px; font-weight: 700; margin: 6px 0 8px; min-height: 36px; letter-spacing: .3px; transition: opacity .15s; }
-    .wave { direction: ltr; display: flex; align-items: center; gap: 3px; height: 22px; }
-    .wave span { flex: 1; height: 3px; border-radius: 2px; background: rgba(255,143,112,.4); transition: height .12s; }
-    .wave.on span { animation: wv .5s ease-in-out infinite alternate; }
-    .wave.on span:nth-child(2n) { animation-delay: .1s; } .wave.on span:nth-child(3n) { animation-delay: .2s; } .wave.on span:nth-child(5n) { animation-delay: .3s; }
-    @keyframes wv { from { height: 3px; } to { height: 20px; background: #ff8f70; } }
-    .said { padding: 12px; border-radius: 18px; background: rgba(255,255,255,.04); border: 1px solid var(--line); }
-    .said-h { font-size: 11.5px; font-weight: 600; color: var(--muted); }
-    .said-v { direction: ltr; text-align: start; font-size: 22px; font-weight: 700; letter-spacing: 4px; min-height: 32px; margin-top: 2px; }
-    [dir="rtl"] .said-v { text-align: right; }
-    .caption { text-align: center; min-height: 22px; margin: 14px 0 0; font-size: 13.5px; color: var(--soft); }
-    .caption.wow { color: #fff; font-weight: 700; font-size: 15px; }
-
-    /* אזורים */
-    section.block { margin-top: 44px; }
-    .kicker { text-align: center; font-size: 12px; font-weight: 700; letter-spacing: 1.5px; color: var(--accent2); text-transform: uppercase; }
-    [dir="rtl"] .kicker { letter-spacing: 0; font-size: 13px; }
-    h2 { text-align: center; font-size: 25px; line-height: 1.25; margin: 8px 0 20px; font-weight: 700; letter-spacing: -.3px; }
-    .diff { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-    .diff div { padding: 16px 8px 14px; border-radius: 18px; background: var(--panel); border: 1px solid var(--line); text-align: center; font-size: 13px; color: var(--soft); line-height: 1.4; }
-    .diff svg { width: 26px; height: 26px; display: block; margin: 0 auto 8px; }
-    .diff b { display: block; color: var(--text); font-size: 14px; margin-bottom: 2px; }
-    .steps { display: grid; gap: 10px; }
-    .step { display: flex; gap: 14px; align-items: flex-start; padding: 16px; border-radius: 18px; background: var(--panel); border: 1px solid var(--line); }
-    .num { flex: none; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: 14px; background: rgba(255,106,69,.12); color: var(--accent2); border: 1px solid rgba(255,106,69,.4); }
-    .step b { display: block; font-size: 15.5px; }
-    .step span { color: var(--muted); font-size: 14px; }
-    .feat { list-style: none; margin: 0; padding: 6px 18px; border-radius: 20px; background: var(--panel); border: 1px solid var(--line); }
-    .feat li { display: flex; gap: 12px; padding: 13px 0; border-bottom: 1px solid var(--line); font-size: 14.5px; color: var(--muted); }
-    .feat li:last-child { border-bottom: none; }
-    .feat svg { flex: none; width: 20px; height: 20px; margin-top: 2px; }
-    .feat b { color: var(--text); font-weight: 700; }
-
-    /* התקנה */
-    .card { padding: 18px; border-radius: 20px; background: var(--panel); border: 1px solid var(--line); margin-bottom: 12px; }
-    .card h3 { margin: 0 0 12px; font-size: 16px; }
-    .card ol { margin: 0; padding: 0; list-style: none; counter-reset: s; }
-    .card ol li { counter-increment: s; position: relative; padding-inline-start: 34px; margin-bottom: 11px; font-size: 14.5px; color: var(--soft); }
-    .card ol li::before { content: counter(s); position: absolute; inset-inline-start: 0; top: 1px; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 700; background: var(--panel2); color: var(--text); }
-    .card ol li b { color: var(--text); }
-    .note { font-size: 13px; color: var(--muted); margin-top: 10px; text-align: center; }
-    .warn { border-color: rgba(251,146,60,.4); background: rgba(251,146,60,.06); }
-    .vip { text-align: center; border-color: rgba(250,204,21,.4); background: rgba(250,204,21,.05); }
+    body { margin: 0; min-height: 100vh; background: radial-gradient(120% 55% at 90% 0%, rgba(139,92,246,.4) 0%, transparent 60%), radial-gradient(120% 55% at 0% 100%, rgba(6,182,212,.25) 0%, transparent 60%), #07060f; background-attachment: fixed; color: #e2e8f0; font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif; line-height: 1.6; }
+    main { max-width: 460px; margin: 0 auto; padding: 32px 18px 48px; }
+    .logo { width: 76px; height: 76px; margin: 0 auto 12px; border-radius: 22px; background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 48%, #06b6d4 100%); display: grid; place-items: center; font-size: 40px; box-shadow: 0 0 0 8px rgba(99,102,241,.12), 0 14px 44px rgba(99,102,241,.55); }
+    h1 { text-align: center; font-size: 30px; margin: 0; letter-spacing: 1px; background: linear-gradient(90deg, #e9d5ff, #fff 45%, #a5f3fc); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    .tag { text-align: center; color: #a5b4fc; margin: 4px 0 22px; font-size: 15px; }
+    .card { background: linear-gradient(rgba(22,20,44,.75), rgba(22,20,44,.75)) padding-box, linear-gradient(145deg, rgba(167,139,250,.45), rgba(255,255,255,.05) 40%, rgba(34,211,238,.35)) border-box; border: 1px solid transparent; border-radius: 22px; padding: 18px; margin-bottom: 14px; box-shadow: 0 16px 40px rgba(3,2,12,.45); }
+    .vip { text-align: center; background: linear-gradient(rgba(40,32,10,.85), rgba(40,32,10,.85)) padding-box, linear-gradient(145deg, rgba(250,204,21,.7), rgba(250,204,21,.15) 50%, rgba(250,204,21,.6)) border-box; }
     .vip-label { font-size: 13px; color: #fde68a; font-weight: 700; }
-    .vip-code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 26px; font-weight: 700; color: #facc15; letter-spacing: 1px; margin: 4px 0 10px; direction: ltr; }
-    .vip-sub { font-size: 13px; color: var(--soft); margin-top: 8px; }
+    .vip-code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 26px; font-weight: 800; color: #facc15; letter-spacing: 1px; margin: 4px 0 10px; direction: ltr; }
+    .vip-sub { font-size: 13px; color: #cbd5e1; margin-top: 8px; }
+    .btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 54px; border: none; border-radius: 16px; font-size: 17px; font-weight: 800; font-family: inherit; text-decoration: none; cursor: pointer; }
+    .btn-main { background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 48%, #06b6d4 100%); color: #fff; box-shadow: 0 10px 28px rgba(99,102,241,.45); }
+    .btn-soft { background: rgba(255,255,255,.1); color: #f8fafc; min-height: 44px; font-size: 15px; }
+    .btn + .btn { margin-top: 10px; }
+    h2 { font-size: 16px; margin: 0 0 10px; }
+    ol { margin: 0; padding-inline-start: 22px; }
+    li { margin-bottom: 9px; font-size: 15px; color: #cbd5e1; }
+    li b { color: #f8fafc; }
+    .note { font-size: 13px; color: #94a3b8; margin-top: 10px; }
+    .warn { background: rgba(251,146,60,.1); border-color: rgba(251,146,60,.4); }
     .tabs { display: flex; gap: 8px; margin-bottom: 12px; }
-    .tab { flex: 1; padding: 10px; border-radius: 12px; border: 1px solid var(--line2); background: transparent; color: var(--soft); font: inherit; font-weight: 700; cursor: pointer; }
-    .tab.on { background: var(--text); color: #fff; border-color: transparent; }
-    .final { margin-top: 44px; padding: 26px 20px; border-radius: 24px; text-align: center; background: radial-gradient(100% 120% at 50% 0%, rgba(255,106,69,.18), transparent 70%), var(--panel); border: 1px solid var(--line2); }
-    .final h2 { margin: 0 0 6px; }
-    .final p { margin: 0 0 18px; color: var(--muted); }
-    .foot { text-align: center; font-size: 12px; color: #5d5d6c; margin-top: 26px; }
-    .foot a { color: #8a8a99; text-decoration: none; }
-    /* לבן: צללים רכים במקום כבדים */
-    .demo { box-shadow: 0 1px 2px rgba(17,17,26,.05), 0 20px 50px rgba(17,17,26,.1) !important; }
-    .diff div, .step, .feat, .card, .final { box-shadow: 0 1px 2px rgba(17,17,26,.04), 0 8px 24px rgba(17,17,26,.05); }
-    .final { background: radial-gradient(100% 120% at 50% 0%, rgba(255,106,69,.14), transparent 70%), #fff !important; }
-    .foot { color: #9a9aa5 !important; }
+    .tab { flex: 1; padding: 10px; border-radius: 12px; border: 1px solid rgba(255,255,255,.12); background: transparent; color: #cbd5e1; font: inherit; font-weight: 700; cursor: pointer; }
+    .tab.on { background: linear-gradient(135deg, #8b5cf6, #06b6d4); border-color: transparent; color: #fff; }
+    .hide { display: none !important; }
+    .foot { text-align: center; font-size: 12px; color: #64748b; margin-top: 18px; }
+    .foot a { color: #94a3b8; }
+    .lang { position: absolute; top: 14px; inset-inline-end: 14px; background: rgba(255,255,255,.08); border: none; color: #cbd5e1; border-radius: 10px; padding: 6px 10px; font: inherit; font-size: 13px; cursor: pointer; }
+    [dir="ltr"] ol { padding-inline-start: 22px; }
   </style>
 </head>
 <body>
+<button type="button" class="lang" id="langBtn">English</button>
 <main>
-  <nav class="nav">
-    <div class="brand">
-      <span class="mark"><svg viewBox="0 0 24 24" fill="none"><rect x="5" y="10.5" width="14" height="10" rx="2.5" fill="#ffffff"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round"/></svg></span>
-      Lockscreen
-    </div>
-    <button type="button" class="lang" id="langBtn">English</button>
-  </nav>
+  <div class="logo">🔒</div>
+  <h1>Lockscreen</h1>
+  <div class="tag" data-t="tag"></div>
 
-  <header class="hero">
-    <span class="eyebrow"><i></i><span data-t="eyebrow"></span></span>
-    <h1 data-t="heroH"></h1>
-    <p class="lead" data-t="lead"></p>
-    <div class="cta-row">
-      <a class="btn btn-grad" href="#install" data-t="ctaGet"></a>
-      <a class="btn btn-ghost" href="#how" data-t="ctaHow"></a>
-    </div>
-    <div class="meta" data-t="meta"></div>
-  </header>
-
-  <!-- הדגמה חיה -->
-  <div class="demo" aria-hidden="true">
-    <div class="demo-grid">
-      <div class="phone-col">
-        <div class="phone" id="phone">
-          <div class="screen">
-            <div class="cam"></div>
-            <div class="pin-title" data-t="pinTitle"></div>
-            <div class="dots"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
-            <div class="keys" id="keys"></div>
-          </div>
-          <div class="finger" id="finger"></div>
-        </div>
-      </div>
-      <div class="ear-col">
-        <div class="ear">
-          <div class="ear-h"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 14v-2a9 9 0 0 1 18 0v2"/><rect x="2.5" y="14" width="5" height="7" rx="2"/><rect x="16.5" y="14" width="5" height="7" rx="2"/></svg><span data-t="earH"></span></div>
-          <div class="ear-word" id="earWord">&nbsp;</div>
-          <div class="wave" id="wave"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
-        </div>
-        <div class="said">
-          <div class="said-h" data-t="saidH"></div>
-          <div class="said-v" id="saidV"></div>
-        </div>
-      </div>
-    </div>
-    <div class="caption" id="caption"></div>
+  <div class="card vip hide" id="vipCard">
+    <div class="vip-label" data-t="vipLabel"></div>
+    <div class="vip-code" id="vipCode"></div>
+    <button type="button" class="btn btn-soft" id="copyCodeBtn" data-t="copyCode"></button>
+    <div class="vip-sub" data-t="vipSub"></div>
   </div>
 
-  <!-- בידול -->
-  <section class="block">
-    <div class="kicker" data-t="diffK"></div>
-    <h2 data-t="diffH"></h2>
-    <div class="diff">
-      <div><svg viewBox="0 0 24 24" fill="none" stroke="#ff6a45" stroke-width="1.8" stroke-linecap="round"><path d="M3 3l18 18"/><path d="M10.6 5.1A10.4 10.4 0 0 1 12 5c6 0 9.5 7 9.5 7a17 17 0 0 1-3.1 4.1M6.2 6.2A17 17 0 0 0 2.5 12S6 19 12 19a9.6 9.6 0 0 0 5-1.4"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg><b data-t="d1b"></b><span data-t="d1"></span></div>
-      <div><svg viewBox="0 0 24 24" fill="none" stroke="#ff6a45" stroke-width="1.8" stroke-linecap="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4l6 6M22 4l-6 6"/></svg><b data-t="d2b"></b><span data-t="d2"></span></div>
-      <div><svg viewBox="0 0 24 24" fill="none" stroke="#ff6a45" stroke-width="1.8" stroke-linecap="round"><rect x="6" y="2.5" width="12" height="19" rx="3"/><path d="M10.5 18.5h3"/></svg><b data-t="d3b"></b><span data-t="d3"></span></div>
+  <div class="tabs" id="tabs">
+    <button type="button" class="tab" data-os="android">🤖 Android</button>
+    <button type="button" class="tab" data-os="ios">🍎 iPhone</button>
+  </div>
+
+  <!-- אנדרואיד -->
+  <section id="androidBox" class="hide">
+    <div class="card">
+      <a class="btn btn-main" id="apkBtn" href="Lockscreen.apk" download="Lockscreen.apk" data-t="download"></a>
+      <div class="note" data-t="aNote"></div>
     </div>
-  </section>
-
-  <!-- איך זה עובד -->
-  <section class="block" id="how">
-    <div class="kicker" data-t="howK"></div>
-    <h2 data-t="howH"></h2>
-    <div class="steps">
-      <div class="step"><span class="num">1</span><div><b data-t="s1b"></b><span data-t="s1"></span></div></div>
-      <div class="step"><span class="num">2</span><div><b data-t="s2b"></b><span data-t="s2"></span></div></div>
-      <div class="step"><span class="num">3</span><div><b data-t="s3b"></b><span data-t="s3"></span></div></div>
-    </div>
-  </section>
-
-  <!-- מה מקבלים -->
-  <section class="block">
-    <div class="kicker" data-t="featK"></div>
-    <h2 data-t="featH"></h2>
-    <ul class="feat">
-      <li><svg viewBox="0 0 24 24" fill="none" stroke="#ff6a45" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg><span data-t="f1"></span></li>
-      <li><svg viewBox="0 0 24 24" fill="none" stroke="#ff6a45" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg><span data-t="f2"></span></li>
-      <li><svg viewBox="0 0 24 24" fill="none" stroke="#ff6a45" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg><span data-t="f3"></span></li>
-      <li><svg viewBox="0 0 24 24" fill="none" stroke="#ff6a45" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg><span data-t="f4"></span></li>
-      <li><svg viewBox="0 0 24 24" fill="none" stroke="#ff6a45" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg><span data-t="f5"></span></li>
-    </ul>
-  </section>
-
-  <!-- התקנה -->
-  <section class="block" id="install">
-    <div class="kicker" data-t="instK"></div>
-    <h2 data-t="instH"></h2>
-
-    <div class="card vip hide" id="vipCard">
-      <div class="vip-label" data-t="vipLabel"></div>
-      <div class="vip-code" id="vipCode"></div>
-      <button type="button" class="btn btn-ghost" id="copyCodeBtn" data-t="copyCode"></button>
-      <div class="vip-sub" data-t="vipSub"></div>
-    </div>
-
-    <div class="tabs" id="tabs">
-      <button type="button" class="tab" data-os="android">Android</button>
-      <button type="button" class="tab" data-os="ios">iPhone</button>
-    </div>
-
-    <div id="androidBox" class="hide">
-      <div class="card">
-        <a class="btn btn-main" id="apkBtn" href="Lockscreen.apk" download="Lockscreen.apk" data-t="download"></a>
-        <div class="note" data-t="aNote"></div>
-      </div>
-      <div class="card">
-        <h3 data-t="aStepsTitle"></h3>
-        <ol>
-          <li data-t="a1"></li>
-          <li data-t="a2"></li>
-          <li data-t="a3"></li>
-          <li data-t="a4"></li>
-          <li data-t="a5"></li>
-        </ol>
-      </div>
-    </div>
-
-    <div id="iosBox" class="hide">
-      <div class="card warn hide" id="notSafari">
-        <h3 data-t="nsTitle"></h3>
-        <div style="font-size:14px; color:var(--soft);" data-t="nsText"></div>
-        <button type="button" class="btn btn-ghost" id="copyLinkBtn" style="margin-top:12px; width:100%;" data-t="copyLink"></button>
-      </div>
-      <div class="card">
-        <h3 data-t="iStepsTitle"></h3>
-        <ol>
-          <li data-t="i1"></li>
-          <li data-t="i2"></li>
-          <li data-t="i3"></li>
-          <li data-t="i4"></li>
-          <li data-t="i5"></li>
-        </ol>
-        <a class="btn btn-main" id="openAppBtn" href="./" style="margin-top:14px;" data-t="openApp"></a>
-      </div>
-    </div>
-
-    <div class="card" id="firstMinute">
-      <h3 data-t="fmTitle"></h3>
+    <div class="card">
+      <h2 data-t="aStepsTitle"></h2>
       <ol>
-        <li data-t="fm1"></li>
-        <li data-t="fm2"></li>
-        <li data-t="fm3"></li>
-        <li data-t="fm4"></li>
-        <li data-t="fm5"></li>
+        <li data-t="a1"></li>
+        <li data-t="a2"></li>
+        <li data-t="a3"></li>
+        <li data-t="a4"></li>
+        <li data-t="a5"></li>
       </ol>
     </div>
   </section>
 
-  <div class="final">
-    <h2 data-t="finalH"></h2>
-    <p data-t="finalP"></p>
-    <a class="btn btn-grad" href="#install" data-t="ctaGet"></a>
+  <!-- אייפון -->
+  <section id="iosBox" class="hide">
+    <div class="card warn hide" id="notSafari">
+      <h2 data-t="nsTitle"></h2>
+      <div style="font-size:14px; color:#cbd5e1;" data-t="nsText"></div>
+      <button type="button" class="btn btn-soft" id="copyLinkBtn" style="margin-top:10px;" data-t="copyLink"></button>
+    </div>
+    <div class="card">
+      <h2 data-t="iStepsTitle"></h2>
+      <ol>
+        <li data-t="i1"></li>
+        <li data-t="i2"></li>
+        <li data-t="i3"></li>
+        <li data-t="i4"></li>
+        <li data-t="i5"></li>
+      </ol>
+      <a class="btn btn-main" id="openAppBtn" href="./" style="margin-top:12px;" data-t="openApp"></a>
+    </div>
+  </section>
+
+  <div class="card" id="firstMinute">
+    <h2 data-t="fmTitle"></h2>
+    <ol>
+      <li data-t="fm1"></li>
+      <li data-t="fm2"></li>
+      <li data-t="fm3"></li>
+      <li data-t="fm4"></li>
+      <li data-t="fm5"></li>
+    </ol>
   </div>
 
   <div class="foot"><a href="terms.html" data-t="terms"></a> · <a href="privacy.html" data-t="privacy"></a></div>
@@ -291,130 +114,68 @@
   (function () {
     const T = {
       he: {
-        eyebrow: 'חדש: קריאה בזמן אמת',
-        heroH: 'הצופה מקליד קוד.<br>אתה עם הגב.<br><span class="g">ואתה יודע כל ספרה.</span>',
-        lead: 'כל ספרה שהצופה לוחץ נלחשת לך באוזניית בלוטות\' - באותה שנייה. בלי להציץ, בלי שותף.',
-        ctaGet: 'להורדה',
-        ctaHow: 'איך זה עובד',
-        meta: 'אנדרואיד ואייפון · התקנה בפחות מדקה',
-        pinTitle: 'הזן קוד PIN',
-        earH: 'באוזנייה שלך',
-        saidH: 'אתה אומר בקול',
-        capStart: 'הצופה מקליד קוד סודי...',
-        capWow: 'הצופה: "...רגע. איך?!"',
-        diffK: 'למה זה שונה',
-        diffH: 'שום דבר שהצופה יכול לתפוס',
-        d1b: 'בלי להציץ', d1: 'אתה לא נוגע ולא מסתכל בטלפון',
-        d2b: 'בלי שותף', d2: 'וגם בלי טלפון שני',
-        d3b: 'הטלפון שלך', d3: 'נראה בדיוק כמו מסך הנעילה שלך',
-        howK: 'איך זה עובד',
-        howH: 'שלושה צעדים. אפס הכנה מסובכת.',
-        s1b: 'אוזנייה באוזן', s1: 'אוזניית בלוטות\' אחת, מחוברת לטלפון. לוחצים "שמור וסגור".',
-        s2b: 'נותנים לצופה את הטלפון', s2: 'מסתובבים עם הגב: "תקליד קוד, מה שבא לך."',
-        s3b: 'אומרים כל ספרה', s3: 'כל ספרה נלחשת לך ברגע שהיא נלחצת. אתה אומר אותה בקול - לפני שהוא מרים את האצבע.',
-        featK: 'מה מקבלים',
-        featH: 'ערכה שלמה בטלפון אחד',
-        f1: '<b>קריאה בזמן אמת</b> - כל ספרה נלחשת לאוזנייה ברגע שהיא נלחצת.',
-        f2: '<b>"תחזור על הקוד"</b> - אומרים את זה בקול, והקוד נלחש שוב. (אנדרואיד)',
-        f3: '<b>הצצה סודית</b> - בלחיצה ארוכה, בשעון חכם או בטלפון שני.',
-        f4: '<b>תאריך לידה</b> - הצופה מקליד תאריך, ואתה יודע מזל, גיל ויום בשבוע.',
-        f5: '<b>מסך נעילה אמיתי</b> - סמסונג, פיקסל, שיאומי ואייפון, עם הטפט שלך.',
-        instK: 'התקנה',
-        instH: 'מוכן תוך דקה',
-        finalH: 'הטריק הבא שלך כבר בכיס.',
-        finalP: 'מורידים, שמים אוזנייה, ומסתובבים עם הגב.',
+        tag: 'מסך נעילה מזויף לקוסמים - נראה בדיוק כמו הטלפון שלך',
         vipLabel: '⭐ קוד ההזמנה האישי שלך',
-        copyCode: 'העתק את הקוד',
+        copyCode: '📋 העתק את הקוד',
         copied: '✓ הועתק',
         vipSub: 'בהרשמה באפליקציה לוחצים "⭐ יש לך קוד הזמנה?" ומדביקים - ונכנסים מיד, בחינם.',
-        download: 'הורד את האפליקציה',
+        download: '⬇️ הורד את האפליקציה',
         aNote: 'האפליקציה לא בחנות - מתקינים אותה ישירות מכאן. זה בטוח ולוקח פחות מדקה.',
         aStepsTitle: 'איך מתקינים (פעם אחת)',
         a1: 'לוחצים <b>"הורד את האפליקציה"</b> למעלה. אם שואלים - <b>"הורד בכל זאת"</b>.',
         a2: 'כשההורדה מסתיימת לוחצים <b>"פתח"</b> (או פותחים את הקובץ מההתראות / מ"הורדות").',
         a3: 'אם מופיע "מטעמי אבטחה..." - לוחצים <b>"הגדרות"</b>, מדליקים <b>"אפשר ממקור זה"</b> וחוזרים אחורה.',
         a4: 'לוחצים <b>"התקן"</b>. אם Play Protect שואל - <b>"פרטים נוספים" ← "התקן בכל זאת"</b>.',
-        a5: 'פותחים את <b>Lockscreen</b>, ממלאים שם וטלפון - וזהו.',
-        nsTitle: 'צריך לפתוח את העמוד הזה ב-Safari',
+        a5: 'פותחים את <b>Lockscreen</b>, ממלאים שם וטלפון - וזהו 🎩',
+        nsTitle: '⚠️ צריך לפתוח את העמוד הזה ב-Safari',
         nsText: 'באייפון מוסיפים את האפליקציה למסך הבית רק מ-Safari. מעתיקים את הקישור, פותחים את Safari ומדביקים בשורת הכתובת.',
-        copyLink: 'העתק קישור',
+        copyLink: '📋 העתק קישור',
         iStepsTitle: 'איך מתקינים באייפון (פעם אחת)',
         i1: 'אם העמוד נפתח בתוך וואטסאפ - קודם לוחצים על סמל ה-<b>Safari</b> (מצפן) כדי לפתוח בספארי. ואז לוחצים <b>"פתח את Lockscreen"</b> למטה.',
         i2: 'בעמוד שנפתח לוחצים על כפתור <b>השיתוף</b> (ריבוע עם חץ למעלה, בתחתית המסך).',
         i3: 'גוללים ובוחרים <b>"הוסף למסך הבית"</b> ← <b>"הוסף"</b>.',
         i4: 'פותחים את <b>Lockscreen</b> מהמסך הבית (לא מ-Safari) וממלאים שם וטלפון.',
-        i5: 'חשוב, פעם אחת: צלמו את מסך הבית שלכם (<b>צד + עוצמה למעלה</b>), ובאפליקציה: לשונית <b>🏠 פתיחה</b> ← <b>&quot;בחר צילום של מסך הבית שלך&quot;</b>. ככה אחרי הפתיחה הצופה רואה את מסך הבית שלכם.',
-        openApp: 'פתח את Lockscreen',
-        fmTitle: 'הדקה הראשונה',
+        i5: '📸 חשוב, פעם אחת: צלמו את מסך הבית שלכם (<b>צד + עוצמה למעלה</b>), ובאפליקציה: לשונית <b>🏠 פתיחה</b> ← <b>&quot;בחר צילום של מסך הבית שלך&quot;</b>. ככה אחרי הפתיחה הצופה רואה את מסך הבית שלכם 🎩',
+        openApp: '🍎 פתח את Lockscreen',
+        fmTitle: '🎬 הדקה הראשונה - ככה מגיעים ל&quot;וואו&quot;',
         fm1: 'בוחרים את הטלפון <b>שלך</b> ואת הדגם.',
         fm2: 'לשונית <b>📱 מראה</b> ← <b>&quot;בחר תמונה מהגלריה שלך&quot;</b> - הטפט האמיתי שלך. ככה אי אפשר להבדיל.',
-        fm3: 'אוזניית בלוטות&#39; באוזן ← לשונית <b>🎯 טריק</b> ← <b>&quot;הפעל ונסה עכשיו&quot;</b> ← <b>&quot;בדיקת אוזנייה&quot;</b>.',
-        fm4: 'לוחצים <b>&quot;שמור וסגור&quot;</b>, נותנים לצופה את הטלפון ומסתובבים עם הגב: <b>&quot;תקליד קוד&quot;</b>.',
+        fm3: 'לוחצים <b>&quot;שמור וסגור&quot;</b> ← <b>קוד PIN</b>, ונותנים לצופה להקליד כל קוד שהוא רוצה - הטלפון נפתח.',
+        fm4: '<b>לחיצה ארוכה</b> על המסך = רואים בסתר מה הוא הקליד.',
         fm5: 'חזרה להגדרות בסתר: <b>לחיצה ארוכה של 3 שניות על השעון</b>. ליד כל טריק יש כפתור <b>?</b> עם הסבר ומה אומרים לקהל.',
         terms: 'תנאי שימוש',
         privacy: 'פרטיות',
         lang: 'English'
       },
       en: {
-        eyebrow: 'New: Live reading',
-        heroH: 'They type a code.<br>Your back is turned.<br><span class="g">You know every digit.</span>',
-        lead: 'Every digit the spectator presses is whispered into your Bluetooth earphone - the same second. No peeking, no stooge.',
-        ctaGet: 'Get it',
-        ctaHow: 'How it works',
-        meta: 'Android & iPhone · Installs in under a minute',
-        pinTitle: 'Enter PIN',
-        earH: 'In your earphone',
-        saidH: 'You say out loud',
-        capStart: 'The spectator types a secret code...',
-        capWow: 'Spectator: "...wait. HOW?!"',
-        diffK: 'Why it\'s different',
-        diffH: 'Nothing the spectator can catch',
-        d1b: 'No peeking', d1: 'You never touch or look at the phone',
-        d2b: 'No stooge', d2: 'And no second phone',
-        d3b: 'Your phone', d3: 'Looks exactly like your lock screen',
-        howK: 'How it works',
-        howH: 'Three steps. Zero complicated prep.',
-        s1b: 'Earphone in', s1: 'One Bluetooth earphone, connected to the phone. Tap "Save & Close".',
-        s2b: 'Hand over the phone', s2: 'Turn your back: "Type any code you like."',
-        s3b: 'Name every digit', s3: 'Each digit is whispered to you the moment it\'s pressed. Say it out loud - before they lift their finger.',
-        featK: 'What you get',
-        featH: 'A full kit in one phone',
-        f1: '<b>Live reading</b> - every digit is whispered into your earphone the moment it\'s pressed.',
-        f2: '<b>"Repeat the code"</b> - say it out loud and the code is whispered again. (Android)',
-        f3: '<b>Secret peek</b> - long-press, a smartwatch or a second phone.',
-        f4: '<b>Birthday</b> - the spectator types a date; you know the sign, age and weekday.',
-        f5: '<b>A real lock screen</b> - Samsung, Pixel, Xiaomi and iPhone, with your wallpaper.',
-        instK: 'Install',
-        instH: 'Ready in a minute',
-        finalH: 'Your next trick is already in your pocket.',
-        finalP: 'Download, put in an earphone, and turn your back.',
+        tag: 'A fake lock screen for magicians - looks exactly like your phone',
         vipLabel: '⭐ Your personal invite code',
-        copyCode: 'Copy code',
+        copyCode: '📋 Copy code',
         copied: '✓ Copied',
         vipSub: 'In the app\'s sign-up tap "⭐ Have an invite code?" and paste it - you\'re in right away, for free.',
-        download: 'Download the app',
+        download: '⬇️ Download the app',
         aNote: 'The app isn\'t on the store - you install it directly from here. It\'s safe and takes under a minute.',
         aStepsTitle: 'How to install (once)',
         a1: 'Tap <b>"Download the app"</b> above. If asked - <b>"Download anyway"</b>.',
         a2: 'When the download finishes tap <b>"Open"</b> (or open the file from notifications / Downloads).',
         a3: 'If you see "For your security..." - tap <b>"Settings"</b>, turn on <b>"Allow from this source"</b> and go back.',
         a4: 'Tap <b>"Install"</b>. If Play Protect asks - <b>"More details" → "Install anyway"</b>.',
-        a5: 'Open <b>Lockscreen</b>, enter your name and phone - done.',
-        nsTitle: 'Open this page in Safari',
+        a5: 'Open <b>Lockscreen</b>, enter your name and phone - done 🎩',
+        nsTitle: '⚠️ Open this page in Safari',
         nsText: 'On iPhone you can add the app to the home screen only from Safari. Copy the link, open Safari and paste it in the address bar.',
-        copyLink: 'Copy link',
+        copyLink: '📋 Copy link',
         iStepsTitle: 'How to install on iPhone (once)',
         i1: 'If this page opened inside WhatsApp - first tap the <b>Safari</b> (compass) icon to open it in Safari. Then tap <b>"Open Lockscreen"</b> below.',
         i2: 'On the page that opens tap the <b>Share</b> button (square with an up arrow, at the bottom).',
         i3: 'Scroll and choose <b>"Add to Home Screen"</b> → <b>"Add"</b>.',
         i4: 'Open <b>Lockscreen</b> from the home screen (not from Safari) and enter your name and phone.',
-        i5: 'Important, once: screenshot your home screen (<b>side + volume up</b>), then in the app: <b>🏠 Unlock</b> tab → <b>&quot;Pick a screenshot of your home screen&quot;</b>. That way, after unlocking, the spectator sees your home screen.',
-        openApp: 'Open Lockscreen',
-        fmTitle: 'Your first minute',
+        i5: '📸 Important, once: screenshot your home screen (<b>side + volume up</b>), then in the app: <b>🏠 Unlock</b> tab → <b>&quot;Pick a screenshot of your home screen&quot;</b>. That way, after unlocking, the spectator sees your home screen 🎩',
+        openApp: '🍎 Open Lockscreen',
+        fmTitle: '🎬 Your first minute - straight to the &quot;wow&quot;',
         fm1: 'Pick <b>your</b> phone and model.',
         fm2: '<b>📱 Look</b> tab → <b>&quot;Choose a photo from your gallery&quot;</b> - your real wallpaper. Now it is impossible to tell apart.',
-        fm3: 'Bluetooth earphone in → <b>🎯 Trick</b> tab → <b>&quot;Turn on &amp; try now&quot;</b> → <b>&quot;Earphone test&quot;</b>.',
-        fm4: 'Tap <b>&quot;Save &amp; Close&quot;</b>, hand over the phone and turn your back: <b>&quot;Type a code&quot;</b>.',
+        fm3: 'Tap <b>&quot;Save &amp; Close&quot;</b> → <b>PIN</b>, and let the spectator type any code they like - the phone unlocks.',
+        fm4: '<b>Long-press</b> the screen = secretly see what they typed.',
         fm5: 'Back to settings secretly: <b>long-press the clock for 3 seconds</b>. Every trick has a <b>?</b> button with a how-to and what to say.',
         terms: 'Terms',
         privacy: 'Privacy',
@@ -487,78 +248,6 @@
       lang = lang === 'he' ? 'en' : 'he';
       render();
     });
-
-    // ---- הדגמה חיה: הצופה מקליד, הספרה נלחשת באוזנייה, הקוסם אומר אותה ----
-    const WORDS = {
-      he: ['אפס', 'אחת', 'שתיים', 'שלוש', 'ארבע', 'חמש', 'שש', 'שבע', 'שמונה', 'תשע'],
-      en: ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine']
-    };
-    const keysEl = document.getElementById('keys');
-    const phone = document.getElementById('phone');
-    const finger = document.getElementById('finger');
-    const dots = Array.from(document.querySelectorAll('.dot'));
-    const earWord = document.getElementById('earWord');
-    const wave = document.getElementById('wave');
-    const saidV = document.getElementById('saidV');
-    const caption = document.getElementById('caption');
-    const keyMap = {};
-    ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', ''].forEach((k) => {
-      const d = document.createElement('div');
-      d.className = 'key' + (k === '' ? ' blank' : '');
-      d.textContent = k;
-      if (k !== '') keyMap[k] = d;
-      keysEl.appendChild(d);
-    });
-    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-    function fingerTo(k) {
-      const kr = keyMap[k].getBoundingClientRect();
-      const pr = phone.getBoundingClientRect();
-      finger.style.left = (kr.left - pr.left + kr.width / 2) + 'px';
-      finger.style.top = (kr.top - pr.top + kr.height / 2) + 'px';
-      finger.classList.add('in');
-    }
-    function fingerAway() {
-      finger.style.left = '50%';
-      finger.style.top = '108%';
-      finger.classList.remove('in');
-    }
-    async function round() {
-      const digits = Array.from({ length: 4 }, () => String(Math.floor(Math.random() * 10)));
-      dots.forEach((d) => d.classList.remove('on'));
-      earWord.innerHTML = '&nbsp;';
-      saidV.textContent = '';
-      caption.classList.remove('wow');
-      caption.textContent = T[lang].capStart;
-      fingerAway();
-      await sleep(1300);
-      for (let j = 0; j < digits.length; j++) {
-        const k = digits[j];
-        fingerTo(k);
-        await sleep(520);
-        finger.classList.add('tap');
-        keyMap[k].classList.add('hit');
-        dots[j].classList.add('on');
-        await sleep(130);
-        finger.classList.remove('tap');
-        keyMap[k].classList.remove('hit');
-        // באוזנייה - מיד
-        earWord.textContent = WORDS[lang][Number(k)];
-        wave.classList.add('on');
-        await sleep(600);
-        wave.classList.remove('on');
-        // הקוסם אומר בקול
-        saidV.textContent = digits.slice(0, j + 1).join(' ');
-        await sleep(650);
-      }
-      fingerAway();
-      caption.classList.add('wow');
-      caption.textContent = T[lang].capWow;
-      await sleep(3200);
-    }
-    (async () => {
-      await sleep(400);
-      for (;;) await round();
-    })();
   })();
 </script>
 </body>

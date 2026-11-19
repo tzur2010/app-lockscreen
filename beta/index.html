@@ -355,7 +355,7 @@ fit();addEventListener('resize',fit);addEventListener('orientationchange',functi
 
       <!-- קו הפרדה אמצעי -->
       <div class="split-divider">
-        <span>איזה טלפון יש לך?</span>
+        <span>בחר מכשיר</span>
       </div>
 
       <!-- חצי תחתון: Apple iPhone (iOS) -->
@@ -426,118 +426,20 @@ fit();addEventListener('resize',fit);addEventListener('orientationchange',functi
           <span id="trialBannerText"></span>
           <button type="button" class="trial-banner-btn" id="trialBuyBtn">לרכישה</button>
         </div>
-        <!-- 10.1: במקום לשוניות - מסך בית עם אריחים, וכל אריח פותח עמוד משלו עם "חזרה" -->
-        <div class="subpage-bar" id="subpageBar">
-          <button type="button" class="subpage-back" id="subpageBack" aria-label="חזרה">
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
-            <span id="subpageBackText">ראשי</span>
-          </button>
-          <div class="subpage-title" id="subpageTitle"></div>
+        <div class="show-actions-bar">
+          <button type="button" class="reset-show-btn" id="resetShowBtn">🔄 מוכן לצופה הבא</button>
+          <button type="button" class="preshow-btn" id="preShowCheckBtn">✅ בדיקה לפני הופעה</button>
         </div>
 
-        <section class="settings-panel" data-tab="home">
-          <!-- 10.2: תצוגה מקדימה חיה של מה שהצופה יראה + "התחל הופעה" -->
-          <div class="hm-top">
-            <div>
-              <div class="home-greet" id="homeGreet">ערב טוב</div>
-              <div class="home-title" id="homeTitle">מוכן להופעה?</div>
-            </div>
-          </div>
-
-          <div class="hm-stage">
-            <div class="hm-preview" id="hmPreview" aria-hidden="true">
-              <div class="hm-pv-time" id="hmPvTime">20:45</div>
-              <div class="hm-pv-date" id="hmPvDate"></div>
-              <div class="hm-pv-lock">
-                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><rect x="5" y="11" width="14" height="9" rx="2" fill="#fff"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
-              </div>
-            </div>
-            <div class="hm-stage-info">
-              <div class="hm-label" id="hmLabel">מה שהצופה יראה</div>
-              <div class="hm-device" id="hmDevice">Galaxy S26</div>
-              <div class="hm-meta" id="hmMeta">PIN · הטפט שלך</div>
-              <button type="button" class="hm-start" id="hmStartBtn">
-                <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.4-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg>
-                <span id="hmStartText">התחל הופעה</span>
-              </button>
-            </div>
-          </div>
-
-          <div class="hm-section-head">
-            <span id="hmTricksHead">הטריקים שלך</span>
-            <button type="button" class="hm-link" data-go="trick" id="hmAllTricks">הכל ‹</button>
-          </div>
-          <div class="hm-cards" id="hmCards">
-            <button type="button" class="hm-card c1" data-toggle="toggleLiveRead">
-              <span class="hm-card-ico"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 14v-2a9 9 0 0 1 18 0v2"/><rect x="2.5" y="14" width="5" height="7" rx="2"/><rect x="16.5" y="14" width="5" height="7" rx="2"/></svg></span>
-              <span class="hm-card-title" data-hc="live">קריאה בזמן אמת</span>
-              <span class="hm-card-sub" data-hcs="live">כל ספרה נלחשת לך באוזנייה</span>
-              <span class="hm-card-state"><i></i><b></b></span>
-            </button>
-            <button type="button" class="hm-card c2" data-toggle="toggleForceUnlockMode">
-              <span class="hm-card-ico"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 7.6-1.8"/></svg></span>
-              <span class="hm-card-title" data-hc="any">פתיחה בכל קוד</span>
-              <span class="hm-card-sub" data-hcs="any">כל קוד שהצופה מקליד פותח</span>
-              <span class="hm-card-state"><i></i><b></b></span>
-            </button>
-            <button type="button" class="hm-card c3" data-toggle="toggleBirthdayTrick">
-              <span class="hm-card-ico"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3.5" y="10" width="17" height="10" rx="2"/><path d="M3.5 14.5c2 1.3 3.6 1.3 5.6 0s3.6-1.3 5.6 0 3.6 1.3 5.8 0M12 10V7M12 4.5v.01"/></svg></span>
-              <span class="hm-card-title" data-hc="bday">תאריך לידה</span>
-              <span class="hm-card-sub" data-hcs="bday">מזל, גיל ויום בשבוע</span>
-              <span class="hm-card-state"><i></i><b></b></span>
-            </button>
-          </div>
-
-          <div class="hm-section-head"><span id="hmSetHead">הגדרות</span></div>
-          <div class="hm-list" id="homeGrid">
-            <button type="button" class="home-tile hm-row" data-go="peek">
-              <span class="hm-row-ico">👁️</span>
-              <span class="ht-title" data-ht="peek">הצצה</span>
-              <span class="ht-sub" id="htSubPeek"></span>
-              <span class="hm-chev">‹</span>
-            </button>
-            <button type="button" class="home-tile hm-row" data-go="look">
-              <span class="hm-row-ico">📱</span>
-              <span class="ht-title" data-ht="look">מראה</span>
-              <span class="ht-sub" id="htSubLook"></span>
-              <span class="hm-chev">‹</span>
-            </button>
-            <button type="button" class="home-tile hm-row" data-go="reveal">
-              <span class="hm-row-ico">🏠</span>
-              <span class="ht-title" data-ht="reveal">אחרי הפתיחה</span>
-              <span class="ht-sub" id="htSubReveal"></span>
-              <span class="hm-chev">‹</span>
-            </button>
-            <button type="button" class="home-tile hm-row" data-go="trick">
-              <span class="hm-row-ico">🎯</span>
-              <span class="ht-title" data-ht="trick">כל הטריקים</span>
-              <span class="ht-sub" id="htSubTrick"></span>
-              <span class="hm-chev">‹</span>
-            </button>
-            <button type="button" class="home-tile hm-row" data-go="more">
-              <span class="hm-row-ico">⚙️</span>
-              <span class="ht-title" data-ht="more">עוד</span>
-              <span class="ht-sub" id="htSubMore"></span>
-              <span class="hm-chev">‹</span>
-            </button>
-          </div>
-
-          <div class="show-actions-bar">
-            <button type="button" class="reset-show-btn" id="resetShowBtn">🔄 מוכן לצופה הבא</button>
-            <button type="button" class="preshow-btn" id="preShowCheckBtn">✅ בדיקה לפני הופעה</button>
-          </div>
-        </section>
-
-        <!-- לשוניות ישנות (מוסתרות): נשארות בשביל הקוד הקיים -->
+        <!-- לשוניות: טריק (מה קורה) · פתיחה (מסך הבית אחרי הפתיחה) · הצצה (איך אתה יודע) · מראה · עוד -->
         <nav class="settings-tabs" id="settingsTabs" role="tablist">
-          <button type="button" class="settings-tab" data-tab="home" role="tab"><span class="tab-ico">⌂</span><span>ראשי</span></button>
-          <button type="button" class="settings-tab" data-tab="trick" role="tab"><span class="tab-ico">🎯</span><span>טריק</span></button>
+          <button type="button" class="settings-tab active" data-tab="trick" role="tab"><span class="tab-ico">🎯</span><span>טריק</span></button>
           <button type="button" class="settings-tab" data-tab="reveal" role="tab"><span class="tab-ico">🏠</span><span>פתיחה</span></button>
           <button type="button" class="settings-tab" data-tab="peek" role="tab"><span class="tab-ico">👁️</span><span>הצצה</span></button>
           <button type="button" class="settings-tab" data-tab="look" role="tab"><span class="tab-ico">📱</span><span>מראה</span></button>
           <button type="button" class="settings-tab" data-tab="more" role="tab"><span class="tab-ico">⚙️</span><span>עוד</span></button>
         </nav>
-        <section class="settings-panel" data-tab="trick">
+        <section class="settings-panel active" data-tab="trick">
         <div class="oneui-section-header">🔓 הבסיס</div>
         <div class="config-group oneui-card">
           <div class="clean-toggle-row oneui-row-with-sub">

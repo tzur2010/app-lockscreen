@@ -5,14 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="robots" content="noindex">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:">
-  <meta name="theme-color" content="#060609">
+  <meta name="theme-color" content="#f5f5f7">
   <title>Lockscreen</title>
   <meta property="og:title" content="Lockscreen - הצופה מקליד קוד. אתה עם הגב. ואתה יודע כל ספרה.">
   <meta property="og:description" content="אפליקציית קסמים לטלפון: כל ספרה שהצופה לוחץ נלחשת לך באוזנייה. אנדרואיד ואייפון.">
   <style>
     :root {
-      --bg: #0c0c0e; --panel: #18181c; --panel2: #202026; --line: rgba(255,255,255,.07); --line2: rgba(255,255,255,.12);
-      --text: #f4f4f6; --muted: #9b9ba6; --soft: #d0d0d8; --accent: #ff6a45; --accent2: #ff8f70;
+      --bg: #f5f5f7; --panel: #ffffff; --panel2: #f3f3f6; --line: rgba(17,17,26,.07); --line2: rgba(17,17,26,.12);
+      --text: #15151b; --muted: #6e6e7a; --soft: #3d3d47; --accent: #ff6a45; --accent2: #ff8f70;
       --grad: linear-gradient(135deg, #ff8a5c 0%, #ff5a3c 100%); --ink: #ffffff;
     }
     * { box-sizing: border-box; }
@@ -39,7 +39,7 @@
     .lead { margin: 0 auto; max-width: 400px; color: var(--muted); font-size: 16.5px; }
     .cta-row { display: flex; gap: 10px; margin: 24px 0 6px; }
     .btn { flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 52px; border-radius: 14px; border: none; font: inherit; font-size: 16px; font-weight: 700; text-decoration: none; cursor: pointer; }
-    .btn-main { background: var(--text); color: #0a0a10; }
+    .btn-main { background: var(--text); color: #fff; }
     .btn-grad { background: var(--grad); color: var(--ink); box-shadow: 0 10px 30px rgba(255,106,69,.28); }
     .btn-ghost { background: rgba(255,255,255,.05); color: var(--text); border: 1px solid var(--line2); }
     .meta { text-align: center; color: var(--muted); font-size: 12.5px; margin-top: 8px; }
@@ -105,7 +105,7 @@
     .card h3 { margin: 0 0 12px; font-size: 16px; }
     .card ol { margin: 0; padding: 0; list-style: none; counter-reset: s; }
     .card ol li { counter-increment: s; position: relative; padding-inline-start: 34px; margin-bottom: 11px; font-size: 14.5px; color: var(--soft); }
-    .card ol li::before { content: counter(s); position: absolute; inset-inline-start: 0; top: 1px; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 700; background: rgba(255,255,255,.07); color: var(--text); }
+    .card ol li::before { content: counter(s); position: absolute; inset-inline-start: 0; top: 1px; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 700; background: var(--panel2); color: var(--text); }
     .card ol li b { color: var(--text); }
     .note { font-size: 13px; color: var(--muted); margin-top: 10px; text-align: center; }
     .warn { border-color: rgba(251,146,60,.4); background: rgba(251,146,60,.06); }
@@ -115,12 +115,17 @@
     .vip-sub { font-size: 13px; color: var(--soft); margin-top: 8px; }
     .tabs { display: flex; gap: 8px; margin-bottom: 12px; }
     .tab { flex: 1; padding: 10px; border-radius: 12px; border: 1px solid var(--line2); background: transparent; color: var(--soft); font: inherit; font-weight: 700; cursor: pointer; }
-    .tab.on { background: var(--text); color: #0a0a10; border-color: transparent; }
+    .tab.on { background: var(--text); color: #fff; border-color: transparent; }
     .final { margin-top: 44px; padding: 26px 20px; border-radius: 24px; text-align: center; background: radial-gradient(100% 120% at 50% 0%, rgba(255,106,69,.18), transparent 70%), var(--panel); border: 1px solid var(--line2); }
     .final h2 { margin: 0 0 6px; }
     .final p { margin: 0 0 18px; color: var(--muted); }
     .foot { text-align: center; font-size: 12px; color: #5d5d6c; margin-top: 26px; }
     .foot a { color: #8a8a99; text-decoration: none; }
+    /* לבן: צללים רכים במקום כבדים */
+    .demo { box-shadow: 0 1px 2px rgba(17,17,26,.05), 0 20px 50px rgba(17,17,26,.1) !important; }
+    .diff div, .step, .feat, .card, .final { box-shadow: 0 1px 2px rgba(17,17,26,.04), 0 8px 24px rgba(17,17,26,.05); }
+    .final { background: radial-gradient(100% 120% at 50% 0%, rgba(255,106,69,.14), transparent 70%), #fff !important; }
+    .foot { color: #9a9aa5 !important; }
   </style>
 </head>
 <body>

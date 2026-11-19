@@ -4659,3 +4659,102 @@ html[dir="ltr"] .hm-chev { transform: scaleX(-1); }
 /* כפתורי בין-צופים בתחתית */
 .settings-panel[data-tab="home"] .show-actions-bar { margin: 18px 0 0; }
 .device-config-sheet .show-actions-bar .reset-show-btn { background: var(--st-card) !important; color: var(--st-text) !important; border: 1px solid var(--st-line2) !important; box-shadow: none !important; }
+
+/* ==========================================================================
+   ☀️ 10.3 - לבן: רקע בהיר, כרטיסים לבנים, אלמוג כצבע הדגשה
+   + כניסה יפה: מסך פתיחה, בחירת טלפון והרשמה
+   ========================================================================== */
+:root {
+  --st-bg: #f5f5f7;
+  --st-bg2: #eeeef2;
+  --st-card: #ffffff;
+  --st-card2: #f3f3f6;
+  --st-line: rgba(17, 17, 26, .07);
+  --st-line2: rgba(17, 17, 26, .12);
+  --st-text: #15151b;
+  --st-sub: #6e6e7a;
+  --st-gold: #ff5a36;
+  --st-gold2: #f04a25;
+  --st-gold-grad: linear-gradient(135deg, #ff8a5c 0%, #ff5236 100%);
+  --st-gold-soft: rgba(255, 90, 54, .1);
+  --st-ink: #ffffff;
+}
+.device-config-sheet,
+.device-config-sheet.light-mode {
+  --cfg-header-bg: rgba(255, 255, 255, .92);
+  --cfg-switch-off: #dcdce2;
+  --cfg-footer-grad: linear-gradient(180deg, rgba(245, 245, 247, 0) 0%, rgba(245, 245, 247, .95) 36%, #f5f5f7 100%);
+  color-scheme: light;
+}
+.device-config-sheet .config-header { background: rgba(255, 255, 255, .9) !important; border-bottom: 1px solid var(--st-line) !important; }
+.device-config-sheet.in-subpage .subpage-bar { background: rgba(245, 245, 247, .94) !important; }
+.device-config-sheet .slider { background: #dcdce2 !important; }
+.device-config-sheet .slider:before { background: #fff !important; box-shadow: 0 2px 6px rgba(0, 0, 0, .18) !important; }
+.device-config-sheet .switch input:checked + .slider { background: var(--st-gold) !important; }
+.device-config-sheet .config-group,
+.device-config-sheet .oneui-card,
+.hm-stage, .hm-list { box-shadow: 0 1px 2px rgba(17, 17, 26, .04), 0 8px 24px rgba(17, 17, 26, .05) !important; border-color: rgba(17, 17, 26, .06) !important; }
+.device-config-sheet .feedback-textarea,
+.device-config-sheet input[type="text"],
+.device-config-sheet input[type="number"],
+.device-config-sheet textarea { background: #f4f4f7 !important; color: var(--st-text) !important; }
+.device-config-sheet .live-read-status.good { color: #0f8a5f !important; }
+.device-config-sheet .live-read-status.bad { color: #d23b2a !important; }
+.device-config-sheet .live-read-status.warn { color: #b26a00 !important; }
+.device-config-sheet .back-to-split-btn,
+.device-config-sheet .selected-device-pill,
+.device-config-sheet .floating-close-settings-btn,
+.device-config-sheet .theme-mode-toggle-btn { background: #fff !important; box-shadow: 0 1px 3px rgba(17, 17, 26, .08) !important; }
+.hm-top .home-title { color: var(--st-text); }
+.hm-card:not(.on) { filter: saturate(.15) brightness(1.08) !important; opacity: .55; }
+.hm-preview { box-shadow: 0 0 0 4px #111, 0 0 0 5px rgba(0, 0, 0, .08), 0 16px 30px rgba(17, 17, 26, .18) !important; }
+.device-config-sheet .show-actions-bar .reset-show-btn,
+.device-config-sheet .show-actions-bar .preshow-btn { background: #fff !important; color: var(--st-text) !important; border: 1px solid var(--st-line2) !important; box-shadow: 0 1px 3px rgba(17, 17, 26, .06) !important; }
+.update-popup-overlay { background: rgba(17, 17, 26, .38) !important; }
+.update-popup-card, .tour-card { box-shadow: 0 30px 80px rgba(17, 17, 26, .22) !important; }
+
+/* ---- מסך פתיחה ---- */
+.splash-screen {
+  background:
+    radial-gradient(60% 40% at 80% 10%, rgba(255, 138, 92, .28), transparent 70%),
+    radial-gradient(60% 40% at 10% 90%, rgba(255, 82, 54, .16), transparent 70%),
+    #fbfbfd !important;
+}
+.splash-lock-glow { background: var(--st-gold-grad) !important; color: #fff !important; box-shadow: 0 0 0 12px rgba(255, 90, 54, .08), 0 24px 60px rgba(255, 82, 54, .35) !important; animation: entryPop .7s cubic-bezier(.2, 1.3, .4, 1) both; }
+.splash-title { color: var(--st-text) !important; letter-spacing: 9px !important; font-weight: 700 !important; animation: entryUp .7s .15s ease both; }
+@keyframes entryPop { from { opacity: 0; transform: scale(.6); } to { opacity: 1; transform: none; } }
+@keyframes entryUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+
+/* ---- בחירת טלפון: שני כרטיסים גדולים ---- */
+.setup-overlay { background: radial-gradient(80% 35% at 50% 0%, rgba(255, 138, 92, .18), transparent 70%), #f5f5f7 !important; }
+.split-choice-screen { padding: 92px 18px calc(env(safe-area-inset-bottom, 0px) + 22px); gap: 14px; box-sizing: border-box; }
+.split-divider {
+  top: 34px !important; transform: translateX(-50%) !important;
+  background: transparent !important; box-shadow: none !important; padding: 0 !important;
+  color: var(--st-text) !important; font-size: 24px !important; font-weight: 700 !important; white-space: nowrap;
+}
+.split-half { border-radius: 30px; flex: 1; animation: entryUp .55s ease both; }
+.split-ios { animation-delay: .08s; }
+.split-samsung { background: linear-gradient(150deg, #ff9466 0%, #ff5a3a 60%, #f0412b 100%) !important; border: 0 !important; box-shadow: 0 18px 40px rgba(255, 82, 54, .3); }
+.split-ios { background: #ffffff !important; box-shadow: 0 1px 2px rgba(17, 17, 26, .05), 0 14px 34px rgba(17, 17, 26, .08); }
+.split-samsung:active, .split-ios:active { transform: scale(.98); filter: none; }
+.split-samsung .split-half-inner, .split-samsung .split-title { color: #fff !important; }
+.split-ios .split-half-inner, .split-ios .split-title { color: var(--st-text) !important; }
+.split-samsung .split-badge { color: #fff !important; border-color: rgba(255, 255, 255, .55) !important; }
+.split-ios .split-badge { color: var(--st-sub) !important; border-color: var(--st-line2) !important; }
+.split-samsung .split-icon { background: rgba(255, 255, 255, .2) !important; border-color: rgba(255, 255, 255, .4) !important; color: #fff !important; }
+.split-ios .split-icon { background: #f3f3f6 !important; border-color: transparent !important; color: var(--st-text) !important; }
+.split-subtitle { color: var(--st-sub) !important; }
+.split-samsung .split-brand { background: rgba(255, 255, 255, .95) !important; color: #e8432b !important; border: 0 !important; font-weight: 700; padding: 8px 16px; }
+.split-samsung .split-brand:active { background: #fff !important; transform: scale(.96); }
+
+/* ---- הרשמה ---- */
+.license-lock-overlay { background: radial-gradient(70% 40% at 50% 0%, rgba(255, 138, 92, .22), transparent 70%), #f5f5f7 !important; }
+.license-lock-card { background: #fff !important; border: 0 !important; box-shadow: 0 1px 2px rgba(17, 17, 26, .05), 0 24px 60px rgba(17, 17, 26, .1) !important; animation: entryUp .5s ease both; }
+.license-lock-title { color: var(--st-text) !important; }
+.license-lock-desc { color: var(--st-sub) !important; }
+.license-reg-input, .license-key-input { background: #f4f4f7 !important; border: 1px solid transparent !important; color: var(--st-text) !important; }
+.license-reg-input:focus, .license-key-input:focus { background: #fff !important; border-color: var(--st-gold) !important; box-shadow: 0 0 0 4px rgba(255, 90, 54, .12) !important; }
+.license-reg-submit-btn, .license-activate-btn { color: #fff !important; box-shadow: 0 12px 28px rgba(255, 82, 54, .3) !important; }
+.reg-terms-row { color: var(--st-sub) !important; }
+.reg-terms-row a, .reg-link-btn { color: var(--st-gold2) !important; }

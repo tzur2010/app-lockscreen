@@ -597,6 +597,9 @@ function enforceRetiredFeatures(cfg) {
   cfg.callReveal = false;
   // 9.0: "הטלפון ידע מראש" הוסר (אנדרואיד לא מאפשר לכתוב בשורה של מסך הנעילה)
   cfg.wordPredict = false;
+  // 9.4: הוסרו גם "הקלף בטלפון" ו"שלט רחוק סודי"
+  cfg.cardTrick = false;
+  cfg.remoteTrick = false;
   return cfg;
 }
 
@@ -5062,7 +5065,7 @@ function initDeviceLicenseGate() {
 // החלון מוצג רק כשמסך ההגדרות פתוח (בפתיחת האפליקציה / בתפריט הסודי),
 // ולעולם לא מעל מסך הנעילה הפעיל מול קהל.
 // ============================================================================
-const APP_VERSION = '9.3';
+const APP_VERSION = '9.4';
 const DEFAULT_APK_URL = 'https://github.com/tzur2010/app-lockscreen/raw/main/Lockscreen.apk';
 const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 const UPDATE_DISMISS_KEY = 'magic_update_dismissed_version';
@@ -6855,9 +6858,9 @@ function syncNewRevealsUI() {
   // 🃏 / 🗣️ (אנדרואיד בלבד)
   const voiceOk = hasNativeWordListen();
   const ctBlock = document.getElementById('cardTrickBlock');
-  if (ctBlock) ctBlock.style.display = voiceOk ? '' : 'none';
+  if (ctBlock) ctBlock.style.display = 'none';
   const rtBlock = document.getElementById('remoteTrickBlock');
-  if (rtBlock) rtBlock.style.display = voiceOk ? '' : 'none';
+  if (rtBlock) rtBlock.style.display = 'none';
   const ctToggle = document.getElementById('toggleCardTrick');
   if (ctToggle) ctToggle.checked = Boolean(config.cardTrick);
   const ctExtra = document.getElementById('cardTrickExtra');
@@ -7895,8 +7898,6 @@ function initTour() {
 const WHATS_NEW_SEEN_KEY = 'magic_whats_new_seen_v1';
 const WHATS_NEW_MAX_ITEMS = 6;
 const WHATS_NEW = [
-  { ver: '9.1', icon: '🃏', target: '#toggleCardTrick', he: ['הקלף בטלפון', 'הצופה אומר בקול איזה קלף בחר. הופכים את הטלפון הנעול - והטפט הוא הקלף שלו. (אנדרואיד)'], en: ['Card on the phone', 'The spectator says their card out loud. Flip the locked phone - the wallpaper is their card. (Android)'] },
-  { ver: '9.1', icon: '🗣️', target: '#toggleRemoteTrick', he: ['שלט רחוק סודי', 'הטלפון ביד של הצופה. אתה אומר מילת קוד בשיחה - ואצלו קופצת הודעה או מתחלפת התמונה. (אנדרואיד)'], en: ['Secret remote', 'The phone is in the spectator\'s hand. You say a code word - and a message pops up or the photo changes. (Android)'] },
   { ver: '8.0', icon: '🎧', target: '#toggleLiveRead', he: ['קריאה בזמן אמת', 'אתה עם הגב, הצופה מקליד קוד - ואתה אומר כל ספרה ברגע שהוא לוחץ עליה. הספרות נלחשות לך באוזניית בלוטות\'.'], en: ['Live reading', 'Your back is turned, the spectator types a code - and you name every digit the moment it is pressed. The digits are whispered into your Bluetooth earphone.'] },
   { ver: '7.9', icon: '🛡️', target: null, he: ['ליטוש לפני הופעות', 'עברנו על כל מסך בכל סוג טלפון. באייפון מוצג רק מה שעובד שם, והכל אמין יותר מתמיד.'], en: ['Polished for shows', 'We went over every screen on every phone type. On iPhone you see only what works there, and everything is more reliable than ever.'] },
   { ver: '7.8', icon: '✨', target: null, he: ['מראה חדש מהרגע הראשון', 'גם ההרשמה, בחירת הטלפון וכל החלונות בעיצוב החדש. האפליקציה ממוקדת: רק מה שעובד בצורה מושלמת.'], en: ['A new look from the first second', 'Sign-up, phone selection and every window now share the new design. The app is focused: only what works perfectly.'] },

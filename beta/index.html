@@ -625,6 +625,49 @@ fit();addEventListener('resize',fit);addEventListener('orientationchange',functi
           <div class="oneui-card-divider"></div>
           </div>
 
+          <!-- 📸 התמונה כבר הייתה שם: הצופה אומר מילה - והיא בתמונה "מהבוקר" בגלריה האמיתית (אנדרואיד) -->
+          <div id="galleryPredictBlock">
+          <div class="clean-toggle-row oneui-row-with-sub">
+            <div class="toggle-text-stack">
+              <span class="toggle-main-title">📸 התמונה כבר הייתה שם</span>
+              <span class="toggle-sub-desc">הצופה אומר בקול מילה כלשהי. הוא פותח את הגלריה האמיתית של הטלפון - והתמונה האחרונה, שצולמה הבוקר, היא פתק בכתב יד עם המילה שלו.</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="toggleGalleryPredict">
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="oneui-field-block" id="galleryPredictExtra" style="display: none; padding-top: 0;">
+            <label class="config-label">התמונה "צולמה"</label>
+            <div class="segmented-row" id="galleryPredictAgoSelector">
+              <button type="button" class="seg-pill" data-gpago="60">לפני שעה</button>
+              <button type="button" class="seg-pill" data-gpago="180">לפני 3 שעות</button>
+              <button type="button" class="seg-pill" data-gpago="360">הבוקר</button>
+              <button type="button" class="seg-pill" data-gpago="1440">אתמול</button>
+            </div>
+            <label class="config-label" for="galleryPredictTplInput">מה כתוב על הפתק ({מילה} = מה שהצופה אמר)</label>
+            <input type="text" id="galleryPredictTplInput" class="feedback-textarea gallery-text-input" maxlength="60" dir="rtl">
+            <label class="media-upload-btn" style="display: block; text-align: center; width: 100%; margin-top: 6px; box-sizing: border-box;">
+              📷 צלם דף ריק מהמחברת שלך (לא חובה)
+              <input type="file" id="predictPaperFileInput" accept="image/*" capture="environment" hidden>
+            </label>
+            <div class="toggle-sub-desc live-read-status" id="predictPaperStatus"></div>
+            <label class="config-label">שפת הזיהוי</label>
+            <div class="segmented-row voice-lang-selector">
+              <button type="button" class="seg-pill" data-vlang="he">עברית</button>
+              <button type="button" class="seg-pill" data-vlang="en">English</button>
+            </div>
+            <button type="button" class="media-upload-btn" id="galleryPredictTestBtn" style="width: 100%; margin-top: 8px;">🧪 נסה עכשיו: שים "בדיקה" בגלריה</button>
+            <div class="toggle-sub-desc live-read-status" id="galleryPredictTestStatus" style="line-height: 1.6;"></div>
+            <img id="galleryPredictPreview" alt="" style="display: none; width: 46%; margin: 8px auto 0; border-radius: 10px;">
+            <div class="toggle-sub-desc live-read-status" id="galleryPredictStatus"></div>
+            <div class="toggle-sub-desc" style="margin-top: 4px; line-height: 1.6;">
+              אחרי "שמור וסגור" הטלפון מקשיב. כשבאוזנייה נשמע "נקלט: ..." - התמונה כבר בגלריה. "מוכן לצופה הבא" מוחק אותה. הסבר מלא: כפתור ה-?
+            </div>
+          </div>
+          <div class="oneui-card-divider"></div>
+          </div>
+
           <!-- 🃏 הקלף בטלפון: הצופה אומר קלף בקול - הטפט של מסך הנעילה הופך לקלף שלו (אנדרואיד) -->
           <div id="cardTrickBlock">
           <div class="clean-toggle-row oneui-row-with-sub">

@@ -567,6 +567,9 @@ const DEFAULT_CONFIG = {
   wordPredictMode: 'wallpaper', // איפה המילה מופיעה במסך הנעילה האמיתי: 'wallpaper' (בשורה למטה) או 'notification'
   liveReadLang: isEnglishUi() ? 'en' : 'he',
   cardTrick: false,             // 🃏 "הקלף בטלפון": הצופה אומר קלף - הטפט הופך לקלף שלו
+  galleryPredict: false,        // 📸 "התמונה כבר הייתה שם": המילה של הצופה בתמונה "מהבוקר" בגלריה האמיתית
+  galleryPredictAgo: 360,       // התמונה "צולמה" לפני X דקות
+  galleryPredictTpl: '{מילה}',  // מה כתוב על הפתק
   remoteTrick: false,           // 🗣️ "שלט רחוק סודי": מילת קוד של הקוסם - קופצת הודעה / מתחלפת התמונה
   remoteWord: 'וואלה',          // מילת הקוד
   remoteAction: 'notif',        // 'notif' (הודעה במסך הנעילה) או 'photo' (הטפט מתחלף לתמונה)
@@ -2661,7 +2664,7 @@ function voiceLang() {
 }
 
 function voiceTricksWanted() {
-  return Boolean((config.cardTrick || config.remoteTrick) && hasNativeWordListen() && config.osTheme !== 'ios');
+  return Boolean((config.cardTrick || config.remoteTrick || config.galleryPredict) && hasNativeWordListen() && config.osTheme !== 'ios');
 }
 
 function normalizeHeard(text) {
@@ -2695,6 +2698,8 @@ function parseSpokenCard(text) {
 
 function voiceTricksStart() {
   voiceTricksReset();
+  // 📸 הופעה חדשה: התמונה מהצופה הקודם יוצאת מהגלריה
+  galleryPredictDelete();
   if (!voiceTricksWanted()) return;
   voiceTrickListening = true;
   try {
@@ -2740,7 +2745,215 @@ function voiceTrickHeard(text, isFinal) {
     clearTimeout(voiceTrickCardTimer);
     voiceTrickCardTimer = setTimeout(() => cardTrickShow(card), 300);
   }
+  // 📸 המילה של הצופה -> תמונה "מהבוקר" בגלריה האמיתית (המילה האחרונה מנצחת)
+  if (config.galleryPredict && isFinal) {
+    const w = cleanSpokenWord(text);
+    if (!w) return;
+    clearTimeout(galleryPredictTimer);
+    galleryPredictTimer = setTimeout(() => galleryPredictSave(w, 'word'), 900);
+  }
 }
+
+// ----------------------------------------------------------------------------
+// 📸 "התמונה כבר הייתה שם": הצופה אומר מילה -> בגלריה האמיתית של הטלפון מופיעה
+// תמונה של פתק בכתב יד עם המילה, שצולמה "הבוקר". ב"מוכן לצופה הבא" היא נמחקת.
+// ----------------------------------------------------------------------------
+var galleryPredictTimer = null;
+var galleryPredictSaved = false;
+const PREDICT_PAPER_KEY = 'magic_predict_paper';
+
+function hasNativeGalleryPredict() {
+  return Boolean(window.AndroidNative && typeof window.AndroidNative.savePredictionPhoto === 'function');
+}
+
+function galleryPredictText(word) {
+  const tpl = String(config.galleryPredictTpl || '{מילה}');
+  return /\{(מילה|word)\}/i.test(tpl) ? tpl.replace(/\{(מילה|word)\}/gi, word) : `${tpl} ${word}`.trim();
+}
+
+function loadImg(src) {
+  return new Promise((resolve) => {
+    if (!src) return resolve(null);
+    const im = new Image();
+    im.onload = () => resolve(im);
+    im.onerror = () => resolve(null);
+    im.src = src;
+  });
+}
+
+// פתק בכתב יד: כל אות בנפרד, עם הטיה וגובה קצת שונים, בדיו כחול - ותאורה של צילום אמיתי
+async function drawPredictionPhoto(text) {
+  const W = 1536;
+  const H = 2048;
+  const c = document.createElement('canvas');
+  c.width = W;
+  c.height = H;
+  const x = c.getContext('2d');
+  let paper = null;
+  try { paper = await loadImg(localStorage.getItem(PREDICT_PAPER_KEY) || ''); } catch (e) {}
+  if (paper) {
+    const sc = Math.max(W / paper.width, H / paper.height);
+    x.drawImage(paper, (W - paper.width * sc) / 2, (H - paper.height * sc) / 2, paper.width * sc, paper.height * sc);
+  } else {
+    // שולחן עץ כהה, ועליו דף מחברת מעט מסובב
+    const desk = x.createLinearGradient(0, 0, W, H);
+    desk.addColorStop(0, '#5a4330');
+    desk.addColorStop(1, '#3a2a1d');
+    x.fillStyle = desk;
+    x.fillRect(0, 0, W, H);
+    for (let i = 0; i < 90; i++) {
+      x.strokeStyle = `rgba(0,0,0,${0.03 + Math.random() * 0.05})`;
+      x.lineWidth = 1 + Math.random() * 3;
+      x.beginPath();
+      const yy = Math.random() * H;
+      x.moveTo(0, yy);
+      x.bezierCurveTo(W * 0.3, yy + Math.random() * 40 - 20, W * 0.7, yy + Math.random() * 40 - 20, W, yy + Math.random() * 30 - 15);
+      x.stroke();
+    }
+    x.save();
+    x.translate(W / 2, H / 2);
+    x.rotate(-0.035);
+    const pw = W * 0.84;
+    const ph = H * 0.86;
+    x.shadowColor = 'rgba(0,0,0,.45)';
+    x.shadowBlur = 40;
+    x.shadowOffsetY = 18;
+    x.fillStyle = '#f7f4ec';
+    x.fillRect(-pw / 2, -ph / 2, pw, ph);
+    x.shadowColor = 'transparent';
+    x.strokeStyle = 'rgba(70,120,200,.28)';
+    x.lineWidth = 2;
+    for (let yy = -ph / 2 + 200; yy < ph / 2 - 40; yy += 78) {
+      x.beginPath();
+      x.moveTo(-pw / 2, yy);
+      x.lineTo(pw / 2, yy);
+      x.stroke();
+    }
+    x.strokeStyle = 'rgba(210,70,70,.35)';
+    x.beginPath();
+    x.moveTo(pw / 2 - 150, -ph / 2);
+    x.lineTo(pw / 2 - 150, ph / 2);
+    x.stroke();
+    x.restore();
+  }
+  // כתב יד: כותבים על דף נפרד, ואז "מרעידים" את הקווים כמו יד עם עט
+  const isHe = /[֐-׿]/.test(text);
+  const chars = Array.from(text);
+  const FONT = (s) => `400 ${s}px "Segoe Print", "Bradley Hand", "Noteworthy", "Comic Sans MS", cursive, sans-serif`;
+  const t = document.createElement('canvas');
+  const TW = Math.round(W * 0.9);
+  const TH = 520;
+  t.width = TW;
+  t.height = TH;
+  const g = t.getContext('2d');
+  let fs = 230;
+  g.font = FONT(fs);
+  let total = chars.reduce((s, ch) => s + g.measureText(ch).width * 0.95, 0);
+  const maxW = TW * 0.78;
+  if (total > maxW) {
+    fs = Math.max(80, Math.floor(fs * maxW / total));
+    g.font = FONT(fs);
+    total = chars.reduce((s, ch) => s + g.measureText(ch).width * 0.95, 0);
+  }
+  g.fillStyle = '#1c307d';
+  g.textBaseline = 'alphabetic';
+  const baseY = TH * 0.62;
+  let pos = isHe ? TW / 2 + total / 2 : TW / 2 - total / 2;
+  chars.forEach((ch, i) => {
+    const cw = g.measureText(ch).width * 0.95;
+    const cx = isHe ? pos - cw : pos;
+    g.save();
+    // השורה עולה קצת לאורך המילה, וכל אות קצת שונה
+    g.translate(cx + cw / 2, baseY - i * fs * 0.012 + (Math.random() - 0.5) * fs * 0.07);
+    g.rotate((Math.random() - 0.5) * 0.14);
+    g.scale(0.92 + Math.random() * 0.12, 0.92 + Math.random() * 0.14);
+    g.fillText(ch, -cw / 2, 0);
+    g.restore();
+    pos = isHe ? pos - cw : pos + cw;
+  });
+  // קו מתחת, כמו שמסמנים בעט
+  g.lineWidth = Math.max(5, fs * 0.035);
+  g.strokeStyle = '#1c307d';
+  g.lineCap = 'round';
+  g.beginPath();
+  g.moveTo(TW / 2 - total / 2 - 14, baseY + fs * 0.24);
+  g.quadraticCurveTo(TW / 2, baseY + fs * 0.34, TW / 2 + total / 2 + 24, baseY + fs * 0.16);
+  g.stroke();
+  // רעד יד: הזזת שורות ועמודות בגל קטן ולא קבוע
+  const warp = document.createElement('canvas');
+  warp.width = TW;
+  warp.height = TH;
+  const wg = warp.getContext('2d');
+  const ph1 = Math.random() * 6;
+  for (let yy = 0; yy < TH; yy += 2) {
+    const dx = Math.sin(yy * 0.045 + ph1) * 3.2 + Math.sin(yy * 0.13) * 1.4;
+    wg.drawImage(t, 0, yy, TW, 2, dx, yy, TW, 2);
+  }
+  g.clearRect(0, 0, TW, TH);
+  const ph2 = Math.random() * 6;
+  for (let xx = 0; xx < TW; xx += 2) {
+    const dy = Math.sin(xx * 0.038 + ph2) * 3 + Math.sin(xx * 0.11) * 1.2;
+    g.drawImage(warp, xx, 0, 2, TH, xx, dy, 2, TH);
+  }
+  x.save();
+  x.translate(W / 2, H * 0.44);
+  x.rotate(-0.045);
+  x.globalAlpha = 0.9;
+  x.filter = 'blur(0.6px)';
+  x.drawImage(t, -TW / 2, -TH / 2);
+  x.filter = 'none';
+  x.globalAlpha = 1;
+  x.restore();
+  // תאורה לא אחידה + וינייטה, כמו צילום בטלפון
+  const light = x.createRadialGradient(W * 0.35, H * 0.3, W * 0.1, W * 0.5, H * 0.5, H * 0.8);
+  light.addColorStop(0, 'rgba(255,248,230,.10)');
+  light.addColorStop(1, 'rgba(0,0,0,.28)');
+  x.fillStyle = light;
+  x.fillRect(0, 0, W, H);
+  return c.toDataURL('image/jpeg', 0.88);
+}
+
+async function galleryPredictSave(word, tag) {
+  if (!hasNativeGalleryPredict()) return;
+  const dataUrl = await drawPredictionPhoto(galleryPredictText(word));
+  window.__lastPredictionWord = word;
+  try {
+    window.AndroidNative.savePredictionPhoto(dataUrl, Number(config.galleryPredictAgo) || 360, tag + ':' + word);
+  } catch (e) {}
+  return dataUrl;
+}
+
+function galleryPredictDelete() {
+  // אנדרואיד זוכר איזו תמונה שמרנו (גם אחרי סגירת האפליקציה) ומוחק רק אותה
+  if (!hasNativeGalleryPredict()) return;
+  galleryPredictSaved = false;
+  try {
+    window.AndroidNative.deletePredictionPhoto();
+  } catch (e) {}
+}
+
+// אנדרואיד מודיע שהתמונה נשמרה בגלריה
+window.onPredictionPhotoSaved = function (ok, tag, info) {
+  const t = String(tag || '');
+  const word = t.slice(t.indexOf(':') + 1);
+  if (ok) galleryPredictSaved = true;
+  if (t.startsWith('test:')) {
+    const st = document.getElementById('galleryPredictTestStatus');
+    if (st) {
+      st.textContent = ok
+        ? (isEnglishUi() ? '✓ Saved. Open your Gallery - the newest photo is from earlier today. ("Ready for next spectator" deletes it.)' : '✓ נשמר. פתח את הגלריה של הטלפון - התמונה האחרונה "צולמה" מוקדם יותר היום. ("מוכן לצופה הבא" מוחק אותה.)')
+        : '❌ ' + String(info || '');
+      st.className = 'toggle-sub-desc live-read-status ' + (ok ? 'good' : 'bad');
+    }
+    return;
+  }
+  if (ok) {
+    trackEvent('gallerypredict_hit');
+    voiceTrickWhisper('נקלט: ' + word, 'got: ' + word);
+  } else {
+    voiceTrickWhisper('לא הצלחתי לשמור', 'could not save');
+  }
+};
 
 // הטפט הרגיל שנבחר באפליקציה (התמונה של הקוסם) - הקלף מצויר עליו
 function currentBaseWallpaperUrl() {
@@ -5065,7 +5278,7 @@ function initDeviceLicenseGate() {
 // החלון מוצג רק כשמסך ההגדרות פתוח (בפתיחת האפליקציה / בתפריט הסודי),
 // ולעולם לא מעל מסך הנעילה הפעיל מול קהל.
 // ============================================================================
-const APP_VERSION = '10.4';
+const APP_VERSION = '10.5';
 const DEFAULT_APK_URL = 'https://github.com/tzur2010/app-lockscreen/raw/main/Lockscreen.apk';
 const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 const UPDATE_DISMISS_KEY = 'magic_update_dismissed_version';
@@ -6331,6 +6544,7 @@ function getStatsForReport() {
   if (config.wordPredict) on.push('wordpredict');
   if (config.cardTrick) on.push('cardtrick');
   if (config.remoteTrick) on.push('remotetrick');
+  if (config.galleryPredict) on.push('gallerypredict');
   if (config.unlockTargetScreen === 'gallery') on.push('gallery');
   if (config.unlockTargetScreen === 'search') on.push('search');
   try {
@@ -6867,6 +7081,25 @@ function syncNewRevealsUI() {
   if (ctExtra) ctExtra.style.display = config.cardTrick ? 'block' : 'none';
   const rtToggle = document.getElementById('toggleRemoteTrick');
   if (rtToggle) rtToggle.checked = Boolean(config.remoteTrick);
+  // 📸 התמונה כבר הייתה שם
+  const gpBlock = document.getElementById('galleryPredictBlock');
+  if (gpBlock) gpBlock.style.display = hasNativeGalleryPredict() && hasNativeWordListen() ? '' : 'none';
+  const gpToggle = document.getElementById('toggleGalleryPredict');
+  if (gpToggle) gpToggle.checked = Boolean(config.galleryPredict);
+  const gpExtra = document.getElementById('galleryPredictExtra');
+  if (gpExtra) gpExtra.style.display = config.galleryPredict ? 'block' : 'none';
+  document.querySelectorAll('#galleryPredictAgoSelector .seg-pill').forEach((btn) => {
+    btn.classList.toggle('active', Number(btn.dataset.gpago) === (Number(config.galleryPredictAgo) || 360));
+  });
+  const gpTpl = document.getElementById('galleryPredictTplInput');
+  if (gpTpl && document.activeElement !== gpTpl) gpTpl.value = config.galleryPredictTpl || '{מילה}';
+  const ppSt = document.getElementById('predictPaperStatus');
+  if (ppSt) {
+    let hasPaper = false;
+    try { hasPaper = Boolean(localStorage.getItem(PREDICT_PAPER_KEY)); } catch (e) {}
+    ppSt.textContent = hasPaper ? '✓ הדף שלך נשמר - הפתק ייכתב עליו' : 'בלי צילום - הפתק ייכתב על דף מחברת על שולחן עץ.';
+    ppSt.className = 'toggle-sub-desc live-read-status ' + (hasPaper ? 'good' : '');
+  }
   const rtExtra = document.getElementById('remoteTrickExtra');
   if (rtExtra) rtExtra.style.display = config.remoteTrick ? 'block' : 'none';
   const rWord = document.getElementById('remoteWordInput');
@@ -7102,6 +7335,36 @@ function initNewReveals() {
   };
   voiceTrickToggle('toggleCardTrick', 'cardTrick', 'cardTrickStatus');
   voiceTrickToggle('toggleRemoteTrick', 'remoteTrick', 'remoteTrickStatus');
+  voiceTrickToggle('toggleGalleryPredict', 'galleryPredict', 'galleryPredictStatus');
+  document.querySelectorAll('#galleryPredictAgoSelector .seg-pill').forEach((btn) => btn.addEventListener('click', () => {
+    config.galleryPredictAgo = Number(btn.dataset.gpago) || 360;
+    saveConfig();
+    syncNewRevealsUI();
+  }));
+  const gpTplInput = document.getElementById('galleryPredictTplInput');
+  if (gpTplInput) gpTplInput.addEventListener('input', () => {
+    config.galleryPredictTpl = gpTplInput.value.slice(0, 60) || '{מילה}';
+    saveConfig();
+  });
+  const paperInput = document.getElementById('predictPaperFileInput');
+  if (paperInput) paperInput.addEventListener('change', (e) => {
+    compressAndStoreImage(e.target.files[0], PREDICT_PAPER_KEY, () => {
+      paperInput.value = '';
+      syncNewRevealsUI();
+    });
+  });
+  const gpTest = document.getElementById('galleryPredictTestBtn');
+  if (gpTest) gpTest.addEventListener('click', async () => {
+    const st = document.getElementById('galleryPredictTestStatus');
+    if (!hasNativeGalleryPredict()) {
+      if (st) { st.textContent = '❌ צריך לעדכן את האפליקציה ("בדוק עדכון").'; st.className = 'toggle-sub-desc live-read-status bad'; }
+      return;
+    }
+    if (st) { st.textContent = '⏳ שומר בגלריה...'; st.className = 'toggle-sub-desc live-read-status'; }
+    const url = await galleryPredictSave(isEnglishUi() ? 'test' : 'בדיקה', 'test');
+    const pv = document.getElementById('galleryPredictPreview');
+    if (pv && url) { pv.src = url; pv.style.display = 'block'; }
+  });
   document.querySelectorAll('.voice-lang-selector .seg-pill').forEach((btn) => btn.addEventListener('click', () => {
     config.voiceLang = btn.dataset.vlang === 'en' ? 'en' : 'he';
     saveConfig();
@@ -7503,6 +7766,12 @@ async function collectPreShowChecks() {
     }
   }
 
+  // 📸 התמונה כבר הייתה שם: צריך מיקרופון
+  if (config.galleryPredict && hasNativeGalleryPredict()) {
+    if (!liveReadMicReady()) add('bad', 'אין הרשאת מיקרופון', 'בלי מיקרופון 📸 לא יעבוד.', 'אשר', () => { try { window.AndroidNative.requestMicPermission(); } catch (e) {} });
+    else add('ok', '📸 התמונה כבר הייתה שם - מוכן', 'הצופה אומר מילה, ובאוזנייה נשמע "נקלט". צריך אינטרנט.');
+  }
+
   // 🃏 / 🗣️: צריך מיקרופון (ותמונה, אם בחרו "התמונה מתחלפת")
   if ((config.cardTrick || config.remoteTrick) && hasNativeWordListen()) {
     if (!liveReadMicReady()) add('bad', 'אין הרשאת מיקרופון', 'בלי מיקרופון 🃏 / 🗣️ לא יעבדו.', 'אשר', () => { try { window.AndroidNative.requestMicPermission(); } catch (e) {} });
@@ -7730,6 +7999,10 @@ const TRICK_TIPS = {
     he: ['🔮 הטלפון ידע מראש', 'הכנה (פעם אחת): לאשר מיקרופון. ללחוץ "בחר את התמונה המקורית" ולבחור מהגלריה את התמונה של הטפט (התמונה עצמה, לא צילום מסך), ובהגדרות הטלפון למחוק את "פרטי הקשר" במסך הנעילה (המילה תופיע במקומם). אוזנייה - מומלץ מאוד.\n\n1. "שמור וסגור" - המסך נהיה שחור, כאילו הטלפון כבוי. מניחים אותו על השולחן.\n2. "תגיד בקול שם של מפורסם - מי שבא לך." (או עיר, חיה, שם של חבר)\n3. הצופה אומר מילה. אתה שותק! (המילה האחרונה שנאמרת היא זו שמופיעה)\n4. עם אוזנייה: שומעים בסתר "נקלט: ..." - רק אז מדליקים (הטפט כבר הוחלף).\n5. "מצחיק... תסתכל על הטלפון שלי." לוחצים פעמיים על כפתור הצד: הלחיצה הראשונה מכבה באמת (לא רואים הבדל), השנייה מדליקה את מסך הנעילה האמיתי - ובשורה שלמטה כתובה המילה.\n\n💡 טיפים:\n• אחרי שהצופה אמר את המילה - לא לדבר עד שמכבים.\n• מקום שקט עובד הכי טוב. צריך אינטרנט.\n• "מוכן לצופה הבא" מחזיר את הטפט הרגיל שלך.', '"תגיד שם של מפורסם... ריהאנה? מצחיק. תסתכל על התזכורת שיש לי בטלפון מהבוקר..."'],
     en: ['🔮 My phone knew', 'Setup (once): allow the microphone. In the "Look" tab pick your real wallpaper photo, and in the phone settings delete the lock-screen "Contact information" (the word appears in its place). An earphone is highly recommended.\n\n1. "Save & Close" - the screen goes black, as if the phone is off. Put it on the table.\n2. "Say out loud the name of a celebrity - anyone you like." (or a city, an animal, a friend\'s name)\n3. The spectator says a word. You stay silent! (the last word spoken is the one that appears)\n4. With an earphone: you secretly hear "got: ..." - only then turn it on (the wallpaper is already changed).\n5. "Funny... look at my phone." Press the side button twice: the first press really turns the screen off (no visible change), the second turns on the REAL lock screen - with the word in the line at the bottom.\n\n💡 Tips:\n• After the spectator says the word - don\'t talk until you press the button.\n• A quiet place works best. Needs internet.\n• "Ready for next spectator" restores your normal wallpaper.', '"Name a celebrity... Rihanna? Funny. Look at the reminder I have on my phone from this morning..."']
   },
+  toggleGalleryPredict: {
+    he: ['📸 התמונה כבר הייתה שם', 'הכנה (פעם אחת): לאשר מיקרופון. מומלץ: "צלם דף ריק מהמחברת שלך". אוזנייה - מומלץ מאוד. צריך אינטרנט.\nלפני ההופעה: "🧪 נסה עכשיו" ופתח את הגלריה - לוודא שהתמונה מופיעה ראשונה.\n\n1. "שמור וסגור". הטלפון מקשיב.\n2. "תגיד בקול שם של מפורסם - מי שבא לך." (או עיר, חיה, חפץ)\n3. הצופה אומר. אתה שותק! (המילה האחרונה היא זו שנשמרת)\n4. באוזנייה: "נקלט: ..." - התמונה כבר בגלריה.\n5. "הבוקר כתבתי משהו וצילמתי. תפתח לי את הגלריה." פותחים את הטלפון (מסך הבית האמיתי) ונותנים לו לפתוח את הגלריה בעצמו.\n6. התמונה האחרונה - "מהבוקר" - פתק עם המילה שלו. אפשר אפילו ללחוץ על "פרטים".\n\n💡 "מוכן לצופה הבא" מוחק את התמונה מהגלריה.', '"הבוקר כתבתי משהו על פתק וצילמתי... תגיד שם של מפורסם. ריהאנה? תפתח לי את הגלריה. מה צילמתי הבוקר?"'],
+    en: ['📸 The photo was already there', 'Setup (once): allow the microphone. Recommended: "Snap a blank page from your notebook". An earphone is highly recommended. Needs internet.\nBefore the show: "🧪 Try now" and open the Gallery - make sure the photo shows first.\n\n1. "Save & Close". The phone listens.\n2. "Say out loud the name of a celebrity - anyone you like."\n3. The spectator says it. You stay silent! (the last word is the one saved)\n4. In your earphone: "got: ..." - the photo is already in the Gallery.\n5. "I wrote something this morning and took a photo. Open my Gallery." Unlock (real home screen) and let them open the Gallery themselves.\n6. The newest photo - "from this morning" - is a note with their word. They can even tap "Details".\n\n💡 "Ready for next spectator" deletes the photo.', '"I wrote something on a note this morning and took a picture... name a celebrity. Rihanna? Open my Gallery. What did I shoot this morning?"']
+  },
   toggleCardTrick: {
     he: ['🃏 הקלף בטלפון', 'הכנה: לאשר מיקרופון. צריך אינטרנט. אוזנייה - מומלץ.\n\n1. "שמור וסגור" - מסך הנעילה מופיע. מניחים את הטלפון הפוך על השולחן.\n2. הצופה בוחר קלף מהחפיסה.\n3. "תגיד בקול איזה קלף בחרת." ("שבע לב", "מלכה עלה", "אס יהלום")\n4. עם אוזנייה: שומעים בסתר "נקלט: ..." - הקלף כבר מוכן.\n5. "תהפוך את הטלפון שלי." הטפט של מסך הנעילה הוא הקלף שלו.\n\n💡 טיפים:\n• אחרי שהצופה אמר את הקלף - לא להגיד קלף אחר בקול.\n• "מוכן לצופה הבא" מחזיר את הטפט הרגיל.', '"איזה קלף בחרת? שבע לב? ...מוזר. תהפוך את הטלפון שלי."'],
     en: ['🃏 Card on the phone', 'Setup: allow the microphone. Needs internet. An earphone is recommended.\n\n1. "Save & Close" - the lock screen shows. Put the phone face down on the table.\n2. The spectator picks a card.\n3. "Say out loud which card you picked." ("seven of hearts")\n4. With an earphone: you secretly hear "got: ..." - the card is ready.\n5. "Flip my phone." The lock screen wallpaper is their card.\n\n💡 Tips:\n• After the spectator names the card - don\'t say another card out loud.\n• "Ready for next spectator" restores the normal wallpaper.', '"Which card? Seven of hearts? ...strange. Flip my phone."']
@@ -7898,6 +8171,7 @@ function initTour() {
 const WHATS_NEW_SEEN_KEY = 'magic_whats_new_seen_v1';
 const WHATS_NEW_MAX_ITEMS = 6;
 const WHATS_NEW = [
+  { ver: '10.5', icon: '📸', target: '#toggleGalleryPredict', he: ['התמונה כבר הייתה שם', 'הצופה אומר מילה, פותח את הגלריה האמיתית - והתמונה האחרונה, "מהבוקר", היא פתק עם המילה שלו. (אנדרואיד)'], en: ['The photo was already there', 'The spectator says a word, opens the real Gallery - and the newest photo, "from this morning", is a note with their word. (Android)'] },
   { ver: '8.0', icon: '🎧', target: '#toggleLiveRead', he: ['קריאה בזמן אמת', 'אתה עם הגב, הצופה מקליד קוד - ואתה אומר כל ספרה ברגע שהוא לוחץ עליה. הספרות נלחשות לך באוזניית בלוטות\'.'], en: ['Live reading', 'Your back is turned, the spectator types a code - and you name every digit the moment it is pressed. The digits are whispered into your Bluetooth earphone.'] },
   { ver: '7.9', icon: '🛡️', target: null, he: ['ליטוש לפני הופעות', 'עברנו על כל מסך בכל סוג טלפון. באייפון מוצג רק מה שעובד שם, והכל אמין יותר מתמיד.'], en: ['Polished for shows', 'We went over every screen on every phone type. On iPhone you see only what works there, and everything is more reliable than ever.'] },
   { ver: '7.8', icon: '✨', target: null, he: ['מראה חדש מהרגע הראשון', 'גם ההרשמה, בחירת הטלפון וכל החלונות בעיצוב החדש. האפליקציה ממוקדת: רק מה שעובד בצורה מושלמת.'], en: ['A new look from the first second', 'Sign-up, phone selection and every window now share the new design. The app is focused: only what works perfectly.'] },

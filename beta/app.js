@@ -2398,7 +2398,7 @@ function wordPredictLang() {
 }
 
 function cleanSpokenWord(text) {
-  let t = String(text || '').replace(/[.,!?״"׳'"]/g, ' ').replace(/\s+/g, ' ').trim();
+  let t = String(text || '').replace(/[.,!?״"]/g, ' ').replace(/\s+/g, ' ').trim();
   for (let i = 0; i < 3 && WORD_FILLERS.test(t); i++) t = t.replace(WORD_FILLERS, '');
   return t.slice(0, 40);
 }
@@ -2748,25 +2748,80 @@ function voiceTrickHeard(text, isFinal) {
   }
   // 📸 המילה של הצופה -> תמונה "מהבוקר" בגלריה האמיתית.
   // הקוסם אומר משפט עם "תגיד" -> רק התשובה הראשונה אחרי זה נשמרת -> ואז מפסיקים להקשיב.
-  if (config.galleryPredict && isFinal) {
+  if (config.galleryPredict) {
     const heard = normalizeHeard(text);
     if (!heard) return;
     const hasCue = GALLERY_CUE.test(' ' + heard + ' ');
-    if (hasCue) {
-      // הקוסם ביקש (שוב) - מחכים לתשובה של הצופה
-      galleryPredictStage = 'armed';
+    if (!isFinal) {
+      // תוצאה חלקית: אם מחכים לתשובה - שומרים אותה כגיבוי (לפעמים מילה קצרה לא מגיעה כ"סופית")
+      if (galleryPredictStage === 'armed' && !hasCue) {
+        galleryCandidate = cleanSpokenWord(text);
+        clearTimeout(galleryPredictTimer);
+        galleryPredictTimer = setTimeout(() => {
+          if (galleryPredictStage === 'armed' && galleryCandidate) {
+            heardLog(galleryCandidate, 'נשמר (חלקי)');
+            galleryPredictStage = 'done';
+            galleryPredictSave(galleryCandidate, 'word');
+          }
+        }, 1800);
+      }
       return;
     }
-    if (galleryPredictStage !== 'armed') return;
+    if (hasCue) {
+      // הצופה ענה מהר, והתשובה נדבקה למשפט של הקוסם: "תגיד שם של מפורסם ריהאנה"
+      // -> מה שבא אחרי מילת הקטגוריה האחרונה הוא התשובה
+      const raw = String(text).replace(/[.,!?״"]/g, ' ').split(/\s+/).filter(Boolean);
+      const toks = raw.map((tk) => normalizeHeard(tk));
+      let cueAt = -1;
+      toks.forEach((tk, i) => { if (GALLERY_CUE.test(' ' + tk + ' ')) cueAt = i; });
+      let catAt = -1;
+      toks.forEach((tk, i) => { if (i > cueAt && GALLERY_CATEGORY.test(tk)) catAt = i; });
+      if (catAt >= 0 && catAt < toks.length - 1) {
+        const ans = cleanSpokenWord(raw.slice(catAt + 1, catAt + 4).join(' '));
+        if (ans) {
+          clearTimeout(galleryPredictTimer);
+          galleryPredictStage = 'done';
+          heardLog(text, 'נשמר מתוך המשפט: ' + ans);
+          galleryPredictSave(ans, 'word');
+          return;
+        }
+      }
+      // הקוסם ביקש (שוב) - מחכים לתשובה של הצופה
+      clearTimeout(galleryPredictTimer);
+      galleryCandidate = '';
+      galleryPredictStage = 'armed';
+      heardLog(text, '"תגיד" - מחכה לתשובה');
+      return;
+    }
+    if (galleryPredictStage !== 'armed') {
+      heardLog(text, galleryPredictStage === 'done' ? 'התעלמתי (כבר נשמר)' : 'התעלמתי (עוד לא נאמר "תגיד")');
+      return;
+    }
     const w = cleanSpokenWord(text);
     if (!w) return;
+    clearTimeout(galleryPredictTimer);
     galleryPredictStage = 'done';
+    heardLog(w, 'נשמר');
     galleryPredictSave(w, 'word');
   }
 }
 
+// יומן "מה הטלפון שמע" (15 האחרונים) - כדי להבין מה קרה בהופעה
+const HEARD_LOG_KEY = 'magic_heard_log';
+var galleryCandidate = '';
+function heardLog(text, what) {
+  try {
+    const arr = JSON.parse(localStorage.getItem(HEARD_LOG_KEY) || '[]');
+    const d = new Date();
+    arr.unshift({ t: String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0') + ':' + String(d.getSeconds()).padStart(2, '0'), s: String(text).slice(0, 80), w: what });
+    localStorage.setItem(HEARD_LOG_KEY, JSON.stringify(arr.slice(0, 15)));
+  } catch (e) {}
+}
+
 // המילים שמסמנות "עכשיו הצופה עונה": תגיד / תגידי / תאמר / תאמרי / תבחר / say / tell
-const GALLERY_CUE = /\s(תגיד|תגידי|תגידו|תאמר|תאמרי|תבחר|תבחרי|say|tell)\s/;
+const GALLERY_CUE = /\s[ושהכ]?(תגיד|תגידי|תגידו|תאמר|תאמרי|תבחר|תבחרי|say|tell)\s/;
+// מילים שמסיימות את הבקשה של הקוסם ("...שם של מפורסם", "...עיר", "...חיה")
+const GALLERY_CATEGORY = /^[הלש]?(מפורסם|מפורסמת|מפורסמים|זמר|זמרת|שחקן|שחקנית|עיר|מדינה|חיה|צבע|מילה|פרי|ירק|מספר|חפץ|אוכל|מותג|דמות|קבוצה|celebrity|city|country|animal|color|colour|word|fruit|number|object|name|singer|actor)$/;
 var galleryPredictStage = 'wait';
 
 // ----------------------------------------------------------------------------
@@ -2794,6 +2849,144 @@ function loadImg(src) {
     im.onerror = () => resolve(null);
     im.src = src;
   });
+}
+
+// ----------------------------------------------------------------------------
+// ✍️ כתב היד של הקוסם: כל אות נכתבת פעם אחת באצבע (קווים, לא תמונה), ונשמרת בטלפון.
+// כל אות בתיבה 0..1; קו הכתיבה ב-0.72.
+// ----------------------------------------------------------------------------
+const HANDWRITING_KEY = 'magic_handwriting_v1';
+const HAND_LETTERS = ['א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ז', 'ח', 'ט', 'י', 'כ', 'ך', 'ל', 'מ', 'ם', 'נ', 'ן', 'ס', 'ע', 'פ', 'ף', 'צ', 'ץ', 'ק', 'ר', 'ש', 'ת', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
+
+function loadHandwriting() {
+  try {
+    return JSON.parse(localStorage.getItem(HANDWRITING_KEY) || '{}') || {};
+  } catch (e) {
+    return {};
+  }
+}
+
+// כל האותיות של הטקסט קיימות בכתב היד? -> מפה עם מידות; אחרת null (כותבים בגופן)
+function handwritingFor(text) {
+  const hw = loadHandwriting();
+  const out = {};
+  for (const ch of Array.from(text)) {
+    if (ch === ' ') continue;
+    // גרש (ג׳, צ׳, ז׳) - קו קטן, לא צריך לכתוב אותו
+    const strokes = hw[ch] || (ch === '׳' || ch === "'" ? [[[0.52, 0.34], [0.5, 0.42], [0.47, 0.5]]] : null);
+    if (!strokes || !strokes.length) return null;
+    if (!out[ch]) {
+      let minX = 1;
+      let maxX = 0;
+      strokes.forEach((st) => st.forEach((p) => { minX = Math.min(minX, p[0]); maxX = Math.max(maxX, p[0]); }));
+      out[ch] = { strokes, minX, adv: Math.max(0.12, maxX - minX) + 0.1 };
+    }
+  }
+  return Object.keys(out).length ? out : null;
+}
+
+function drawHandGlyph(g, strokes, S, color) {
+  g.strokeStyle = color;
+  g.lineWidth = Math.max(3, S * 0.032);
+  g.lineCap = 'round';
+  g.lineJoin = 'round';
+  strokes.forEach((st) => {
+    if (!st.length) return;
+    g.beginPath();
+    g.moveTo(st[0][0] * S, st[0][1] * S);
+    if (st.length === 1) {
+      g.lineTo(st[0][0] * S + 0.5, st[0][1] * S + 0.5);
+    }
+    for (let i = 1; i < st.length - 1; i++) {
+      const mx = (st[i][0] + st[i + 1][0]) / 2;
+      const my = (st[i][1] + st[i + 1][1]) / 2;
+      g.quadraticCurveTo(st[i][0] * S, st[i][1] * S, mx * S, my * S);
+    }
+    if (st.length > 1) g.lineTo(st[st.length - 1][0] * S, st[st.length - 1][1] * S);
+    g.stroke();
+  });
+}
+
+// מסך הכתיבה: אות אחרי אות
+function openHandwritingPad() {
+  const pad = document.getElementById('handPad');
+  const cv = document.getElementById('handPadCanvas');
+  if (!pad || !cv) return;
+  // מעל כל המסכים (גם מעל ההגדרות)
+  if (pad.parentElement !== document.body) document.body.appendChild(pad);
+  const hw = loadHandwriting();
+  let idx = HAND_LETTERS.findIndex((l) => !hw[l]);
+  if (idx < 0) idx = 0;
+  let strokes = [];
+  let cur = null;
+  const ctx = cv.getContext('2d');
+  const fit = () => {
+    const r = cv.getBoundingClientRect();
+    const d = window.devicePixelRatio || 1;
+    cv.width = Math.round(r.width * d);
+    cv.height = Math.round(r.height * d);
+  };
+  const render = () => {
+    const Wc = cv.width;
+    ctx.clearRect(0, 0, Wc, cv.height);
+    // קווי עזר: קו כתיבה (0.72) וקו אמצע (0.38)
+    ctx.strokeStyle = 'rgba(28,48,125,.25)';
+    ctx.lineWidth = Math.max(1, Wc * 0.004);
+    ctx.setLineDash([Wc * 0.02, Wc * 0.02]);
+    [0.38, 0.72].forEach((yy) => { ctx.beginPath(); ctx.moveTo(0, yy * Wc); ctx.lineTo(Wc, yy * Wc); ctx.stroke(); });
+    ctx.setLineDash([]);
+    drawHandGlyph(ctx, strokes, Wc, '#1c307d');
+  };
+  const show = () => {
+    const l = HAND_LETTERS[idx];
+    strokes = (loadHandwriting()[l] || []).map((s) => s.slice());
+    document.getElementById('handPadLetter').textContent = l;
+    document.getElementById('handPadProgress').textContent = `${idx + 1} / ${HAND_LETTERS.length}`;
+    render();
+  };
+  const toPt = (e) => {
+    const r = cv.getBoundingClientRect();
+    return [Math.round(((e.clientX - r.left) / r.width) * 1000) / 1000, Math.round(((e.clientY - r.top) / r.width) * 1000) / 1000];
+  };
+  cv.onpointerdown = (e) => {
+    e.preventDefault();
+    try { cv.setPointerCapture(e.pointerId); } catch (err) {}
+    cur = [toPt(e)];
+    strokes.push(cur);
+    render();
+  };
+  cv.onpointermove = (e) => {
+    if (!cur) return;
+    e.preventDefault();
+    const p = toPt(e);
+    const last = cur[cur.length - 1];
+    if (Math.hypot(p[0] - last[0], p[1] - last[1]) > 0.006) {
+      cur.push(p);
+      render();
+    }
+  };
+  cv.onpointerup = cv.onpointercancel = () => { cur = null; };
+  const save = () => {
+    const all = loadHandwriting();
+    const l = HAND_LETTERS[idx];
+    if (strokes.length) all[l] = strokes;
+    else delete all[l];
+    try { localStorage.setItem(HANDWRITING_KEY, JSON.stringify(all)); } catch (e) {}
+  };
+  document.getElementById('handPadClear').onclick = () => { strokes = []; render(); };
+  document.getElementById('handPadNext').onclick = () => {
+    save();
+    if (idx < HAND_LETTERS.length - 1) { idx++; show(); } else close();
+  };
+  document.getElementById('handPadPrev').onclick = () => { save(); if (idx > 0) { idx--; show(); } };
+  const close = () => {
+    save();
+    pad.style.display = 'none';
+    syncNewRevealsUI();
+  };
+  document.getElementById('handPadDone').onclick = close;
+  pad.style.display = 'flex';
+  requestAnimationFrame(() => { fit(); show(); });
 }
 
 // פתק בכתב יד: כל אות בנפרד, עם הטיה וגובה קצת שונים, בדיו כחול - ותאורה של צילום אמיתי
@@ -2862,30 +3055,59 @@ async function drawPredictionPhoto(text) {
   t.height = TH;
   const g = t.getContext('2d');
   let fs = 230;
-  g.font = FONT(fs);
-  let total = chars.reduce((s, ch) => s + g.measureText(ch).width * 0.95, 0);
+  const baseY = TH * 0.62;
   const maxW = TW * 0.78;
-  if (total > maxW) {
-    fs = Math.max(80, Math.floor(fs * maxW / total));
+  const hand = handwritingFor(text);
+  let total = 0;
+  if (hand) {
+    // ✍️ כתב היד האמיתי של הקוסם: כל אות כפי שהוא כתב אותה באצבע
+    let S = fs * 1.3;
+    const adv = (ch) => (ch === ' ' ? 0.36 : hand[ch].adv);
+    total = chars.reduce((s, ch) => s + adv(ch) * S, 0);
+    if (total > maxW) {
+      S = S * maxW / total;
+      total = maxW;
+    }
+    fs = S / 1.3;
+    let pos = isHe ? TW / 2 + total / 2 : TW / 2 - total / 2;
+    chars.forEach((ch, i) => {
+      const w = adv(ch) * S;
+      if (ch !== ' ') {
+        const gl = hand[ch];
+        const left = isHe ? pos - w : pos;
+        g.save();
+        // נקודת הבסיס של התיבה (0.72 = קו הכתיבה), השורה עולה קצת, כל אות קצת שונה
+        g.translate(left - gl.minX * S + 0.05 * S, baseY - 0.72 * S - i * S * 0.008 + (Math.random() - 0.5) * S * 0.03);
+        g.rotate((Math.random() - 0.5) * 0.05);
+        drawHandGlyph(g, gl.strokes, S, '#1c307d');
+        g.restore();
+      }
+      pos = isHe ? pos - w : pos + w;
+    });
+  } else {
     g.font = FONT(fs);
     total = chars.reduce((s, ch) => s + g.measureText(ch).width * 0.95, 0);
+    if (total > maxW) {
+      fs = Math.max(80, Math.floor(fs * maxW / total));
+      g.font = FONT(fs);
+      total = chars.reduce((s, ch) => s + g.measureText(ch).width * 0.95, 0);
+    }
+    g.fillStyle = '#1c307d';
+    g.textBaseline = 'alphabetic';
+    let pos = isHe ? TW / 2 + total / 2 : TW / 2 - total / 2;
+    chars.forEach((ch, i) => {
+      const cw = g.measureText(ch).width * 0.95;
+      const cx = isHe ? pos - cw : pos;
+      g.save();
+      // השורה עולה קצת לאורך המילה, וכל אות קצת שונה
+      g.translate(cx + cw / 2, baseY - i * fs * 0.012 + (Math.random() - 0.5) * fs * 0.07);
+      g.rotate((Math.random() - 0.5) * 0.14);
+      g.scale(0.92 + Math.random() * 0.12, 0.92 + Math.random() * 0.14);
+      g.fillText(ch, -cw / 2, 0);
+      g.restore();
+      pos = isHe ? pos - cw : pos + cw;
+    });
   }
-  g.fillStyle = '#1c307d';
-  g.textBaseline = 'alphabetic';
-  const baseY = TH * 0.62;
-  let pos = isHe ? TW / 2 + total / 2 : TW / 2 - total / 2;
-  chars.forEach((ch, i) => {
-    const cw = g.measureText(ch).width * 0.95;
-    const cx = isHe ? pos - cw : pos;
-    g.save();
-    // השורה עולה קצת לאורך המילה, וכל אות קצת שונה
-    g.translate(cx + cw / 2, baseY - i * fs * 0.012 + (Math.random() - 0.5) * fs * 0.07);
-    g.rotate((Math.random() - 0.5) * 0.14);
-    g.scale(0.92 + Math.random() * 0.12, 0.92 + Math.random() * 0.14);
-    g.fillText(ch, -cw / 2, 0);
-    g.restore();
-    pos = isHe ? pos - cw : pos + cw;
-  });
   // קו מתחת, כמו שמסמנים בעט
   g.lineWidth = Math.max(5, fs * 0.035);
   g.strokeStyle = '#1c307d';
@@ -2895,7 +3117,9 @@ async function drawPredictionPhoto(text) {
   g.quadraticCurveTo(TW / 2, baseY + fs * 0.34, TW / 2 + total / 2 + 24, baseY + fs * 0.16);
   g.stroke();
   // רעד יד: הזזת שורות ועמודות בגל קטן ולא קבוע
+  // (בכתב היד האמיתי של הקוסם - בלי רעד, בדיוק כמו שהוא כתב)
   const warp = document.createElement('canvas');
+  if (!hand) {
   warp.width = TW;
   warp.height = TH;
   const wg = warp.getContext('2d');
@@ -2909,6 +3133,7 @@ async function drawPredictionPhoto(text) {
   for (let xx = 0; xx < TW; xx += 2) {
     const dy = Math.sin(xx * 0.038 + ph2) * 3 + Math.sin(xx * 0.11) * 1.2;
     g.drawImage(warp, xx, 0, 2, TH, xx, dy, 2, TH);
+  }
   }
   x.save();
   x.translate(W / 2, H * 0.44);
@@ -5293,7 +5518,7 @@ function initDeviceLicenseGate() {
 // החלון מוצג רק כשמסך ההגדרות פתוח (בפתיחת האפליקציה / בתפריט הסודי),
 // ולעולם לא מעל מסך הנעילה הפעיל מול קהל.
 // ============================================================================
-const APP_VERSION = '10.6';
+const APP_VERSION = '10.7';
 const DEFAULT_APK_URL = 'https://github.com/tzur2010/app-lockscreen/raw/main/Lockscreen.apk';
 const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 const UPDATE_DISMISS_KEY = 'magic_update_dismissed_version';
@@ -7108,6 +7333,37 @@ function syncNewRevealsUI() {
   });
   const gpTpl = document.getElementById('galleryPredictTplInput');
   if (gpTpl && document.activeElement !== gpTpl) gpTpl.value = config.galleryPredictTpl || '{מילה}';
+  const hlList = document.getElementById('heardLogList');
+  if (hlList) {
+    let arr = [];
+    try { arr = JSON.parse(localStorage.getItem(HEARD_LOG_KEY) || '[]'); } catch (e) {}
+    hlList.innerHTML = '';
+    if (!arr.length) hlList.textContent = 'עוד לא נשמע כלום. "שמור וסגור" ונסה.';
+    arr.forEach((it) => {
+      const row = document.createElement('div');
+      row.className = 'heard-log-row';
+      const a = document.createElement('span');
+      a.textContent = it.t + '  "' + it.s + '"';
+      const b = document.createElement('b');
+      b.textContent = it.w;
+      row.appendChild(a);
+      row.appendChild(b);
+      hlList.appendChild(row);
+    });
+  }
+  const hwSt = document.getElementById('handwritingStatus');
+  if (hwSt) {
+    const hw = loadHandwriting();
+    const he = HAND_LETTERS.filter((l) => /[֐-׿]/.test(l));
+    const doneHe = he.filter((l) => hw[l]).length;
+    const doneAll = HAND_LETTERS.filter((l) => hw[l]).length;
+    hwSt.textContent = doneHe === he.length
+      ? `✓ כתב היד שלך מוכן (${doneAll}/${HAND_LETTERS.length}) - הפתק ייכתב בכתב היד שלך`
+      : doneAll
+        ? `חסרות עוד ${he.length - doneHe} אותיות. מילה עם אות חסרה תיכתב בגופן רגיל.`
+        : 'בלי כתב יד - הפתק ייכתב בגופן שנראה כמו עט.';
+    hwSt.className = 'toggle-sub-desc live-read-status ' + (doneHe === he.length ? 'good' : doneAll ? 'warn' : '');
+  }
   const ppSt = document.getElementById('predictPaperStatus');
   if (ppSt) {
     let hasPaper = false;
@@ -7361,6 +7617,8 @@ function initNewReveals() {
     config.galleryPredictTpl = gpTplInput.value.slice(0, 60) || '{מילה}';
     saveConfig();
   });
+  const hwBtn = document.getElementById('handwritingBtn');
+  if (hwBtn) hwBtn.addEventListener('click', openHandwritingPad);
   const paperInput = document.getElementById('predictPaperFileInput');
   if (paperInput) paperInput.addEventListener('change', (e) => {
     compressAndStoreImage(e.target.files[0], PREDICT_PAPER_KEY, () => {

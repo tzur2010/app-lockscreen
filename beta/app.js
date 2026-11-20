@@ -568,7 +568,7 @@ const DEFAULT_CONFIG = {
   liveReadLang: isEnglishUi() ? 'en' : 'he',
   cardTrick: false,             // 🃏 "הקלף בטלפון": הצופה אומר קלף - הטפט הופך לקלף שלו
   galleryPredict: false,        // 📸 "התמונה כבר הייתה שם": המילה של הצופה בתמונה "מהבוקר" בגלריה האמיתית
-  galleryPredictAgo: 360,       // התמונה "צולמה" לפני X דקות
+  galleryPredictAgo: 2,         // התמונה "צולמה" לפני X דקות (2 = תמיד ראשונה בגלריה)
   galleryPredictTpl: '{מילה}',  // מה כתוב על הפתק
   remoteTrick: false,           // 🗣️ "שלט רחוק סודי": מילת קוד של הקוסם - קופצת הודעה / מתחלפת התמונה
   remoteWord: 'וואלה',          // מילת הקוד
@@ -3158,7 +3158,7 @@ async function galleryPredictSave(word, tag) {
   const dataUrl = await drawPredictionPhoto(galleryPredictText(word));
   window.__lastPredictionWord = word;
   try {
-    window.AndroidNative.savePredictionPhoto(dataUrl, Number(config.galleryPredictAgo) || 360, tag + ':' + word);
+    window.AndroidNative.savePredictionPhoto(dataUrl, Number(config.galleryPredictAgo) || 2, tag + ':' + word);
   } catch (e) {}
   return dataUrl;
 }
@@ -3181,8 +3181,9 @@ window.onPredictionPhotoSaved = function (ok, tag, info) {
     const st = document.getElementById('galleryPredictTestStatus');
     if (st) {
       st.textContent = ok
-        ? (isEnglishUi() ? '✓ Saved. Open your Gallery - the newest photo is from earlier today. ("Ready for next spectator" deletes it.)' : '✓ נשמר. פתח את הגלריה של הטלפון - התמונה האחרונה "צולמה" מוקדם יותר היום. ("מוכן לצופה הבא" מוחק אותה.)')
+        ? (isEnglishUi() ? '✓ Saved to the Gallery (Camera album). ("Ready for next spectator" deletes it.)' : '✓ נשמר בגלריה, באלבום "מצלמה". אם צילמת משהו אחרי השעה שבחרת - התמונה תהיה מתחתיו. ("מוכן לצופה הבא" מוחק אותה.)') + '\n[' + String(info || '') + ']'
         : '❌ ' + String(info || '');
+      st.style.whiteSpace = 'pre-line';
       st.className = 'toggle-sub-desc live-read-status ' + (ok ? 'good' : 'bad');
     }
     return;
@@ -5518,7 +5519,7 @@ function initDeviceLicenseGate() {
 // החלון מוצג רק כשמסך ההגדרות פתוח (בפתיחת האפליקציה / בתפריט הסודי),
 // ולעולם לא מעל מסך הנעילה הפעיל מול קהל.
 // ============================================================================
-const APP_VERSION = '10.7';
+const APP_VERSION = '10.8';
 const DEFAULT_APK_URL = 'https://github.com/tzur2010/app-lockscreen/raw/main/Lockscreen.apk';
 const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 const UPDATE_DISMISS_KEY = 'magic_update_dismissed_version';
@@ -7329,7 +7330,7 @@ function syncNewRevealsUI() {
   const gpExtra = document.getElementById('galleryPredictExtra');
   if (gpExtra) gpExtra.style.display = config.galleryPredict ? 'block' : 'none';
   document.querySelectorAll('#galleryPredictAgoSelector .seg-pill').forEach((btn) => {
-    btn.classList.toggle('active', Number(btn.dataset.gpago) === (Number(config.galleryPredictAgo) || 360));
+    btn.classList.toggle('active', Number(btn.dataset.gpago) === (Number(config.galleryPredictAgo) || 2));
   });
   const gpTpl = document.getElementById('galleryPredictTplInput');
   if (gpTpl && document.activeElement !== gpTpl) gpTpl.value = config.galleryPredictTpl || '{מילה}';

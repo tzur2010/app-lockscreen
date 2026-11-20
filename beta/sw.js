@@ -1,5 +1,5 @@
 // להעלות את המספר בכל עדכון כדי לנקות מטמון ישן
-const CACHE_NAME = 'magic-lockscreen-v10.5';
+const CACHE_NAME = 'magic-lockscreen-v10.6';
 const ASSETS = [
   './',
   './index.html',

@@ -570,6 +570,7 @@ const DEFAULT_CONFIG = {
   galleryPredict: false,        // 📸 "התמונה כבר הייתה שם": המילה של הצופה בתמונה "מהבוקר" בגלריה האמיתית
   galleryPredictAgo: 2,         // התמונה "צולמה" לפני X דקות (2 = תמיד ראשונה בגלריה)
   galleryPredictTpl: '{מילה}',  // מה כתוב על הפתק
+  galleryPredictSource: 'voice', // 'voice' (מה שהצופה אומר) או 'code' (הקוד שהוא מקליד - 100%)
   remoteTrick: false,           // 🗣️ "שלט רחוק סודי": מילת קוד של הקוסם - קופצת הודעה / מתחלפת התמונה
   remoteWord: 'וואלה',          // מילת הקוד
   remoteAction: 'notif',        // 'notif' (הודעה במסך הנעילה) או 'photo' (הטפט מתחלף לתמונה)
@@ -2671,7 +2672,7 @@ function voiceLang() {
 }
 
 function voiceTricksWanted() {
-  return Boolean((config.cardTrick || config.remoteTrick || config.galleryPredict) && hasNativeWordListen() && config.osTheme !== 'ios');
+  return Boolean((config.cardTrick || config.remoteTrick || (config.galleryPredict && config.galleryPredictSource !== 'code')) && hasNativeWordListen() && config.osTheme !== 'ios');
 }
 
 function normalizeHeard(text) {
@@ -3688,7 +3689,9 @@ function verifyAndSubmitPasscode(enteredValue, modeLabel) {
   const isPatternMode = modeLabel === 'PATTERN' || config.unlockMode === 'pattern';
 
   // 📸 גיבוי של 100%: במצב "סיסמה", מה שהקוסם מקליד = המילה לפתק. שומרים, ורק אז הטלפון נפתח.
-  if (config.galleryPredict && hasNativeGalleryPredict() && config.unlockMode === 'words' && !isPatternMode && !settingsTrickPin) {
+  // 🔢 במצב "הקוד שהצופה מקליד": גם ב-PIN - הקוד שהוקלד נכנס לפתק (100%, בלי מיקרופון)
+  const gpTyped = config.unlockMode === 'words' || config.galleryPredictSource === 'code';
+  if (config.galleryPredict && hasNativeGalleryPredict() && gpTyped && !isPatternMode && !settingsTrickPin) {
     galleryPredictStage = 'done';
     clearTimeout(galleryPredictTimer);
     heardLog(cleaned, 'הוקלד כסיסמה - נשמר');
@@ -5590,7 +5593,7 @@ function initDeviceLicenseGate() {
 // החלון מוצג רק כשמסך ההגדרות פתוח (בפתיחת האפליקציה / בתפריט הסודי),
 // ולעולם לא מעל מסך הנעילה הפעיל מול קהל.
 // ============================================================================
-const APP_VERSION = '11.1';
+const APP_VERSION = '11.2';
 const DEFAULT_APK_URL = 'https://github.com/tzur2010/app-lockscreen/raw/main/Lockscreen.apk';
 const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 const UPDATE_DISMISS_KEY = 'magic_update_dismissed_version';
@@ -7403,6 +7406,20 @@ function syncNewRevealsUI() {
   document.querySelectorAll('#galleryPredictAgoSelector .seg-pill').forEach((btn) => {
     btn.classList.toggle('active', Number(btn.dataset.gpago) === (Number(config.galleryPredictAgo) || 2));
   });
+  const gpSrc = config.galleryPredictSource === 'code' ? 'code' : 'voice';
+  document.querySelectorAll('#galleryPredictSourceSelector .seg-pill').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.gpsrc === gpSrc);
+  });
+  const gpSrcNote = document.getElementById('galleryPredictSourceNote');
+  if (gpSrcNote) {
+    gpSrcNote.textContent = gpSrc === 'code'
+      ? '"תחשוב על מספר ותקליד אותו כקוד." הטלפון נפתח, ובגלריה פתק עם בדיוק המספר הזה. בלי מיקרופון ובלי אינטרנט - תמיד עובד. (הספרות בכתב היד שלך, אם כתבת אותן)'
+      : 'הצופה אומר מילה בקול. הכי אמין עם מילים רגילות: חיה, עיר, צבע, פרי. שמות של מפורסמים - פחות.';
+  }
+  // במצב "קוד" לא צריך את שדות המיקרופון
+  document.querySelectorAll('#galleryPredictExtra .voice-lang-selector, #galleryPredictExtra .heard-log-box').forEach((el) => {
+    el.style.display = gpSrc === 'code' ? 'none' : '';
+  });
   const gpTpl = document.getElementById('galleryPredictTplInput');
   if (gpTpl && document.activeElement !== gpTpl) gpTpl.value = config.galleryPredictTpl || '{מילה}';
   const hlList = document.getElementById('heardLogList');
@@ -7679,6 +7696,11 @@ function initNewReveals() {
   voiceTrickToggle('toggleCardTrick', 'cardTrick', 'cardTrickStatus');
   voiceTrickToggle('toggleRemoteTrick', 'remoteTrick', 'remoteTrickStatus');
   voiceTrickToggle('toggleGalleryPredict', 'galleryPredict', 'galleryPredictStatus');
+  document.querySelectorAll('#galleryPredictSourceSelector .seg-pill').forEach((btn) => btn.addEventListener('click', () => {
+    config.galleryPredictSource = btn.dataset.gpsrc === 'code' ? 'code' : 'voice';
+    saveConfig();
+    syncNewRevealsUI();
+  }));
   document.querySelectorAll('#galleryPredictAgoSelector .seg-pill').forEach((btn) => btn.addEventListener('click', () => {
     config.galleryPredictAgo = Number(btn.dataset.gpago) || 360;
     saveConfig();
@@ -8112,7 +8134,9 @@ async function collectPreShowChecks() {
   }
 
   // 📸 התמונה כבר הייתה שם: צריך מיקרופון
-  if (config.galleryPredict && hasNativeGalleryPredict()) {
+  if (config.galleryPredict && hasNativeGalleryPredict() && config.galleryPredictSource === 'code') {
+    add('ok', '📸 התמונה כבר הייתה שם - מוכן (קוד)', '"תחשוב על מספר ותקליד אותו כקוד" - המספר נכנס לפתק בגלריה. בלי מיקרופון.');
+  } else if (config.galleryPredict && hasNativeGalleryPredict()) {
     if (!liveReadMicReady()) add('bad', 'אין הרשאת מיקרופון', 'בלי מיקרופון 📸 לא יעבוד.', 'אשר', () => { try { window.AndroidNative.requestMicPermission(); } catch (e) {} });
     else add('ok', '📸 התמונה כבר הייתה שם - מוכן', 'משפט עם "תגיד" ← התשובה הראשונה של הצופה נשמרת ← באוזנייה "נקלט". צריך אינטרנט.');
   }

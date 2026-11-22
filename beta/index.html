@@ -638,6 +638,12 @@ fit();addEventListener('resize',fit);addEventListener('orientationchange',functi
             </label>
           </div>
           <div class="oneui-field-block" id="galleryPredictExtra" style="display: none; padding-top: 0;">
+            <label class="config-label">מה נכתב בפתק</label>
+            <div class="segmented-row" id="galleryPredictSourceSelector">
+              <button type="button" class="seg-pill" data-gpsrc="code">🔢 הקוד שהוא מקליד (100%)</button>
+              <button type="button" class="seg-pill" data-gpsrc="voice">🗣️ מה שהוא אומר</button>
+            </div>
+            <div class="toggle-sub-desc" id="galleryPredictSourceNote" style="line-height: 1.6;"></div>
             <label class="config-label">התמונה "צולמה"</label>
             <div class="segmented-row" id="galleryPredictAgoSelector">
               <button type="button" class="seg-pill" data-gpago="2">לפני 2 דק׳</button>

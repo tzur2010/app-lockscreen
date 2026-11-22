@@ -591,6 +591,13 @@ if (window.MagicI18n && window.MagicI18n.isEn && config.uiLang !== 'en') config.
 // אחרי הפתיחה: רק מסך הבית האמיתי.
 function enforceRetiredFeatures(cfg) {
   if (!cfg) return cfg;
+  // 10.9: 📸 "הבוקר" הכניס את התמונה מתחת לצילומי המסך של היום -> עוברים ל"לפני 2 דקות" (פעם אחת)
+  try {
+    if (!localStorage.getItem('magic_gp_ago_mig_v1')) {
+      if (Number(cfg.galleryPredictAgo) !== 2) cfg.galleryPredictAgo = 2;
+      localStorage.setItem('magic_gp_ago_mig_v1', '1');
+    }
+  } catch (e) {}
   cfg.settingsTrick = false;
   cfg.faceTrick = false;
   cfg.notesReveal = false;
@@ -3157,9 +3164,14 @@ async function galleryPredictSave(word, tag) {
   if (!hasNativeGalleryPredict()) return;
   const dataUrl = await drawPredictionPhoto(galleryPredictText(word));
   window.__lastPredictionWord = word;
+  // בדיקה: תמיד "לפני 2 דקות" - שתהיה ראשונה בגלריה
+  const mins = tag === 'test' ? 2 : Number(config.galleryPredictAgo) || 2;
   try {
-    window.AndroidNative.savePredictionPhoto(dataUrl, Number(config.galleryPredictAgo) || 2, tag + ':' + word);
-  } catch (e) {}
+    window.AndroidNative.savePredictionPhoto(dataUrl, mins, tag + ':' + word);
+  } catch (e) {
+    const st = document.getElementById('galleryPredictTestStatus');
+    if (st && tag === 'test') { st.textContent = '❌ ' + (e && e.message ? e.message : 'bridge'); st.className = 'toggle-sub-desc live-read-status bad'; }
+  }
   return dataUrl;
 }
 
@@ -3185,6 +3197,14 @@ window.onPredictionPhotoSaved = function (ok, tag, info) {
         : '❌ ' + String(info || '');
       st.style.whiteSpace = 'pre-line';
       st.className = 'toggle-sub-desc live-read-status ' + (ok ? 'good' : 'bad');
+    }
+    // הוכחה: פותחים את התמונה בגלריה האמיתית
+    if (ok) {
+      setTimeout(() => {
+        let opened = false;
+        try { opened = Boolean(window.AndroidNative.openPredictionPhoto && window.AndroidNative.openPredictionPhoto()); } catch (e) {}
+        if (!opened && st) st.textContent += '\n⚠️ הגלריה לא נפתחה אוטומטית - פתח אותה ידנית, אלבום "מצלמה".';
+      }, 500);
     }
     return;
   }
@@ -5519,7 +5539,7 @@ function initDeviceLicenseGate() {
 // החלון מוצג רק כשמסך ההגדרות פתוח (בפתיחת האפליקציה / בתפריט הסודי),
 // ולעולם לא מעל מסך הנעילה הפעיל מול קהל.
 // ============================================================================
-const APP_VERSION = '10.8';
+const APP_VERSION = '10.9';
 const DEFAULT_APK_URL = 'https://github.com/tzur2010/app-lockscreen/raw/main/Lockscreen.apk';
 const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 const UPDATE_DISMISS_KEY = 'magic_update_dismissed_version';

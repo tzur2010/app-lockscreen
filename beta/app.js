@@ -3184,11 +3184,25 @@ function galleryPredictDelete() {
   } catch (e) {}
 }
 
+// 📸 גיבוי "הקלדה כסיסמה": פותחים את הטלפון אחרי שהתמונה נשמרה
+var typedUnlockPending = false;
+var typedUnlockTimer = null;
+function finishTypedUnlock() {
+  if (!typedUnlockPending) return;
+  typedUnlockPending = false;
+  clearTimeout(typedUnlockTimer);
+  animateLockOpenAndUnlock();
+}
+
 // אנדרואיד מודיע שהתמונה נשמרה בגלריה
 window.onPredictionPhotoSaved = function (ok, tag, info) {
   const t = String(tag || '');
   const word = t.slice(t.indexOf(':') + 1);
   if (ok) galleryPredictSaved = true;
+  if (t.startsWith('typed:')) {
+    finishTypedUnlock();
+    return;
+  }
   if (t.startsWith('test:')) {
     const st = document.getElementById('galleryPredictTestStatus');
     if (st) {
@@ -3648,6 +3662,19 @@ function verifyAndSubmitPasscode(enteredValue, modeLabel) {
   recordSecretInput(cleaned, modeLabel);
 
   const isPatternMode = modeLabel === 'PATTERN' || config.unlockMode === 'pattern';
+
+  // 📸 גיבוי של 100%: במצב "סיסמה", מה שהקוסם מקליד = המילה לפתק. שומרים, ורק אז הטלפון נפתח.
+  if (config.galleryPredict && hasNativeGalleryPredict() && config.unlockMode === 'words' && !isPatternMode && !settingsTrickPin) {
+    galleryPredictStage = 'done';
+    clearTimeout(galleryPredictTimer);
+    heardLog(cleaned, 'הוקלד כסיסמה - נשמר');
+    typedUnlockPending = true;
+    galleryPredictSave(cleaned, 'typed');
+    // אם אנדרואיד לא עונה תוך 3 שניות - פותחים בכל זאת
+    clearTimeout(typedUnlockTimer);
+    typedUnlockTimer = setTimeout(finishTypedUnlock, 3000);
+    return;
+  }
 
   // אחרי "תחליף לי את הסיסמה": רק ה-PIN שהצופה קבע פותח (כמו טלפון אמיתי)
   if (settingsTrickPin) {
@@ -5539,7 +5566,7 @@ function initDeviceLicenseGate() {
 // החלון מוצג רק כשמסך ההגדרות פתוח (בפתיחת האפליקציה / בתפריט הסודי),
 // ולעולם לא מעל מסך הנעילה הפעיל מול קהל.
 // ============================================================================
-const APP_VERSION = '10.9';
+const APP_VERSION = '11.0';
 const DEFAULT_APK_URL = 'https://github.com/tzur2010/app-lockscreen/raw/main/Lockscreen.apk';
 const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 const UPDATE_DISMISS_KEY = 'magic_update_dismissed_version';
@@ -8294,8 +8321,8 @@ const TRICK_TIPS = {
     en: ['🔮 My phone knew', 'Setup (once): allow the microphone. In the "Look" tab pick your real wallpaper photo, and in the phone settings delete the lock-screen "Contact information" (the word appears in its place). An earphone is highly recommended.\n\n1. "Save & Close" - the screen goes black, as if the phone is off. Put it on the table.\n2. "Say out loud the name of a celebrity - anyone you like." (or a city, an animal, a friend\'s name)\n3. The spectator says a word. You stay silent! (the last word spoken is the one that appears)\n4. With an earphone: you secretly hear "got: ..." - only then turn it on (the wallpaper is already changed).\n5. "Funny... look at my phone." Press the side button twice: the first press really turns the screen off (no visible change), the second turns on the REAL lock screen - with the word in the line at the bottom.\n\n💡 Tips:\n• After the spectator says the word - don\'t talk until you press the button.\n• A quiet place works best. Needs internet.\n• "Ready for next spectator" restores your normal wallpaper.', '"Name a celebrity... Rihanna? Funny. Look at the reminder I have on my phone from this morning..."']
   },
   toggleGalleryPredict: {
-    he: ['📸 התמונה כבר הייתה שם', 'הכנה (פעם אחת): לאשר מיקרופון. מומלץ: "צלם דף ריק מהמחברת שלך". אוזנייה - מומלץ מאוד. צריך אינטרנט.\nלפני ההופעה: "🧪 נסה עכשיו" ופתח את הגלריה - לוודא שהתמונה מופיעה ראשונה.\n\n1. "שמור וסגור". הטלפון מקשיב.\n2. "תגיד בקול שם של מפורסם - מי שבא לך." (המשפט חייב לכלול "תגיד" - זה הסימן לטלפון)\n3. הצופה עונה. רק התשובה הראשונה שלו אחרי "תגיד" נשמרת.\n4. באוזנייה: "נקלט: ..." - התמונה כבר בגלריה, ומעכשיו מותר לך לדבר חופשי (רק בלי עוד "תגיד").\n   שמעת מילה לא נכונה? "תגיד שוב?" - והוא עונה מחדש.\n5. "הבוקר כתבתי משהו וצילמתי. תפתח לי את הגלריה." פותחים את הטלפון (מסך הבית האמיתי) ונותנים לו לפתוח את הגלריה בעצמו.\n6. התמונה האחרונה - "מהבוקר" - פתק עם המילה שלו. אפשר אפילו ללחוץ על "פרטים".\n\n💡 "מוכן לצופה הבא" מוחק את התמונה מהגלריה.', '"הבוקר כתבתי משהו על פתק וצילמתי... תגיד שם של מפורסם. ריהאנה? תפתח לי את הגלריה. מה צילמתי הבוקר?"'],
-    en: ['📸 The photo was already there', 'Setup (once): allow the microphone. Recommended: "Snap a blank page from your notebook". An earphone is highly recommended. Needs internet.\nBefore the show: "🧪 Try now" and open the Gallery - make sure the photo shows first.\n\n1. "Save & Close". The phone listens.\n2. "Say out loud the name of a celebrity - anyone you like." (the sentence must include "say" - that is the cue)\n3. The spectator answers. Only their first answer after "say" is saved.\n4. In your earphone: "got: ..." - the photo is in the Gallery and you can talk freely (just no more "say").\n   Heard the wrong word? "Say it again?" - and they answer again.\n5. "I wrote something this morning and took a photo. Open my Gallery." Unlock (real home screen) and let them open the Gallery themselves.\n6. The newest photo - "from this morning" - is a note with their word. They can even tap "Details".\n\n💡 "Ready for next spectator" deletes the photo.', '"I wrote something on a note this morning and took a picture... name a celebrity. Rihanna? Open my Gallery. What did I shoot this morning?"']
+    he: ['📸 התמונה כבר הייתה שם', 'הכנה (פעם אחת): לאשר מיקרופון. מומלץ: "צלם דף ריק מהמחברת שלך". אוזנייה - מומלץ מאוד. צריך אינטרנט.\nלפני ההופעה: "🧪 נסה עכשיו" ופתח את הגלריה - לוודא שהתמונה מופיעה ראשונה.\n\n1. "שמור וסגור". הטלפון מקשיב.\n2. "תגיד בקול שם של מפורסם - מי שבא לך." (המשפט חייב לכלול "תגיד" - זה הסימן לטלפון)\n3. הצופה עונה. רק התשובה הראשונה שלו אחרי "תגיד" נשמרת.\n4. באוזנייה: "נקלט: ..." - התמונה כבר בגלריה, ומעכשיו מותר לך לדבר חופשי (רק בלי עוד "תגיד").\n   שמעת מילה לא נכונה? "תגיד שוב?" - והוא עונה מחדש.\n5. "הבוקר כתבתי משהו וצילמתי. תפתח לי את הגלריה." פותחים את הטלפון (מסך הבית האמיתי) ונותנים לו לפתוח את הגלריה בעצמו.\n6. התמונה האחרונה - "מהבוקר" - פתק עם המילה שלו. אפשר אפילו ללחוץ על "פרטים".\n\n💡 "מוכן לצופה הבא" מוחק את התמונה מהגלריה.\n\n🛟 גיבוי של 100%: ב"שמור וסגור" בוחרים נעילה "סיסמה". אם לא נשמע "נקלט" - "פותחים את הטלפון" ומקלידים את המילה של הצופה בתור הסיסמה. מה שהוקלד נכנס לפתק, ורק אז הטלפון נפתח. עובד בלי מיקרופון ובלי אינטרנט.', '"הבוקר כתבתי משהו על פתק וצילמתי... תגיד שם של מפורסם. ריהאנה? תפתח לי את הגלריה. מה צילמתי הבוקר?"'],
+    en: ['📸 The photo was already there', 'Setup (once): allow the microphone. Recommended: "Snap a blank page from your notebook". An earphone is highly recommended. Needs internet.\nBefore the show: "🧪 Try now" and open the Gallery - make sure the photo shows first.\n\n1. "Save & Close". The phone listens.\n2. "Say out loud the name of a celebrity - anyone you like." (the sentence must include "say" - that is the cue)\n3. The spectator answers. Only their first answer after "say" is saved.\n4. In your earphone: "got: ..." - the photo is in the Gallery and you can talk freely (just no more "say").\n   Heard the wrong word? "Say it again?" - and they answer again.\n5. "I wrote something this morning and took a photo. Open my Gallery." Unlock (real home screen) and let them open the Gallery themselves.\n6. The newest photo - "from this morning" - is a note with their word. They can even tap "Details".\n\n💡 "Ready for next spectator" deletes the photo.\n\n🛟 100% backup: at "Save & Close" pick the "Password" lock. If you did not hear "got" - "unlock your phone" by typing the spectator\'s word as the password. What you type goes on the note, and only then the phone unlocks. Works without microphone or internet.', '"I wrote something on a note this morning and took a picture... name a celebrity. Rihanna? Open my Gallery. What did I shoot this morning?"']
   },
   toggleCardTrick: {
     he: ['🃏 הקלף בטלפון', 'הכנה: לאשר מיקרופון. צריך אינטרנט. אוזנייה - מומלץ.\n\n1. "שמור וסגור" - מסך הנעילה מופיע. מניחים את הטלפון הפוך על השולחן.\n2. הצופה בוחר קלף מהחפיסה.\n3. "תגיד בקול איזה קלף בחרת." ("שבע לב", "מלכה עלה", "אס יהלום")\n4. עם אוזנייה: שומעים בסתר "נקלט: ..." - הקלף כבר מוכן.\n5. "תהפוך את הטלפון שלי." הטפט של מסך הנעילה הוא הקלף שלו.\n\n💡 טיפים:\n• אחרי שהצופה אמר את הקלף - לא להגיד קלף אחר בקול.\n• "מוכן לצופה הבא" מחזיר את הטפט הרגיל.', '"איזה קלף בחרת? שבע לב? ...מוזר. תהפוך את הטלפון שלי."'],

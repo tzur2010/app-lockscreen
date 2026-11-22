@@ -625,56 +625,6 @@ fit();addEventListener('resize',fit);addEventListener('orientationchange',functi
           <div class="oneui-card-divider"></div>
           </div>
 
-          <!-- 📸 התמונה כבר הייתה שם: הצופה אומר מילה - והיא בתמונה "מהבוקר" בגלריה האמיתית (אנדרואיד) -->
-          <div id="galleryPredictBlock">
-          <div class="clean-toggle-row oneui-row-with-sub">
-            <div class="toggle-text-stack">
-              <span class="toggle-main-title">📸 התמונה כבר הייתה שם</span>
-              <span class="toggle-sub-desc">הצופה אומר בקול מילה כלשהי. הוא פותח את הגלריה האמיתית של הטלפון - והתמונה האחרונה, שצולמה הבוקר, היא פתק בכתב יד עם המילה שלו.</span>
-            </div>
-            <label class="switch">
-              <input type="checkbox" id="toggleGalleryPredict">
-              <span class="slider"></span>
-            </label>
-          </div>
-          <div class="oneui-field-block" id="galleryPredictExtra" style="display: none; padding-top: 0;">
-            <label class="config-label">התמונה "צולמה"</label>
-            <div class="segmented-row" id="galleryPredictAgoSelector">
-              <button type="button" class="seg-pill" data-gpago="2">לפני 2 דק׳</button>
-              <button type="button" class="seg-pill" data-gpago="60">לפני שעה</button>
-              <button type="button" class="seg-pill" data-gpago="180">לפני 3 שעות</button>
-              <button type="button" class="seg-pill" data-gpago="360">הבוקר</button>
-              <button type="button" class="seg-pill" data-gpago="1440">אתמול</button>
-            </div>
-            <label class="config-label" for="galleryPredictTplInput">מה כתוב על הפתק ({מילה} = מה שהצופה אמר)</label>
-            <input type="text" id="galleryPredictTplInput" class="feedback-textarea gallery-text-input" maxlength="60" dir="rtl">
-            <button type="button" class="media-upload-btn" id="handwritingBtn" style="width: 100%; margin-top: 6px;">✍️ כתב היד שלי - כתוב את האותיות באצבע</button>
-            <div class="toggle-sub-desc live-read-status" id="handwritingStatus"></div>
-            <label class="media-upload-btn" style="display: block; text-align: center; width: 100%; margin-top: 6px; box-sizing: border-box;">
-              📷 צלם דף ריק מהמחברת שלך (לא חובה)
-              <input type="file" id="predictPaperFileInput" accept="image/*" capture="environment" hidden>
-            </label>
-            <div class="toggle-sub-desc live-read-status" id="predictPaperStatus"></div>
-            <label class="config-label">שפת הזיהוי</label>
-            <div class="segmented-row voice-lang-selector">
-              <button type="button" class="seg-pill" data-vlang="he">עברית</button>
-              <button type="button" class="seg-pill" data-vlang="en">English</button>
-            </div>
-            <button type="button" class="media-upload-btn" id="galleryPredictTestBtn" style="width: 100%; margin-top: 8px;">🧪 נסה עכשיו: שים "בדיקה" בגלריה</button>
-            <div class="toggle-sub-desc live-read-status" id="galleryPredictTestStatus" style="line-height: 1.6;"></div>
-            <img id="galleryPredictPreview" alt="" style="display: none; width: 46%; margin: 8px auto 0; border-radius: 10px;">
-            <div class="toggle-sub-desc live-read-status" id="galleryPredictStatus"></div>
-            <details class="heard-log-box">
-              <summary>👂 מה הטלפון שמע לאחרונה</summary>
-              <div id="heardLogList" class="heard-log-list"></div>
-            </details>
-            <div class="toggle-sub-desc" style="margin-top: 4px; line-height: 1.6;">
-              הכלל: תגיד משפט עם המילה <b>"תגיד"</b> ("תגיד בקול שם של מפורסם"). רק התשובה הראשונה של הצופה אחרי זה נשמרת, ואחרי "נקלט" באוזנייה מותר לך לדבר חופשי. שמעת מילה לא נכונה? "תגיד שוב?" - והוא עונה מחדש. "מוכן לצופה הבא" מוחק את התמונה.
-            </div>
-          </div>
-          <div class="oneui-card-divider"></div>
-          </div>
-
           <!-- 🃏 הקלף בטלפון: הצופה אומר קלף בקול - הטפט של מסך הנעילה הופך לקלף שלו (אנדרואיד) -->
           <div id="cardTrickBlock">
           <div class="clean-toggle-row oneui-row-with-sub">
@@ -1734,26 +1684,6 @@ fit();addEventListener('resize',fit);addEventListener('orientationchange',functi
     <!-- חלון הצצה סודי (Secret Hold Peek) -->
     <!-- 🔮 "הטלפון ידע מראש": מסך "כבוי" (שחור). נגיעה = מסך הנעילה נדלק עם המילה -->
     <div class="fake-off-screen" id="fakeOffScreen" style="display: none;"></div>
-    <!-- ✍️ כתב היד של הקוסם: כותבים באצבע אות אחרי אות -->
-    <div class="hand-pad" id="handPad" style="display: none;">
-      <div class="hand-pad-card">
-        <div class="hand-pad-head">
-          <div>
-            <div class="hand-pad-title">כתוב באצבע את האות</div>
-            <div class="hand-pad-sub">כמו שאתה כותב בעט. האות יושבת על הקו התחתון.</div>
-          </div>
-          <div class="hand-pad-letter" id="handPadLetter">א</div>
-        </div>
-        <canvas class="hand-pad-canvas" id="handPadCanvas"></canvas>
-        <div class="hand-pad-progress" id="handPadProgress">1 / 37</div>
-        <div class="hand-pad-actions">
-          <button type="button" id="handPadPrev">→ הקודמת</button>
-          <button type="button" id="handPadClear">מחק</button>
-          <button type="button" class="primary" id="handPadNext">הבאה ←</button>
-        </div>
-        <button type="button" class="hand-pad-done" id="handPadDone">סיימתי - שמור</button>
-      </div>
-    </div>
 
     <div class="secret-peek" id="secretPeek">
       <svg class="peek-pattern-mini" id="peekPatternMini" viewBox="0 0 60 60"></svg>

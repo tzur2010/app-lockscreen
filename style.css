@@ -4315,22 +4315,3 @@ html.real-ios .clean-toggle-row:has(#toggleChameleonClock) { display: none !impo
 .phone-container.samsung-oneui-lock .clock-lock-big-time { font-size: min(25.5vw, 124px); font-weight: 700; color: rgba(255,255,255,.9); text-shadow: 0 1px 10px rgba(0,0,0,.18); }
 .phone-container.samsung-oneui-lock .clock-lock-date { font-size: min(4.6vw, 19px); font-weight: 600; margin-top: 0.9vh; color: rgba(255,255,255,.92); text-shadow: 0 1px 6px rgba(0,0,0,.3); }
 .phone-container.samsung-oneui-lock .clock-shortcut { background: rgba(40,30,30,.45); }
-
-/* ✍️ מסך כתיבת האותיות (כתב היד של הקוסם) */
-.hand-pad { position: fixed; inset: 0; z-index: 99995; background: rgba(4, 3, 12, .78); align-items: center; justify-content: center; padding: 16px; direction: rtl; }
-.hand-pad-card { width: 100%; max-width: 420px; background: #fbfaf6; color: #1e1b4b; border-radius: 26px; padding: 18px; box-shadow: 0 30px 80px rgba(0, 0, 0, .5); }
-.hand-pad-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
-.hand-pad-title { font-size: 17px; font-weight: 800; }
-.hand-pad-sub { font-size: 13px; color: #6b6890; margin-top: 2px; }
-.hand-pad-letter { flex: none; width: 64px; height: 64px; border-radius: 18px; display: grid; place-items: center; font-size: 38px; font-weight: 700; color: #fff; background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 48%, #06b6d4 100%); }
-.hand-pad-canvas { display: block; width: 100%; aspect-ratio: 1 / 1; border-radius: 18px; background: #fff; border: 1.5px solid rgba(99, 102, 241, .25); touch-action: none; }
-.hand-pad-progress { text-align: center; font-size: 13px; color: #6b6890; margin: 8px 0; }
-.hand-pad-actions { display: flex; gap: 8px; }
-.hand-pad-actions button, .hand-pad-done { flex: 1; min-height: 46px; border-radius: 14px; border: 1px solid rgba(99, 102, 241, .25); background: #fff; color: #1e1b4b; font: inherit; font-size: 15px; font-weight: 700; cursor: pointer; }
-.hand-pad-actions button.primary { background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 48%, #06b6d4 100%); color: #fff; border: 0; }
-.hand-pad-done { width: 100%; margin-top: 8px; background: transparent; border: 0; color: #6366f1; }
-.heard-log-box { margin-top: 10px; border-radius: 14px; background: var(--cfg-subbox-bg); border: 1px solid var(--cfg-subbox-border); padding: 10px 12px; }
-.heard-log-box summary { cursor: pointer; font-weight: 700; font-size: 14px; color: var(--cfg-text-main); }
-.heard-log-list { margin-top: 8px; font-size: 12.5px; color: var(--cfg-text-sub); line-height: 1.5; }
-.heard-log-row { display: flex; justify-content: space-between; gap: 8px; padding: 5px 0; border-bottom: 1px solid var(--cfg-divider); }
-.heard-log-row b { flex: none; color: var(--cfg-text-main); font-weight: 600; }

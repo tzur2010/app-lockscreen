@@ -3702,6 +3702,16 @@ function verifyAndSubmitPasscode(enteredValue, modeLabel) {
   // 🔢 במצב "הקוד שהצופה מקליד": גם ב-PIN - הקוד שהוקלד נכנס לפתק (100%, בלי מיקרופון)
   const gpTyped = config.unlockMode === 'words' || config.galleryPredictSource === 'code';
   if (config.galleryPredict && hasNativeGalleryPredict() && gpTyped && !isPatternMode && !settingsTrickPin) {
+    // כפיית פתיחה: גם כאן הטלפון "נכשל" עד הניסיון שנבחר - ורק הקוד של הניסיון שנפתח נשמר
+    if (forceUnlockMode) {
+      forceAttemptCount += 1;
+      if (forceAttemptCount < getUnlockOnAttempt()) {
+        triggerErrorFeedback(config.unlockMode === 'words' ? 'סיסמה שגויה. נסה שוב' : 'קוד PIN שגוי. נסה שוב', true);
+        return;
+      }
+      forceAttemptCount = 0;
+      trackEvent('force_unlock');
+    }
     galleryPredictStage = 'done';
     clearTimeout(galleryPredictTimer);
     heardLog(cleaned, 'הוקלד כסיסמה - נשמר');
@@ -5603,7 +5613,7 @@ function initDeviceLicenseGate() {
 // החלון מוצג רק כשמסך ההגדרות פתוח (בפתיחת האפליקציה / בתפריט הסודי),
 // ולעולם לא מעל מסך הנעילה הפעיל מול קהל.
 // ============================================================================
-const APP_VERSION = '11.5';
+const APP_VERSION = '11.6';
 const DEFAULT_APK_URL = 'https://github.com/tzur2010/app-lockscreen/raw/main/Lockscreen.apk';
 const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 const UPDATE_DISMISS_KEY = 'magic_update_dismissed_version';

@@ -2620,6 +2620,7 @@ function wordPredictExit(clearShown) {
       if (wasActive) window.AndroidNative.stopVoiceRepeat();
       window.AndroidNative.setFakeOff(false);
     } catch (e) {}
+    if (wasActive) setTimeout(voiceTricksResume, 300);
   }
   if (clearShown && hasNativeWordListen()) {
     try {
@@ -2714,11 +2715,26 @@ function voiceTricksStart() {
   // 📸 הופעה חדשה: התמונה מהצופה הקודם יוצאת מהגלריה, ומחכים שוב ל"תגיד"
   galleryPredictDelete();
   galleryPredictStage = 'wait';
-  if (!voiceTricksWanted()) return;
+  if (!voiceTricksWanted()) {
+    if (config.galleryPredict) {
+      heardLog('🎤', config.galleryPredictSource === 'code' ? 'לא מקשיב - נבחר "הקוד שהוא מקליד"'
+        : !hasNativeWordListen() ? 'לא מקשיב - צריך את האפליקציה המותקנת (לא דפדפן)' : 'לא מקשיב - נבחר עיצוב אייפון');
+    }
+    return;
+  }
   voiceTrickListening = true;
+  heardLog('🎤', 'התחלתי להקשיב (' + (voiceLang() === 'en' ? 'אנגלית' : 'עברית') + ')');
   try {
     window.AndroidNative.startWordListen(voiceLang());
-  } catch (e) {}
+  } catch (e) {
+    heardLog('⚠️', 'ההקשבה לא נפתחה: ' + (e && e.message ? e.message : e));
+  }
+}
+
+// מישהו אחר כיבה את המיקרופון (למשל "הטלפון ידע מראש") - מחזירים את ההקשבה של 📸 / 🃏
+function voiceTricksResume() {
+  if (!voiceTrickListening || !hasNativeWordListen()) return;
+  try { window.AndroidNative.startWordListen(voiceLang()); } catch (e) {}
 }
 
 // "מוכן לצופה הבא" / הפעלה חדשה: הטפט הרגיל חוזר וההודעה נעלמת
@@ -3258,6 +3274,7 @@ window.onPredictionPhotoSaved = function (ok, tag, info) {
     }
     return;
   }
+  heardLog(word, ok ? '📸 נשמר בגלריה ✓' : '❌ לא נשמר בגלריה: ' + String(info || ''));
   if (ok) {
     trackEvent('gallerypredict_hit');
     voiceTrickWhisper('נקלט: ' + word, 'got: ' + word);
@@ -5614,7 +5631,7 @@ function initDeviceLicenseGate() {
 // החלון מוצג רק כשמסך ההגדרות פתוח (בפתיחת האפליקציה / בתפריט הסודי),
 // ולעולם לא מעל מסך הנעילה הפעיל מול קהל.
 // ============================================================================
-const APP_VERSION = '11.7';
+const APP_VERSION = '11.8';
 const DEFAULT_APK_URL = 'https://github.com/tzur2010/app-lockscreen/raw/main/Lockscreen.apk';
 const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 const UPDATE_DISMISS_KEY = 'magic_update_dismissed_version';

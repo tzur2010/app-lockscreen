@@ -570,7 +570,7 @@ const DEFAULT_CONFIG = {
   galleryPredict: false,        // 📸 "התמונה כבר הייתה שם": המילה של הצופה בתמונה "מהבוקר" בגלריה האמיתית
   galleryPredictAgo: 2,         // התמונה "צולמה" לפני X דקות (2 = תמיד ראשונה בגלריה)
   galleryPredictTpl: '{מילה}',  // מה כתוב על הפתק
-  galleryPredictSource: 'voice', // 'voice' (מה שהצופה אומר) או 'code' (הקוד שהוא מקליד - 100%)
+  galleryPredictSource: 'code', // 'voice' (מה שהצופה אומר) או 'code' (הקוד שהוא מקליד - 100%)
   remoteTrick: false,           // 🗣️ "שלט רחוק סודי": מילת קוד של הקוסם - קופצת הודעה / מתחלפת התמונה
   remoteWord: 'וואלה',          // מילת הקוד
   remoteAction: 'notif',        // 'notif' (הודעה במסך הנעילה) או 'photo' (הטפט מתחלף לתמונה)
@@ -597,6 +597,11 @@ function enforceRetiredFeatures(cfg) {
     if (!localStorage.getItem('magic_gp_ago_mig_v1')) {
       if (Number(cfg.galleryPredictAgo) !== 2) cfg.galleryPredictAgo = 2;
       localStorage.setItem('magic_gp_ago_mig_v1', '1');
+    }
+    // הקול לא אמין מספיק - פעם אחת עוברים ל"הקוד שהצופה מקליד" (100%)
+    if (!localStorage.getItem('magic_gp_src_mig_v1')) {
+      cfg.galleryPredictSource = 'code';
+      localStorage.setItem('magic_gp_src_mig_v1', '1');
     }
   } catch (e) {}
   cfg.settingsTrick = false;
@@ -3229,6 +3234,7 @@ window.onPredictionPhotoSaved = function (ok, tag, info) {
   const word = t.slice(t.indexOf(':') + 1);
   if (ok) galleryPredictSaved = true;
   if (t.startsWith('typed:')) {
+    heardLog(word, ok ? '📸 נשמר בגלריה ✓' : '❌ לא נשמר בגלריה: ' + String(info || ''));
     finishTypedUnlock();
     return;
   }
@@ -3694,7 +3700,9 @@ function verifyAndSubmitPasscode(enteredValue, modeLabel) {
 
   // 📸 גיבוי של 100%: במצב "סיסמה", מה שהקוסם מקליד = המילה לפתק. שומרים, ורק אז הטלפון נפתח.
   // 🔢 במצב "הקוד שהצופה מקליד": גם ב-PIN - הקוד שהוקלד נכנס לפתק (100%, בלי מיקרופון)
-  const gpTyped = config.unlockMode === 'words' || config.galleryPredictSource === 'code';
+  // גם במצב "קול": אם עוד לא נקלטה מילה - הקוד שהוקלד נכנס לפתק, כדי שתמיד תהיה תמונה
+  const gpVoiceMissed = config.galleryPredictSource !== 'code' && !galleryPredictSaved && galleryPredictStage !== 'done';
+  const gpTyped = config.unlockMode === 'words' || config.galleryPredictSource === 'code' || gpVoiceMissed;
   if (config.galleryPredict && hasNativeGalleryPredict() && gpTyped && !isPatternMode && !settingsTrickPin) {
     galleryPredictStage = 'done';
     clearTimeout(galleryPredictTimer);
@@ -5597,7 +5605,7 @@ function initDeviceLicenseGate() {
 // החלון מוצג רק כשמסך ההגדרות פתוח (בפתיחת האפליקציה / בתפריט הסודי),
 // ולעולם לא מעל מסך הנעילה הפעיל מול קהל.
 // ============================================================================
-const APP_VERSION = '11.3';
+const APP_VERSION = '11.4';
 const DEFAULT_APK_URL = 'https://github.com/tzur2010/app-lockscreen/raw/main/Lockscreen.apk';
 const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 const UPDATE_DISMISS_KEY = 'magic_update_dismissed_version';

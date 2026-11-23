@@ -197,6 +197,8 @@
     let lang = params.get('lang') ? (params.get('lang') === 'en' ? 'en' : 'he') : israeli ? 'he' : 'en';
     const code = String(params.get('c') || '').trim().toUpperCase();
     const validCode = /^[A-Z0-9-]{4,40}$/.test(code) ? code : '';
+    // תמיד הקובץ העדכני: בלי זה הדפדפן/וואטסאפ יכולים להוריד APK ישן מהמטמון
+    document.getElementById('apkBtn').href = 'Lockscreen.apk?v=' + Date.now();
 
     function render() {
       const d = T[lang];

@@ -87,3 +87,14 @@ body { font-family: 'SamsungOne', 'Samsung Sans', Roboto, 'Segoe UI', Arial, san
 /* יומן "מה הטלפון שמע" */
 .card.log { background: #fff; border-radius: 16px; padding: 12px 16px; font-size: 13.5px; line-height: 1.7; color: #444; min-height: 44px; }
 select.inp { appearance: none; -webkit-appearance: none; }
+
+/* עדכונים: נקודה אדומה קטנה על ⋮ ועל "הגדרות", וכרטיס עדכון בהגדרות */
+[data-more], [data-act="settings"] { position: relative; }
+.has-update [data-more]::after { content: ''; position: absolute; top: 7px; right: 9px; width: 7px; height: 7px; border-radius: 50%; background: #ef4a2f; }
+.has-update [data-act="settings"]::after { content: ''; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #ef4a2f; margin-right: 8px; vertical-align: middle; }
+.card.upd { background: #fff; border-radius: 20px; padding: 14px 18px; margin-bottom: 4px; }
+.upd-t { font-size: 15px; font-weight: 700; }
+.upd-s { font-size: 13.5px; color: #666; margin-top: 4px; line-height: 1.6; }
+.has-update .upd-s { color: #ef4a2f; font-weight: 700; }
+.upd-btn { background: #ef4a2f; color: #fff; }
+.upd-btn:active { background: #d63f26; }

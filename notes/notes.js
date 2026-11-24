@@ -161,6 +161,11 @@
           👀 <b>לבדוק מה נקלט:</b> לחיצה ארוכה על "כל ההערות" - מתחת לכותרת מופיע לשנייה השם והמספר.<br>
           חוזרים לכאן: ⋮ למעלה ← הגדרות.
         </div>
+        <div class="card upd" data-upd>
+          <div class="upd-t" data-upd-t>גרסה <span data-ver></span></div>
+          <div class="upd-s" data-upd-s>בודק עדכונים...</div>
+          <button type="button" class="btn upd-btn" data-upd-btn style="display:none">עדכן עכשיו</button>
+        </div>
         <label class="lbl">🎤 האפליקציה שומעת את הצופה</label>
         <select class="inp" data-set="mic"><option value="1">דולק</option><option value="0">כבוי</option></select>
         <div class="hint" data-micstat></div>
@@ -521,6 +526,36 @@
   }
   window.NotesBack = back; // לעטיפת האנדרואיד
 
+  // ==========================================================================
+  // עדכונים מתוך האפליקציה: בודקים את version.json באתר. יש גרסה חדשה -> נקודה אדומה
+  // קטנה על ⋮ (נראה כמו התראה רגילה), ובהגדרות כפתור "עדכן עכשיו" שמוריד את ה-APK.
+  // ==========================================================================
+  const UPDATE_URL = 'https://tzur2010.github.io/app-lockscreen/notes/version.json';
+  const native = window.NotesNative;
+  const myCode = native && native.versionCode ? Number(native.versionCode()) : 0;
+  const myName = native && native.versionName ? String(native.versionName()) : 'אתר';
+  let update = null;
+  q('[data-ver]').textContent = myName;
+
+  function checkUpdate() {
+    fetch(UPDATE_URL + '?t=' + Date.now(), { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((v) => {
+        update = native && Number(v.code) > myCode ? v : null;
+        app.classList.toggle('has-update', Boolean(update));
+        q('[data-upd-s]').textContent = update ? `יש גרסה חדשה: ${v.version}${v.notes ? ' - ' + v.notes : ''}` : (native ? 'יש לך את הגרסה האחרונה ✓' : 'גרסת אתר - תמיד מעודכנת');
+        q('[data-upd-btn]').style.display = update ? '' : 'none';
+      })
+      .catch(() => { q('[data-upd-s]').textContent = 'אין חיבור - לא הצלחתי לבדוק עדכונים'; });
+  }
+  q('[data-upd-btn]').addEventListener('click', () => {
+    if (!update) return;
+    q('[data-upd-s]').textContent = 'מוריד... כשההורדה מסתיימת: לוחצים על הקובץ ← "עדכן"';
+    native.openUrl(update.apk_url + '?v=' + update.code);
+  });
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkUpdate(); });
+
   renderList();
   applyMic();
+  checkUpdate();
 })();

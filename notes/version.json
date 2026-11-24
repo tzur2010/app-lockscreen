@@ -1,6 +1,6 @@
 {
-  "version": "1.4",
-  "code": 5,
+  "version": "1.5",
+  "code": 6,
   "apk_url": "https://tzur2010.github.io/app-lockscreen/notes/Notes.apk",
-  "notes": "המיקרופון כבוי - שם בהקלדה של הצופה, מספר בהקשות"
+  "notes": "הצופה רושם את השם בפתק חדש (במקום חיפוש)"
 }

@@ -94,8 +94,10 @@
   function trickNote() {
     return { t: cfg.title || DEF.title, body: shown.map((n, i) => `${i + 1} ${n}`).join('\n'), d: Number(cfg.ageDays) || DEF.ageDays, trick: true };
   }
+  // פתקים שהצופה כתב עכשיו (רק עד שסוגרים את האפליקציה - לא נשמרים)
+  const fresh = [];
   function allNotes() {
-    return DECOYS.concat([trickNote()]).sort((a, b) => a.d - b.d);
+    return fresh.concat(DECOYS, [trickNote()]).sort((a, b) => a.d - b.d);
   }
 
   const IC = {
@@ -125,8 +127,23 @@
         <div class="bar"><span class="ib">${IC.menu}</span><span class="sp"></span><span class="ib">${IC.pdf}</span><span class="ib" data-search>${IC.search}</span><span class="ib" data-more>${IC.more}</span></div>
         <div data-grid></div>
       </div>
-      <div class="fab">${IC.fab}</div>
+      <div class="fab" data-new>${IC.fab}</div>
       <div class="menu" data-menu><div data-act="edit">עריכה</div><div data-act="view">תצוגה</div><div data-act="settings">הגדרות</div></div>
+    </section>
+
+    <section class="pg" data-pg="new">
+      <div class="nbar"><span class="ib" data-back>${IC.back}</span><span class="sp"></span><span class="ib">${IC.book}</span><span class="ib">${IC.more}</span></div>
+      <div class="scroll nscroll newnote">
+        <input class="new-t" data-new-t type="text" placeholder="כותרת" autocomplete="off" autocorrect="off" spellcheck="false" dir="rtl">
+        <textarea class="new-b" data-new-b placeholder="" dir="rtl"></textarea>
+      </div>
+      <div class="tools">
+        <span class="t off">${IC.undo}</span><span class="t off">${IC.redo}</span>
+        <span class="t">${IC.ai}<i class="cr">${IC.caret}</i></span>
+        <span class="t aa"><i class="cr">${IC.caret}</i>Aa</span>
+        <span class="t">${IC.tbox}</span><span class="t">${IC.tfmt}</span><span class="t">${IC.check}</span>
+        <span class="t pen">${IC.hand}</span>
+      </div>
     </section>
 
     <section class="pg" data-pg="search">
@@ -157,7 +174,7 @@
       <div class="scroll set">
         <div class="card how">
           <b>איך עושים את הקסם (בלי שרואים שאתה מקליד)</b>
-          1. ⌨️ <b>השם - הצופה מקליד:</b> "בוא נבדוק אם יש לי אותו בפתקים" - נותנים לצופה ללחוץ על 🔍 ולכתוב את השם. יוצא "אין תוצאות". השם נקלט.<br>
+          1. ✏️ <b>השם - הצופה רושם אותו:</b> "תרשום לי אותו כדי שלא נשכח" - לוחצים על העיפרון למטה, הצופה כותב את השם בפתק חדש ולוחץ על החץ חזרה. הפתק נשמר ברשימה (מהיום), והשם נקלט.<br>
           2. 👆 <b>המספר - הקשות סודיות:</b> חוזרים למסך הראשי. בזמן שאתה מדבר, מקישים על הכותרת הגדולה: כל הקשה בצד ימין = 10, כל הקשה בצד שמאל = 1 (82 = 8 ימין + 2 שמאל). כל הקשה = רטט קטן.<br>
           3. נכנסים לפתק "${esc(DEF.title)}" וגוללים יחד עם הצופה למספר שלו.<br>
           🎤 <b>מיקרופון (לא מומלץ, לא אמין ב-100%):</b> אם מדליקים למטה - הצופה אומר שם ומספר בקול והאפליקציה מנסה לשמוע לבד.<br>
@@ -208,6 +225,7 @@
     if (stack.length <= 1) return false;
     const leaving = stack.pop();
     if (leaving === 'settings') { names = buildNames(cfg.names); shown = names.slice(); renderList(); }
+    if (leaving === 'new') saveFresh();
     show(stack[stack.length - 1], true);
     return true;
   }
@@ -436,10 +454,30 @@
       q('[data-decoy]').textContent = vis;
     }
     q('[data-ph]').style.display = real.value ? 'none' : '';
-    const res = vis ? allNotes().filter((n) => n.t.includes(vis) || (spect && !n.trick && n.body.includes(vis))) : [];
+    const res = vis ? allNotes().filter((n) => n.t.includes(vis) || (spect && n.body.includes(vis))) : [];
     q('[data-results]').innerHTML = res.map((n) => card(n, n.t.includes(vis) ? vis : '')).join('');
     q('[data-none]').style.display = vis && !res.length ? '' : 'none';
   }
+  // ---- פתק חדש: הצופה רושם את השם בעצמו. בחזרה הפתק נשמר ברשימה, והשם נקלט ----
+  function openNew() {
+    q('[data-new-t]').value = '';
+    q('[data-new-b]').value = '';
+    go('new');
+    try { q('[data-new-t]').focus({ preventScroll: true }); } catch (e) { q('[data-new-t]').focus(); }
+  }
+  function saveFresh() {
+    const t = q('[data-new-t]').value.trim();
+    const b = q('[data-new-b]').value.trim();
+    q('[data-new-t]').blur();
+    q('[data-new-b]').blur();
+    if (!t && !b) return;
+    fresh.push({ t: t || b.split('\n')[0], body: b || t, d: 0 });
+    const { name, num } = parseSecret(t || b.split('\n')[0]);
+    if (name) setName(name, 'הצופה רשם');
+    if (num) setNum(num, 'הצופה רשם');
+    renderList();
+  }
+
   function takeSearch() {
     const { name, num } = parseSecret(real.value);
     if (name) setName(name, cfg.searchMode === 'secret' ? 'הקלדה סודית' : 'הצופה הקליד');
@@ -483,6 +521,7 @@
   app.addEventListener('click', (e) => {
     const t = e.target;
     if (t.closest('[data-back]')) return back();
+    if (t.closest('[data-new]')) return openNew();
     if (t.closest('[data-search]')) {
       real.value = '';
       renderSearch();

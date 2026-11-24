@@ -98,3 +98,9 @@ select.inp { appearance: none; -webkit-appearance: none; }
 .has-update .upd-s { color: #ef4a2f; font-weight: 700; }
 .upd-btn { background: #ef4a2f; color: #fff; }
 .upd-btn:active { background: #d63f26; }
+
+/* פתק חדש (הצופה רושם את השם) */
+.newnote { display: flex; flex-direction: column; }
+.new-t { border: 0; outline: 0; font: inherit; font-size: 22px; font-weight: 700; color: #111; padding: 4px 0 12px; background: transparent; direction: rtl; -webkit-user-select: text; user-select: text; }
+.new-t::placeholder { color: #b5b5b8; }
+.new-b { flex: 1; min-height: 50vh; border: 0; outline: 0; resize: none; font: inherit; font-size: 16.5px; line-height: 1.9; color: #1a1a1a; background: transparent; direction: rtl; }

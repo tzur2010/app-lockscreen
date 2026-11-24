@@ -295,29 +295,59 @@
     }
     return out;
   }
-  // מילים שהקוסם אומר ("תזרוק שם של מפורסם", "תבחר מספר") - משפט עם מילה כזו לא נחשב לשם
-  const STOP = ['מספר', 'מפורסם', 'מפורסמת', 'זרוק', 'תזרוק', 'תזרקי', 'תגיד', 'תגידי', 'תבחר', 'תבחרי', 'בחר', 'שם', 'בין', 'בוא', 'בואו', 'אוקיי', 'אוקי',
-    'יפה', 'טוב', 'עכשיו', 'פתק', 'פתקים', 'אפליקציה', 'תראה', 'תראי', 'נראה', 'כן', 'לא', 'רגע', 'סבבה', 'מה', 'אני', 'אתה', 'את', 'יש', 'לי', 'לך',
-    'של', 'זה', 'בסדר', 'מגניב', 'אחלה', 'וואו', 'מאמין', 'תחשוב', 'תחשבי', 'מישהו', 'מישהי', 'בבקשה', 'תודה', 'שלום', 'נגיד', 'סתם', 'אולי'];
-  const STOP_RE = new RegExp('(^|\\s)[והלבש]?(' + STOP.join('|') + ')(?=\\s|$)');
-  const hasStop = (s) => STOP_RE.test(' ' + s + ' ');
+  // מילים שהקוסם (או הצופה) אומרים מסביב לשם: "תזרוק שם של מפורסם", "נגיד", "תבחר מספר".
+  // הן נמחקות מהמשפט, ומה שנשאר (1-3 מילים) הוא השם. כך "תזרוק שם של מפורסם ישי ריבו" -> "ישי ריבו"
+  const STOP = new Set(['מספר', 'מספרים', 'מפורסם', 'מפורסמת', 'מפורסמים', 'זרוק', 'תזרוק', 'תזרקי', 'זורק', 'זרקת', 'תגיד', 'תגידי', 'תגידו', 'אמרת', 'אומר',
+    'תבחר', 'תבחרי', 'בחר', 'בחרת', 'בוחר', 'שם', 'שמות', 'בין', 'בוא', 'בואו', 'אוקיי', 'אוקי', 'יפה', 'יופי', 'טוב', 'מאוד', 'עכשיו', 'אז', 'נו', 'הנה',
+    'פתק', 'פתקים', 'אפליקציה', 'תראה', 'תראי', 'נראה', 'כן', 'לא', 'רגע', 'סבבה', 'מה', 'אני', 'אתה', 'את', 'אתם', 'הוא', 'היא', 'יש', 'אין', 'לי',
+    'לך', 'לו', 'של', 'שלי', 'שלך', 'זה', 'זאת', 'פה', 'כאן', 'עם', 'על', 'אם', 'גם', 'רק', 'כל', 'היה', 'היית', 'בסדר', 'מגניב', 'אחלה', 'וואו', 'מאמין',
+    'תחשוב', 'תחשבי', 'מישהו', 'מישהי', 'בבקשה', 'תודה', 'שלום', 'נגיד', 'סתם', 'אולי', 'אחד', 'אחת', 'כזה', 'כזאת', 'משהו', 'איזה', 'איזשהו', 'בואי',
+    'תן', 'תני', 'ניכנס', 'נכנס', 'נכנסים', 'תסתכל', 'שים', 'לב', 'בדיוק', 'דווקא', 'מאה', 'עשר', 'עשרה', 'ממ', 'אממ', 'אה', 'אהה', 'ו', 'ה', 'ל', 'ב']);
+  Object.keys(UNITS).concat(Object.keys(TENS)).forEach((w) => STOP.add(w));
+  const PREFIX = 'והלבשמכ';
+  function isStop(tok) {
+    if (STOP.has(tok)) return true;
+    // "ושם", "לשם", "המספר", "שתזרוק"... (אות אחת או שתיים לפני המילה)
+    for (let k = 1; k <= 2; k++) {
+      if (tok.length - k < 2 || !PREFIX.includes(tok[k - 1])) break;
+      if (STOP.has(tok.slice(k))) return true;
+    }
+    return false;
+  }
+  function leftoverName(t) {
+    return String(t).replace(/\d+/g, ' ').replace(/[.,!?;:"()״\-–]/g, ' ').split(/\s+/)
+      .map((w) => w.replace(/^'+|'+$/g, (m, off) => (off === 0 ? '' : m))) // גרש בסוף נשאר (ברקוביץ')
+      .filter((w) => w.length >= 2 && !isStop(w));
+  }
 
+  // השמות שנשמעו לאחרונה. כשמגיע מספר, לוקחים את השם האחרון - ומעדיפים שם של 2-3 מילים
+  // (שם של מילה אחת יכול להיות סתם מילה מהשיחה)
+  const cands = [];
   window.onNotesHeard = function (text, isFinal) {
     if (!isFinal) return;
     const t = String(text || '').trim();
     if (!t) return;
     logHeard('🎤 ' + t);
     const nums = numbersIn(t).filter((n) => n >= 1 && n <= 100);
-    const words = t.split(/\s+/).filter(Boolean);
-    // "בין 1 ל-100" (שני מספרים) = הקוסם מסביר -> מתעלמים
-    if (nums.length === 1 && words.length <= 5) {
-      const rest = t.replace(/\d+/g, ' ').replace(/\s+/g, ' ').trim();
-      const restWords = rest.split(' ').filter(Boolean);
-      if (rest && numbersIn(rest).length === 0 && restWords.length <= 3 && !hasStop(rest)) setName(rest, 'מיקרופון');
-      setNum(nums[0], 'מיקרופון');
-      return;
+    const left = leftoverName(t);
+    let here = null;
+    if (left.length >= 1 && left.length <= 3) {
+      here = { name: left.join(' '), multi: left.length >= 2, at: Date.now() };
+      cands.push(here);
+      if (cands.length > 12) cands.shift();
+      // רטט "שם נקלט" מיד (שם של מילה אחת לא דורס שם של 2-3 מילים)
+      if (here.multi || !secret.name || secret.revealed || !secret.name.includes(' ')) setName(here.name, 'מיקרופון');
     }
-    if (nums.length === 0 && words.length <= 4 && !hasStop(t)) setName(t, 'מיקרופון');
+    // "בין 1 ל-100" (שני מספרים) = הקוסם מסביר -> לא מספר
+    if (nums.length !== 1) return;
+    let pick = here;
+    if (!pick) {
+      const recent = cands.filter((c) => Date.now() - c.at < 120000);
+      pick = recent.slice().reverse().find((c) => c.multi) || recent[recent.length - 1] || null;
+    }
+    if (pick) setName(pick.name, 'מיקרופון');
+    setNum(nums[0], 'מיקרופון');
+    cands.length = 0;
   };
   window.onNotesMic = function (msg) {
     const el = q('[data-micstat]');

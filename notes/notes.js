@@ -199,7 +199,7 @@
       </div>
       <div class="tools">
         <span class="t off">${IC.undo}</span><span class="t off">${IC.redo}</span>
-        <span class="t">${IC.ai}<i class="cr">${IC.caret}</i></span>
+        <span class="t">${IC.ai}</span>
         <span class="t aa"><i class="cr">${IC.caret}</i>15</span>
         <span class="t aa"><i class="cr">${IC.caret}</i>Aa</span>
         <span class="t">${IC.tbox}</span><span class="t">${IC.tfmt}</span><span class="t">${IC.check}</span>
@@ -231,10 +231,11 @@
 
     <section class="pg" data-pg="note">
       <div class="nbar"><span class="ib" data-back>${IC.back}</span><span class="ntitle" data-ntitle></span><span class="sp"></span><span class="ib">${IC.book}</span><span class="ib">${IC.plus}</span><span class="ib">${IC.more}</span></div>
-      <div class="scroll nscroll"><div class="nbody" data-nbody></div></div>
+      <div class="scroll nscroll" data-nscroll><div class="nbody" data-nbody></div></div>
+      <div class="sbi" data-sbi></div>
       <div class="tools">
         <span class="t off">${IC.undo}</span><span class="t off">${IC.redo}</span>
-        <span class="t">${IC.ai}<i class="cr">${IC.caret}</i></span>
+        <span class="t">${IC.ai}</span><span class="t cr">${IC.caret}</span>
         <span class="t aa"><i class="cr">${IC.caret}</i>Aa</span>
         <span class="t">${IC.tbox}</span><span class="t">${IC.tfmt}</span><span class="t">${IC.check}</span>
         <span class="t pen">${IC.hand}</span>
@@ -320,7 +321,7 @@
       const i = n.t.indexOf(hl);
       if (i >= 0) title = esc(n.t.slice(0, i)) + '<mark>' + esc(hl) + '</mark>' + esc(n.t.slice(i + hl.length));
     }
-    const lines = n.body.split('\n').filter((l) => l !== '~').slice(0, 14).map(lineHtml).join('');
+    const lines = n.body.split('\n').filter((l) => l !== '~' && l.trim()).slice(0, 14).map(lineHtml).join(''); // בתצוגה המוקטנת אין שורות ריקות (כמו באמיתי)
     return `<div class="card-n" data-open="${n.id}"><div class="thumb"><div class="thumb-in">${lines}</div></div><div class="ct">${title}</div><div class="cd">${shortDate(n.date)}</div></div>`;
   }
 
@@ -622,6 +623,22 @@
   function drawer(open) {
     app.classList.toggle('drawer-open', open);
   }
+  // ---- פס גלילה דק בצד שמאל של הפתק: מופיע בזמן גלילה ונעלם (כמו באמיתי) ----
+  (function () {
+    const sc = q('[data-nscroll]');
+    const bar = q('[data-sbi]');
+    let t = null;
+    sc.addEventListener('scroll', () => {
+      const max = sc.scrollHeight - sc.clientHeight;
+      const h = Math.max(60, sc.clientHeight * sc.clientHeight / sc.scrollHeight);
+      bar.style.height = h + 'px';
+      bar.style.transform = `translateY(${max > 0 ? (sc.scrollTop / max) * (sc.clientHeight - h) : 0}px)`;
+      bar.classList.add('on');
+      clearTimeout(t);
+      t = setTimeout(() => bar.classList.remove('on'), 900);
+    }, { passive: true });
+  })();
+
   // ---- כשגוללים את הרשימה: "כל ההערות" הקטן מופיע בסרגל העליון ----
   q('[data-list-scroll]').addEventListener('scroll', (e) => {
     const h = q('[data-hero]').offsetHeight;

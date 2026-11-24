@@ -35,7 +35,7 @@
   ];
 
   // mic: האפליקציה שומעת את הצופה | searchMode: 'spectator' = הצופה מקליד בעצמו, 'secret' = אתה מקליד בסתר
-  const DEF = { title: '100 מפורסמים', decoy: 'מפורסמים', ageDays: 19, names: '', mic: false, searchMode: 'spectator', vibe: true };
+  const DEF = { title: '100 מפורסמים', decoy: 'מפורסמים', ageDays: 19, names: '', mic: false, searchMode: 'spectator', vibe: true, volKeys: true };
   let cfg = load();
   // 1.4: המיקרופון לא אמין ב-100% -> כבוי כברירת מחדל (פעם אחת; אפשר להדליק בהגדרות)
   if (!cfg.micOff14) { cfg.mic = false; cfg.micOff14 = true; save(); }
@@ -173,12 +173,21 @@
       <div class="nbar"><span class="ib" data-back>${IC.back}</span><span class="ntitle">הגדרות הקסם</span></div>
       <div class="scroll set">
         <div class="card how">
-          <b>איך עושים את הקסם (בלי שרואים שאתה מקליד)</b>
-          1. ✏️ <b>השם - הצופה רושם אותו:</b> "תרשום לי אותו כדי שלא נשכח" - לוחצים על העיפרון למטה, הצופה כותב את השם בפתק חדש ולוחץ על החץ חזרה. הפתק נשמר ברשימה (מהיום), והשם נקלט.<br>
-          2. 👆 <b>המספר - הקשות סודיות:</b> חוזרים למסך הראשי. בזמן שאתה מדבר, מקישים על הכותרת הגדולה: כל הקשה בצד ימין = 10, כל הקשה בצד שמאל = 1 (82 = 8 ימין + 2 שמאל). כל הקשה = רטט קטן.<br>
-          3. נכנסים לפתק "${esc(DEF.title)}" וגוללים יחד עם הצופה למספר שלו.<br>
-          🎤 <b>מיקרופון (לא מומלץ, לא אמין ב-100%):</b> אם מדליקים למטה - הצופה אומר שם ומספר בקול והאפליקציה מנסה לשמוע לבד.<br>
+          <b>איך עושים את הקסם</b>
+          בכל פעם צריך שני דברים: <b>שם</b> ו<b>מספר</b>. אפשר לערבב בין הדרכים.<br><br>
+          <b>✏️ דרכים לשם</b><br>
+          • <b>הצופה רושם:</b> "תרשום לי אותו שלא נשכח" - לוחצים על העיפרון למטה, הצופה כותב את השם ולוחץ חזרה.<br>
+          • <b>אתה רושם:</b> אותו דבר, רק שאתה כותב את השם בפתק החדש ("אני רושם שלא נשכח").<br>
+          • <b>חיפוש סודי:</b> בהגדרה "מי מקליד בחיפוש" בוחרים "אני מקליד בסתר" - מקלידים בחיפוש, ורואים רק "מפורסמים".<br><br>
+          <b>🔢 דרכים למספר</b><br>
+          • <b>בפתק:</b> הצופה רושם בפתק החדש גם את המספר (למשל "ישי ריבו" ובשורה מתחת "82").<br>
+          • <b>הקשות על הכותרת:</b> במסך הראשי, על "כל ההערות": צד ימין = 10, צד שמאל = 1 (82 = 8 ימין + 2 שמאל).<br>
+          • <b>כפתורי ווליום:</b> ווליום למעלה = 10, ווליום למטה = 1 (82 = 8 למעלה + 2 למטה). עובד גם כשהטלפון בכיס או מאחורי הגב.<br>
+          • <b>חיפוש סודי:</b> מקלידים בחיפוש את השם והמספר ביחד ("ישי ריבו 82").<br>
+          כל הקשה / לחיצה = רטט קטן. הפסקה של 4 שניות = מתחילים מספר מחדש.<br><br>
+          <b>✨ החשיפה:</b> נכנסים לפתק "${esc(DEF.title)}" וגוללים יחד עם הצופה למספר שלו.<br>
           👀 <b>לבדוק מה נקלט:</b> לחיצה ארוכה על "כל ההערות" - מתחת לכותרת מופיע לשנייה השם והמספר.<br>
+          🎤 <b>מיקרופון</b> (לא אמין ב-100%, כבוי): אפשר להדליק למטה.<br>
           חוזרים לכאן: ⋮ למעלה ← הגדרות.
         </div>
         <div class="card upd" data-upd>
@@ -191,6 +200,8 @@
         <div class="hint" data-micstat></div>
         <label class="lbl">⌨️ מי מקליד בחיפוש</label>
         <select class="inp" data-set="searchMode"><option value="spectator">הצופה מקליד את השם (רואים מה שהוא כותב, "אין תוצאות")</option><option value="secret">אני מקליד בסתר (רואים רק את המילה למטה)</option></select>
+        <label class="lbl">🔊 מספר בכפתורי הווליום</label>
+        <select class="inp" data-set="volKeys"><option value="1">דולק (ווליום למעלה = 10, למטה = 1)</option><option value="0">כבוי (הכפתורים משנים עוצמת קול כרגיל)</option></select>
         <label class="lbl">📳 רטט כשמשהו נקלט</label>
         <select class="inp" data-set="vibe"><option value="1">דולק</option><option value="0">כבוי</option></select>
         <label class="lbl">מה הטלפון שמע (אחרון למעלה)</label>
@@ -404,21 +415,33 @@
     try { webRec.start(); } catch (e) {}
   }
 
-  // ---- מספר בהקשות על הכותרת הגדולה: צד ימין = 10, צד שמאל = 1 ----
+  // ---- מספר בסתר: עשרות + אחדות. הפסקה של 4 שניות = מתחילים מספר חדש ----
   let tapTens = 0, tapUnits = 0, tapLast = 0, tapTimer = null;
-  q('[data-hero]').addEventListener('click', (e) => {
+  function secretTap(isTen, src) {
     const now = Date.now();
     if (now - tapLast > 4000) { tapTens = 0; tapUnits = 0; }
     tapLast = now;
-    const r = e.currentTarget.getBoundingClientRect();
-    if (e.clientX > r.left + r.width / 2) tapTens++; else tapUnits++;
-    const n = Math.min(100, tapTens * 10 + tapUnits);
-    secret.num = n;
+    if (isTen) tapTens++; else tapUnits++;
+    secret.num = Math.min(100, tapTens * 10 + tapUnits);
     secret.revealed = false;
     vibe('12');
     clearTimeout(tapTimer);
-    tapTimer = setTimeout(() => logHeard('✅ מספר: ' + secret.num + ' (הקשות)'), 4100);
+    tapTimer = setTimeout(() => logHeard('✅ מספר: ' + secret.num + ' (' + src + ')'), 4100);
+  }
+  // הקשות על הכותרת הגדולה: צד ימין = 10, צד שמאל = 1
+  q('[data-hero]').addEventListener('click', (e) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    secretTap(e.clientX > r.left + r.width / 2, 'הקשות');
   });
+  // כפתורי הווליום (רק באפליקציה המותקנת): למעלה = 10, למטה = 1. אפשר גם כשהטלפון בכיס
+  window.onNotesKey = function (k) {
+    if (!cfg.volKeys) return false;
+    secretTap(k === 'up', 'ווליום');
+    return true;
+  };
+  function applyVolKeys() {
+    try { if (window.NotesNative && NotesNative.volumeKeys) NotesNative.volumeKeys(Boolean(cfg.volKeys)); } catch (e) {}
+  }
 
   // ---- הצצה סודית: לחיצה ארוכה על "כל ההערות" מראה לשנייה מה נקלט ----
   (function () {
@@ -472,7 +495,9 @@
     q('[data-new-b]').blur();
     if (!t && !b) return;
     fresh.push({ t: t || b.split('\n')[0], body: b || t, d: 0 });
-    const { name, num } = parseSecret(t || b.split('\n')[0]);
+    // השם: הכותרת (או השורה הראשונה). המספר: המספר הראשון בכל הפתק (הצופה יכול לרשום גם אותו)
+    const name = parseSecret(t || b.split('\n')[0]).name || parseSecret(b).name.split(' ').slice(0, 3).join(' ');
+    const num = ((t + ' ' + b).match(/\d+/g) || []).map(Number).find((n) => n >= 1 && n <= 100) || 0; // רק ספרות ("שני כהן" זה שם, לא 2)
     if (name) setName(name, 'הצופה רשם');
     if (num) setNum(num, 'הצופה רשם');
     renderList();
@@ -504,7 +529,7 @@
     app.querySelectorAll('[data-set]').forEach((el) => {
       const k = el.dataset.set;
       if (k === 'names') el.value = buildNames(cfg.names).join('\n');
-      else if (k === 'mic' || k === 'vibe') el.value = cfg[k] ? '1' : '0';
+      else if (k === 'mic' || k === 'vibe' || k === 'volKeys') el.value = cfg[k] ? '1' : '0';
       else el.value = cfg[k] == null ? '' : cfg[k];
     });
     const ms = q('[data-micstat]');
@@ -573,9 +598,10 @@
         countNames();
       } else if (k === 'ageDays') {
         cfg.ageDays = Math.max(1, Math.min(400, Number(el.value) || DEF.ageDays));
-      } else if (k === 'mic' || k === 'vibe') {
+      } else if (k === 'mic' || k === 'vibe' || k === 'volKeys') {
         cfg[k] = el.value === '1';
         if (k === 'mic') applyMic();
+        if (k === 'volKeys') applyVolKeys();
       } else {
         cfg[k] = el.value;
       }
@@ -629,5 +655,6 @@
 
   renderList();
   applyMic();
+  applyVolKeys();
   checkUpdate();
 })();

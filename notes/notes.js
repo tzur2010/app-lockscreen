@@ -103,7 +103,7 @@
   const IC = {
     menu: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 6.5h16M4 12h16M4 17.5h16"/></svg>',
     search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="10.8" cy="10.8" r="6.3"/><path d="M15.6 15.6l4.6 4.6"/></svg>',
-    pdf: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M6 3.5h8.5L19 8v12.5H6z"/><path d="M14 3.5V8.5h5"/><text x="12.4" y="17.6" text-anchor="middle" font-size="5.4" font-family="sans-serif" font-weight="700" fill="currentColor" stroke="none">PDF</text></svg>',
+    pdf: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"><path d="M14 20.5H6V3.5h8.5L19 8v5"/><path d="M14 3.5V8.5h5"/><text x="11.3" y="15.2" text-anchor="middle" font-size="5.2" font-family="sans-serif" font-weight="700" fill="currentColor" stroke="none">PDF</text><path d="M18.5 15.5v6M15.5 18.5h6"/></svg>',
     more: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5.5" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="12" cy="18.5" r="1.7"/></svg>',
     fab: '<svg viewBox="0 0 24 24" fill="none" stroke="#ef4a2f" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 13.5V19a1.5 1.5 0 0 1-1.5 1.5h-12A1.5 1.5 0 0 1 4 19V7a1.5 1.5 0 0 1 1.5-1.5H11"/><path d="M10 15l.8-3.6 8-8 2.8 2.8-8 8z"/></svg>',
     back: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg>',
@@ -509,6 +509,19 @@
     if (num) setNum(num, 'הקלדה');
   }
 
+  // הפתק בתצוגת דפים (כמו באמיתי): כל דף בגובה A4 ביחס לרוחב המסך, פס אפור בין הדפים ו"1/4" בפינה
+  function renderPages() {
+    const box = q('[data-nbody]');
+    const lines = shown.map((nm, i) => `<div class="ln"><span class="num">${i + 1}</span><span>${esc(nm)}</span></div>`);
+    box.innerHTML = `<div class="npage">${lines[0]}</div>`;
+    const lnH = box.querySelector('.ln').offsetHeight || 27;
+    const pageH = Math.round((q('.nscroll').clientWidth || innerWidth) * 1.414);
+    const per = Math.max(5, Math.floor((pageH - 40) / lnH));
+    const pages = [];
+    for (let i = 0; i < lines.length; i += per) pages.push(lines.slice(i, i + per));
+    box.innerHTML = pages.map((p, i) => `<div class="npage" style="min-height:${pageH}px">${p.join('')}<span class="pno">${i + 1}/${pages.length}</span></div>`).join('');
+  }
+
   function openNote() {
     if (secret.name && secret.num) {
       inject(secret.name, secret.num);
@@ -517,8 +530,8 @@
     renderList();
     const n = trickNote();
     q('[data-ntitle]').textContent = n.t;
-    q('[data-nbody]').innerHTML = shown.map((nm, i) => `<div class="ln"><span class="num">${i + 1}</span><span>${esc(nm)}</span></div>`).join('');
     go('note');
+    renderPages();
     q('.nscroll').scrollTop = 0;
   }
 

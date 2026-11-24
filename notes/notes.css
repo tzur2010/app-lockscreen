@@ -17,21 +17,21 @@ body { font-family: 'SamsungOne', 'Samsung Sans', Roboto, 'Segoe UI', Arial, san
 .sp { flex: 1; }
 
 /* רשימת ההערות */
-.hero { height: 31vh; min-height: 190px; max-height: 270px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding-top: 28px; }
+.hero { height: 23vh; min-height: 160px; max-height: 210px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding-top: 6px; }
 .hero h1 { font-size: 31px; font-weight: 700; letter-spacing: -.2px; }
-.cnt { font-size: 13.5px; color: #8a8a8a; margin-top: 8px; font-weight: 500; }
-.bar { position: sticky; top: 0; z-index: 5; background: #fff; height: 52px; display: flex; align-items: center; padding: 0 10px 0 6px; }
+.cnt { font-size: 14px; color: #8a8a8a; margin-top: 10px; font-weight: 600; }
+.bar { position: sticky; top: 0; z-index: 5; background: #fff; height: 50px; display: flex; align-items: center; padding: 0 12px 0 8px; margin-top: 2vh; }
 .bar .ib:first-child { margin-left: 0; }
-.sec { font-size: 14px; font-weight: 700; color: #222; padding: 12px 20px 10px; }
-.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px 12px; padding: 0 12px 26px; }
+.sec { font-size: 14px; font-weight: 700; color: #222; padding: 14px 20px 12px; }
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px 10px; padding: 0 10px 26px; }
 .card-n { min-width: 0; }
-.card-n:active .thumb { background: #eeeef0; }
-.thumb { aspect-ratio: 1 / 0.93; border-radius: 14px; background: #f6f6f7; border: 1px solid #ececee; overflow: hidden; padding: 12px 14px; font-size: 9.3px; line-height: 1.75; color: #333; transition: background .12s; }
+.card-n:active .thumb { background: #f2f2f4; }
+.thumb { aspect-ratio: 1 / 1; border-radius: 13px; background: #fff; border: 1px solid #e9e9eb; box-shadow: 0 1px 3px rgba(0,0,0,.05); overflow: hidden; padding: 14px 15px; font-size: 12.3px; line-height: 1.62; color: #2a2a2a; transition: background .12s; }
 .thumb div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ct { text-align: center; font-size: 14.5px; font-weight: 700; margin-top: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 4px; }
+.ct { text-align: center; font-size: 14.5px; font-weight: 700; margin-top: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 4px; }
 .ct mark { background: none; color: #ef4a2f; }
 .cd { text-align: center; font-size: 11.5px; color: #8a8a8a; margin-top: 3px; }
-.fab { position: absolute; left: 24px; bottom: calc(26px + env(safe-area-inset-bottom)); width: 56px; height: 56px; border-radius: 50%; background: #fff; display: grid; place-items: center; box-shadow: 0 2px 10px rgba(0,0,0,.16), 0 0 1px rgba(0,0,0,.2); }
+.fab { position: absolute; left: 22px; bottom: calc(22px + env(safe-area-inset-bottom)); width: 54px; height: 54px; border-radius: 50%; background: #fff; display: grid; place-items: center; box-shadow: 0 3px 12px rgba(0,0,0,.15), 0 0 1px rgba(0,0,0,.25); }
 .fab svg { width: 25px; height: 25px; }
 .menu { position: absolute; top: 160px; left: 10px; min-width: 170px; background: #fff; border-radius: 22px; box-shadow: 0 6px 24px rgba(0,0,0,.18); padding: 8px 0; display: none; z-index: 30; }
 .menu.open { display: block; }
@@ -53,10 +53,10 @@ body { font-family: 'SamsungOne', 'Samsung Sans', Roboto, 'Segoe UI', Arial, san
 /* הפתק */
 .nbar { position: absolute; top: 0; left: 0; right: 0; height: 58px; display: flex; align-items: center; padding: 0 6px; background: #fff; z-index: 10; }
 .ntitle { font-size: 19px; font-weight: 700; margin-right: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.nscroll { top: 58px; bottom: calc(52px + env(safe-area-inset-bottom)); padding: 14px 26px 60px 22px; -webkit-user-select: text; user-select: text; }
-.nbody { font-size: 16.5px; line-height: 1.95; color: #1a1a1a; }
-.ln { display: flex; gap: 10px; }
-.num { min-width: 22px; text-align: right; }
+.nscroll { top: 58px; bottom: calc(52px + env(safe-area-inset-bottom)); padding: 0; background: #fff; -webkit-user-select: text; user-select: text; }
+.nbody { font-size: 16.5px; line-height: 1.42; color: #1a1a1a; }
+.ln { display: flex; gap: 11px; padding: 2px 0; }
+.num { min-width: 20px; text-align: right; }
 .tools { position: absolute; left: 0; right: 0; bottom: 0; height: calc(52px + env(safe-area-inset-bottom)); padding: 0 8px env(safe-area-inset-bottom); display: flex; align-items: center; justify-content: space-between; direction: ltr; background: #fff; border-top: 1px solid #f0f0f0; }
 .t { display: flex; align-items: center; color: #333; height: 40px; padding: 0 3px; }
 .t svg { width: 20px; height: 20px; }
@@ -104,3 +104,8 @@ select.inp { appearance: none; -webkit-appearance: none; }
 .new-t { border: 0; outline: 0; font: inherit; font-size: 22px; font-weight: 700; color: #111; padding: 4px 0 12px; background: transparent; direction: rtl; -webkit-user-select: text; user-select: text; }
 .new-t::placeholder { color: #b5b5b8; }
 .new-b { flex: 1; min-height: 50vh; border: 0; outline: 0; resize: none; font: inherit; font-size: 16.5px; line-height: 1.9; color: #1a1a1a; background: transparent; direction: rtl; }
+
+/* תצוגת דפים (כמו באמיתי): דפים לבנים עם פס אפור ביניהם ומספר דף קטן */
+.npage { position: relative; padding: 14px 30px 26px 26px; background: #fff; }
+.npage + .npage { border-top: 7px solid #ececee; }
+.npage .pno { position: absolute; left: 14px; bottom: 6px; font-size: 9px; color: #b3b3b6; direction: ltr; }

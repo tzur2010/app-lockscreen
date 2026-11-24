@@ -28,10 +28,39 @@
     }
   })(DEFAULT_NAMES);
 
+  // הפתקים מהטלפון של הקוסם (מהסרטון), אחד לאחד.
+  // סימונים בגוף הפתק: "~" = דף חדש | "_" בתחילת שורה = נטוי | "3  טקסט" (מספר ושני רווחים) = שורה ממוספרת
+  // "!" בתחילת שורה = HTML (הסימונים הצבעוניים במטלות)
   const DECOYS = [
-    { t: 'רשימת קניות', body: 'חלב\nלחם\nביצים\nעגבניות\nגבינה צהובה\nבמבה לילדים\nשמן זית', d: 2 },
-    { t: 'רעיונות לטיול', body: '1. עין גדי\n2. נחל עמוד\n3. ראש הנקרה\n4. מכתש רמון\nלבדוק מזג אוויר!', d: 6 },
-    { t: 'מתכון עוגה', body: '3 ביצים\nכוס סוכר\nחצי כוס שמן\nכוס קמח תופח\n4 כפות קקאו\n180 מעלות, 35 דק׳', d: 47 }
+    { id: 'u1', t: 'הערת טקסט 21.11', date: new Date(2026, 10, 21, 20, 14), body: 'טעיתי ב-1מ' },
+    { id: 'u2', t: 'קסמי קלפים', date: new Date(2026, 10, 16, 22, 3), body: [
+      '1  קלף עקשן', '2.הקלף המתחלף (קלף כפול)', 'הקלפים שמשנים הכל', 'הקוסם הרשלן', 'ספירה לאחור', '',
+      '2.קריאת מחשבות עם תלפ"י (תלתן, לב, עלה, יהלום)', '1  קריאת מחשבות עם פורסים', '_להלנן פורסים:', '',
+      '2  פורסים על הקלף הראשון בחבילה תמיד:', 'לתת למתנדב לחתוך את החבילה איפה שהוא רוצה ואז להסיח את דעתו ולהראות לו כאילו הוא חתך על הקלף הכי למעלה', '', '',
+      'להוריד קלפים שהחבילה על הצד וברגע שמתחילים לוקחים ביחד איתך את הקלף הכי עליון מתי שהוא אומר סטופ אתה מביא לו אותו',
+      '~',
+      'להוריד קלפים מלמעלה עד שהוא אומר סטופ ולהראות לו את ההכי למטה (פורס לקלף הכי תחתון בערמה)', '',
+      'להחזיק את הערמה על הצד לרפרף ושהוא אומר סטופ לעשות תתנועה גדולה ותוך כדי להגניב את הקלף למעלה', '',
+      'לעשות קאט ואז לשמור פניקי להגיד לו לומר לך סטופ ולא משנה מה להרים איפה שהפנקי', '',
+      'להגיד לו שאתה הולך להוריד קלפים ושהוא רוצה שיגיד סטופ ואז בקלף השלישי לקטוע את עצמך בדיבור ופשוט לפרוס את הקלפים לומר שיגע במה שהוא רוצה ואז לקפל הכל שזה יראה כאילו זה הקלף הראשון', '', '',
+      '5  החלפת קלפים ביד של המתנדב', '2  קריאת מחשבות לחמישה אנשים ביחד עם קיק',
+      '~',
+      '  קארדאים', '3  שוטרים וגנבים', '4  קלף תאום', '5  למצוא את כל רביעית קלפים שתבחר', '6  שחור אדום לפי אינטואיציה', '7  קלף מפתח קסם פשוט לכל דבר',
+      '8  קסם שהחבילה מאייתת את בקלף', '9  חזרה אחורה בזמן', '10  הגנבת קלף קסם מיומנות', '11  קסם הסיפור', '12  להפוך את הקלפים למטה ואז זה נראה שהחבילה התהפכה',
+      '_ערבובי דמה בקלפים:', '', '', '1  קאט משולש רגיל', '2  אליקס 190', '_דברים מרשימים:',
+      '~',
+      '1  מניפה',
+      '~', ''
+    ].join('\n') },
+    { id: 'u3', t: 'הערת טקסט 14.11', date: new Date(2026, 10, 14, 21, 40), body: 'שלוש תלתן\nארבע לב\nמלך יהלום\nגוקר\nשלוש לב' },
+    { id: 'u4', t: 'מטלות', date: new Date(2026, 10, 1, 18, 25), body: [
+      '!<div class="mt">דחוף ממש = <i class="hl hl-r">...........</i></div>',
+      '!<div class="mt">בנוני = <i class="hl hl-y">...........</i></div>',
+      '!<div class="mt">בזמני הפנוי = <i class="hl hl-g">...........</i></div>',
+      '!<div class="mt"><b class="mk mk-r">לבנות את הדמקה</b></div>',
+      '!<div class="mt"><b class="mk mk-g">ללמוד קסמים</b></div>',
+      '~', ''
+    ].join('\n') }
   ];
 
   // mic: האפליקציה שומעת את הצופה | searchMode: 'spectator' = הצופה מקליד בעצמו, 'secret' = אתה מקליד בסתר
@@ -92,12 +121,25 @@
   }
 
   function trickNote() {
-    return { t: cfg.title || DEF.title, body: shown.map((n, i) => `${i + 1} ${n}`).join('\n'), d: Number(cfg.ageDays) || DEF.ageDays, trick: true };
+    const date = dayDate(Number(cfg.ageDays) || DEF.ageDays);
+    date.setHours(21, 47, 0, 0);
+    return { id: 'trick', t: cfg.title || DEF.title, body: shown.map((n, i) => `${i + 1}  ${n}`).join('\n'), date, trick: true };
   }
   // פתקים שהצופה כתב עכשיו (רק עד שסוגרים את האפליקציה - לא נשמרים)
   const fresh = [];
   function allNotes() {
-    return fresh.concat(DECOYS, [trickNote()]).sort((a, b) => a.d - b.d);
+    return fresh.concat(DECOYS, [trickNote()]).sort((a, b) => b.date - a.date);
+  }
+  const noteById = (id) => allNotes().find((n) => n.id === id);
+
+  // שורה אחת בגוף הפתק -> HTML (אותו דבר בתצוגה המוקטנת ובפתק עצמו)
+  function lineHtml(l) {
+    if (l.startsWith('!')) return l.slice(1);
+    if (!l.trim()) return '<div class="pl pl-empty">&nbsp;</div>';
+    if (l.startsWith('_')) return `<div class="pl pl-i">${esc(l.slice(1))}</div>`;
+    const m = l.match(/^(\d*)\s{2}(.*)$/);
+    if (m) return `<div class="ln"><span class="num">${m[1]}</span><span>${esc(m[2])}</span></div>`;
+    return `<div class="pl">${esc(l)}</div>`;
   }
 
   const IC = {
@@ -116,6 +158,13 @@
     tbox: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8.5 8.5h7M12 8.5v7.5" stroke-linecap="round"/></svg>',
     tfmt: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 5h12M12 5v11M5 20.5h14"/></svg>',
     check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 12.3l2.8 2.7L16.3 9" stroke-linecap="round"/></svg>',
+    gear: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="3"/><path d="M12 2.8l1.6 2.3 2.7-.7.6 2.7 2.6 1-1 2.6 1.6 2.3-2.3 1.6.3 2.8-2.8.2-1.1 2.6-2.5-1.3-2.5 1.3-1.1-2.6-2.8-.2.3-2.8L4.2 14l1.6-2.3-1-2.6 2.6-1 .6-2.7 2.7.7z" stroke-linejoin="round"/></svg>',
+    notesIc: '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="3" width="13" height="18" rx="2"/><rect x="4" y="6" width="4" height="1.6" rx=".8" fill="#fff" stroke="currentColor" stroke-width=".8"/><rect x="4" y="11.2" width="4" height="1.6" rx=".8" fill="#fff" stroke="currentColor" stroke-width=".8"/><rect x="4" y="16.4" width="4" height="1.6" rx=".8" fill="#fff" stroke="currentColor" stroke-width=".8"/></svg>',
+    shared: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M6 3.5h9l3 3V12M6 3.5v17h6"/><circle cx="15" cy="14.5" r="1.8"/><circle cx="19.2" cy="14.8" r="1.5"/><path d="M11.8 20.5c.4-2 1.6-3 3.2-3s2.8 1 3.2 3M17.5 17.6c1.8-.3 3 .7 3.3 2.9"/></svg>',
+    trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 6.5h15M9.5 6.5V4.5h5v2M6.5 6.5l1 13.5h9l1-13.5M10.2 10v6.5M13.8 10v6.5"/></svg>',
+    folder: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M3.5 6.5a1.5 1.5 0 0 1 1.5-1.5h4.5l2 2.2H19a1.5 1.5 0 0 1 1.5 1.5V18a1.5 1.5 0 0 1-1.5 1.5H5A1.5 1.5 0 0 1 3.5 18z"/></svg>',
+    mic: '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+    chevUp: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/></svg>',
     hand: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 19l1-4 9-9 3 3-9 9z"/><path d="M14 20c2 0 4-.8 5.5-2"/></svg>'
   };
 
@@ -124,22 +173,34 @@
     <section class="pg pg-on" data-pg="list">
       <div class="scroll" data-list-scroll>
         <div class="hero" data-hero><h1 data-peek>כל ההערות</h1><div class="cnt" data-count></div></div>
-        <div class="bar"><span class="ib">${IC.menu}</span><span class="sp"></span><span class="ib">${IC.pdf}</span><span class="ib" data-search>${IC.search}</span><span class="ib" data-more>${IC.more}</span></div>
+        <div class="bar" data-bar><span class="ib" data-drawer>${IC.menu}</span><span class="bar-t">כל ההערות</span><span class="sp"></span><span class="ib">${IC.pdf}</span><span class="ib" data-search>${IC.search}</span><span class="ib" data-more>${IC.more}</span></div>
         <div data-grid></div>
       </div>
       <div class="fab" data-new>${IC.fab}</div>
       <div class="menu" data-menu><div data-act="edit">עריכה</div><div data-act="view">תצוגה</div><div data-act="settings">הגדרות</div></div>
+      <div class="dim" data-dim></div>
+      <div class="drawer" data-drawer-panel>
+        <div class="dr-top"><span class="ib dr-gear" data-act="settings">${IC.gear}</span></div>
+        <div class="dr-item on">${IC.notesIc}<span>כל ההערות</span><i data-dcount></i></div>
+        <div class="dr-item">${IC.shared}<span>פתקים משותפים <em>BETA</em></span><i></i></div>
+        <div class="dr-item">${IC.trash}<span>סל מיחזור</span><i>1</i></div>
+        <div class="dr-sep"></div>
+        <div class="dr-item">${IC.folder}<span>תיקיות</span><i>4</i></div>
+        <div class="dr-btn">נהל תיקיות</div>
+      </div>
     </section>
 
     <section class="pg" data-pg="new">
-      <div class="nbar"><span class="ib" data-back>${IC.back}</span><span class="sp"></span><span class="ib">${IC.book}</span><span class="ib">${IC.more}</span></div>
-      <div class="scroll nscroll newnote">
+      <div class="nbar"><span class="ib" data-back>${IC.back}</span>
         <input class="new-t" data-new-t type="text" placeholder="כותרת" autocomplete="off" autocorrect="off" spellcheck="false" dir="rtl">
-        <textarea class="new-b" data-new-b placeholder="" dir="rtl"></textarea>
+        <span class="ib">${IC.book}</span><span class="ib">${IC.plus}</span><span class="ib">${IC.more}</span></div>
+      <div class="scroll nscroll newnote">
+        <div class="npage new-page"><textarea class="new-b" data-new-b placeholder="" dir="rtl"></textarea></div>
       </div>
       <div class="tools">
         <span class="t off">${IC.undo}</span><span class="t off">${IC.redo}</span>
         <span class="t">${IC.ai}<i class="cr">${IC.caret}</i></span>
+        <span class="t aa"><i class="cr">${IC.caret}</i>15</span>
         <span class="t aa"><i class="cr">${IC.caret}</i>Aa</span>
         <span class="t">${IC.tbox}</span><span class="t">${IC.tfmt}</span><span class="t">${IC.check}</span>
         <span class="t pen">${IC.hand}</span>
@@ -147,14 +208,25 @@
     </section>
 
     <section class="pg" data-pg="search">
-      <div class="sbar">
-        <span class="ib" data-back>${IC.back}</span>
-        <label class="field">
-          <span class="field-txt"><span data-decoy></span><i class="caret"></i><span class="ph" data-ph>חיפוש</span></span>
-          <input class="real" data-real type="text" inputmode="text" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="search" aria-label="חיפוש" placeholder="חיפוש">
-        </label>
+      <div class="sbar"><span class="ib" data-back>${IC.back}</span></div>
+      <div class="scroll sres">
+        <div data-sidle>
+          <div class="flt-h">מסננים<span class="flt-up">${IC.chevUp}</span></div>
+          <div class="flt">
+            <div class="flt-t">שעה</div>
+            <div class="chips"><span>אתמול</span><span>7 ימים אחרונים</span><span>30 ימים אחרונים</span></div>
+            <div class="flt-t">סוג</div>
+            <div class="chips"><span>רשמקול</span><span>כותרת</span></div>
+          </div>
+          <div class="no-recent">אין חיפושים אחרונים</div>
+        </div>
+        <div class="grid" data-results></div><div class="none" data-none>אין תוצאות</div>
       </div>
-      <div class="scroll sres"><div class="grid" data-results></div><div class="none" data-none>אין תוצאות</div></div>
+      <label class="field">
+        <span class="field-txt"><span data-decoy></span><i class="caret"></i><span class="ph" data-ph>חיפוש</span></span>
+        <input class="real" data-real type="text" inputmode="text" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="search" aria-label="חיפוש" placeholder="חיפוש">
+        <span class="field-ic">${IC.mic}</span><span class="field-ic">${IC.more}</span>
+      </label>
     </section>
 
     <section class="pg" data-pg="note">
@@ -233,6 +305,7 @@
   }
   function go(id) { stack.push(id); show(id); }
   function back() {
+    if (app.classList.contains('drawer-open')) { drawer(false); return true; }
     if (stack.length <= 1) return false;
     const leaving = stack.pop();
     if (leaving === 'settings') { names = buildNames(cfg.names); shown = names.slice(); renderList(); }
@@ -247,17 +320,18 @@
       const i = n.t.indexOf(hl);
       if (i >= 0) title = esc(n.t.slice(0, i)) + '<mark>' + esc(hl) + '</mark>' + esc(n.t.slice(i + hl.length));
     }
-    const lines = n.body.split('\n').slice(0, 12).map((l) => `<div>${esc(l) || '&nbsp;'}</div>`).join('');
-    return `<div class="card-n" ${n.trick ? 'data-open' : 'data-other'}><div class="thumb">${lines}</div><div class="ct">${title}</div><div class="cd">${shortDate(dayDate(n.d))}</div></div>`;
+    const lines = n.body.split('\n').filter((l) => l !== '~').slice(0, 14).map(lineHtml).join('');
+    return `<div class="card-n" data-open="${n.id}"><div class="thumb"><div class="thumb-in">${lines}</div></div><div class="ct">${title}</div><div class="cd">${shortDate(n.date)}</div></div>`;
   }
 
   function renderList() {
     const notes = allNotes();
     q('[data-count]').textContent = `${notes.length} הערות`;
+    q('[data-dcount]').textContent = notes.length;
     let html = '';
     let cur = null;
     notes.forEach((n) => {
-      const g = groupName(dayDate(n.d));
+      const g = groupName(n.date);
       if (g !== cur) {
         if (cur !== null) html += '</div>';
         html += `<div class="sec">${esc(g)}</div><div class="grid">`;
@@ -477,6 +551,7 @@
       q('[data-decoy]').textContent = vis;
     }
     q('[data-ph]').style.display = real.value ? 'none' : '';
+    q('[data-sidle]').style.display = vis ? 'none' : ''; // לפני שמקלידים: מסננים + "אין חיפושים אחרונים"
     const res = vis ? allNotes().filter((n) => n.t.includes(vis) || (spect && n.body.includes(vis))) : [];
     q('[data-results]').innerHTML = res.map((n) => card(n, n.t.includes(vis) ? vis : '')).join('');
     q('[data-none]').style.display = vis && !res.length ? '' : 'none';
@@ -494,7 +569,7 @@
     q('[data-new-t]').blur();
     q('[data-new-b]').blur();
     if (!t && !b) return;
-    fresh.push({ t: t || b.split('\n')[0], body: b || t, d: 0 });
+    fresh.push({ id: 'f' + fresh.length, t: t || b.split('\n')[0], body: b || t, date: new Date() });
     // השם: הכותרת (או השורה הראשונה). המספר: המספר הראשון בכל הפתק (הצופה יכול לרשום גם אותו)
     const name = parseSecret(t || b.split('\n')[0]).name || parseSecret(b).name.split(' ').slice(0, 3).join(' ');
     const num = ((t + ' ' + b).match(/\d+/g) || []).map(Number).find((n) => n >= 1 && n <= 100) || 0; // רק ספרות ("שני כהן" זה שם, לא 2)
@@ -510,30 +585,48 @@
   }
 
   // הפתק בתצוגת דפים (כמו באמיתי): כל דף בגובה A4 ביחס לרוחב המסך, פס אפור בין הדפים ו"1/4" בפינה
-  function renderPages() {
+  // פתק עם "~" -> הדפים בדיוק כמו בפתק המקורי. בלי "~" (פתק הקסם) -> כמה שורות שנכנסות בדף
+  function renderPages(n) {
     const box = q('[data-nbody]');
-    const lines = shown.map((nm, i) => `<div class="ln"><span class="num">${i + 1}</span><span>${esc(nm)}</span></div>`);
-    box.innerHTML = `<div class="npage">${lines[0]}</div>`;
-    const lnH = box.querySelector('.ln').offsetHeight || 27;
-    const pageH = Math.round((q('.nscroll').clientWidth || innerWidth) * 1.414);
-    const per = Math.max(5, Math.floor((pageH - 40) / lnH));
-    const pages = [];
-    for (let i = 0; i < lines.length; i += per) pages.push(lines.slice(i, i + per));
+    const pageH = Math.round((q('[data-pg="note"] .nscroll').clientWidth || innerWidth) * 1.414);
+    let pages;
+    if (n.body.includes('\n~')) {
+      pages = [[]];
+      n.body.split('\n').forEach((l) => { if (l === '~') pages.push([]); else pages[pages.length - 1].push(lineHtml(l)); });
+    } else {
+      const lines = n.body.split('\n').map(lineHtml);
+      box.innerHTML = `<div class="npage">${lines[0]}</div>`;
+      const lnH = box.firstChild.firstChild ? box.firstChild.firstChild.offsetHeight || 27 : 27;
+      const per = Math.max(5, Math.floor((pageH - 40) / lnH));
+      pages = [];
+      for (let i = 0; i < lines.length; i += per) pages.push(lines.slice(i, i + per));
+    }
     box.innerHTML = pages.map((p, i) => `<div class="npage" style="min-height:${pageH}px">${p.join('')}<span class="pno">${i + 1}/${pages.length}</span></div>`).join('');
   }
 
-  function openNote() {
-    if (secret.name && secret.num) {
+  function openNote(id) {
+    if (id === 'trick' && secret.name && secret.num) {
       inject(secret.name, secret.num);
       secret.revealed = true;
     }
     renderList();
-    const n = trickNote();
+    const n = noteById(id || 'trick');
+    if (!n) return;
     q('[data-ntitle]').textContent = n.t;
     go('note');
-    renderPages();
-    q('.nscroll').scrollTop = 0;
+    renderPages(n);
+    q('[data-pg="note"] .nscroll').scrollTop = 0;
   }
+
+  // ---- תפריט ☰ (כמו באמיתי: חלון צף מלמעלה, הרקע מטושטש) ----
+  function drawer(open) {
+    app.classList.toggle('drawer-open', open);
+  }
+  // ---- כשגוללים את הרשימה: "כל ההערות" הקטן מופיע בסרגל העליון ----
+  q('[data-list-scroll]').addEventListener('scroll', (e) => {
+    const h = q('[data-hero]').offsetHeight;
+    q('[data-bar]').classList.toggle('collapsed', e.target.scrollTop > h - 20);
+  }, { passive: true });
 
   // ==========================================================================
   // הגדרות
@@ -559,6 +652,9 @@
   app.addEventListener('click', (e) => {
     const t = e.target;
     if (t.closest('[data-back]')) return back();
+    if (t.closest('[data-drawer]')) return drawer(true);
+    if (t.closest('[data-dim]')) return drawer(false);
+    if (app.classList.contains('drawer-open') && !t.closest('[data-act]')) { if (!t.closest('[data-drawer-panel]')) drawer(false); return; }
     if (t.closest('[data-new]')) return openNew();
     if (t.closest('[data-search]')) {
       real.value = '';
@@ -571,6 +667,7 @@
     const act = t.closest('[data-act]');
     if (act) {
       q('[data-menu]').classList.remove('open');
+      drawer(false);
       if (act.dataset.act === 'settings') openSettings();
       return;
     }
@@ -581,9 +678,10 @@
       countNames();
       return;
     }
-    if (t.closest('[data-open]')) {
+    const op = t.closest('[data-open]');
+    if (op) {
       if (stack[stack.length - 1] === 'search') takeSearch();
-      return openNote();
+      return openNote(op.dataset.open);
     }
     q('[data-menu]').classList.remove('open');
   });
@@ -593,7 +691,7 @@
     if (e.key !== 'Enter') return;
     e.preventDefault();
     takeSearch();
-    if (cfg.searchMode === 'secret') openNote();
+    if (cfg.searchMode === 'secret') openNote('trick');
     else real.blur(); // הצופה לחץ "חפש": נשארים ב"אין תוצאות"
   });
   real.addEventListener('focus', () => app.classList.add('typing'));

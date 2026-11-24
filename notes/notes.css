@@ -27,7 +27,8 @@ body { font-family: 'SamsungOne', 'Samsung Sans', Roboto, 'Segoe UI', Arial, san
 .card-n { min-width: 0; }
 .card-n:active .thumb { background: #f2f2f4; }
 .thumb { aspect-ratio: 1 / 1; border-radius: 13px; background: #fff; border: 1px solid #e9e9eb; box-shadow: 0 1px 3px rgba(0,0,0,.05); overflow: hidden; padding: 14px 15px; font-size: 12.3px; line-height: 1.62; color: #2a2a2a; transition: background .12s; }
-.thumb div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.thumb-in { font-size: 16.5px; line-height: 1.42; transform: scale(.74); transform-origin: top right; width: 135%; }
+.thumb .pl, .thumb .ln { white-space: normal; }
 .ct { text-align: center; font-size: 14.5px; font-weight: 700; margin-top: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 4px; }
 .ct mark { background: none; color: #ef4a2f; }
 .cd { text-align: center; font-size: 11.5px; color: #8a8a8a; margin-top: 3px; }
@@ -39,23 +40,33 @@ body { font-family: 'SamsungOne', 'Samsung Sans', Roboto, 'Segoe UI', Arial, san
 .menu div:active { background: #f0f0f2; }
 
 /* חיפוש: השדה האמיתי שקוף ומונח מעל השדה המזויף */
-.sbar { position: absolute; top: 0; left: 0; right: 0; height: 64px; display: flex; align-items: center; gap: 4px; padding: 0 6px 0 14px; background: #fff; z-index: 10; }
-.field { position: relative; flex: 1; min-width: 0; height: 44px; border-radius: 22px; background: #f1f1f3; display: flex; align-items: center; padding: 0 18px; overflow: hidden; }
-.field-txt { flex: 1; min-width: 0; display: flex; align-items: center; font-size: 16.5px; white-space: nowrap; overflow: hidden; }
+.sbar { position: absolute; top: 0; left: 0; right: 0; height: 58px; display: flex; align-items: center; padding: 0 6px; background: #fff; z-index: 10; }
+.field { position: absolute; left: 14px; right: 14px; bottom: calc(10px + env(safe-area-inset-bottom)); height: 50px; border-radius: 25px; background: #fff; box-shadow: 0 1px 8px rgba(0,0,0,.12); display: flex; align-items: center; padding: 0 20px 0 10px; gap: 4px; overflow: hidden; z-index: 12; }
+.field-ic { width: 34px; height: 34px; display: grid; place-items: center; color: #222; flex: 0 0 auto; }
+.field-ic svg { width: 21px; height: 21px; }
+.field-txt { flex: 1; min-width: 0; display: flex; align-items: center; font-size: 16.5px; font-weight: 600; white-space: nowrap; overflow: hidden; }
 .ph { color: #8d8d90; }
 .caret { display: none; width: 2px; height: 21px; background: #ef4a2f; margin: 0 1px; animation: blink 1s steps(1) infinite; }
 .typing .caret { display: inline-block; }
 @keyframes blink { 50% { opacity: 0; } }
 .real { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; border: 0; outline: 0; background: transparent; color: transparent; caret-color: transparent; font-size: 16px; direction: rtl; }
-.sres { top: 64px; padding-top: 14px; }
-.none { text-align: center; color: #8a8a8a; font-size: 15px; padding-top: 30vh; }
+.sres { top: 58px; bottom: calc(70px + env(safe-area-inset-bottom)); padding-top: 4px; }
+.flt-h { display: flex; align-items: center; justify-content: space-between; font-size: 14px; color: #555; font-weight: 600; padding: 6px 20px 12px 18px; }
+.flt-up svg { width: 18px; height: 18px; color: #333; display: block; }
+.flt { background: #f2f2f4; border-radius: 22px; margin: 0 8px; padding: 16px 16px 18px; }
+.flt-t { font-size: 14px; font-weight: 700; color: #555; margin: 2px 4px 12px; }
+.flt-t + .chips + .flt-t { margin-top: 20px; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chips span { border: 1px solid #c9c9cc; border-radius: 18px; padding: 7px 13px; font-size: 13.5px; color: #333; }
+.no-recent { text-align: center; color: #555; font-size: 17px; padding: 38px 0 10px; }
+.none { text-align: center; color: #8a8a8a; font-size: 15px; padding-top: 25vh; }
 
 /* הפתק */
 .nbar { position: absolute; top: 0; left: 0; right: 0; height: 58px; display: flex; align-items: center; padding: 0 6px; background: #fff; z-index: 10; }
 .ntitle { font-size: 19px; font-weight: 700; margin-right: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .nscroll { top: 58px; bottom: calc(52px + env(safe-area-inset-bottom)); padding: 0; background: #fff; -webkit-user-select: text; user-select: text; }
-.nbody { font-size: 16.5px; line-height: 1.42; color: #1a1a1a; }
-.ln { display: flex; gap: 11px; padding: 2px 0; }
+.nbody { font-size: 15.6px; line-height: 1.42; color: #1a1a1a; }
+.ln { display: flex; gap: 9px; padding: 2px 0; }
 .num { min-width: 20px; text-align: right; }
 .tools { position: absolute; left: 0; right: 0; bottom: 0; height: calc(52px + env(safe-area-inset-bottom)); padding: 0 8px env(safe-area-inset-bottom); display: flex; align-items: center; justify-content: space-between; direction: ltr; background: #fff; border-top: 1px solid #f0f0f0; }
 .t { display: flex; align-items: center; color: #333; height: 40px; padding: 0 3px; }
@@ -100,12 +111,48 @@ select.inp { appearance: none; -webkit-appearance: none; }
 .upd-btn:active { background: #d63f26; }
 
 /* פתק חדש (הצופה רושם את השם) */
-.newnote { display: flex; flex-direction: column; }
-.new-t { border: 0; outline: 0; font: inherit; font-size: 22px; font-weight: 700; color: #111; padding: 4px 0 12px; background: transparent; direction: rtl; -webkit-user-select: text; user-select: text; }
+.newnote { background: #fff; }
+.new-page { min-height: 100%; }
+.new-t { flex: 1; min-width: 0; border: 0; outline: 0; font: inherit; font-size: 19px; font-weight: 700; color: #111; padding: 0 2px; background: transparent; direction: rtl; -webkit-user-select: text; user-select: text; }
 .new-t::placeholder { color: #b5b5b8; }
-.new-b { flex: 1; min-height: 50vh; border: 0; outline: 0; resize: none; font: inherit; font-size: 16.5px; line-height: 1.9; color: #1a1a1a; background: transparent; direction: rtl; }
+.new-b { width: 100%; min-height: 60vh; border: 0; outline: 0; resize: none; font: inherit; font-size: 16.5px; line-height: 1.6; color: #1a1a1a; background: transparent; direction: rtl; }
 
 /* תצוגת דפים (כמו באמיתי): דפים לבנים עם פס אפור ביניהם ומספר דף קטן */
-.npage { position: relative; padding: 14px 30px 26px 26px; background: #fff; }
+.npage { position: relative; padding: 14px 20px 26px 16px; background: #fff; }
 .npage + .npage { border-top: 7px solid #ececee; }
 .npage .pno { position: absolute; left: 14px; bottom: 6px; font-size: 9px; color: #b3b3b6; direction: ltr; }
+
+/* שורות בפתק */
+.pl { white-space: pre-wrap; padding: 2px 0; }
+.pl-i { font-style: italic; }
+.pl-empty { min-height: 1.42em; }
+/* מטלות: הסימונים הצבעוניים */
+.mt { padding: 7px 0; white-space: nowrap; }
+.hl { font-style: normal; display: inline-block; min-width: 54px; padding: 0 4px; letter-spacing: 1px; color: #333; }
+.hl-r { background: #f23b35; color: #7a1a17; }
+.hl-y { background: #fff200; }
+.hl-g { background: #12e3a5; color: #0a5c43; }
+.mk { font-weight: 400; padding: 2px 4px; }
+.mk-r { background: linear-gradient(#f2494a, #e8383b); color: #4a0d0d; }
+.mk-g { background: #12e3a5; color: #08392b; }
+
+/* סרגל עליון מקופל (גוללים למטה): "כל ההערות" קטן ליד ☰ */
+.bar-t { font-size: 20px; font-weight: 700; margin-right: 6px; opacity: 0; transition: opacity .15s; }
+.bar.collapsed .bar-t { opacity: 1; }
+
+/* תפריט ☰ */
+.dim { position: absolute; inset: 0; background: rgba(240,240,242,.55); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); opacity: 0; pointer-events: none; transition: opacity .2s; z-index: 40; }
+.drawer { position: absolute; top: 12px; right: 10px; width: 78%; max-width: 360px; bottom: 12px; background: rgba(248,248,249,.97); border-radius: 30px; box-shadow: 0 6px 30px rgba(0,0,0,.12); padding: 14px 12px; z-index: 41; transform: translateX(40px) scale(.98); opacity: 0; pointer-events: none; transition: transform .22s cubic-bezier(.2,.8,.2,1), opacity .18s; }
+.drawer-open .dim { opacity: 1; pointer-events: auto; }
+.drawer-open .drawer { transform: none; opacity: 1; pointer-events: auto; }
+.dr-top { display: flex; justify-content: flex-end; height: 44px; margin-bottom: 8px; }
+.dr-gear { color: #555; }
+.dr-gear svg { width: 22px; height: 22px; }
+.dr-item { display: flex; align-items: center; gap: 14px; height: 54px; padding: 0 16px; border-radius: 14px; font-size: 16.5px; color: #111; }
+.dr-item.on { background: #e4e4e7; font-weight: 700; }
+.dr-item svg { width: 23px; height: 23px; flex: 0 0 auto; color: #222; }
+.dr-item span { flex: 1; }
+.dr-item em { font-style: normal; font-size: 10px; font-weight: 700; color: #fff; background: #9a9a9e; border-radius: 4px; padding: 1px 5px; margin-right: 6px; vertical-align: 2px; }
+.dr-item i { font-style: normal; font-size: 13.5px; color: #8a8a8e; font-weight: 400; }
+.dr-sep { border-top: 1.5px dotted #c8c8cc; margin: 10px 16px; }
+.dr-btn { margin: 34px auto 0; width: 66%; height: 44px; border-radius: 22px; background: #e6e6e9; display: grid; place-items: center; font-size: 15px; font-weight: 700; color: #222; }

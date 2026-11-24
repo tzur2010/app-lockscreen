@@ -2857,6 +2857,7 @@ function voiceTrickHeard(text, isFinal) {
 // איזה מיקרופון מקשיב (נכתב ביומן)
 window.onVoiceMicMode = function (mode) {
   if (String(mode).startsWith('err:')) { heardLog('⚠️', String(mode).slice(4)); return; }
+  if (String(mode).startsWith('try:')) { heardLog('🔄', 'ניסיתי ' + String(mode).slice(4)); return; }
   if (String(mode).startsWith('ok:')) { heardLog('✅', 'זיהוי הדיבור עובד: ' + String(mode).slice(3)); return; }
   heardLog('🎤', mode === 'phone' ? 'מקשיב דרך המיקרופון של הטלפון' : 'חזר למיקרופון הרגיל');
 };
@@ -5632,7 +5633,7 @@ function initDeviceLicenseGate() {
 // החלון מוצג רק כשמסך ההגדרות פתוח (בפתיחת האפליקציה / בתפריט הסודי),
 // ולעולם לא מעל מסך הנעילה הפעיל מול קהל.
 // ============================================================================
-const APP_VERSION = '12.0';
+const APP_VERSION = '12.1';
 const DEFAULT_APK_URL = 'https://github.com/tzur2010/app-lockscreen/raw/main/Lockscreen.apk';
 const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 const UPDATE_DISMISS_KEY = 'magic_update_dismissed_version';

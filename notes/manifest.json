@@ -1,6 +1,6 @@
 {
-  "name": "פתקים",
-  "short_name": "פתקים",
+  "name": "Notes",
+  "short_name": "Notes",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#ffffff",

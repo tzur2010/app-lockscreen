@@ -34,7 +34,8 @@
     { t: 'מתכון עוגה', body: '3 ביצים\nכוס סוכר\nחצי כוס שמן\nכוס קמח תופח\n4 כפות קקאו\n180 מעלות, 35 דק׳', d: 47 }
   ];
 
-  const DEF = { title: '100 מפורסמים', decoy: 'מפורסמים', ageDays: 19, names: '' };
+  // mic: האפליקציה שומעת את הצופה | searchMode: 'spectator' = הצופה מקליד בעצמו, 'secret' = אתה מקליד בסתר
+  const DEF = { title: '100 מפורסמים', decoy: 'מפורסמים', ageDays: 19, names: '', mic: true, searchMode: 'spectator', vibe: true };
   let cfg = load();
   function load() {
     try { return Object.assign({}, DEF, JSON.parse(localStorage.getItem(STORE) || '{}')); } catch (e) { return Object.assign({}, DEF); }
@@ -118,7 +119,7 @@
   app.innerHTML = `
     <section class="pg pg-on" data-pg="list">
       <div class="scroll" data-list-scroll>
-        <div class="hero"><h1>כל ההערות</h1><div class="cnt" data-count></div></div>
+        <div class="hero" data-hero><h1 data-peek>כל ההערות</h1><div class="cnt" data-count></div></div>
         <div class="bar"><span class="ib">${IC.menu}</span><span class="sp"></span><span class="ib">${IC.pdf}</span><span class="ib" data-search>${IC.search}</span><span class="ib" data-more>${IC.more}</span></div>
         <div data-grid></div>
       </div>
@@ -131,7 +132,7 @@
         <span class="ib" data-back>${IC.back}</span>
         <label class="field">
           <span class="field-txt"><span data-decoy></span><i class="caret"></i><span class="ph" data-ph>חיפוש</span></span>
-          <input class="real" data-real type="text" inputmode="text" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="search" aria-label="חיפוש">
+          <input class="real" data-real type="text" inputmode="text" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="search" aria-label="חיפוש" placeholder="חיפוש">
         </label>
       </div>
       <div class="scroll sres"><div class="grid" data-results></div><div class="none" data-none>אין תוצאות</div></div>
@@ -153,15 +154,25 @@
       <div class="nbar"><span class="ib" data-back>${IC.back}</span><span class="ntitle">הגדרות הקסם</span></div>
       <div class="scroll set">
         <div class="card how">
-          <b>איך עושים את הקסם</b>
-          1. הצופה זורק שם של מפורסם, ואחר כך מספר בין 1 ל-100.<br>
-          2. לוחצים על 🔍 ומקלידים את השם והמספר, למשל <b>ישי ריבו 82</b> (הסדר לא משנה). על המסך רואים רק את המילה שבחרת למטה.<br>
-          3. לוחצים על הפתק שמופיע (או "חפש" במקלדת), וגוללים יחד עם הצופה למספר שלו.<br>
+          <b>איך עושים את הקסם (בלי שרואים שאתה מקליד)</b>
+          🎤 <b>מיקרופון:</b> פותחים את האפליקציה ומניחים אותה. הצופה אומר בקול שם של מפורסם, ואחר כך מספר - האפליקציה שומעת לבד. רטט קצר = נקלט השם, רטט כפול = נקלט המספר. אחר כך פשוט נכנסים לפתק "${esc(DEF.title)}".<br>
+          ⌨️ <b>הצופה מקליד:</b> "בוא נבדוק אם הוא בפתקים שלי" - הצופה כותב את השם בחיפוש ומקבל "אין תוצאות". השם נקלט.<br>
+          👆 <b>מספר בהקשות:</b> במסך הראשי, על הכותרת הגדולה: כל הקשה בצד ימין = 10, כל הקשה בצד שמאל = 1 (82 = 8 ימין + 2 שמאל). כל הקשה = רטט קטן.<br>
+          👀 <b>לבדוק מה נקלט:</b> לחיצה ארוכה על "כל ההערות" - מתחת לכותרת מופיע לשנייה השם והמספר.<br>
           חוזרים לכאן: ⋮ למעלה ← הגדרות.
         </div>
+        <label class="lbl">🎤 האפליקציה שומעת את הצופה</label>
+        <select class="inp" data-set="mic"><option value="1">דולק</option><option value="0">כבוי</option></select>
+        <div class="hint" data-micstat></div>
+        <label class="lbl">⌨️ מי מקליד בחיפוש</label>
+        <select class="inp" data-set="searchMode"><option value="spectator">הצופה מקליד את השם (רואים מה שהוא כותב, "אין תוצאות")</option><option value="secret">אני מקליד בסתר (רואים רק את המילה למטה)</option></select>
+        <label class="lbl">📳 רטט כשמשהו נקלט</label>
+        <select class="inp" data-set="vibe"><option value="1">דולק</option><option value="0">כבוי</option></select>
+        <label class="lbl">מה הטלפון שמע (אחרון למעלה)</label>
+        <div class="card log" data-log>עוד לא נשמע כלום</div>
         <label class="lbl">שם הפתק</label>
         <input class="inp" data-set="title" maxlength="40" placeholder="${DEF.title}">
-        <label class="lbl">מה רואים בשורת החיפוש כשאתה מקליד</label>
+        <label class="lbl">מה רואים בשורת החיפוש כשאתה מקליד בסתר</label>
         <input class="inp" data-set="decoy" maxlength="20" placeholder="${DEF.decoy}">
         <div class="hint">כדאי מילה מתוך שם הפתק, כדי שהוא יופיע בתוצאות.</div>
         <label class="lbl">לפני כמה ימים "נכתב" הפתק</label>
@@ -220,23 +231,189 @@
     q('[data-grid]').innerHTML = html + (cur !== null ? '</div>' : '');
   }
 
-  // מה שהקוסם מקליד נשאר בשדה נסתר; על המסך מופיעה מילת החיפוש התמימה, אות אחרי אות
-  function renderSearch() {
-    const decoy = (cfg.decoy || '').trim() || DEF.decoy;
-    const vis = decoy.slice(0, Math.min(Array.from(real.value).length, decoy.length));
-    q('[data-decoy]').textContent = vis;
-    q('[data-ph]').style.display = vis ? 'none' : '';
-    const res = vis ? allNotes().filter((n) => n.t.includes(vis)) : [];
-    q('[data-results]').innerHTML = res.map((n) => card(n, vis)).join('');
-    q('[data-none]').style.display = vis && !res.length ? '' : 'none';
+  // ==========================================================================
+  // מה שנקלט מהצופה (מיקרופון / הקלדה בחיפוש / הקשות סודיות)
+  // ==========================================================================
+  const secret = { name: '', num: 0, revealed: false };
+  const heardLog = [];
+
+  function vibe(pattern) {
+    if (!cfg.vibe) return;
+    try {
+      if (window.NotesNative && NotesNative.vibrate) NotesNative.vibrate(String(pattern));
+      else if (navigator.vibrate) navigator.vibrate(String(pattern).split(',').map(Number));
+    } catch (e) {}
+  }
+  function setName(name, src) {
+    name = String(name || '').replace(/\s+/g, ' ').trim();
+    if (!name || name.length < 2) return;
+    if (secret.revealed) { secret.num = 0; secret.revealed = false; } // צופה חדש
+    if (norm(name) === norm(secret.name)) return;
+    secret.name = name;
+    vibe('35');
+    logHeard('✅ שם: ' + name + ' (' + src + ')');
+  }
+  function setNum(num, src) {
+    if (!(num >= 1 && num <= 100)) return;
+    if (secret.revealed) return; // אחרי החשיפה מחכים לשם של הצופה הבא
+    secret.num = num;
+    vibe('35,90,35');
+    logHeard('✅ מספר: ' + num + ' (' + src + ')');
+  }
+  function logHeard(line) {
+    heardLog.unshift(line);
+    heardLog.length = Math.min(heardLog.length, 14);
+    const el = q('[data-log]');
+    if (el) el.innerHTML = heardLog.map((l) => `<div>${esc(l)}</div>`).join('');
   }
 
-  function openNote(fromSearch) {
-    if (fromSearch) {
-      const { name, num } = parseSecret(real.value);
-      inject(name, num);
-      renderList();
+  // ---- מספרים בעברית ("שמונים ושתיים" -> 82). גוגל בדרך כלל מחזיר ספרות, זה גיבוי ----
+  const UNITS = { 'אחת': 1, 'אחד': 1, 'שתיים': 2, 'שתים': 2, 'שניים': 2, 'שנים': 2, 'שתי': 2, 'שני': 2, 'שלוש': 3, 'שלושה': 3, 'ארבע': 4, 'ארבעה': 4,
+    'חמש': 5, 'חמישה': 5, 'שש': 6, 'שישה': 6, 'שבע': 7, 'שבעה': 7, 'שמונה': 8, 'תשע': 9, 'תשעה': 9 };
+  const TENS = { 'עשרים': 20, 'שלושים': 30, 'ארבעים': 40, 'חמישים': 50, 'שישים': 60, 'שבעים': 70, 'שמונים': 80, 'תשעים': 90 };
+  function numbersIn(text) {
+    const out = [];
+    (String(text).match(/\d+/g) || []).forEach((d) => out.push(Number(d)));
+    const w = String(text).replace(/[.,!?]/g, ' ').split(/\s+/).filter(Boolean).map((x) => (x.length > 2 && x[0] === 'ו' ? x.slice(1) : x));
+    for (let i = 0; i < w.length; i++) {
+      const x = w[i];
+      if (x === 'מאה') { out.push(100); continue; }
+      if (x === 'עשר' || x === 'עשרה') { out.push(10); continue; }
+      if (TENS[x]) {
+        const u = UNITS[w[i + 1]];
+        if (u) { out.push(TENS[x] + u); i++; } else out.push(TENS[x]);
+        continue;
+      }
+      if (UNITS[x]) {
+        if (w[i + 1] === 'עשר' || w[i + 1] === 'עשרה') { out.push(10 + UNITS[x]); i++; } else out.push(UNITS[x]);
+      }
     }
+    return out;
+  }
+  // מילים שהקוסם אומר ("תזרוק שם של מפורסם", "תבחר מספר") - משפט עם מילה כזו לא נחשב לשם
+  const STOP = ['מספר', 'מפורסם', 'מפורסמת', 'זרוק', 'תזרוק', 'תזרקי', 'תגיד', 'תגידי', 'תבחר', 'תבחרי', 'בחר', 'שם', 'בין', 'בוא', 'בואו', 'אוקיי', 'אוקי',
+    'יפה', 'טוב', 'עכשיו', 'פתק', 'פתקים', 'אפליקציה', 'תראה', 'תראי', 'נראה', 'כן', 'לא', 'רגע', 'סבבה', 'מה', 'אני', 'אתה', 'את', 'יש', 'לי', 'לך',
+    'של', 'זה', 'בסדר', 'מגניב', 'אחלה', 'וואו', 'מאמין', 'תחשוב', 'תחשבי', 'מישהו', 'מישהי', 'בבקשה', 'תודה', 'שלום', 'נגיד', 'סתם', 'אולי'];
+  const STOP_RE = new RegExp('(^|\\s)[והלבש]?(' + STOP.join('|') + ')(?=\\s|$)');
+  const hasStop = (s) => STOP_RE.test(' ' + s + ' ');
+
+  window.onNotesHeard = function (text, isFinal) {
+    if (!isFinal) return;
+    const t = String(text || '').trim();
+    if (!t) return;
+    logHeard('🎤 ' + t);
+    const nums = numbersIn(t).filter((n) => n >= 1 && n <= 100);
+    const words = t.split(/\s+/).filter(Boolean);
+    // "בין 1 ל-100" (שני מספרים) = הקוסם מסביר -> מתעלמים
+    if (nums.length === 1 && words.length <= 5) {
+      const rest = t.replace(/\d+/g, ' ').replace(/\s+/g, ' ').trim();
+      const restWords = rest.split(' ').filter(Boolean);
+      if (rest && numbersIn(rest).length === 0 && restWords.length <= 3 && !hasStop(rest)) setName(rest, 'מיקרופון');
+      setNum(nums[0], 'מיקרופון');
+      return;
+    }
+    if (nums.length === 0 && words.length <= 4 && !hasStop(t)) setName(t, 'מיקרופון');
+  };
+  window.onNotesMic = function (msg) {
+    const el = q('[data-micstat]');
+    if (msg === 'ok') { if (el) el.textContent = '🎤 המיקרופון מקשיב'; return; }
+    if (String(msg).startsWith('err:')) {
+      if (el) el.textContent = '⚠️ ' + String(msg).slice(4);
+      logHeard('⚠️ ' + String(msg).slice(4));
+    }
+  };
+
+  // ---- הקשבה: באפליקציה (APK) דרך אנדרואיד, בדפדפן Chrome דרך זיהוי הדיבור של הדפדפן ----
+  let webRec = null;
+  function applyMic() {
+    const on = Boolean(cfg.mic);
+    if (window.NotesNative && NotesNative.listen) { try { NotesNative.listen(on); } catch (e) {} return; }
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR || location.protocol === 'file:') return;
+    if (!on) {
+      if (webRec) { const r = webRec; webRec = null; try { r.stop(); } catch (e) {} }
+      return;
+    }
+    if (webRec) return;
+    webRec = new SR();
+    webRec.lang = 'he-IL';
+    webRec.continuous = true;
+    webRec.interimResults = false;
+    webRec.onresult = (ev) => {
+      for (let i = ev.resultIndex; i < ev.results.length; i++) if (ev.results[i].isFinal) window.onNotesHeard(ev.results[i][0].transcript, true);
+    };
+    webRec.onstart = () => window.onNotesMic('ok');
+    webRec.onerror = (ev) => { if (ev.error === 'not-allowed') window.onNotesMic('err:אין הרשאת מיקרופון'); };
+    webRec.onend = () => { setTimeout(() => { try { if (webRec) webRec.start(); } catch (e) {} }, 300); };
+    try { webRec.start(); } catch (e) {}
+  }
+
+  // ---- מספר בהקשות על הכותרת הגדולה: צד ימין = 10, צד שמאל = 1 ----
+  let tapTens = 0, tapUnits = 0, tapLast = 0, tapTimer = null;
+  q('[data-hero]').addEventListener('click', (e) => {
+    const now = Date.now();
+    if (now - tapLast > 4000) { tapTens = 0; tapUnits = 0; }
+    tapLast = now;
+    const r = e.currentTarget.getBoundingClientRect();
+    if (e.clientX > r.left + r.width / 2) tapTens++; else tapUnits++;
+    const n = Math.min(100, tapTens * 10 + tapUnits);
+    secret.num = n;
+    secret.revealed = false;
+    vibe('12');
+    clearTimeout(tapTimer);
+    tapTimer = setTimeout(() => logHeard('✅ מספר: ' + secret.num + ' (הקשות)'), 4100);
+  });
+
+  // ---- הצצה סודית: לחיצה ארוכה על "כל ההערות" מראה לשנייה מה נקלט ----
+  (function () {
+    const h = q('[data-peek]');
+    let t = null;
+    const cancel = () => clearTimeout(t);
+    h.addEventListener('pointerdown', () => {
+      cancel();
+      t = setTimeout(() => {
+        const c = q('[data-count]');
+        const orig = c.textContent;
+        c.textContent = `${secret.name || '—'} · ${secret.num || '—'}`;
+        vibe('20');
+        setTimeout(() => { c.textContent = orig; }, 1600);
+      }, 700);
+    });
+    ['pointerup', 'pointerleave', 'pointercancel'].forEach((ev) => h.addEventListener(ev, cancel));
+  })();
+
+  // ==========================================================================
+  // חיפוש
+  // ==========================================================================
+  function renderSearch() {
+    const spect = cfg.searchMode !== 'secret';
+    app.classList.toggle('spect', spect);
+    let vis;
+    if (spect) {
+      vis = real.value.trim(); // הצופה רואה בדיוק מה שהוא כותב
+    } else {
+      // מה שהקוסם מקליד נשאר בשדה נסתר; על המסך מופיעה מילת החיפוש התמימה, אות אחרי אות
+      const decoy = (cfg.decoy || '').trim() || DEF.decoy;
+      vis = decoy.slice(0, Math.min(Array.from(real.value).length, decoy.length));
+      q('[data-decoy]').textContent = vis;
+    }
+    q('[data-ph]').style.display = real.value ? 'none' : '';
+    const res = vis ? allNotes().filter((n) => n.t.includes(vis) || (spect && !n.trick && n.body.includes(vis))) : [];
+    q('[data-results]').innerHTML = res.map((n) => card(n, n.t.includes(vis) ? vis : '')).join('');
+    q('[data-none]').style.display = vis && !res.length ? '' : 'none';
+  }
+  function takeSearch() {
+    const { name, num } = parseSecret(real.value);
+    if (name) setName(name, cfg.searchMode === 'secret' ? 'הקלדה סודית' : 'הצופה הקליד');
+    if (num) setNum(num, 'הקלדה');
+  }
+
+  function openNote() {
+    if (secret.name && secret.num) {
+      inject(secret.name, secret.num);
+      secret.revealed = true;
+    }
+    renderList();
     const n = trickNote();
     q('[data-ntitle]').textContent = n.t;
     q('[data-nbody]').innerHTML = shown.map((nm, i) => `<div class="ln"><span class="num">${i + 1}</span><span>${esc(nm)}</span></div>`).join('');
@@ -244,11 +421,19 @@
     q('.nscroll').scrollTop = 0;
   }
 
+  // ==========================================================================
+  // הגדרות
+  // ==========================================================================
   function openSettings() {
     app.querySelectorAll('[data-set]').forEach((el) => {
       const k = el.dataset.set;
-      el.value = k === 'names' ? buildNames(cfg.names).join('\n') : (k === 'ageDays' ? cfg.ageDays : (cfg[k] || ''));
+      if (k === 'names') el.value = buildNames(cfg.names).join('\n');
+      else if (k === 'mic' || k === 'vibe') el.value = cfg[k] ? '1' : '0';
+      else el.value = cfg[k] == null ? '' : cfg[k];
     });
+    const ms = q('[data-micstat]');
+    if (!cfg.mic) ms.textContent = '';
+    else if (!window.NotesNative && !(window.SpeechRecognition || window.webkitSpeechRecognition)) ms.textContent = 'המיקרופון עובד רק באפליקציה המותקנת';
     countNames();
     go('settings');
   }
@@ -281,19 +466,29 @@
       countNames();
       return;
     }
-    if (t.closest('[data-open]')) return openNote(stack[stack.length - 1] === 'search');
+    if (t.closest('[data-open]')) {
+      if (stack[stack.length - 1] === 'search') takeSearch();
+      return openNote();
+    }
     q('[data-menu]').classList.remove('open');
   });
 
   real.addEventListener('input', renderSearch);
   real.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') { e.preventDefault(); openNote(true); }
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    takeSearch();
+    if (cfg.searchMode === 'secret') openNote();
+    else real.blur(); // הצופה לחץ "חפש": נשארים ב"אין תוצאות"
   });
   real.addEventListener('focus', () => app.classList.add('typing'));
-  real.addEventListener('blur', () => app.classList.remove('typing'));
+  real.addEventListener('blur', () => {
+    app.classList.remove('typing');
+    if (cfg.searchMode !== 'secret' && real.value.trim()) takeSearch();
+  });
 
   app.querySelectorAll('[data-set]').forEach((el) => {
-    el.addEventListener('input', () => {
+    const onChange = () => {
       const k = el.dataset.set;
       if (k === 'names') {
         const lines = el.value.split('\n').map((l) => l.trim()).filter(Boolean).slice(0, 100).join('\n');
@@ -301,11 +496,16 @@
         countNames();
       } else if (k === 'ageDays') {
         cfg.ageDays = Math.max(1, Math.min(400, Number(el.value) || DEF.ageDays));
+      } else if (k === 'mic' || k === 'vibe') {
+        cfg[k] = el.value === '1';
+        if (k === 'mic') applyMic();
       } else {
         cfg[k] = el.value;
       }
       save();
-    });
+    };
+    el.addEventListener('input', onChange);
+    el.addEventListener('change', onChange);
   });
 
   // כפתור "חזרה" של הטלפון: חוזרים מסך אחד אחורה, כמו באפליקציה אמיתית
@@ -322,5 +522,5 @@
   window.NotesBack = back; // לעטיפת האנדרואיד
 
   renderList();
-  if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
+  applyMic();
 })();

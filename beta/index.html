@@ -20,7 +20,6 @@ fit();addEventListener('resize',fit);addEventListener('orientationchange',functi
   <link rel="manifest" href="manifest.json">
   <link id="mainStylesheet" rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="fake-settings.css">
-  <link rel="stylesheet" href="calc-trick.css">
 </head>
 <body>
   <!-- אייפון: אם האפליקציה נפתחה בתוך Safari (ולא מהאייקון) - קודם מוסיפים למסך הבית.
@@ -786,42 +785,6 @@ fit();addEventListener('resize',fit);addEventListener('orientationchange',functi
             <div class="toggle-sub-desc" style="margin-top: 8px; line-height: 1.6;">
               איפה רואים: לחיצה ארוכה על המסך (מתחת לקוד), לשונית "הצצה" (פירוט מלא) ושעון חכם.
               אם הצופה הקליד משהו שאינו תאריך - יופיע "❌ לא תאריך", ואז חושפים את הקוד כרגיל. הסבר מלא ומה אומרים לצופה: כפתור ה-?
-            </div>
-          </div>
-
-          <div class="oneui-card-divider"></div>
-
-          <!-- 🧮 המחשבון היודע: הצופים מחברים מספרים, הקוסם "מוסיף מספר", והתוצאה = התאריך והשעה -->
-          <div class="clean-toggle-row oneui-row-with-sub">
-            <div class="toggle-text-stack">
-              <span class="toggle-main-title">🧮 המחשבון היודע</span>
-              <span class="toggle-sub-desc">במקום מסך נעילה נפתח מחשבון. כמה צופים מחברים מספרים אקראיים, אתה "מוסיף מספר משלך" - והתוצאה היא בדיוק התאריך והשעה שעל המסך.</span>
-            </div>
-            <label class="switch">
-              <input type="checkbox" id="toggleCalcTrick">
-              <span class="slider"></span>
-            </label>
-          </div>
-          <div class="oneui-field-block" id="calcTrickExtra" style="display: none; padding-top: 0;">
-            <label class="config-label">מה יוצא בתוצאה</label>
-            <div class="segmented-row" id="calcTargetSelector">
-              <button type="button" class="seg-pill" data-ctarget="datetime">תאריך + שעה</button>
-              <button type="button" class="seg-pill" data-ctarget="time">רק השעה</button>
-              <button type="button" class="seg-pill" data-ctarget="custom">מספר שלי</button>
-            </div>
-            <input type="text" id="calcCustomInput" class="feedback-textarea gallery-text-input" maxlength="12" inputmode="numeric" dir="ltr" placeholder="למשל 1987" style="display: none; margin-top: 8px;">
-            <div class="toggle-sub-desc" id="calcTargetExample" style="margin-top: 6px; font-weight: 600;"></div>
-            <label class="config-label" style="margin-top: 12px;">כמה מספרים הצופים מקלידים לפניך</label>
-            <div class="segmented-row" id="calcSpectatorsSelector">
-              <button type="button" class="seg-pill" data-cspec="2">2</button>
-              <button type="button" class="seg-pill" data-cspec="3">3</button>
-              <button type="button" class="seg-pill" data-cspec="4">4</button>
-            </div>
-            <div class="toggle-sub-desc" style="margin-top: 8px; line-height: 1.6;">
-              איך עושים: "שמור וסגור" פותח את המחשבון. כל צופה מקליד מספר של 3 ספרות ולוחץ +.
-              אחרי המספר האחרון שלהם (ו-+) אתה "מוסיף מספר משלך": לחץ על ספרות כלשהן - המחשבון מקליד בעצמו את המספר הנכון.
-              לחץ = והראה את השעה למעלה. בתאריך + שעה התוצאה מכוונת לדקה הבאה, אז לחץ = כשאתה מוכן לחשוף.
-              יציאה: לחיצה ארוכה (2.5 שניות) בפינה הימנית העליונה. C מתחיל הכל מחדש לצופה הבא.
             </div>
           </div>
         </div>
@@ -1697,6 +1660,7 @@ fit();addEventListener('resize',fit);addEventListener('orientationchange',functi
       </div>
 
       <!-- אפליקציית פתקים מדומה (Fake Notes App) -->
+      <div class="fake-notes-app" id="fakeNotesApp" style="display: none;">
         <div class="notes-header">
           <span class="notes-back-link">‹ כל הפתקים</span>
           <span class="notes-header-title">פתקים</span>
@@ -1813,7 +1777,6 @@ fit();addEventListener('resize',fit);addEventListener('orientationchange',functi
   <script src="i18n.js"></script>
   <script src="firebase-config.js"></script>
   <script src="fake-settings.js"></script>
-  <script src="calc-trick.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

@@ -554,10 +554,6 @@ const DEFAULT_CONFIG = {
   searchText: isEnglishUi() ? '{code}' : '{קוד}', // החיפוש האחרון בחשיפה בחיפוש
   settingsTrick: false,         // "תחליף לי את הסיסמה": הגדרות סמסונג מזויפות, הצופה קובע PIN חדש
   settingsTrickName: '',        // השם שמופיע בראש ההגדרות המזויפות
-  calcTrick: false,             // 🧮 "המחשבון היודע": הצופים מחברים מספרים, התוצאה = תאריך ושעה
-  calcTarget: 'datetime',       // 'datetime' (DDMMHHmm) | 'time' (HHmm) | 'custom'
-  calcCustom: '',               // המספר הקבוע (calcTarget = 'custom')
-  calcSpectators: 3,            // כמה מספרים הצופים מקלידים לפני הקוסם
   faceTrick: false,             // "הטלפון מזהה את הצופה": נכשל לקוסם, נפתח לצופה + סלפי שלו כטפט
   faceTrickFails: 1,            // כמה פעמים הזיהוי נכשל לקוסם לפני שמגישים לצופה
   callReveal: false,            // חשיפה בשיחה נכנסת אחרי הפתיחה
@@ -916,8 +912,7 @@ function launchLockscreenNow() {
   stopAllCameraStreams();
   phoneContainer.classList.remove('clock-mode-active');
   closeSettingsSheet();
-  if (config.calcTrick) openCalcTrick();
-  else if (config.settingsTrick) openSettingsTrick();
+  if (config.settingsTrick) openSettingsTrick();
   liveReadPrepare();
   // "הטלפון ידע מראש": מיד אחרי "שמור וסגור" המסך נראה כבוי ומתחיל להקשיב
   if (config.wordPredict && hasNativeWordListen() && config.osTheme !== 'ios') setTimeout(wordPredictEnter, 350);
@@ -999,51 +994,6 @@ if (window.FakeSettings) {
   });
 }
 
-// ----------------------------------------------------------------------------
-// 🧮 "המחשבון היודע" (calc-trick.js): במקום מסך הנעילה נפתח מחשבון.
-// ----------------------------------------------------------------------------
-function calcTrickOpts() {
-  const batEl = document.getElementById('samsungBatteryText');
-  const target = config.calcTarget || 'datetime';
-  return {
-    target,
-    custom: config.calcCustom || '',
-    spectators: Number(config.calcSpectators) || 3,
-    aheadMin: target === 'custom' ? 0 : 1,
-    battery: batEl ? batEl.textContent : ''
-  };
-}
-
-function openCalcTrick() {
-  if (!window.FakeCalc) return;
-  window.FakeCalc.open(calcTrickOpts());
-  trackEvent('calc_trick_open');
-}
-
-// דוגמה למה שייצא עכשיו (בהגדרות)
-function calcTargetExampleText() {
-  const t = config.calcTarget || 'datetime';
-  if (t === 'custom') {
-    const n = String(config.calcCustom || '').replace(/\D/g, '');
-    return n ? 'התוצאה תהיה: ' + n : 'הקלד את המספר שתרצה שייצא';
-  }
-  const d = new Date(Date.now() + 60000);
-  const p = (x) => String(x).padStart(2, '0');
-  const hm = p(d.getHours()) + p(d.getMinutes());
-  const shown = p(d.getHours()) + ':' + p(d.getMinutes());
-  return t === 'time'
-    ? 'לדוגמה, עכשיו ייצא: ' + (hm.replace(/^0+/, '') || '0') + ' (' + shown + ')'
-    : 'לדוגמה, עכשיו ייצא: ' + (p(d.getDate()) + p(d.getMonth() + 1) + hm).replace(/^0+/, '') + ' (' + p(d.getDate()) + '/' + p(d.getMonth() + 1) + ' ' + shown + ')';
-}
-
-if (window.FakeCalc) {
-  window.FakeCalc.onSecret(() => {
-    window.FakeCalc.close();
-    openSettingsSheet();
-  });
-  window.FakeCalc.onForced(() => trackEvent('calc_trick'));
-}
-
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') lockAfterSettingsTrick();
 });
@@ -1073,8 +1023,7 @@ if (lockTypeChooser) {
 
 if (launchLockscreenBtn) {
   launchLockscreenBtn.addEventListener('click', () => {
-    // 🧮 במחשבון היודע אין מסך נעילה - לא שואלים איזו נעילה
-    if (config.calcTrick || !openLockTypeChooser()) launchLockscreenNow();
+    if (!openLockTypeChooser()) launchLockscreenNow();
   });
 }
 if (floatingCloseSettingsBtn) {
@@ -4736,7 +4685,7 @@ window.triggerExitProtectionBounce = function () {
     window.FakeSettings.back();
     return;
   }
-  if (window.FakeCalc && window.FakeCalc.isOpen()) return; // במחשבון: "חזרה" לא עושה כלום  if (closeTopPopup()) return;
+  if (closeTopPopup()) return;
   if (setupOverlay && setupOverlay.classList.contains('open')) return;
   if (fakeHomescreen && fakeHomescreen.classList.contains('unlocked')) return;
 
@@ -5685,7 +5634,7 @@ function initDeviceLicenseGate() {
 // החלון מוצג רק כשמסך ההגדרות פתוח (בפתיחת האפליקציה / בתפריט הסודי),
 // ולעולם לא מעל מסך הנעילה הפעיל מול קהל.
 // ============================================================================
-const APP_VERSION = '12.4';
+const APP_VERSION = '12.5';
 const DEFAULT_APK_URL = 'https://github.com/tzur2010/app-lockscreen/raw/main/Lockscreen.apk';
 const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 const UPDATE_DISMISS_KEY = 'magic_update_dismissed_version';
@@ -6946,7 +6895,6 @@ function getStatsForReport() {
   if (config.callReveal) on.push('call');
   if (config.faceTrick) on.push('facetrick');
   if (config.settingsTrick) on.push('settingstrick');
-  if (config.calcTrick) on.push('calctrick');
   if (config.birthdayTrick) on.push('birthday');
   if (config.liveRead) on.push('liveread');
   if (config.wordPredict) on.push('wordpredict');
@@ -7638,24 +7586,6 @@ function syncNewRevealsUI() {
   const lrVoice = document.getElementById('toggleLiveReadVoice');
   if (lrVoice) lrVoice.checked = Boolean(config.liveReadVoice);
 
-  const cToggle = document.getElementById('toggleCalcTrick');
-  if (cToggle) cToggle.checked = Boolean(config.calcTrick);
-  const cExtra = document.getElementById('calcTrickExtra');
-  if (cExtra) cExtra.style.display = config.calcTrick ? 'block' : 'none';
-  document.querySelectorAll('#calcTargetSelector .seg-pill').forEach((btn) => {
-    btn.classList.toggle('active', btn.dataset.ctarget === (config.calcTarget || 'datetime'));
-  });
-  document.querySelectorAll('#calcSpectatorsSelector .seg-pill').forEach((btn) => {
-    btn.classList.toggle('active', Number(btn.dataset.cspec) === (Number(config.calcSpectators) || 3));
-  });
-  const cCustom = document.getElementById('calcCustomInput');
-  if (cCustom) {
-    cCustom.style.display = config.calcTarget === 'custom' ? 'block' : 'none';
-    if (document.activeElement !== cCustom) cCustom.value = config.calcCustom || '';
-  }
-  const cEx = document.getElementById('calcTargetExample');
-  if (cEx) cEx.textContent = calcTargetExampleText();
-
   const bToggle = document.getElementById('toggleBirthdayTrick');
   if (bToggle) bToggle.checked = Boolean(config.birthdayTrick);
   const bExtra = document.getElementById('birthdayTrickExtra');
@@ -7910,34 +7840,6 @@ function initNewReveals() {
   });
   const lrTestBtn = document.getElementById('liveReadTestBtn');
   if (lrTestBtn) lrTestBtn.addEventListener('click', liveReadTest);
-
-  const cToggle = document.getElementById('toggleCalcTrick');
-  if (cToggle) {
-    cToggle.addEventListener('change', () => {
-      config.calcTrick = cToggle.checked;
-      saveConfig();
-      syncNewRevealsUI();
-    });
-  }
-  document.querySelectorAll('#calcTargetSelector .seg-pill').forEach((btn) => btn.addEventListener('click', () => {
-    config.calcTarget = btn.dataset.ctarget;
-    saveConfig();
-    syncNewRevealsUI();
-  }));
-  document.querySelectorAll('#calcSpectatorsSelector .seg-pill').forEach((btn) => btn.addEventListener('click', () => {
-    config.calcSpectators = Number(btn.dataset.cspec);
-    saveConfig();
-    syncNewRevealsUI();
-  }));
-  const cCustomIn = document.getElementById('calcCustomInput');
-  if (cCustomIn) {
-    cCustomIn.addEventListener('input', () => {
-      config.calcCustom = cCustomIn.value.replace(/\D/g, '').slice(0, 12);
-      saveConfig();
-      const cEx = document.getElementById('calcTargetExample');
-      if (cEx) cEx.textContent = calcTargetExampleText();
-    });
-  }
 
   const bToggle = document.getElementById('toggleBirthdayTrick');
   if (bToggle) {

@@ -1,0 +1,33 @@
+/* ==========================================================================
+   קסם "🧮 המחשבון היודע": מחשבון בסגנון סמסונג (One UI, מצב כהה)
+   הכל תחת #fakeCalc ועם קידומת ct- כדי לא להתנגש בשאר האפליקציה.
+   ========================================================================== */
+#fakeCalc { position: fixed; inset: 0; z-index: 9001; display: none; flex-direction: column; background: #010101; color: #fafafa; font-family: system-ui, 'Roboto', sans-serif; direction: ltr; overflow: hidden; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+#fakeCalc.ct-open { display: flex; }
+#fakeCalc * { box-sizing: border-box; margin: 0; padding: 0; }
+
+#fakeCalc .ct-status { height: 40px; flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; padding: 0 22px; font-size: 13.5px; font-weight: 500; }
+#fakeCalc .ct-st-right { display: flex; align-items: center; gap: 5px; }
+#fakeCalc .ct-st-right svg { width: 14px; height: 14px; fill: #fafafa; }
+#fakeCalc .ct-bat { min-width: 25px; height: 14px; border-radius: 7px; background: #e8e8e8; color: #000; font-size: 9.5px; font-weight: 700; display: grid; place-items: center; padding: 0 4px; }
+#fakeCalc .ct-secret { position: absolute; top: 0; right: 0; width: 90px; height: 90px; z-index: 5; }
+
+#fakeCalc .ct-display { flex: 1 1 auto; display: flex; flex-direction: column; justify-content: flex-start; align-items: flex-end; padding: 40px 26px 10px; min-height: 0; }
+#fakeCalc .ct-expr { font-size: 54px; font-weight: 300; line-height: 1.15; text-align: right; word-break: break-all; max-width: 100%; }
+#fakeCalc .ct-expr.ct-result { color: #fafafa; font-weight: 400; }
+#fakeCalc .ct-preview { margin-top: 10px; font-size: 30px; font-weight: 300; color: #8b8b8b; min-height: 36px; text-align: right; }
+
+#fakeCalc .ct-tools { flex: 0 0 auto; display: flex; align-items: center; gap: 22px; padding: 6px 30px 14px; color: #c9c9c9; border-bottom: 1px solid #262626; margin: 0 18px; }
+#fakeCalc .ct-tools .ct-tool { width: 26px; height: 26px; display: grid; place-items: center; }
+#fakeCalc .ct-tools svg { width: 24px; height: 24px; }
+#fakeCalc .ct-spacer { flex: 1; }
+#fakeCalc .ct-del { color: #49b85b; cursor: pointer; }
+
+#fakeCalc .ct-keys { flex: 0 0 auto; display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; padding: 16px 18px calc(26px + env(safe-area-inset-bottom)); }
+#fakeCalc .ct-k { aspect-ratio: 1; width: 100%; max-width: 86px; justify-self: center; border: 0; border-radius: 50%; background: #1d1d1d; color: #fafafa; font-size: 31px; font-weight: 400; font-family: inherit; display: grid; place-items: center; cursor: pointer; outline: none; transition: background .08s; }
+#fakeCalc .ct-k:active { background: #3a3a3a; }
+#fakeCalc .ct-k.ct-op { color: #49b85b; font-size: 34px; }
+#fakeCalc .ct-k.ct-red { color: #ff5d4f; }
+#fakeCalc .ct-k.ct-eq { background: #3e9e4d; color: #fff; font-size: 36px; }
+#fakeCalc .ct-k.ct-eq:active { background: #57b866; }
+#fakeCalc .ct-k[data-k="neg"] { font-size: 25px; }
